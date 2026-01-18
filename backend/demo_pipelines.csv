@@ -1,0 +1,4 @@
+id,name,start_station_id,end_station_id,diameter,length,category,status
+demo-line-001,京津线,demo-001,demo-002,813,120,京津线,normal
+demo-line-002,津石线,demo-002,demo-003,660,280,津石线,normal
+demo-line-003,石保线,demo-003,demo-004,508,95,石保线,normal

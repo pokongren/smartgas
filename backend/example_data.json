@@ -1,0 +1,91 @@
+{
+    "stations": [
+        {
+            "id": "custom-001",
+            "name": "成都气源站",
+            "type": "source",
+            "longitude": 104.06,
+            "latitude": 30.67,
+            "design_pressure": 10.0,
+            "status": "normal"
+        },
+        {
+            "id": "custom-002",
+            "name": "重庆压气站",
+            "type": "compressor",
+            "longitude": 106.55,
+            "latitude": 29.56,
+            "design_pressure": 8.5,
+            "status": "normal"
+        },
+        {
+            "id": "custom-003",
+            "name": "武汉分输站",
+            "type": "distribution",
+            "longitude": 114.31,
+            "latitude": 30.52,
+            "design_pressure": 6.0,
+            "status": "normal"
+        },
+        {
+            "id": "custom-004",
+            "name": "长沙分输站",
+            "type": "distribution",
+            "longitude": 112.94,
+            "latitude": 28.23,
+            "design_pressure": 6.0,
+            "status": "normal"
+        },
+        {
+            "id": "custom-005",
+            "name": "南昌分输站",
+            "type": "distribution",
+            "longitude": 115.86,
+            "latitude": 28.68,
+            "design_pressure": 5.5,
+            "status": "normal"
+        }
+    ],
+    "pipelines": [
+        {
+            "id": "custom-line-001",
+            "name": "成渝干线",
+            "start_station_id": "custom-001",
+            "end_station_id": "custom-002",
+            "diameter": 1016,
+            "length": 320,
+            "category": "成渝线",
+            "status": "normal"
+        },
+        {
+            "id": "custom-line-002",
+            "name": "渝汉支线",
+            "start_station_id": "custom-002",
+            "end_station_id": "custom-003",
+            "diameter": 813,
+            "length": 680,
+            "category": "渝汉线",
+            "status": "normal"
+        },
+        {
+            "id": "custom-line-003",
+            "name": "渝长支线",
+            "start_station_id": "custom-002",
+            "end_station_id": "custom-004",
+            "diameter": 660,
+            "length": 520,
+            "category": "渝长线",
+            "status": "normal"
+        },
+        {
+            "id": "custom-line-004",
+            "name": "长昌支线",
+            "start_station_id": "custom-004",
+            "end_station_id": "custom-005",
+            "diameter": 508,
+            "length": 380,
+            "category": "长昌线",
+            "status": "normal"
+        }
+    ]
+}

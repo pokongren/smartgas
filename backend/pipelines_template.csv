@@ -1,0 +1,2 @@
+id,name,start_station_id,end_station_id,diameter,length,category,status
+line-001,示例管线,node-001,node-002,1016,580,中贵线,normal

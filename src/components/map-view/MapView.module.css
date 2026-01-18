@@ -1,0 +1,62 @@
+/* 地图容器样式 */
+.mapContainer {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    background-color: #f0f0f0;
+    border-radius: 8px;
+}
+
+/* 地图加载提示 */
+.mapLoading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    color: #666;
+}
+
+/* 地图控制按钮容器 */
+.mapControls {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 10;
+}
+
+/* 控制按钮 */
+.controlButton {
+    width: 32px;
+    height: 32px;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.controlButton:hover {
+    background-color: #f5f5f5;
+    border-color: #999;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+    .mapControls {
+        top: 8px;
+        right: 8px;
+    }
+
+    .controlButton {
+        width: 28px;
+        height: 28px;
+    }
+}

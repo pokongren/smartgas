@@ -1,0 +1,25 @@
+{
+  "stations": [
+    {
+      "id": "node-001",
+      "name": "示例站场",
+      "type": "compressor",
+      "longitude": 106.71,
+      "latitude": 26.57,
+      "design_pressure": 8.5,
+      "status": "normal"
+    }
+  ],
+  "pipelines": [
+    {
+      "id": "line-001",
+      "name": "示例管线",
+      "start_station_id": "node-001",
+      "end_station_id": "node-002",
+      "diameter": 1016,
+      "length": 580.0,
+      "category": "中贵线",
+      "status": "normal"
+    }
+  ]
+}

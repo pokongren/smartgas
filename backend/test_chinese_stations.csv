@@ -1,0 +1,6 @@
+编号,站场名称,站场类型,经度,纬度,设计压力,状态
+S001,北京分输站,distribution,116.40,39.90,6.0,normal
+S002,天津压气站,compressor,117.20,39.13,8.5,normal
+S003,石家庄分输站,distribution,114.48,38.03,5.5,normal
+S004,太原分输站,distribution,112.55,37.87,6.0,maintenance
+S005,呼和浩特气源站,source,111.75,40.84,10.0,normal

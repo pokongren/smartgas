@@ -1,0 +1,364 @@
+/* MapDemo 深色主题样式 */
+
+.map-demo-container {
+    width: 100vw;
+    height: 100vh;
+    background-color: #0a1929;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 顶部标题栏 */
+.map-demo-header {
+    background: linear-gradient(135deg, #1a2332 0%, #0f1621 100%);
+    border-bottom: 2px solid #2d3748;
+    padding: 16px 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.map-demo-title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #00d4ff;
+    text-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+    letter-spacing: 1px;
+}
+
+/* 主内容区域 */
+.map-demo-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* 左侧控制面板 */
+.control-panel {
+    width: 240px;
+    background-color: #1a2332;
+    border-right: 1px solid #2d3748;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* 自定义滚动条 */
+.control-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.control-panel::-webkit-scrollbar-track {
+    background: #0a1929;
+}
+
+.control-panel::-webkit-scrollbar-thumb {
+    background: #2d3748;
+    border-radius: 3px;
+}
+
+.control-panel::-webkit-scrollbar-thumb:hover {
+    background: #4a5568;
+}
+
+/* 搜索容器 */
+.search-container {
+    position: relative;
+    padding: 12px 16px;
+    border-bottom: 1px solid #2d3748;
+}
+
+.search-input {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: #0f1621;
+    border: 1px solid #2d3748;
+    border-radius: 6px;
+    color: #e5e7eb;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.search-input::placeholder {
+    color: #6b7280;
+}
+
+.search-input:focus {
+    border-color: #00d4ff;
+    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.1);
+}
+
+/* 搜索结果下拉框 */
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 16px;
+    right: 16px;
+    margin-top: 4px;
+    background-color: #1a2332;
+    border: 1px solid #00d4ff;
+    border-radius: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.search-result-item {
+    padding: 10px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    border-bottom: 1px solid rgba(45, 55, 72, 0.5);
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover {
+    background-color: #2d3748;
+}
+
+.result-name {
+    color: #e5e7eb;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.result-type {
+    color: #9ca3af;
+    font-size: 11px;
+    background: rgba(0, 212, 255, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+
+/* 分类项 */
+.category-item {
+    border-bottom: 1px solid #2d3748;
+}
+
+.category-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background-color: #1a2332;
+    transition: background-color 0.2s;
+}
+
+.category-header:hover {
+    background-color: #1f2937;
+}
+
+/* 展开按钮 */
+.category-toggle {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 0;
+    margin-right: 8px;
+    font-size: 12px;
+    transition: transform 0.2s;
+}
+
+.expand-icon {
+    display: inline-block;
+    transition: transform 0.2s;
+}
+
+.expand-icon.expanded {
+    transform: rotate(180deg);
+}
+
+/* 分类标签 */
+.category-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.category-checkbox {
+    margin-right: 8px;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.category-color-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    margin-right: 8px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.category-name {
+    flex: 1;
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.category-count {
+    color: #9ca3af;
+    font-size: 12px;
+    margin-left: 4px;
+}
+
+/* 展开内容区域 */
+.category-content {
+    background-color: #0f1621;
+    padding: 8px 16px 8px 48px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+    }
+
+    to {
+        opacity: 1;
+        max-height: 500px;
+    }
+}
+
+/* 管线项 */
+.line-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    margin: 2px 0;
+    background-color: #1a2332;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.line-item:hover {
+    background-color: #2d3748;
+}
+
+.line-name {
+    flex: 1;
+    color: #d1d5db;
+    font-size: 12px;
+}
+
+.line-length {
+    color: #9ca3af;
+    font-size: 11px;
+    margin-left: 8px;
+}
+
+/* 地图容器 */
+.map-container {
+    flex: 1;
+    position: relative;
+    background-color: #0a1929;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .control-panel {
+        width: 200px;
+    }
+
+    .map-demo-title {
+        font-size: 18px;
+    }
+
+    .category-name {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .control-panel {
+        position: absolute;
+        left: -240px;
+        z-index: 1000;
+        transition: left 0.3s;
+    }
+
+    .control-panel.open {
+        left: 0;
+    }
+}
+
+/* 自定义 InfoWindow 样式 */
+.custom-infowindow {
+    background: rgba(26, 35, 50, 0.95);
+    border: 1px solid #00d4ff;
+    border-radius: 8px;
+    padding: 16px;
+    color: #fff;
+    min-width: 220px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.infowindow-header {
+    border-bottom: 1px solid rgba(0, 212, 255, 0.3);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.infowindow-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #00d4ff;
+}
+
+.infowindow-type {
+    font-size: 11px;
+    background: rgba(0, 212, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.infowindow-body {
+    font-size: 13px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.info-label {
+    color: #9ca3af;
+}
+
+.info-value {
+    color: #fff;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.info-value.status-normal {
+    color: #00ff88;
+}
+
+/* 高德地图自带关闭按钮隐藏，我们逻辑控制或使用其原生 */
+.amap-info-content {
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+}
+
+.amap-info-sharp {
+    border-top-color: rgba(26, 35, 50, 0.95) !important;
+}

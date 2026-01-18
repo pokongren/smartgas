@@ -1,0 +1,57 @@
+[
+  {
+    "id": "S001",
+    "name": "北京分输站",
+    "type": "distribution",
+    "longitude": 116.4,
+    "latitude": 39.9,
+    "design_pressure": 6.0,
+    "status": "normal",
+    "region": "华北地区",
+    "operator": "中国石油"
+  },
+  {
+    "id": "S002",
+    "name": "天津压气站",
+    "type": "compressor",
+    "longitude": 117.2,
+    "latitude": 39.13,
+    "design_pressure": 8.5,
+    "status": "normal",
+    "region": "华北地区",
+    "operator": "中国石油"
+  },
+  {
+    "id": "S003",
+    "name": "石家庄分输站",
+    "type": "distribution",
+    "longitude": 114.48,
+    "latitude": 38.03,
+    "design_pressure": 5.5,
+    "status": "normal",
+    "region": "华北地区",
+    "operator": "中国石油"
+  },
+  {
+    "id": "S004",
+    "name": "太原分输站",
+    "type": "distribution",
+    "longitude": 112.55,
+    "latitude": 37.87,
+    "design_pressure": 6.0,
+    "status": "maintenance",
+    "region": "华北地区",
+    "operator": "中国石油"
+  },
+  {
+    "id": "S005",
+    "name": "呼和浩特气源站",
+    "type": "source",
+    "longitude": 111.75,
+    "latitude": 40.84,
+    "design_pressure": 10.0,
+    "status": "normal",
+    "region": "华北地区",
+    "operator": "中国石油"
+  }
+]

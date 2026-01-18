@@ -1,0 +1,5 @@
+{
+  "name": "SmartGas Grid",
+  "description": "A comprehensive gas network monitoring system featuring dual interfaces: a corporate executive dashboard for high-level overview and a technical engineering dashboard for real-time operations and maintenance.",
+  "requestFramePermissions": []
+}

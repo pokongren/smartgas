@@ -1,0 +1,2 @@
+id,name,type,longitude,latitude,design_pressure,status
+node-001,示例站场,compressor,106.71,26.57,8.5,normal

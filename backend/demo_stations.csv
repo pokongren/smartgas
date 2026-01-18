@@ -1,0 +1,5 @@
+id,name,type,longitude,latitude,design_pressure,status
+demo-001,北京分输站,distribution,116.40,39.90,6.0,normal
+demo-002,天津压气站,compressor,117.20,39.13,8.5,normal
+demo-003,石家庄分输站,distribution,114.48,38.03,6.0,normal
+demo-004,保定分输站,distribution,115.48,38.87,5.5,normal
