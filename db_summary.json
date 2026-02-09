@@ -1,0 +1,620 @@
+{
+  "stations": {
+    "columns": [
+      "id",
+      "name",
+      "type",
+      "longitude",
+      "latitude",
+      "design_pressure",
+      "properties"
+    ],
+    "sample_data": [
+      {
+        "id": "STOR-001",
+        "name": "大港",
+        "type": "source",
+        "longitude": 0.0,
+        "latitude": 0.0,
+        "design_pressure": null,
+        "properties": null
+      },
+      {
+        "id": "STOR-002",
+        "name": "华北",
+        "type": "source",
+        "longitude": 0.0,
+        "latitude": 0.0,
+        "design_pressure": null,
+        "properties": null
+      },
+      {
+        "id": "STOR-003",
+        "name": "刘庄",
+        "type": "source",
+        "longitude": 0.0,
+        "latitude": 0.0,
+        "design_pressure": null,
+        "properties": null
+      },
+      {
+        "id": "STOR-004",
+        "name": "国网金坛",
+        "type": "source",
+        "longitude": 0.0,
+        "latitude": 0.0,
+        "design_pressure": null,
+        "properties": null
+      },
+      {
+        "id": "STOR-005",
+        "name": "文23",
+        "type": "source",
+        "longitude": 0.0,
+        "latitude": 0.0,
+        "design_pressure": null,
+        "properties": null
+      }
+    ]
+  },
+  "pipelines": {
+    "columns": [
+      "id",
+      "name",
+      "start_station_id",
+      "end_station_id",
+      "diameter",
+      "length",
+      "category",
+      "properties"
+    ],
+    "sample_data": [
+      {
+        "id": "LINE4-SEG-001",
+        "name": "西四线-1",
+        "start_station_id": "NODE-01188",
+        "end_station_id": "NODE-01189",
+        "diameter": 1219,
+        "length": 23.2,
+        "category": "trunk",
+        "properties": null
+      },
+      {
+        "id": "LINE4-SEG-002",
+        "name": "西四线-2",
+        "start_station_id": "NODE-01189",
+        "end_station_id": "NODE-01190",
+        "diameter": 1219,
+        "length": 23.8,
+        "category": "trunk",
+        "properties": null
+      },
+      {
+        "id": "LINE4-SEG-003",
+        "name": "西四线-3",
+        "start_station_id": "NODE-01190",
+        "end_station_id": "NODE-01191",
+        "diameter": 1219,
+        "length": 24.599999999999994,
+        "category": "trunk",
+        "properties": null
+      },
+      {
+        "id": "LINE4-SEG-004",
+        "name": "西四线-4",
+        "start_station_id": "NODE-01191",
+        "end_station_id": "NODE-01192",
+        "diameter": 1219,
+        "length": 20.900000000000006,
+        "category": "trunk",
+        "properties": null
+      },
+      {
+        "id": "LINE4-SEG-005",
+        "name": "西四线-5",
+        "start_station_id": "NODE-01192",
+        "end_station_id": "NODE-01193",
+        "diameter": 1219,
+        "length": 32.0,
+        "category": "trunk",
+        "properties": null
+      }
+    ]
+  },
+  "emergency_events": {
+    "columns": [
+      "id",
+      "event_type",
+      "location",
+      "severity",
+      "status",
+      "description",
+      "created_at"
+    ],
+    "sample_data": []
+  },
+  "trunk_pipeline_details": {
+    "columns": [
+      "id",
+      "name",
+      "control_level",
+      "length",
+      "capacity",
+      "station_count",
+      "valve_count",
+      "compressor_count"
+    ],
+    "sample_data": [
+      {
+        "id": 1,
+        "name": "西气东输一线",
+        "control_level": "一级",
+        "length": 4474.7199,
+        "capacity": 3098264.58556608,
+        "station_count": 65,
+        "valve_count": 158,
+        "compressor_count": 22
+      },
+      {
+        "id": 2,
+        "name": "冀宁线",
+        "control_level": "一级",
+        "length": 1331.2707,
+        "capacity": 487778.669482251,
+        "station_count": 32,
+        "valve_count": 45,
+        "compressor_count": 1
+      },
+      {
+        "id": 3,
+        "name": "江苏LNG外输管道",
+        "control_level": "一级",
+        "length": 391.877,
+        "capacity": 250339.447737152,
+        "station_count": 10,
+        "valve_count": 20,
+        "compressor_count": 0
+      },
+      {
+        "id": 4,
+        "name": "淮武线",
+        "control_level": "一级",
+        "length": 436.889,
+        "capacity": 116059.0,
+        "station_count": 3,
+        "valve_count": 21,
+        "compressor_count": 0
+      },
+      {
+        "id": 5,
+        "name": "西气东输二线",
+        "control_level": "一级",
+        "length": 5098.0123,
+        "capacity": 5365107.9459223,
+        "station_count": 64,
+        "valve_count": 150,
+        "compressor_count": 27
+      }
+    ]
+  },
+  "branch_pipeline_details": {
+    "columns": [
+      "id",
+      "name",
+      "trunk_link",
+      "start_point",
+      "end_point",
+      "length",
+      "diameter",
+      "thickness",
+      "design_pressure",
+      "design_flow",
+      "commission_date",
+      "dispatch_console"
+    ],
+    "sample_data": [
+      {
+        "id": 1,
+        "name": "西一线干线新疆段",
+        "trunk_link": "西气东输一线",
+        "start_point": "轮南压气站",
+        "end_point": "红柳压气站",
+        "length": 954.9577,
+        "diameter": 1016,
+        "thickness": 14.0,
+        "design_pressure": 10.0,
+        "design_flow": 170.0,
+        "commission_date": "20041001",
+        "dispatch_console": "西部"
+      },
+      {
+        "id": 2,
+        "name": "西一线干线甘肃段",
+        "trunk_link": "西气东输一线",
+        "start_point": "红柳压气站",
+        "end_point": "中卫压气站",
+        "length": 1028.9439,
+        "diameter": 1016,
+        "thickness": 14.0,
+        "design_pressure": 10.0,
+        "design_flow": 170.0,
+        "commission_date": "20041001",
+        "dispatch_console": "西部"
+      },
+      {
+        "id": 3,
+        "name": "西一线干线东段",
+        "trunk_link": "西气东输一线",
+        "start_point": "中卫压气站",
+        "end_point": "白鹤末站",
+        "length": 1862.2965,
+        "diameter": 1016,
+        "thickness": 14.0,
+        "design_pressure": 10.0,
+        "design_flow": 170.0,
+        "commission_date": "20041001",
+        "dispatch_console": "东部"
+      },
+      {
+        "id": 4,
+        "name": "常长支线",
+        "trunk_link": "西气东输一线",
+        "start_point": "芙蓉分输站",
+        "end_point": "长兴末站",
+        "length": 99.6003,
+        "diameter": 813,
+        "thickness": null,
+        "design_pressure": 6.4,
+        "design_flow": 17.86,
+        "commission_date": "20031218",
+        "dispatch_console": "东部"
+      },
+      {
+        "id": 5,
+        "name": "南芜支线",
+        "trunk_link": "西气东输一线",
+        "start_point": "西一线南京站",
+        "end_point": "芜湖末站",
+        "length": 130.0,
+        "diameter": 508,
+        "thickness": 7.1,
+        "design_pressure": 6.3,
+        "design_flow": 16.71,
+        "commission_date": "200405",
+        "dispatch_console": "东部"
+      }
+    ]
+  },
+  "node_relation_details": {
+    "columns": [
+      "id",
+      "trunk_name",
+      "branch_name",
+      "node_name",
+      "node_name_calc",
+      "company",
+      "work_area",
+      "mileage",
+      "spacing",
+      "elevation",
+      "node_type_2025",
+      "location_desc"
+    ],
+    "sample_data": [
+      {
+        "id": 1,
+        "trunk_name": "西气东输一线",
+        "branch_name": "西一线干线新疆段",
+        "node_name": "轮南压气站",
+        "node_name_calc": "轮南压气站●",
+        "company": "西部管道",
+        "work_area": "轮南作业区",
+        "mileage": 0.0,
+        "spacing": 0.0,
+        "elevation": 930.0,
+        "node_type_2025": "压气站",
+        "location_desc": "新疆维吾尔自治区巴音郭楞蒙古自治州轮台县轮南镇西南侧约1m"
+      },
+      {
+        "id": 2,
+        "trunk_name": "西气东输一线",
+        "branch_name": "西一线干线新疆段",
+        "node_name": "西一1#阀室",
+        "node_name_calc": "1#阀室★",
+        "company": "西部管道",
+        "work_area": "轮南作业区",
+        "mileage": 32.5005,
+        "spacing": 32.5005,
+        "elevation": 924.0,
+        "node_type_2025": "监控阀室",
+        "location_desc": "新疆维吾尔自治区巴音郭楞蒙古自治州轮台县阿克萨来乡"
+      },
+      {
+        "id": 3,
+        "trunk_name": "西气东输一线",
+        "branch_name": "西一线干线新疆段",
+        "node_name": "西一2#阀室",
+        "node_name_calc": "2#阀室★",
+        "company": "西部管道",
+        "work_area": "轮南作业区",
+        "mileage": 62.5294,
+        "spacing": 30.0289,
+        "elevation": 910.0,
+        "node_type_2025": "监控阀室",
+        "location_desc": "新疆维吾尔自治区巴音郭楞蒙古自治州轮台县"
+      },
+      {
+        "id": 4,
+        "trunk_name": "西气东输一线",
+        "branch_name": "西一线干线新疆段",
+        "node_name": "西一3#阀室",
+        "node_name_calc": "3#阀室★",
+        "company": "西部管道",
+        "work_area": "轮南作业区",
+        "mileage": 95.5411,
+        "spacing": 33.0117,
+        "elevation": 901.0,
+        "node_type_2025": "监控阀室",
+        "location_desc": "新疆维吾尔自治区巴音郭楞蒙古自治州轮台县"
+      },
+      {
+        "id": 5,
+        "trunk_name": "西气东输一线",
+        "branch_name": "西一线干线新疆段",
+        "node_name": "西一4#阀室",
+        "node_name_calc": "4#阀室★",
+        "company": "西部管道",
+        "work_area": "库尔勒作业区",
+        "mileage": 128.5829,
+        "spacing": 33.0418,
+        "elevation": 925.0,
+        "node_type_2025": "监控阀室",
+        "location_desc": "新疆维吾尔自治区巴音郭楞蒙古自治州库尔勒市"
+      }
+    ]
+  },
+  "distribution_point_details": {
+    "columns": [
+      "id",
+      "name",
+      "trunk_name",
+      "node_link",
+      "station_abbr",
+      "dispatch_console",
+      "metering_info",
+      "pressure_reg_info",
+      "commission_date"
+    ],
+    "sample_data": [
+      {
+        "id": 1,
+        "name": "新捷伊犁<伊宁>",
+        "trunk_name": "西气东输二线",
+        "node_link": "站场",
+        "station_abbr": "伊宁首",
+        "dispatch_console": "西部",
+        "metering_info": "1用1备",
+        "pressure_reg_info": "1用1备",
+        "commission_date": null
+      },
+      {
+        "id": 2,
+        "name": "新捷伊犁<霍尔果斯>",
+        "trunk_name": "西气东输二线",
+        "node_link": "站场",
+        "station_abbr": "霍尔果斯",
+        "dispatch_console": "西部",
+        "metering_info": "1用1备",
+        "pressure_reg_info": "1用1备",
+        "commission_date": null
+      },
+      {
+        "id": 3,
+        "name": "兵团燃气（喀什）<霍尔果斯>",
+        "trunk_name": "西气东输二线",
+        "node_link": "站场",
+        "station_abbr": "霍尔果斯",
+        "dispatch_console": "西部",
+        "metering_info": "1用1备",
+        "pressure_reg_info": "1用1备",
+        "commission_date": null
+      },
+      {
+        "id": 4,
+        "name": "新捷博乐<精河>",
+        "trunk_name": "西气东输二线",
+        "node_link": "站场",
+        "station_abbr": "精河",
+        "dispatch_console": "西部",
+        "metering_info": "1用1备",
+        "pressure_reg_info": "1用1备",
+        "commission_date": null
+      },
+      {
+        "id": 5,
+        "name": "新捷博乐<西二9#>",
+        "trunk_name": "西气东输二线",
+        "node_link": "阀室",
+        "station_abbr": "西二9#",
+        "dispatch_console": "西部",
+        "metering_info": null,
+        "pressure_reg_info": null,
+        "commission_date": null
+      }
+    ]
+  },
+  "compressor_details": {
+    "columns": [
+      "id",
+      "station_name",
+      "trunk_name",
+      "branch_name",
+      "unit_config",
+      "unit_id",
+      "drive_type",
+      "manufacturer",
+      "model",
+      "power",
+      "commission_status"
+    ],
+    "sample_data": [
+      {
+        "id": 1,
+        "station_name": "轮南压气站",
+        "trunk_name": "西气东输一线",
+        "branch_name": "西一线干线新疆段",
+        "unit_config": "2+1",
+        "unit_id": "1#",
+        "drive_type": "燃驱",
+        "manufacturer": "Rolls-Royce",
+        "model": "RF2BB36",
+        "power": 29.53,
+        "commission_status": "投产"
+      },
+      {
+        "id": 2,
+        "station_name": "轮南压气站",
+        "trunk_name": "西气东输一线",
+        "branch_name": "西一线干线新疆段",
+        "unit_config": "2+1",
+        "unit_id": "2#",
+        "drive_type": "燃驱",
+        "manufacturer": "Rolls-Royce",
+        "model": "RF2BB36",
+        "power": 29.53,
+        "commission_status": "投产"
+      },
+      {
+        "id": 3,
+        "station_name": "轮南压气站",
+        "trunk_name": "西气东输一线",
+        "branch_name": "西一线干线新疆段",
+        "unit_config": "2+1",
+        "unit_id": "3#",
+        "drive_type": "燃驱",
+        "manufacturer": "Rolls-Royce",
+        "model": "RF2BB36",
+        "power": 29.53,
+        "commission_status": "投产"
+      },
+      {
+        "id": 4,
+        "station_name": "孔雀河压气站",
+        "trunk_name": "西气东输一线",
+        "branch_name": "西一线干线新疆段",
+        "unit_config": "2+1",
+        "unit_id": "1#",
+        "drive_type": "燃驱",
+        "manufacturer": "General Electric",
+        "model": "PCL804",
+        "power": 31.4,
+        "commission_status": "投产"
+      },
+      {
+        "id": 5,
+        "station_name": "孔雀河压气站",
+        "trunk_name": "西气东输一线",
+        "branch_name": "西一线干线新疆段",
+        "unit_config": "2+1",
+        "unit_id": "2#",
+        "drive_type": "燃驱",
+        "manufacturer": "General Electric",
+        "model": "PCL804",
+        "power": 31.4,
+        "commission_status": "投产"
+      }
+    ]
+  },
+  "storage_details": {
+    "columns": [
+      "id",
+      "name",
+      "storage_type",
+      "commission_date",
+      "working_capacity",
+      "daily_extract_max",
+      "daily_inject_max",
+      "company"
+    ],
+    "sample_data": [
+      {
+        "id": 1,
+        "name": "大港",
+        "storage_type": "枯竭凝析气藏",
+        "commission_date": "36831",
+        "working_capacity": 30.3,
+        "daily_extract_max": 2400.0,
+        "daily_inject_max": 1500.0,
+        "company": "合资"
+      },
+      {
+        "id": 2,
+        "name": "华北",
+        "storage_type": "气顶油气藏",
+        "commission_date": "40391",
+        "working_capacity": 7.5,
+        "daily_extract_max": 420.0,
+        "daily_inject_max": 420.0,
+        "company": "合资"
+      },
+      {
+        "id": 3,
+        "name": "刘庄",
+        "storage_type": "枯竭油气藏",
+        "commission_date": "40848",
+        "working_capacity": 2.4,
+        "daily_extract_max": 100.0,
+        "daily_inject_max": 150.0,
+        "company": "国家管网"
+      },
+      {
+        "id": 4,
+        "name": "国网金坛",
+        "storage_type": "盐穴",
+        "commission_date": "39264",
+        "working_capacity": 17.1,
+        "daily_extract_max": 1500.0,
+        "daily_inject_max": 820.0,
+        "company": "国家管网"
+      },
+      {
+        "id": 5,
+        "name": "文23",
+        "storage_type": "枯竭气藏",
+        "commission_date": "43677",
+        "working_capacity": 32.7,
+        "daily_extract_max": 2600.0,
+        "daily_inject_max": 1800.0,
+        "company": "国家管网"
+      }
+    ]
+  },
+  "dispatch_console_details": {
+    "columns": [
+      "id",
+      "name"
+    ],
+    "sample_data": [
+      {
+        "id": 1,
+        "name": "西部"
+      },
+      {
+        "id": 2,
+        "name": "北部"
+      },
+      {
+        "id": 3,
+        "name": "中部"
+      },
+      {
+        "id": 4,
+        "name": "东部"
+      },
+      {
+        "id": 5,
+        "name": "南部"
+      }
+    ]
+  }
+}

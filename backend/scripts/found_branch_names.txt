@@ -1,0 +1,25 @@
+=== Identifying Trunks for Specific Stations ===
+Searching for station: 玉溪末站
+  Found in trunk: '中缅线（国内段）' at mileage 112.41
+--------------------
+Searching for station: 防城港末站
+  Found in trunk: '中缅线（国内段）' at mileage 62.51
+--------------------
+Searching for station: 都匀分输站
+  Found in trunk: '中缅线（国内段）' at mileage 1285.85
+  Found in trunk: '中缅线（国内段）' at mileage 0.0
+--------------------
+Searching for station: 钦州分输站
+  Found in trunk: '中缅线（国内段）' at mileage 80.699763
+  Found in trunk: '中缅线（国内段）' at mileage 0.0
+--------------------
+Searching for station: 丽江分输站
+  Not found in any trunk.
+--------------------
+Searching for station: 禄丰分输站
+  Found in trunk: '中缅线（国内段）' at mileage 617.82
+  Found in trunk: '中缅线（国内段）' at mileage 0.0
+--------------------
+Searching for station: 安宁分输站
+  Found in trunk: '中缅线（国内段）' at mileage 42.66
+--------------------

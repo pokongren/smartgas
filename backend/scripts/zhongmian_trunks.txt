@@ -1,0 +1,6 @@
+=== Zhongmian Pipeline Trunks ===
+Name: 中缅线（国内段）
+  Nodes: 150
+  Mileage: 0.0 - 1744.21
+  Route: 跨境点 -> 贵港压气站
+------------------------------

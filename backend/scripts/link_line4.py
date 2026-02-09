@@ -17,7 +17,12 @@ def link_line4():
     cursor.execute("SELECT id, name FROM stations")
     name_to_id = {row[1]: row[0] for row in cursor.fetchall()}
     
+    
     pipeline_count = 0
+    skipped = 0
+    print(f"Total nodes: {len(nodes)}")
+    print(f"Total stations: {len(name_to_id)}")
+    
     for i in range(len(nodes) - 1):
         start_node_name, start_mile = nodes[i]
         end_node_name, end_mile = nodes[i+1]
@@ -33,6 +38,10 @@ def link_line4():
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (pipeline_id, f"西四线-{i+1}", start_id, end_id, length, 'trunk', 1219))
             pipeline_count += 1
+        else:
+            skipped += 1
+            if skipped <= 3:
+                print(f"Skipped: {start_node_name} -> {end_node_name} (start_id={start_id}, end_id={end_id})")
             
     conn.commit()
     conn.close()

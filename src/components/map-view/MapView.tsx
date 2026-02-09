@@ -10,10 +10,10 @@ import { sourceNodes as defaultSourceNodes, compressorStations as defaultCompres
  */
 const DEFAULT_CONFIG: MapConfig = {
     center: {
-        longitude: 102.0,
-        latitude: 25.0,
+        longitude: 105.0,
+        latitude: 36.0,
     },
-    zoom: 12,
+    zoom: 4,
     zoomControl: true,
     draggable: true,
     theme: 'light',
@@ -45,6 +45,7 @@ function MapView({
     const [mapInstance, setMapInstance] = useState<any>(null)
     const mapInstanceRef = useRef<any>(null)
     const [isLoading, setIsLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
     const isInitializedRef = useRef(false)
     const overlaysRef = useRef<any[]>([])
 
@@ -67,14 +68,61 @@ function MapView({
         AMapLoader.load({
             key: amapKey,
             version: '2.0',
-            plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.ControlBar'],
+            plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.ControlBar', 'AMap.DistrictSearch', 'AMap.DistrictLayer'],
         })
             .then((AMap) => {
                 const map = new AMap.Map(mapContainerRef.current, {
                     center: [mapConfig.center.longitude, mapConfig.center.latitude],
                     zoom: mapConfig.zoom,
-                    mapStyle: mapConfig.theme === 'dark' ? 'amap://styles/dark' : 'amap://styles/light',
+                    mapStyle: 'amap://styles/dark', // 强制深色
+                    features: ['bg', 'road'], // 只显示背景和道路
                     viewMode: '3D',
+                    pitch: 0,
+                    skyColor: '#1f263a',
+                })
+
+                // 添加省界图层 (只显示边界，不填充颜色)
+                const disCountry = new AMap.DistrictLayer.Country({
+                    zIndex: 9,
+                    SOC: 'CHN',
+                    depth: 1, // 深度1表示显示到省
+                    styles: {
+                        'nation-stroke': '#666666',
+                        'coastline-stroke': '#666666',
+                        'province-stroke': 'rgba(255, 255, 255, 0.3)', // 省界颜色：半透明白
+                        'fill': 'rgba(0,0,0,0)' // 填充透明
+                    }
+                })
+                disCountry.setMap(map)
+
+                // 添加省份名称注记
+                const districtSearch = new AMap.DistrictSearch({
+                    level: 'country',
+                    subdistrict: 1,
+                    extensions: 'base'
+                })
+
+                districtSearch.search('中国', (status: string, result: any) => {
+                    if (status === 'complete' && result.districtList.length > 0) {
+                        const provinces = result.districtList[0].districtList
+                        provinces.forEach((prov: any) => {
+                            const text = new AMap.Text({
+                                text: prov.name,
+                                position: prov.center,
+                                style: {
+                                    'background-color': 'transparent',
+                                    'text-align': 'center',
+                                    'border': 'none',
+                                    'color': 'rgba(255, 255, 255, 0.5)', // 半透明白色文字
+                                    'font-size': '12px',
+                                    'font-weight': 'normal',
+                                    'text-shadow': '1px 1px 2px black'
+                                },
+                                zIndex: 10,
+                                map: map
+                            })
+                        })
+                    }
                 })
 
                 if (mapConfig.showScale) {
@@ -102,8 +150,9 @@ function MapView({
                 onLoad?.(map)
                 console.log('✅ 高德地图初始化成功')
             })
-            .catch((error) => {
-                console.error('❌ 高德地图加载失败:', error)
+            .catch((err) => {
+                console.error('❌ 高德地图加载失败:', err)
+                setError('地图加载失败: ' + (err.message || String(err)))
                 setIsLoading(false)
                 isInitializedRef.current = false
             })
@@ -204,6 +253,23 @@ function MapView({
             {isLoading && (
                 <div className={styles.mapLoading}>
                     地图加载中...
+                </div>
+            )}
+            {error && (
+                <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    padding: '20px',
+                    background: 'rgba(255,0,0,0.8)',
+                    color: 'white',
+                    borderRadius: '8px',
+                    maxWidth: '80%',
+                    textAlign: 'center'
+                }}>
+                    <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>❌ 错误</div>
+                    <div>{error}</div>
                 </div>
             )}
         </div>

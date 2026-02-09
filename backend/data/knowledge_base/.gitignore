@@ -1,0 +1,9 @@
+# 忽略临时文件
+~$*
+*.tmp
+.DS_Store
+Thumbs.db
+
+# 保留 README 和示例文档
+!README.md
+!*_示例.*

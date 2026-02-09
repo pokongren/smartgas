@@ -1,0 +1,337 @@
+{
+  "中缅线": {
+    "total_nodes": 150,
+    "compressors": [
+      {
+        "name": "河池压气站",
+        "mileage": 0
+      },
+      {
+        "name": "保山压气站",
+        "mileage": 253.29
+      },
+      {
+        "name": "贵阳压气站",
+        "mileage": 1182.23
+      },
+      {
+        "name": "贵港压气站",
+        "mileage": 1744.21
+      }
+    ],
+    "distributions": [
+      {
+        "name": "弥渡分输站",
+        "mileage": 0
+      },
+      {
+        "name": "禄丰分输站",
+        "mileage": 0
+      },
+      {
+        "name": "都匀分输站",
+        "mileage": 0
+      },
+      {
+        "name": "忻城分输站",
+        "mileage": 0
+      },
+      {
+        "name": "南宁分输站",
+        "mileage": 0
+      },
+      {
+        "name": "大番坡分输站",
+        "mileage": 0
+      },
+      {
+        "name": "河东分输站",
+        "mileage": 0
+      },
+      {
+        "name": "钦州分输站",
+        "mileage": 0
+      },
+      {
+        "name": "独山首站",
+        "mileage": 0
+      },
+      {
+        "name": "荔波首站",
+        "mileage": 0
+      },
+      {
+        "name": "燕楼首站",
+        "mileage": 0
+      },
+      {
+        "name": "云雾首站",
+        "mileage": 0.5
+      },
+      {
+        "name": "瑞丽分输站",
+        "mileage": 4.51
+      },
+      {
+        "name": "独山分输站",
+        "mileage": 11.56
+      },
+      {
+        "name": "大理分输站",
+        "mileage": 14.6
+      },
+      {
+        "name": "平塘分输站",
+        "mileage": 15.2
+      },
+      {
+        "name": "昌明分输站",
+        "mileage": 18.4
+      },
+      {
+        "name": "荔波末站",
+        "mileage": 18.83
+      },
+      {
+        "name": "广顺分输站",
+        "mileage": 20.68
+      },
+      {
+        "name": "河池末站",
+        "mileage": 23.2
+      },
+      {
+        "name": "都匀末站",
+        "mileage": 33.92
+      },
+      {
+        "name": "安宁分输站",
+        "mileage": 42.66
+      },
+      {
+        "name": "柳州分输站",
+        "mileage": 42.73
+      },
+      {
+        "name": "长顺分输站",
+        "mileage": 43.39
+      },
+      {
+        "name": "贵定分输站",
+        "mileage": 52.4
+      },
+      {
+        "name": "三都末站",
+        "mileage": 59.8
+      },
+      {
+        "name": "防城港末站",
+        "mileage": 62.51
+      },
+      {
+        "name": "福泉末站",
+        "mileage": 92.1
+      },
+      {
+        "name": "芒市分输站",
+        "mileage": 109.07
+      },
+      {
+        "name": "玉溪末站",
+        "mileage": 112.41
+      },
+      {
+        "name": "钦州港分输站",
+        "mileage": 141.24
+      },
+      {
+        "name": "龙陵分输站",
+        "mileage": 156.73
+      },
+      {
+        "name": "永福分输站",
+        "mileage": 173.05
+      },
+      {
+        "name": "丽江末站",
+        "mileage": 199.2
+      },
+      {
+        "name": "桂林末站",
+        "mileage": 202.45
+      },
+      {
+        "name": "楚雄分输站",
+        "mileage": 569.52
+      },
+      {
+        "name": "寻甸分输站",
+        "mileage": 760.97
+      },
+      {
+        "name": "曲靖分输站",
+        "mileage": 820.93
+      },
+      {
+        "name": "安顺分输站",
+        "mileage": 1104.03
+      },
+      {
+        "name": "宜州分输站",
+        "mileage": 1541.97
+      },
+      {
+        "name": "来宾分输站",
+        "mileage": 1670.96
+      }
+    ],
+    "valves_count": 96
+  },
+  "广西管道": {
+    "total_nodes": 53,
+    "compressors": [],
+    "distributions": [
+      {
+        "name": "廉江分输站",
+        "mileage": 0
+      },
+      {
+        "name": "北海首站",
+        "mileage": 9.77
+      },
+      {
+        "name": "茂名分输站",
+        "mileage": 204.65
+      },
+      {
+        "name": "龙朝门站",
+        "mileage": 467.92
+      }
+    ],
+    "valves_count": 33
+  },
+  "广南支干线": {
+    "total_nodes": 83,
+    "compressors": [
+      {
+        "name": "广州压气站",
+        "mileage": 0
+      },
+      {
+        "name": "梧州压气站",
+        "mileage": 0
+      },
+      {
+        "name": "贵港压气站",
+        "mileage": 0
+      }
+    ],
+    "distributions": [
+      {
+        "name": "横县分输站",
+        "mileage": 0
+      },
+      {
+        "name": "南宁分输站",
+        "mileage": 0
+      },
+      {
+        "name": "吴圩分输站",
+        "mileage": 0
+      },
+      {
+        "name": "广西管道南宁分输站",
+        "mileage": 0
+      },
+      {
+        "name": "珊瑚门站",
+        "mileage": 0.17
+      },
+      {
+        "name": "广南支干线南宁分输站",
+        "mileage": 8.0
+      },
+      {
+        "name": "苍梧分输站",
+        "mileage": 15.6
+      },
+      {
+        "name": "清远分输站",
+        "mileage": 21.1
+      },
+      {
+        "name": "临港分输站",
+        "mileage": 25.48
+      },
+      {
+        "name": "长洲分输站",
+        "mileage": 46.0
+      },
+      {
+        "name": "佛山分输站",
+        "mileage": 79.2
+      },
+      {
+        "name": "玉林末站",
+        "mileage": 99.3
+      },
+      {
+        "name": "肇庆分输站",
+        "mileage": 102.7
+      },
+      {
+        "name": "隆安分输站",
+        "mileage": 109.65
+      },
+      {
+        "name": "高要分输站",
+        "mileage": 147.66
+      },
+      {
+        "name": "德庆分输站",
+        "mileage": 202.6
+      },
+      {
+        "name": "贺州末站",
+        "mileage": 205.15
+      },
+      {
+        "name": "田东分输站",
+        "mileage": 244.85
+      },
+      {
+        "name": "百色末站",
+        "mileage": 300.0
+      }
+    ],
+    "valves_count": 54
+  },
+  "广深支干线": {
+    "total_nodes": 24,
+    "compressors": [
+      {
+        "name": "广州压气站",
+        "mileage": 0
+      },
+      {
+        "name": "大铲岛压气站",
+        "mileage": 258.4
+      }
+    ],
+    "distributions": [
+      {
+        "name": "樟木头分输站",
+        "mileage": 0.8
+      },
+      {
+        "name": "东莞分输站",
+        "mileage": 163.0
+      },
+      {
+        "name": "求雨岭分输站",
+        "mileage": 196.04
+      }
+    ],
+    "valves_count": 19
+  }
+}

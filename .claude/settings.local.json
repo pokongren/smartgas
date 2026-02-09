@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(test:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(.venv/python.exe:*)",
+      "Bash(npm run dev:*)",
+      "Bash(python:*)",
+      "Bash(dir:*)",
+      "Bash(sqlite3:*)",
+      "Bash(curl:*)",
+      "Bash(powershell -Command:*)",
+      "Bash(start http://localhost:3001)",
+      "WebSearch",
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run preview:*)",
+      "Bash(npx vite --open)",
+      "WebFetch(domain:docs.claude.code)",
+      "Bash(ls -la:*)",
+      "Bash(head:*)",
+      "Bash(claude --version:*)"
+    ]
+  }
+}

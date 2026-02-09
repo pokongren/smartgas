@@ -1,0 +1,1738 @@
+{
+  "pipeline_name": "西气东输一线",
+  "trunk": [
+    {
+      "id": 1,
+      "name": "轮南压气站",
+      "mileage": 0.0,
+      "type": "compressor",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 2,
+      "name": "西一1#阀室",
+      "mileage": 32.5005,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 3,
+      "name": "西一2#阀室",
+      "mileage": 62.5294,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 4,
+      "name": "西一3#阀室",
+      "mileage": 95.5411,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 5,
+      "name": "西一4#阀室",
+      "mileage": 128.5829,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 6,
+      "name": "西一5#阀室",
+      "mileage": 159.4256,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 7,
+      "name": "孔雀河压气站",
+      "mileage": 178.5865,
+      "type": "compressor",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 8,
+      "name": "西一6#阀室",
+      "mileage": 205.8962,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 9,
+      "name": "西一7#阀室",
+      "mileage": 231.7165,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 10,
+      "name": "西一8#阀室",
+      "mileage": 258.4479,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 11,
+      "name": "西一9#阀室",
+      "mileage": 283.6799,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 12,
+      "name": "四道班压气站",
+      "mileage": 315.9608,
+      "type": "compressor",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 13,
+      "name": "西一10#阀室",
+      "mileage": 347.4971,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 14,
+      "name": "西一11#阀室",
+      "mileage": 378.0201,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 15,
+      "name": "西一11A#阀室",
+      "mileage": 398.0201,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 16,
+      "name": "西一12#阀室",
+      "mileage": 405.859,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 17,
+      "name": "西一13#阀室",
+      "mileage": 435.7706,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 18,
+      "name": "西一14#阀室",
+      "mileage": 466.1453,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 19,
+      "name": "鄯善压气站",
+      "mileage": 494.5473,
+      "type": "compressor",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 20,
+      "name": "西一15#阀室",
+      "mileage": 525.2838,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 21,
+      "name": "西一16#阀室",
+      "mileage": 552.4161,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 22,
+      "name": "西一17#阀室",
+      "mileage": 583.6908,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 23,
+      "name": "西一18#阀室",
+      "mileage": 614.4744,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 24,
+      "name": "西一19#阀室",
+      "mileage": 645.242,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 25,
+      "name": "哈密压气站",
+      "mileage": 659.3964,
+      "type": "compressor",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 26,
+      "name": "西一20#阀室",
+      "mileage": 688.8259,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 27,
+      "name": "西一21#阀室",
+      "mileage": 718.7445,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 28,
+      "name": "西一22#阀室",
+      "mileage": 760.9221,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 29,
+      "name": "西一23#阀室",
+      "mileage": 793.3765,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 30,
+      "name": "雅满苏压气站",
+      "mileage": 824.2455,
+      "type": "compressor",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 31,
+      "name": "西一25#阀室",
+      "mileage": 860.244,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 32,
+      "name": "西一26#阀室",
+      "mileage": 892.2669,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 33,
+      "name": "西一27#阀室",
+      "mileage": 923.5386,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 34,
+      "name": "西一28#阀室",
+      "mileage": 954.9577,
+      "type": "valve",
+      "branch_name": "西一线干线新疆段"
+    },
+    {
+      "id": 35,
+      "name": "红柳压气站",
+      "mileage": 961.6198,
+      "type": "compressor",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 36,
+      "name": "西一29#阀室",
+      "mileage": 995.5445,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 37,
+      "name": "西一30#阀室",
+      "mileage": 1025.5133,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 38,
+      "name": "西一31#阀室",
+      "mileage": 1057.029,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 39,
+      "name": "西一32#阀室",
+      "mileage": 1087.6116,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 40,
+      "name": "柳园压气站",
+      "mileage": 1119.4368,
+      "type": "compressor",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 41,
+      "name": "西一33#阀室",
+      "mileage": 1144.5195,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 42,
+      "name": "西一34#阀室",
+      "mileage": 1174.4132,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 43,
+      "name": "西一35#阀室",
+      "mileage": 1195.3798,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 44,
+      "name": "西一36#阀室",
+      "mileage": 1223.312,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 45,
+      "name": "西一37#阀室",
+      "mileage": 1247.3234,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 46,
+      "name": "玉门压气站",
+      "mileage": 1276.59,
+      "type": "compressor",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 47,
+      "name": "西一38#阀室",
+      "mileage": 1300.6421,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 48,
+      "name": "西一39#阀室",
+      "mileage": 1325.8184,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 49,
+      "name": "西一40#阀室",
+      "mileage": 1352.5837,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 50,
+      "name": "西一41#阀室",
+      "mileage": 1382.9014,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 51,
+      "name": "西一42#阀室",
+      "mileage": 1407.5662,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 52,
+      "name": "西一43#阀室",
+      "mileage": 1438.1382,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 53,
+      "name": "酒泉压气站",
+      "mileage": 1467.1574,
+      "type": "compressor",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 54,
+      "name": "西一44#阀室",
+      "mileage": 1490.8222,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 55,
+      "name": "西一45#阀室",
+      "mileage": 1513.7232,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 56,
+      "name": "西一46#阀室",
+      "mileage": 1536.8368,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 57,
+      "name": "西一47#阀室",
+      "mileage": 1559.856,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 58,
+      "name": "西一48#阀室",
+      "mileage": 1588.311,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 59,
+      "name": "山丹压气站",
+      "mileage": 1610.083,
+      "type": "compressor",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 60,
+      "name": "西一49#阀室",
+      "mileage": 1642.0544,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 61,
+      "name": "西一50#阀室",
+      "mileage": 1667.1571,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 62,
+      "name": "西一51#阀室",
+      "mileage": 1689.1253,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 63,
+      "name": "金昌压气站",
+      "mileage": 1719.0686,
+      "type": "compressor",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 64,
+      "name": "西一53#阀室",
+      "mileage": 1751.9426,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 65,
+      "name": "西一54#阀室",
+      "mileage": 1781.189,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 66,
+      "name": "古浪分输站",
+      "mileage": 1812.911,
+      "type": "distribution",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 67,
+      "name": "古浪压气站",
+      "mileage": 1841.5762,
+      "type": "compressor",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 68,
+      "name": "西一56#阀室",
+      "mileage": 1873.1322,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 69,
+      "name": "西一57#阀室",
+      "mileage": 1902.4369,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 70,
+      "name": "西一58#阀室",
+      "mileage": 1921.0039,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 71,
+      "name": "西一59#阀室",
+      "mileage": 1932.3321,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 72,
+      "name": "西一60#阀室",
+      "mileage": 1957.3368,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 73,
+      "name": "西一61#阀室",
+      "mileage": 1967.0717,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 74,
+      "name": "西一62#阀室",
+      "mileage": 1981.9018,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 75,
+      "name": "西一63#阀室",
+      "mileage": 1983.9016,
+      "type": "valve",
+      "branch_name": "西一线干线甘肃段"
+    },
+    {
+      "id": 76,
+      "name": "中卫压气站",
+      "mileage": 2008.2399,
+      "type": "compressor",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 77,
+      "name": "西一64#阀室",
+      "mileage": 2020.991,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 78,
+      "name": "西一65#阀室",
+      "mileage": 2036.4441,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 79,
+      "name": "西一66#阀室",
+      "mileage": 2054.4698,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 80,
+      "name": "西一67#阀室",
+      "mileage": 2071.0733,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 81,
+      "name": "西一68#阀室",
+      "mileage": 2091.0727,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 82,
+      "name": "西一69#阀室",
+      "mileage": 2111.965,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 83,
+      "name": "西一70#阀室",
+      "mileage": 2113.8639,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 84,
+      "name": "西一71#阀室",
+      "mileage": 2143.5286,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 85,
+      "name": "西一72#阀室",
+      "mileage": 2175.7044,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 86,
+      "name": "西一盐池压气站",
+      "mileage": 2190.506,
+      "type": "compressor",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 87,
+      "name": "西一73#阀室",
+      "mileage": 2219.906,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 88,
+      "name": "西一74#阀室",
+      "mileage": 2244.0381,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 89,
+      "name": "西一75#阀室",
+      "mileage": 2273.1779,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 90,
+      "name": "西一76#阀室",
+      "mileage": 2298.2235,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 91,
+      "name": "西一77#阀室",
+      "mileage": 2318.586,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 92,
+      "name": "西一靖边压气站",
+      "mileage": 2343.806,
+      "type": "compressor",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 93,
+      "name": "西一78#阀室",
+      "mileage": 2349.6473,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 94,
+      "name": "西一79#阀室",
+      "mileage": 2373.0528,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 95,
+      "name": "西一80#阀室",
+      "mileage": 2402.869,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 96,
+      "name": "西一81#阀室",
+      "mileage": 2430.8451,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 97,
+      "name": "西一82#阀室",
+      "mileage": 2454.488,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 98,
+      "name": "子长分输站",
+      "mileage": 2454.488,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 99,
+      "name": "西一83#阀室",
+      "mileage": 2478.2994,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 100,
+      "name": "延川压气站",
+      "mileage": 2494.007,
+      "type": "compressor",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 101,
+      "name": "西一84#阀室",
+      "mileage": 2513.3548,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 102,
+      "name": "延川西分输站",
+      "mileage": 2513.3548,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 103,
+      "name": "西一85#阀室",
+      "mileage": 2540.2008,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 104,
+      "name": "西一86#阀室",
+      "mileage": 2549.907,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 105,
+      "name": "西一87#阀室",
+      "mileage": 2572.107,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 106,
+      "name": "西一88#阀室",
+      "mileage": 2592.4311,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 107,
+      "name": "西一89#阀室",
+      "mileage": 2612.2766,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 108,
+      "name": "蒲县压气站",
+      "mileage": 2635.207,
+      "type": "compressor",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 109,
+      "name": "西一90#阀室",
+      "mileage": 2657.8794,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 110,
+      "name": "西一91#阀室",
+      "mileage": 2687.5686,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 111,
+      "name": "临汾分输站",
+      "mileage": 2697.907,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 112,
+      "name": "西一93#阀室",
+      "mileage": 2711.1122,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 113,
+      "name": "西一94#阀室",
+      "mileage": 2721.9636,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 114,
+      "name": "西一95#阀室",
+      "mileage": 2735.1823,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 115,
+      "name": "西一96#阀室",
+      "mileage": 2751.9154,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 116,
+      "name": "西一97#阀室",
+      "mileage": 2775.2222,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 117,
+      "name": "沁水压气站",
+      "mileage": 2787.5069,
+      "type": "compressor",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 118,
+      "name": "西一98#阀室",
+      "mileage": 2799.4481,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 119,
+      "name": "西一99#阀室",
+      "mileage": 2813.8063,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 120,
+      "name": "阳城清管站",
+      "mileage": 2837.1069,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 121,
+      "name": "西一100#阀室",
+      "mileage": 2861.1069,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 122,
+      "name": "西一101#阀室",
+      "mileage": 2876.723,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 123,
+      "name": "博爱分输站",
+      "mileage": 2891.4069,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 124,
+      "name": "西一102#阀室",
+      "mileage": 2905.9145,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 125,
+      "name": "西一103#阀室",
+      "mileage": 2918.068,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 126,
+      "name": "西一104#阀室",
+      "mileage": 2928.3452,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 127,
+      "name": "郑州压气站",
+      "mileage": 2953.6399,
+      "type": "compressor",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 128,
+      "name": "西一105#阀室",
+      "mileage": 2976.3987,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 129,
+      "name": "薛店分输站",
+      "mileage": 2997.3459,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 130,
+      "name": "西一106A#阀室",
+      "mileage": 3019.4089,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 131,
+      "name": "西一106B#阀室",
+      "mileage": 3033.2899,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 132,
+      "name": "西一107#阀室",
+      "mileage": 3056.5209,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 133,
+      "name": "西一108#阀室",
+      "mileage": 3081.2717,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 134,
+      "name": "西一109#阀室",
+      "mileage": 3105.0971,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 135,
+      "name": "西一110#阀室",
+      "mileage": 3127.6914,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 136,
+      "name": "淮阳压气站",
+      "mileage": 3141.3191,
+      "type": "compressor",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 137,
+      "name": "西一111#阀室",
+      "mileage": 3165.2475,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 138,
+      "name": "西一112#阀室",
+      "mileage": 3191.0929,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 139,
+      "name": "西一113#阀室",
+      "mileage": 3218.119,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 140,
+      "name": "太和分输站",
+      "mileage": 3218.119,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 141,
+      "name": "西一114#阀室",
+      "mileage": 3242.1875,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 142,
+      "name": "西一115#阀室",
+      "mileage": 3268.6503,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 143,
+      "name": "利辛分输站",
+      "mileage": 3293.097,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 144,
+      "name": "西一116#阀室",
+      "mileage": 3312.707,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 145,
+      "name": "西一117#阀室",
+      "mileage": 3337.1078,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 146,
+      "name": "西一118#阀室",
+      "mileage": 3349.8608,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 147,
+      "name": "西一119#阀室",
+      "mileage": 3356.0254,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 148,
+      "name": "西一120#阀室",
+      "mileage": 3376.4366,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 149,
+      "name": "西一121#阀室",
+      "mileage": 3383.3752,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 150,
+      "name": "刘巷子分输站",
+      "mileage": 3391.285,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 151,
+      "name": "西一122#阀室",
+      "mileage": 3417.6773,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 152,
+      "name": "定远压气站",
+      "mileage": 3446.211,
+      "type": "compressor",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 153,
+      "name": "西一123#阀室",
+      "mileage": 3471.6537,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 154,
+      "name": "西一124#阀室",
+      "mileage": 3496.7446,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 155,
+      "name": "滁州分输站",
+      "mileage": 3512.141,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 156,
+      "name": "西一125#阀室",
+      "mileage": 3538.741,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 157,
+      "name": "龙池分输站",
+      "mileage": 3559.341,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 158,
+      "name": "西一126#阀室",
+      "mileage": 3570.5128,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 159,
+      "name": "青山分输站",
+      "mileage": 3586.664,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 160,
+      "name": "龙潭分输站",
+      "mileage": 3593.95,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 161,
+      "name": "西一127#阀室",
+      "mileage": 3609.9476,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 162,
+      "name": "西一127A#阀室",
+      "mileage": 3621.853,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 163,
+      "name": "西一127B#阀室",
+      "mileage": 3628.9856,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 164,
+      "name": "镇江分输站",
+      "mileage": 3633.125,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 165,
+      "name": "丹阳分输站",
+      "mileage": 3655.288,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 166,
+      "name": "西一129#阀室",
+      "mileage": 3675.5392,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 167,
+      "name": "西一130#阀室",
+      "mileage": 3688.7304,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 168,
+      "name": "常州分输站",
+      "mileage": 3700.402,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 169,
+      "name": "芙蓉分输站",
+      "mileage": 3717.33,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 170,
+      "name": "西一131#阀室",
+      "mileage": 3731.7248,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 171,
+      "name": "西一132#阀室",
+      "mileage": 3743.6326,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 172,
+      "name": "无锡分输站",
+      "mileage": 3754.483,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 173,
+      "name": "东桥分输站",
+      "mileage": 3773.533,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 174,
+      "name": "西一133阀室",
+      "mileage": 3783.2276,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 175,
+      "name": "西一134阀室",
+      "mileage": 3792.117,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 176,
+      "name": "苏州分输站",
+      "mileage": 3797.6201,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 177,
+      "name": "西一136#阀室",
+      "mileage": 3805.0804,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 178,
+      "name": "西一137#阀室",
+      "mileage": 3812.1079,
+      "type": "valve",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 179,
+      "name": "甪直分输站",
+      "mileage": 3819.2541,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 180,
+      "name": "昆山分输站",
+      "mileage": 3832.3461,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    },
+    {
+      "id": 181,
+      "name": "白鹤末站",
+      "mileage": 3846.1981,
+      "type": "distribution",
+      "branch_name": "西一线干线东段"
+    }
+  ],
+  "branches": [
+    [
+      {
+        "id": 182,
+        "name": "煤层气端氏首站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "沁水煤层气管道"
+      },
+      {
+        "id": 183,
+        "name": "煤层气郑庄阀室",
+        "mileage": 15.7578,
+        "type": "valve",
+        "branch_name": "沁水煤层气管道"
+      },
+      {
+        "id": 184,
+        "name": "沁水压气站",
+        "mileage": 35.0,
+        "type": "compressor",
+        "branch_name": "沁水煤层气管道"
+      }
+    ],
+    [
+      {
+        "id": 185,
+        "name": "郑州压气站",
+        "mileage": 0.0,
+        "type": "compressor",
+        "branch_name": "长铝支线"
+      },
+      {
+        "id": 186,
+        "name": "长铝末站",
+        "mileage": 24.0,
+        "type": "distribution",
+        "branch_name": "长铝支线"
+      }
+    ],
+    [
+      {
+        "id": 187,
+        "name": "定远压气站",
+        "mileage": 0.0,
+        "type": "compressor",
+        "branch_name": "定合支线"
+      },
+      {
+        "id": 188,
+        "name": "定合1#阀室",
+        "mileage": 12.2497,
+        "type": "valve",
+        "branch_name": "定合支线"
+      },
+      {
+        "id": 189,
+        "name": "定合2#阀室",
+        "mileage": 24.21,
+        "type": "valve",
+        "branch_name": "定合支线"
+      },
+      {
+        "id": 190,
+        "name": "定合3#阀室",
+        "mileage": 37.8017,
+        "type": "valve",
+        "branch_name": "定合支线"
+      },
+      {
+        "id": 191,
+        "name": "定合4#阀室",
+        "mileage": 55.0499,
+        "type": "valve",
+        "branch_name": "定合支线"
+      },
+      {
+        "id": 192,
+        "name": "定合5#阀室",
+        "mileage": 69.3429,
+        "type": "valve",
+        "branch_name": "定合支线"
+      },
+      {
+        "id": 193,
+        "name": "合肥末站",
+        "mileage": 79.5999,
+        "type": "distribution",
+        "branch_name": "定合支线"
+      }
+    ],
+    [
+      {
+        "id": 194,
+        "name": "定远压气站",
+        "mileage": 0.0,
+        "type": "compressor",
+        "branch_name": "定合复线"
+      },
+      {
+        "id": 195,
+        "name": "定合复1#阀室",
+        "mileage": 11.9793,
+        "type": "valve",
+        "branch_name": "定合复线"
+      },
+      {
+        "id": 196,
+        "name": "定合复2#阀室",
+        "mileage": 32.9006,
+        "type": "valve",
+        "branch_name": "定合复线"
+      },
+      {
+        "id": 197,
+        "name": "定合复3#阀室",
+        "mileage": 55.8901,
+        "type": "valve",
+        "branch_name": "定合复线"
+      },
+      {
+        "id": 198,
+        "name": "合肥北站",
+        "mileage": 67.2999,
+        "type": "valve",
+        "branch_name": "定合复线"
+      }
+    ],
+    [
+      {
+        "id": 199,
+        "name": "龙潭分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "南芜支线"
+      },
+      {
+        "id": 200,
+        "name": "南芜1#阀室",
+        "mileage": 8.3765,
+        "type": "valve",
+        "branch_name": "南芜支线"
+      },
+      {
+        "id": 201,
+        "name": "南京分输站",
+        "mileage": 15.2,
+        "type": "distribution",
+        "branch_name": "南芜支线"
+      },
+      {
+        "id": 202,
+        "name": "南芜2#阀室",
+        "mileage": 26.6784,
+        "type": "valve",
+        "branch_name": "南芜支线"
+      },
+      {
+        "id": 203,
+        "name": "南芜3#阀室",
+        "mileage": 40.0958,
+        "type": "valve",
+        "branch_name": "南芜支线"
+      },
+      {
+        "id": 204,
+        "name": "江宁分输站",
+        "mileage": 58.2,
+        "type": "distribution",
+        "branch_name": "南芜支线"
+      },
+      {
+        "id": 205,
+        "name": "南芜5#阀室",
+        "mileage": 69.7,
+        "type": "valve",
+        "branch_name": "南芜支线"
+      },
+      {
+        "id": 206,
+        "name": "马鞍山分输站",
+        "mileage": 92.7,
+        "type": "distribution",
+        "branch_name": "南芜支线"
+      },
+      {
+        "id": 207,
+        "name": "南芜6#阀室",
+        "mileage": 114.198,
+        "type": "valve",
+        "branch_name": "南芜支线"
+      },
+      {
+        "id": 208,
+        "name": "南芜7#阀室",
+        "mileage": 116.366,
+        "type": "valve",
+        "branch_name": "南芜支线"
+      },
+      {
+        "id": 209,
+        "name": "芜湖末站",
+        "mileage": 130.0,
+        "type": "distribution",
+        "branch_name": "南芜支线"
+      }
+    ],
+    [
+      {
+        "id": 210,
+        "name": "芙蓉分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "常长支线"
+      },
+      {
+        "id": 211,
+        "name": "常长1#阀室",
+        "mileage": 11.6734,
+        "type": "valve",
+        "branch_name": "常长支线"
+      },
+      {
+        "id": 212,
+        "name": "武进分输站",
+        "mileage": 19.5,
+        "type": "distribution",
+        "branch_name": "常长支线"
+      },
+      {
+        "id": 213,
+        "name": "常长2#阀室",
+        "mileage": 40.0669,
+        "type": "valve",
+        "branch_name": "常长支线"
+      },
+      {
+        "id": 214,
+        "name": "宜兴分输站",
+        "mileage": 59.3003,
+        "type": "distribution",
+        "branch_name": "常长支线"
+      },
+      {
+        "id": 215,
+        "name": "常长3#阀室",
+        "mileage": 72.6217,
+        "type": "valve",
+        "branch_name": "常长支线"
+      },
+      {
+        "id": 216,
+        "name": "常长4#阀室",
+        "mileage": 86.0003,
+        "type": "valve",
+        "branch_name": "常长支线"
+      },
+      {
+        "id": 217,
+        "name": "长兴末站",
+        "mileage": 99.6003,
+        "type": "distribution",
+        "branch_name": "常长支线"
+      }
+    ],
+    [
+      {
+        "id": 218,
+        "name": "东桥分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "望亭电厂支线"
+      },
+      {
+        "id": 219,
+        "name": "望亭分输站",
+        "mileage": 8.2,
+        "type": "distribution",
+        "branch_name": "望亭电厂支线"
+      }
+    ],
+    [
+      {
+        "id": 220,
+        "name": "龙池分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "扬巴支线"
+      },
+      {
+        "id": 221,
+        "name": "扬子扬巴末站",
+        "mileage": 6.2,
+        "type": "distribution",
+        "branch_name": "扬巴支线"
+      }
+    ],
+    [
+      {
+        "id": 222,
+        "name": "南京分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "金陵电厂支线"
+      },
+      {
+        "id": 223,
+        "name": "金陵电厂",
+        "mileage": 3.696,
+        "type": "valve",
+        "branch_name": "金陵电厂支线"
+      }
+    ],
+    [
+      {
+        "id": 224,
+        "name": "镇江分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "金坛储气库支线"
+      },
+      {
+        "id": 225,
+        "name": "金坛1#阀室",
+        "mileage": 17.1532,
+        "type": "valve",
+        "branch_name": "金坛储气库支线"
+      },
+      {
+        "id": 226,
+        "name": "金坛分输站",
+        "mileage": 34.81,
+        "type": "distribution",
+        "branch_name": "金坛储气库支线"
+      }
+    ],
+    [
+      {
+        "id": 227,
+        "name": "甪直分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "甪宝支线"
+      },
+      {
+        "id": 228,
+        "name": "巴城分输站",
+        "mileage": 16.0,
+        "type": "distribution",
+        "branch_name": "甪宝支线"
+      },
+      {
+        "id": 229,
+        "name": "周市分输站",
+        "mileage": 32.0,
+        "type": "distribution",
+        "branch_name": "甪宝支线"
+      },
+      {
+        "id": 230,
+        "name": "太仓分输站",
+        "mileage": 45.9,
+        "type": "distribution",
+        "branch_name": "甪宝支线"
+      },
+      {
+        "id": 231,
+        "name": "宝钢4#阀室",
+        "mileage": 57.3362,
+        "type": "valve",
+        "branch_name": "甪宝支线"
+      },
+      {
+        "id": 232,
+        "name": "浏河分输站",
+        "mileage": 70.219,
+        "type": "distribution",
+        "branch_name": "甪宝支线"
+      },
+      {
+        "id": 233,
+        "name": "金石路分输站",
+        "mileage": 80.219,
+        "type": "distribution",
+        "branch_name": "甪宝支线"
+      }
+    ],
+    [
+      {
+        "id": 234,
+        "name": "金坛分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "金溧支线"
+      },
+      {
+        "id": 235,
+        "name": "金溧1#阀室",
+        "mileage": 21.6662,
+        "type": "valve",
+        "branch_name": "金溧支线"
+      },
+      {
+        "id": 236,
+        "name": "金溧2#阀室",
+        "mileage": 37.6025,
+        "type": "valve",
+        "branch_name": "金溧支线"
+      },
+      {
+        "id": 237,
+        "name": "南渡分输站",
+        "mileage": 52.3467,
+        "type": "distribution",
+        "branch_name": "金溧支线"
+      }
+    ],
+    [
+      {
+        "id": 238,
+        "name": "青山分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "西一线与青宁线青山-南京联络线"
+      },
+      {
+        "id": 239,
+        "name": "南京末站",
+        "mileage": 1.25,
+        "type": "distribution",
+        "branch_name": "西一线与青宁线青山-南京联络线"
+      }
+    ],
+    [
+      {
+        "id": 240,
+        "name": "龙潭分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "南京计量中心支线"
+      },
+      {
+        "id": 241,
+        "name": "南京计量中心",
+        "mileage": 0.5,
+        "type": "valve",
+        "branch_name": "南京计量中心支线"
+      }
+    ]
+  ],
+  "branch_names": [
+    "沁水煤层气管道",
+    "长铝支线",
+    "定合支线",
+    "定合复线",
+    "南芜支线",
+    "常长支线",
+    "望亭电厂支线",
+    "扬巴支线",
+    "金陵电厂支线",
+    "金坛储气库支线",
+    "甪宝支线",
+    "金溧支线",
+    "西一线与青宁线青山-南京联络线",
+    "南京计量中心支线"
+  ]
+}

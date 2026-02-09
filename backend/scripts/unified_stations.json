@@ -1,0 +1,831 @@
+[
+  {
+    "name": "霍尔果斯压气站",
+    "lines": {
+      "西二线": 0.0,
+      "西三线": 65.0
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "黄州分输站",
+    "lines": {
+      "西二线": 0.0
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "奎屯分输站",
+    "lines": {
+      "西二线": 408.101
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "嘉峪关压气站",
+    "lines": {
+      "西二线": 1743.101,
+      "西三线": 1743.101,
+      "西四线": 983.3
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "张掖压气站",
+    "lines": {
+      "西二线": 1933.101,
+      "西三线": 1933.101,
+      "西四线": 1183.3
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "武威分输站",
+    "lines": {
+      "西二线": 2189.101
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "洛阳分输站",
+    "lines": {
+      "西二线": 3362.8302
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "黄陂压气站",
+    "lines": {
+      "西二线": 3858.3503
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "临潼分输站",
+    "lines": {
+      "西二线": 3028.5176
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "永昌分输站",
+    "lines": {
+      "西二线": 0.02
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "姜家湾分输站",
+    "lines": {
+      "西二线": 1.303
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "独石化末站",
+    "lines": {
+      "西二线": 8.1
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "武威门站",
+    "lines": {
+      "西二线": 9.12
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "酒泉门站",
+    "lines": {
+      "西二线": 11.0
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "嘉峪关门站",
+    "lines": {
+      "西二线": 15.14
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "张掖门站",
+    "lines": {
+      "西二线": 22.93
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "富平分输站",
+    "lines": {
+      "西二线": 23.39
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "洛阳末站",
+    "lines": {
+      "西二线": 24.64
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "金昌末站",
+    "lines": {
+      "西二线": 48.029
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "精河压气站",
+    "lines": {
+      "西二线": 173.101,
+      "西三线": 173.101
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "乌苏压气站",
+    "lines": {
+      "西二线": 350.101,
+      "西三线": 350.101
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "玛纳斯压气站",
+    "lines": {
+      "西二线": 527.101,
+      "西三线": 527.101
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "昌吉分输站",
+    "lines": {
+      "西二线": 608.101,
+      "西三线": 608.101
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "大流量计量站乌鲁木齐分站",
+    "lines": {
+      "西二线": 608.101
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "乌鲁木齐压气站",
+    "lines": {
+      "西二线": 672.101,
+      "西三线": 672.101
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "吐鲁番压气站",
+    "lines": {
+      "西二线": 780.101,
+      "西三线": 780.101,
+      "西四线": 0.0
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "连木沁压气站",
+    "lines": {
+      "西二线": 875.101,
+      "西三线": 875.101,
+      "西四线": 92.5
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "了墩压气站",
+    "lines": {
+      "西二线": 1063.101,
+      "西三线": 1063.101,
+      "西四线": 282.8
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "哈密分输站",
+    "lines": {
+      "西二线": 1186.101
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "烟墩压气站",
+    "lines": {
+      "西二线": 1245.101,
+      "西三线": 1245.101,
+      "西四线": 466.5
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "红柳压气站",
+    "lines": {
+      "西二线": 1381.101,
+      "西三线": 1381.101,
+      "西四线": 602.8
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "瓜州压气站",
+    "lines": {
+      "西二线": 1574.101,
+      "西三线": 1574.101,
+      "西四线": 800.3
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "永昌压气站",
+    "lines": {
+      "西二线": 2080.7266,
+      "西三线": 2080.7266,
+      "西四线": 1344.4
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "古浪压气站",
+    "lines": {
+      "西二线": 2285.101,
+      "西三线": 2285.101,
+      "西四线": 1592.7
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "中卫压气站",
+    "lines": {
+      "西二线": 2434.0003,
+      "西三线": 2434.0003,
+      "西四线": 1745.0
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "海原压气站",
+    "lines": {
+      "西二线": 2556.5003,
+      "西三线": 2559.3003
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "固原分输站",
+    "lines": {
+      "西二线": 2649.9803
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "彭阳压气站",
+    "lines": {
+      "西二线": 2688.3903
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "平泉分输站",
+    "lines": {
+      "西二线": 2742.6903
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "泾川分输站",
+    "lines": {
+      "西二线": 2794.7003
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "灵台压气站",
+    "lines": {
+      "西二线": 2840.4203,
+      "西三线": 2863.3003
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "乾县西分输站",
+    "lines": {
+      "西二线": 2923.5803
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "乾县东分输站",
+    "lines": {
+      "西二线": 2947.8803
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "礼泉分输站",
+    "lines": {
+      "西二线": 2971.0103
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "泾阳分输站",
+    "lines": {
+      "西二线": 2995.5203
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "高陵压气站",
+    "lines": {
+      "西二线": 3011.3903
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "渭南煤层气站",
+    "lines": {
+      "西二线": 3057.7403
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "渭南京蓝站",
+    "lines": {
+      "西二线": 3057.7403
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "华阴分输站",
+    "lines": {
+      "西二线": 3104.7003
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "潼关压气站",
+    "lines": {
+      "西二线": 3151.1403
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "三门峡分输站",
+    "lines": {
+      "西二线": 3225.4402
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "洛宁压气站",
+    "lines": {
+      "西二线": 3298.5302
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "鲁山压气站",
+    "lines": {
+      "西二线": 3459.6202
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "平顶山分输站",
+    "lines": {
+      "西二线": 3489.2702
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "社旗分输站",
+    "lines": {
+      "西二线": 3556.0823
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "南阳分输站",
+    "lines": {
+      "西二线": 3598.1703
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "枣阳压气站",
+    "lines": {
+      "西二线": 3653.1203,
+      "西三线": 3668.2003
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "随州分输站",
+    "lines": {
+      "西二线": 3714.9503
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "孝感分输站",
+    "lines": {
+      "西二线": 3810.7403
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "黄冈分输站",
+    "lines": {
+      "西二线": 3941.1503
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "蕲春分输站",
+    "lines": {
+      "西二线": 4001.1003
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "武穴压气站",
+    "lines": {
+      "西二线": 4042.5663
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "九江分输站",
+    "lines": {
+      "西二线": 4076.6663
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "昌北分输站",
+    "lines": {
+      "西二线": 4176.0662
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "南昌压气站",
+    "lines": {
+      "西二线": 4227.6662
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "樟树分输站",
+    "lines": {
+      "西二线": 4302.3661
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "吉安压气站",
+    "lines": {
+      "西二线": 4404.6662
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "赣州分输站",
+    "lines": {
+      "西二线": 4580.0662
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "南雄分输站",
+    "lines": {
+      "西二线": 4668.7463
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "西二线韶关站",
+    "lines": {
+      "西二线": 4717.6663
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "广州压气站",
+    "lines": {
+      "西二线": 4910.6663
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "海兴分输站",
+    "lines": {
+      "西三线": 0.0
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "仙桃联络站",
+    "lines": {
+      "西三线": 3917.1003
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "吉安分输站",
+    "lines": {
+      "西三线": 0.0
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "角美分输站",
+    "lines": {
+      "西三线": 0.0
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "伊宁首站",
+    "lines": {
+      "西三线": 0.0
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "安沙分输站",
+    "lines": {
+      "西三线": 0.0
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "东田分输站",
+    "lines": {
+      "西三线": 612.2995
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "福州末站",
+    "lines": {
+      "西三线": 812.4902
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "增城分输站",
+    "lines": {
+      "西三线": 0.95
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "石河子分输站",
+    "lines": {
+      "西三线": 1.76
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "南安分输联络站",
+    "lines": {
+      "西三线": 8.9
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "石潭村站",
+    "lines": {
+      "西三线": 9.25
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "新气管道潜江站",
+    "lines": {
+      "西三线": 19.02
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "中海油青口分输站",
+    "lines": {
+      "西三线": 21.6
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "望城末站",
+    "lines": {
+      "西三线": 44.87
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "河源分输站",
+    "lines": {
+      "西三线": 101.4
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "于都分输站",
+    "lines": {
+      "西三线": 163.4201
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "瑞金分输站",
+    "lines": {
+      "西三线": 211.5895
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "西一盐池压气站",
+    "lines": {
+      "西三线": 212.15
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "长汀分输站",
+    "lines": {
+      "西三线": 272.0362
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "揭阳分输站",
+    "lines": {
+      "西三线": 328.4998
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "西一靖边压气站",
+    "lines": {
+      "西三线": 375.15
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "潮州分输站",
+    "lines": {
+      "西三线": 379.9998
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "龙岩分输站",
+    "lines": {
+      "西三线": 403.0002
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "漳州分输站",
+    "lines": {
+      "西三线": 500.8703
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "海沧分输站",
+    "lines": {
+      "西三线": 548.8004
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "同安分输站",
+    "lines": {
+      "西三线": 568.4704
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "泉州分输站",
+    "lines": {
+      "西三线": 636.1003
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "仙游分输站",
+    "lines": {
+      "西三线": 697.1602
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "莆田分输站",
+    "lines": {
+      "西三线": 763.6102
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "福清分输站",
+    "lines": {
+      "西三线": 801.9402
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "山丹分输站",
+    "lines": {
+      "西三线": 1989.101
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "中卫二站",
+    "lines": {
+      "西三线": 2439.4003
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "彭阳分输压气站",
+    "lines": {
+      "西三线": 2692.4003
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "乾县分输清管站",
+    "lines": {
+      "西三线": 2966.4003
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "富平分输压气站",
+    "lines": {
+      "西三线": 3079.7003
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "渭南分输清管站",
+    "lines": {
+      "西三线": 3132.0003
+    },
+    "type": "unknown"
+  },
+  {
+    "name": "商洛分输压气站",
+    "lines": {
+      "西三线": 3281.4003
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "商南分输站",
+    "lines": {
+      "西三线": 3373.7003
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "西峡北分输站",
+    "lines": {
+      "西三线": 3397.2003
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "西峡分输压气站",
+    "lines": {
+      "西三线": 3472.5003
+    },
+    "type": "compressor"
+  },
+  {
+    "name": "京山分输站",
+    "lines": {
+      "西三线": 3831.6003
+    },
+    "type": "distribution"
+  },
+  {
+    "name": "民勤清管站",
+    "lines": {
+      "西四线": 1460.0
+    },
+    "type": "unknown"
+  }
+]

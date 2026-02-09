@@ -1,0 +1,270 @@
+// 中缅干线
+const ZM_TRUNK_NODES = [
+    { name: '跨境点', mileage: 0.0, type: 'valve' },
+    { name: '瑞丽分输站', mileage: 4.51, type: 'distribution' },
+    { name: '中缅1#阀室', mileage: 21.462, type: 'valve' },
+    { name: '中缅2#阀室', mileage: 43.573, type: 'valve' },
+    { name: '中缅3#阀室', mileage: 59.774, type: 'valve' },
+    { name: '中缅4#阀室', mileage: 85.929, type: 'valve' },
+    { name: '芒市分输站', mileage: 109.07, type: 'distribution' },
+    { name: '中缅5#阀室', mileage: 117.907, type: 'valve' },
+    { name: '中缅6#阀室', mileage: 135.127, type: 'valve' },
+    { name: '龙陵分输站', mileage: 156.73, type: 'distribution' },
+    { name: '中缅7#阀室', mileage: 164.907, type: 'valve' },
+    { name: '中缅8#阀室', mileage: 196.593, type: 'valve' },
+    { name: '中缅9#阀室', mileage: 224.54, type: 'valve' },
+    { name: '中缅10#阀室', mileage: 240.127, type: 'valve' },
+    { name: '保山压气站', mileage: 253.29, type: 'compressor' },
+    { name: '中缅11#阀室', mileage: 264.028, type: 'valve' },
+    { name: '中缅12#阀室', mileage: 276.99, type: 'valve' },
+    { name: '中缅13#阀室', mileage: 308.13, type: 'valve' },
+    { name: '中缅14#阀室', mileage: 334.72, type: 'valve' },
+    { name: '中缅15#阀室', mileage: 361.84, type: 'valve' },
+    { name: '中缅16#阀室', mileage: 391.542, type: 'valve' },
+    { name: '弥渡分输站', mileage: 412.8, type: 'distribution' },
+    { name: '中缅17#阀室', mileage: 437.6, type: 'valve' },
+    { name: '中缅18#阀室', mileage: 469.682, type: 'valve' },
+    { name: '中缅19#阀室', mileage: 504.188, type: 'valve' },
+    { name: '中缅20#阀室', mileage: 525.64, type: 'valve' },
+    { name: '中缅21#阀室', mileage: 547.65, type: 'valve' },
+    { name: '楚雄分输站', mileage: 569.52, type: 'distribution' },
+    { name: '中缅22#阀室', mileage: 595.117, type: 'valve' },
+    { name: '禄丰分输站', mileage: 617.82, type: 'distribution' },
+    { name: '中缅23#阀室', mileage: 648.697, type: 'valve' },
+    { name: '中缅24#阀室', mileage: 681.03, type: 'valve' },
+    { name: '中缅25#阀室', mileage: 712.348, type: 'valve' },
+    { name: '中缅26#阀室', mileage: 735.108, type: 'valve' },
+    { name: '寻甸分输站', mileage: 760.97, type: 'distribution' },
+    { name: '中缅27#阀室', mileage: 781.087, type: 'valve' },
+    { name: '中缅28#阀室', mileage: 796.1, type: 'valve' },
+    { name: '曲靖分输站', mileage: 820.93, type: 'distribution' },
+    { name: '中缅29#阀室', mileage: 831.855, type: 'valve' },
+    { name: '中缅30#阀室', mileage: 854.35, type: 'valve' },
+    { name: '中缅31#阀室', mileage: 870.15, type: 'valve' },
+    { name: '中缅32#阀室', mileage: 902.164, type: 'valve' },
+    { name: '中缅33#阀室', mileage: 932.68, type: 'valve' },
+    { name: '中缅34#阀室', mileage: 949.223, type: 'valve' },
+    { name: '中缅35#阀室', mileage: 980.52, type: 'valve' },
+    { name: '中缅35A#阀室', mileage: 1003.339, type: 'valve' },
+    { name: '中缅36#阀室', mileage: 1017.564, type: 'valve' },
+    { name: '中缅37#阀室', mileage: 1038.35, type: 'valve' },
+    { name: '中缅38#阀室', mileage: 1062.04, type: 'valve' },
+    { name: '中缅39#阀室', mileage: 1084.818, type: 'valve' },
+    { name: '安顺分输站', mileage: 1104.03, type: 'distribution' },
+    { name: '中缅40#阀室', mileage: 1125.79, type: 'valve' },
+    { name: '中缅41#阀室', mileage: 1147.48, type: 'valve' },
+    { name: '中缅42#阀室', mileage: 1164.404, type: 'valve' },
+    { name: '贵阳压气站', mileage: 1182.235, type: 'compressor' },
+    { name: '中缅43#阀室', mileage: 1201.429, type: 'valve' },
+    { name: '中缅44#阀室', mileage: 1224.73, type: 'valve' },
+    { name: '中缅45#阀室', mileage: 1247.279, type: 'valve' },
+    { name: '中缅46#阀室', mileage: 1266.58, type: 'valve' },
+    { name: '都匀分输站', mileage: 1285.85, type: 'distribution' },
+    { name: '中缅47#阀室', mileage: 1309.659, type: 'valve' },
+    { name: '中缅48#阀室', mileage: 1334.11, type: 'valve' },
+    { name: '中缅49#阀室', mileage: 1353.6911, type: 'valve' },
+    { name: '中缅50#阀室', mileage: 1377.72, type: 'valve' },
+    { name: '中缅51#阀室', mileage: 1409.342, type: 'valve' },
+    { name: '中缅52#阀室', mileage: 1437.586, type: 'valve' },
+    { name: '中缅53#阀室', mileage: 1465.957, type: 'valve' },
+    { name: '河池压气站', mileage: 1493.96, type: 'compressor' },
+    { name: '中缅54#阀室', mileage: 1522.13, type: 'valve' },
+    { name: '宜州分输站', mileage: 1541.97, type: 'distribution' },
+    { name: '中缅55#阀室', mileage: 1554.84, type: 'valve' },
+    { name: '忻城分输站', mileage: 1586.97, type: 'distribution' },
+    { name: '中缅56#阀室', mileage: 1613.888, type: 'valve' },
+    { name: '中缅57#阀室', mileage: 1639.572, type: 'valve' },
+    { name: '中缅58#阀室', mileage: 1651.493, type: 'valve' },
+    { name: '来宾分输站', mileage: 1670.96, type: 'distribution' },
+    { name: '中缅59#阀室', mileage: 1702.671, type: 'valve' },
+    { name: '中缅60#阀室', mileage: 1725.705, type: 'valve' },
+    { name: '贵港压气站', mileage: 1744.21, type: 'compressor' },
+] as const
+
+export const zmtrunkStations = generatePipelineStationsWithValves(ZM_TRUNK_NODES, '中缅干线', 'ZM-TRUNK', 40)
+export const zmtrunkPipelines = generatePipelineSegments(zmtrunkStations, '中缅干线', 'ZM-TRUNK', MULTI_PIPELINE_COLORS['中缅线'])
+
+// 丽江支线
+const ZM_LIJIANG_NODES = [
+    { name: '弥渡分输站', mileage: 0.0, type: 'distribution' },
+    { name: '大理分输站', mileage: 14.6, type: 'distribution' },
+    { name: '丽江1#阀室', mileage: 45.893, type: 'valve' },
+    { name: '丽江2#阀室', mileage: 68.55, type: 'valve' },
+    { name: '丽江3#阀室', mileage: 94.31, type: 'valve' },
+    { name: '丽江4#阀室', mileage: 119.556, type: 'valve' },
+    { name: '丽江5#阀室', mileage: 148.385, type: 'valve' },
+    { name: '丽江6#阀室', mileage: 160.39, type: 'valve' },
+    { name: '丽江7#阀室', mileage: 177.071, type: 'valve' },
+    { name: '丽江末站', mileage: 199.2, type: 'distribution' },
+] as const
+
+export const zmlijiangStations = generatePipelineStationsWithValves(ZM_LIJIANG_NODES, '丽江支线', 'ZM-LIJIANG', 20)
+export const zmlijiangPipelines = generatePipelineSegments(zmlijiangStations, '丽江支线', 'ZM-LIJIANG', MULTI_PIPELINE_COLORS['中缅支线'])
+
+// 玉溪支线
+const ZM_YUXI_NODES = [
+    { name: '禄丰分输站', mileage: 0.0, type: 'distribution' },
+    { name: '玉溪1#阀室', mileage: 24.2, type: 'valve' },
+    { name: '安宁分输站', mileage: 42.66, type: 'distribution' },
+    { name: '玉溪2#阀室', mileage: 69.637, type: 'valve' },
+    { name: '玉溪3#阀室', mileage: 93.08, type: 'valve' },
+    { name: '玉溪末站', mileage: 112.41, type: 'distribution' },
+] as const
+
+export const zmyuxiStations = generatePipelineStationsWithValves(ZM_YUXI_NODES, '玉溪支线', 'ZM-YUXI', 20)
+export const zmyuxiPipelines = generatePipelineSegments(zmyuxiStations, '玉溪支线', 'ZM-YUXI', MULTI_PIPELINE_COLORS['中缅支线'])
+
+// 都匀支线
+const ZM_DUYUN_NODES = [
+    { name: '都匀分输站', mileage: 0.0, type: 'distribution' },
+    { name: '都匀1#阀室', mileage: 15.169, type: 'valve' },
+    { name: '都匀末站', mileage: 33.92, type: 'distribution' },
+] as const
+
+export const zmduyunStations = generatePipelineStationsWithValves(ZM_DUYUN_NODES, '都匀支线', 'ZM-DUYUN', 20)
+export const zmduyunPipelines = generatePipelineSegments(zmduyunStations, '都匀支线', 'ZM-DUYUN', MULTI_PIPELINE_COLORS['中缅支线'])
+
+// 桂林支线
+const ZM_GUILIN_NODES = [
+    { name: '桂林1#阀室', mileage: 20.984, type: 'valve' },
+    { name: '柳州分输站', mileage: 42.73, type: 'distribution' },
+    { name: '桂林2#阀室', mileage: 66.932, type: 'valve' },
+    { name: '桂林3#阀室', mileage: 90.37, type: 'valve' },
+    { name: '桂林4#阀室', mileage: 112.394, type: 'valve' },
+    { name: '桂林5#阀室', mileage: 132.887, type: 'valve' },
+    { name: '桂林6#阀室', mileage: 155.587, type: 'valve' },
+    { name: '永福分输站', mileage: 173.05, type: 'distribution' },
+    { name: '桂林末站', mileage: 202.45, type: 'distribution' },
+] as const
+
+export const zmguilinStations = generatePipelineStationsWithValves(ZM_GUILIN_NODES, '桂林支线', 'ZM-GUILIN', 30)
+export const zmguilinPipelines = generatePipelineSegments(zmguilinStations, '桂林支线', 'ZM-GUILIN', MULTI_PIPELINE_COLORS['中缅支线'])
+
+// 钦州支线
+const ZM_QINZHOU_NODES = [
+    { name: '南宁分输站', mileage: 0.0, type: 'distribution' },
+    { name: '钦州1#阀室', mileage: 19.668, type: 'valve' },
+    { name: '钦州2#阀室', mileage: 41.992, type: 'valve' },
+    { name: '钦州3#阀室', mileage: 59.787, type: 'valve' },
+    { name: '钦州分输站', mileage: 80.699763, type: 'distribution' },
+    { name: '钦州4#阀室', mileage: 96.314, type: 'valve' },
+    { name: '钦州5#阀室', mileage: 103.97, type: 'valve' },
+    { name: '钦州6#阀室', mileage: 118.34, type: 'valve' },
+    { name: '大番坡分输站', mileage: 0.0, type: 'distribution' },
+    { name: '河东分输站', mileage: 0.0, type: 'distribution' },
+    { name: '钦州7#阀室', mileage: 127.581, type: 'valve' },
+    { name: '钦州港分输站', mileage: 141.24, type: 'distribution' },
+] as const
+
+export const zmqinzhouStations = generatePipelineStationsWithValves(ZM_QINZHOU_NODES, '钦州支线', 'ZM-QINZHOU', 20)
+export const zmqinzhouPipelines = generatePipelineSegments(zmqinzhouStations, '钦州支线', 'ZM-QINZHOU', MULTI_PIPELINE_COLORS['中缅支线'])
+
+// 防城港支线
+const ZM_FANGCHENGGANG_NODES = [
+    { name: '钦州分输站', mileage: 0.0, type: 'distribution' },
+    { name: '防城港1#阀室', mileage: 12.089, type: 'valve' },
+    { name: '防城港2#阀室', mileage: 32.315, type: 'valve' },
+    { name: '防城港3#阀室', mileage: 48.051, type: 'valve' },
+    { name: '防城港末站', mileage: 62.51, type: 'distribution' },
+] as const
+
+export const zmfangchenggangStations = generatePipelineStationsWithValves(ZM_FANGCHENGGANG_NODES, '防城港支线', 'ZM-FANGCHENGGANG', 20)
+export const zmfangchenggangPipelines = generatePipelineSegments(zmfangchenggangStations, '防城港支线', 'ZM-FANGCHENGGANG', MULTI_PIPELINE_COLORS['中缅支线'])
+
+// 河池支线
+const ZM_HECHI_NODES = [
+    { name: '河池压气站', mileage: 0.0, type: 'compressor' },
+    { name: '河池末站', mileage: 23.2, type: 'distribution' },
+] as const
+
+export const zmhechiStations = generatePipelineStationsWithValves(ZM_HECHI_NODES, '河池支线', 'ZM-HECHI', 20)
+export const zmhechiPipelines = generatePipelineSegments(zmhechiStations, '河池支线', 'ZM-HECHI', MULTI_PIPELINE_COLORS['中缅支线'])
+
+// 自动连接支线到干线
+const TRUNK_REF = zmtrunkStations // 引用主干线数据
+
+// 连接 丽江支线
+if (zmlijiangPipelines.length > 0 && ZM_LIJIANG_NODES.length > 0) {
+    const startNodeName = ZM_LIJIANG_NODES[0].name
+    const trunkStation = TRUNK_REF.find(s => s.name === startNodeName)
+    if (trunkStation) {
+        zmlijiangPipelines[0].startStationId = trunkStation.id
+    }
+}
+
+// 连接 玉溪支线
+if (zmyuxiPipelines.length > 0 && ZM_YUXI_NODES.length > 0) {
+    const startNodeName = ZM_YUXI_NODES[0].name
+    const trunkStation = TRUNK_REF.find(s => s.name === startNodeName)
+    if (trunkStation) {
+        zmyuxiPipelines[0].startStationId = trunkStation.id
+    }
+}
+
+// 连接 都匀支线
+if (zmduyunPipelines.length > 0 && ZM_DUYUN_NODES.length > 0) {
+    const startNodeName = ZM_DUYUN_NODES[0].name
+    const trunkStation = TRUNK_REF.find(s => s.name === startNodeName)
+    if (trunkStation) {
+        zmduyunPipelines[0].startStationId = trunkStation.id
+    }
+}
+
+// 连接 桂林支线
+if (zmguilinPipelines.length > 0 && ZM_GUILIN_NODES.length > 0) {
+    const startNodeName = ZM_GUILIN_NODES[0].name
+    const trunkStation = TRUNK_REF.find(s => s.name === startNodeName)
+    if (trunkStation) {
+        zmguilinPipelines[0].startStationId = trunkStation.id
+    }
+}
+
+// 连接 钦州支线
+if (zmqinzhouPipelines.length > 0 && ZM_QINZHOU_NODES.length > 0) {
+    const startNodeName = ZM_QINZHOU_NODES[0].name
+    const trunkStation = TRUNK_REF.find(s => s.name === startNodeName)
+    if (trunkStation) {
+        zmqinzhouPipelines[0].startStationId = trunkStation.id
+    }
+}
+
+// 连接 防城港支线
+if (zmfangchenggangPipelines.length > 0 && ZM_FANGCHENGGANG_NODES.length > 0) {
+    const startNodeName = ZM_FANGCHENGGANG_NODES[0].name
+    const trunkStation = TRUNK_REF.find(s => s.name === startNodeName)
+    if (trunkStation) {
+        zmfangchenggangPipelines[0].startStationId = trunkStation.id
+    }
+}
+
+// 连接 河池支线
+if (zmhechiPipelines.length > 0 && ZM_HECHI_NODES.length > 0) {
+    const startNodeName = ZM_HECHI_NODES[0].name
+    const trunkStation = TRUNK_REF.find(s => s.name === startNodeName)
+    if (trunkStation) {
+        zmhechiPipelines[0].startStationId = trunkStation.id
+    }
+}
+
+// 合并所有数据 (中缅系列)
+export const zhongmianStations = [
+    ...zmtrunkStations,
+    ...zmlijiangStations,
+    ...zmyuxiStations,
+    ...zmduyunStations,
+    ...zmguilinStations,
+    ...zmqinzhouStations,
+    ...zmfangchenggangStations,
+    ...zmhechiStations,
+]
+
+export const zhongmianPipelines = [
+    ...zmtrunkPipelines,
+    ...zmlijiangPipelines,
+    ...zmyuxiPipelines,
+    ...zmduyunPipelines,
+    ...zmguilinPipelines,
+    ...zmqinzhouPipelines,
+    ...zmfangchenggangPipelines,
+    ...zmhechiPipelines,
+]

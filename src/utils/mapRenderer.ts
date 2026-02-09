@@ -14,6 +14,54 @@ export const PRESSURE_COLORS = {
     [PressureLevel.LOW]: '#22c55e',            // 绿色 - 低压
 } as const
 
+/**
+ * 注入地图标记样式
+ */
+function injectMarkerStyles() {
+    const styleId = 'pipeline-marker-styles'
+    if (document.getElementById(styleId)) return
+
+    const style = document.createElement('style')
+    style.id = styleId
+    style.textContent = `
+        @keyframes flash-animation {
+            0% { opacity: 1; filter: drop-shadow(0 0 5px #00d4ff); transform: scale(1); }
+            50% { opacity: 0.6; filter: drop-shadow(0 0 15px #00d4ff); transform: scale(1.1); }
+            100% { opacity: 1; filter: drop-shadow(0 0 5px #00d4ff); transform: scale(1); }
+        }
+        
+        .compressor-marker {
+            width: 0;
+            height: 0;
+            border-bottom: 24px solid #00d4ff;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            position: relative;
+            animation: flash-animation 2s infinite ease-in-out;
+            cursor: pointer;
+            width: 30px; /* Width of the bottom */
+            display: flex;
+            justify-content: center;
+        }
+
+        .compressor-marker::after {
+            content: '';
+            position: absolute;
+            top: 24px;
+            left: -10px;
+            width: 50px; /* 30 + 10 + 10 */
+            height: 4px;
+            background: rgba(0, 212, 255, 0.3);
+            border-radius: 50%;
+            filter: blur(4px);
+        }
+    `
+    document.head.appendChild(style)
+}
+
+// 立即注入样式
+injectMarkerStyles()
+
 // 状态颜色映射
 export const STATUS_COLORS = {
     [PipelineStatus.NORMAL]: '#22c55e',        // 绿色 - 正常
@@ -24,7 +72,9 @@ export const STATUS_COLORS = {
 
 // 管线类别颜色映射(深色主题优化)
 export const PIPELINE_CATEGORY_COLORS: Record<string, string> = {
-    '中缅线': '#ff4444',      // 鲜红色
+    '西一线': '#FF5722',      // 深橙色 - 西气东输一线
+    '中缅线': '#4caf50',      // 绿色
+    '中缅支线': '#8bc34a',    // 浅绿色 (支线颜色)
     '中贵线': '#00d4ff',      // 青色
     '西二线': '#ff9800',      // 橙色
     '西三线': '#9c27b0',      // 紫色
@@ -34,6 +84,9 @@ export const PIPELINE_CATEGORY_COLORS: Record<string, string> = {
     '阿拉支干线': '#00bcd4',  // 深青色
     '闽粤支干线': '#e91e63',  // 粉红色
     '广南/广西': '#ff00ff',   // 品红色
+    '广南支干线': '#ff5722',  // 深橙色
+    '广深支干线': '#9c27b0',  // 紫色
+    '广西管道': '#00bcd4',    // 青色
     '海南': '#00ff00',        // 亮绿色
     'LNG外输': '#ffff00',     // 黄色
     '其他': '#999999',        // 灰色
@@ -59,7 +112,18 @@ export function getStatusColor(status: PipelineStatus): string {
  */
 export function getPipelineCategoryColor(category: string): string {
     const normalizedCategory = category.trim()
-    return PIPELINE_CATEGORY_COLORS[normalizedCategory] || PIPELINE_CATEGORY_COLORS['其他']
+
+    // 如果有精确匹配，直接返回
+    if (PIPELINE_CATEGORY_COLORS[normalizedCategory]) {
+        return PIPELINE_CATEGORY_COLORS[normalizedCategory]
+    }
+
+    // 模糊匹配: 包含"支线"的统一使用中缅支线颜色
+    if (normalizedCategory.includes('支线')) {
+        return PIPELINE_CATEGORY_COLORS['中缅支线']
+    }
+
+    return PIPELINE_CATEGORY_COLORS['其他']
 }
 
 /**
@@ -156,7 +220,9 @@ export function renderPipelineLines(
             const strokeStyle = line.status === PipelineStatus.MAINTENANCE ? 'dashed' : 'solid'
 
             // 根据压力等级调整粗细
-            const baseWidth = line.pressureLevel === PressureLevel.HIGH ? 6 : 4
+            // 特殊逻辑：如果是支线，则线条更细 (2px)
+            const isBranch = category.includes('支线')
+            const baseWidth = isBranch ? 2 : (line.pressureLevel === PressureLevel.HIGH ? 6 : 4)
 
             const path = line.path.map(p => [p.longitude, p.latitude])
 
@@ -332,7 +398,7 @@ export function renderPipelineNodes(
     if (!AMap) return []
 
     const overlays: any[] = []
-    const nodeOverlayMap = new Map<string, { marker: any; text: any; isValve: boolean }>()
+    const nodeOverlayMap = new Map<string, { markers: any[]; isValve: boolean }>()
 
     // 获取当前缩放级别
     const currentZoom = map.getZoom()
@@ -340,93 +406,165 @@ export function renderPipelineNodes(
 
     nodes.forEach(node => {
         try {
-            const isSource = sourceNodes.includes(node.name)
-            const isCompressor = compressorStations.includes(node.name) || node.name.includes('压气站')
-            const isValve = isValveRoom(node.name)
-            const isImportant = isSource || isCompressor || isImportantStation(node.name)
+            // 判定节点类型
+            const isCompressor = node.name.includes('压气站') || compressorStations.includes(node.name) || (node.type as any) === 'compressor'
+            const isDistribution = node.name.includes('分输站') || node.name.includes('门站') || node.name.includes('末站') || (node.type as any) === 'distribution' || (node.type as any) === 'station'
+            const isValve = isValveRoom(node.name) || (node.type as any) === 'valve'
+            const isImportant = isCompressor || isDistribution
 
-            // 根据类型选择颜色
-            let color = '#00ff88' // 默认亮绿色
-            if (isSource) {
-                color = '#ffd700' // 金黄色 - 气源
-            } else if (isCompressor) {
-                color = '#00d4ff' // 青色 - 压气站
-            } else if (isValve) {
-                color = '#ff9800' // 橙色 - 阀室
+            // 1. 压气站：梯形、大尺寸、闪烁
+            if (isCompressor) {
+                // 获取旋转角度 (如果存在)
+                const rotation = node.properties?.rotation || 0
+
+                // 创建容器用于旋转
+                const container = document.createElement('div')
+                container.style.transform = `rotate(${rotation}deg)`
+                container.style.transformOrigin = 'center center'
+
+                // 创建梯形标记
+                const markerContent = document.createElement('div')
+                markerContent.className = 'compressor-marker'
+                container.appendChild(markerContent)
+
+                const marker = new AMap.Marker({
+                    position: [node.coordinate.longitude, node.coordinate.latitude],
+                    content: container,
+                    // 修正 offset:
+                    // 原始: offset: new AMap.Pixel(-15, -24)
+                    // 旋转后: 
+                    // 0度(向上): 底部中心在(0,0), visual(-25, -24)?
+                    // 90度(向右): visual center becomes left center?
+                    // Let's stick with center alignment for simplicity.
+                    // If we rotate around center, we need offset to point to center of the icon.
+                    // compressor-marker 30px w, 24px h.
+                    // Center is (15, 12).
+                    // offset should be (-15, -12).
+                    offset: new AMap.Pixel(-15, -12),
+                    zIndex: 120,
+                    extData: { type: 'compressor' }
+                })
+
+                // 调整文字位置
+                const text = new AMap.Text({
+                    text: node.name,
+                    position: [node.coordinate.longitude, node.coordinate.latitude],
+                    offset: new AMap.Pixel(0, 10), // 梯形下方
+                    style: {
+                        'font-size': '14px',
+                        'font-weight': 'bold',
+                        'color': '#00d4ff',
+                        'background-color': 'rgba(0,0,0,0.7)',
+                        'border-radius': '4px',
+                        'padding': '2px 6px',
+                        'border': '1px solid #00d4ff'
+                    },
+                    zIndex: 121
+                })
+
+                bindClickEvents(marker, text, node, onNodeClick)
+                map.add([marker, text])
+                overlays.push(marker, text)
+                nodeOverlayMap.set(node.id, { markers: [marker, text], isValve: false })
+            }
+            // 2. 分输站/输气站：中等尺寸、方形或圆形
+            else if (isDistribution) {
+                // 使用较大的方形或圆形
+                const radius = 8 // 比阀室大
+                const color = '#ffd700' // 金黄色
+
+                const marker = new AMap.CircleMarker({
+                    center: [node.coordinate.longitude, node.coordinate.latitude],
+                    radius: radius,
+                    fillColor: color,
+                    fillOpacity: 0.9,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2,
+                    zIndex: 110,
+                })
+
+                const text = new AMap.Text({
+                    text: node.name,
+                    position: [node.coordinate.longitude, node.coordinate.latitude],
+                    offset: new AMap.Pixel(0, -15),
+                    style: {
+                        'font-size': '12px',
+                        'color': color,
+                        'background-color': 'rgba(0,0,0,0.6)',
+                        'border-radius': '2px',
+                        'padding': '2px 4px',
+                        'border': 'none'
+                    },
+                    zIndex: 111
+                })
+
+                bindClickEvents(marker, text, node, onNodeClick)
+                map.add([marker, text])
+                overlays.push(marker, text)
+                nodeOverlayMap.set(node.id, { markers: [marker, text], isValve: false })
+            }
+            // 3. 阀室：小尺寸、圆形
+            else { // 默认为阀室或其他小节点
+                const radius = 5 // 较小
+                const color = '#e0e0e0' // 灰白色
+
+                const marker = new AMap.CircleMarker({
+                    center: [node.coordinate.longitude, node.coordinate.latitude],
+                    radius: radius,
+                    fillColor: color,
+                    fillOpacity: 0.8,
+                    strokeColor: '#666',
+                    strokeWeight: 1,
+                    zIndex: 100,
+                })
+
+                const text = new AMap.Text({
+                    text: node.name,
+                    position: [node.coordinate.longitude, node.coordinate.latitude],
+                    offset: new AMap.Pixel(8, 0),
+                    style: {
+                        'font-size': '10px',
+                        'color': '#ccc',
+                        'background-color': 'transparent',
+                        'border': 'none'
+                    },
+                    zIndex: 101
+                })
+
+                bindClickEvents(marker, text, node, onNodeClick)
+                map.add([marker, text])
+                overlays.push(marker, text)
+                nodeOverlayMap.set(node.id, { markers: [marker, text], isValve: true })
+
+                // 初始显示状态
+                if (currentZoom < 8) {
+                    marker.hide()
+                    text.hide()
+                }
             }
 
-            // 根据缩放级别计算大小
-            const radius = getMarkerRadiusByZoom(currentZoom, isImportant)
-            const fontSize = getFontSizeByZoom(currentZoom, isImportant)
-
-            // 创建标记
-            const marker = new AMap.CircleMarker({
-                center: [node.coordinate.longitude, node.coordinate.latitude],
-                radius: radius,
-                fillColor: color,
-                fillOpacity: 0.9,
-                strokeColor: '#ffffff',
-                strokeWeight: isImportant ? 2 : 1,
-                zIndex: isImportant ? 110 : 100,
-            })
-
-            // 创建文字标签
-            const text = new AMap.Text({
-                text: node.name,
-                position: [node.coordinate.longitude, node.coordinate.latitude],
-                offset: new AMap.Pixel(radius + 4, -5),
-                style: {
-                    'font-size': fontSize,
-                    'font-weight': isImportant ? '600' : '400',
-                    'font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                    'color': color,
-                    'background-color': 'rgba(17, 20, 24, 0.85)',
-                    'border': isImportant ? '1px solid rgba(255, 255, 255, 0.2)' : 'none',
-                    'padding': isImportant ? '4px 8px' : '2px 5px',
-                    'border-radius': '4px',
-                    'white-space': 'nowrap',
-                },
-                zIndex: isImportant ? 111 : 101,
-            })
-
-            // 绑定点击事件
-            const handleClick = () => {
-                if (onNodeClick) onNodeClick({ node, position: node.coordinate })
-            }
-            marker.on('click', handleClick)
-            text.on('click', handleClick)
-
-            // 添加到地图
-            map.add([marker, text])
-            overlays.push(marker, text)
-
-            // 存储映射关系，用于缩放时更新显示
-            nodeOverlayMap.set(node.id, { marker, text, isValve })
-
-            // 初始状态：如果缩放级别低于8且是阀室，则隐藏
-            if (currentZoom < 8 && isValve) {
-                marker.hide()
-                text.hide()
-            }
         } catch (error) {
             console.error(`❌ 渲染节点 ${node.name} 失败:`, error)
         }
     })
+
+    // 辅助函数：绑定事件
+    function bindClickEvents(marker: any, text: any, node: PipelineNode, callback?: Function) {
+        const handleClick = () => {
+            if (callback) callback({ node, position: node.coordinate })
+        }
+        marker.on('click', handleClick)
+        text.on('click', handleClick)
+    }
 
     // 监听缩放事件，动态显示/隐藏阀室
     const zoomHandler = () => {
         const zoom = map.getZoom()
         const showValves = zoom >= 8 // 缩放级别 >= 8 时显示阀室
 
-        nodeOverlayMap.forEach(({ marker, text, isValve }) => {
+        nodeOverlayMap.forEach(({ markers, isValve }) => {
             if (isValve) {
-                if (showValves) {
-                    marker.show()
-                    text.show()
-                } else {
-                    marker.hide()
-                    text.hide()
-                }
+                markers.forEach(m => showValves ? m.show() : m.hide())
             }
         })
     }

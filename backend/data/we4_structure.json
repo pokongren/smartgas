@@ -1,0 +1,497 @@
+{
+  "pipeline_name": "西气东输四线",
+  "trunk": [
+    {
+      "id": 1188,
+      "name": "吐鲁番压气站",
+      "mileage": 0.0,
+      "type": "compressor",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1189,
+      "name": "西四1#阀室",
+      "mileage": 23.2,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1190,
+      "name": "西四2#阀室",
+      "mileage": 47.0,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1191,
+      "name": "西四3#阀室",
+      "mileage": 71.6,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1192,
+      "name": "连木沁压气站",
+      "mileage": 92.5,
+      "type": "compressor",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1193,
+      "name": "西四4#阀室",
+      "mileage": 124.5,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1194,
+      "name": "西四5#阀室",
+      "mileage": 156.5,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1195,
+      "name": "西四6#阀室",
+      "mileage": 188.5,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1196,
+      "name": "西四7#阀室",
+      "mileage": 219.0,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1197,
+      "name": "西四8#阀室",
+      "mileage": 250.9,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1198,
+      "name": "了墩压气站",
+      "mileage": 282.8,
+      "type": "compressor",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1199,
+      "name": "西四9#阀室",
+      "mileage": 314.6,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1200,
+      "name": "西四10#阀室",
+      "mileage": 344.3,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1201,
+      "name": "西四11#阀室",
+      "mileage": 374.4,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1202,
+      "name": "西四12#阀室",
+      "mileage": 394.9,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1203,
+      "name": "西四13#阀室",
+      "mileage": 405.9,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1204,
+      "name": "西四14#阀室",
+      "mileage": 436.9,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1205,
+      "name": "烟墩压气站",
+      "mileage": 466.5,
+      "type": "compressor",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1206,
+      "name": "西四15#阀室",
+      "mileage": 494.3,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1207,
+      "name": "西四16#阀室",
+      "mileage": 519.3,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1208,
+      "name": "西四17#阀室",
+      "mileage": 547.6,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1209,
+      "name": "西四18#阀室",
+      "mileage": 574.2,
+      "type": "valve",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1210,
+      "name": "红柳压气站",
+      "mileage": 602.8,
+      "type": "compressor",
+      "branch_name": "西四线干线新疆段"
+    },
+    {
+      "id": 1211,
+      "name": "西四19#阀室",
+      "mileage": 634.8,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1212,
+      "name": "西四20#阀室",
+      "mileage": 666.2,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1213,
+      "name": "西四21#阀室",
+      "mileage": 685.3,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1214,
+      "name": "西四22#阀室",
+      "mileage": 704.6,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1215,
+      "name": "西四23#阀室",
+      "mileage": 736.6,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1216,
+      "name": "西四24#阀室",
+      "mileage": 768.3,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1217,
+      "name": "瓜州压气站",
+      "mileage": 800.3,
+      "type": "compressor",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1218,
+      "name": "西四25#阀室",
+      "mileage": 817.2,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1219,
+      "name": "西四26#阀室",
+      "mileage": 839.5,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1220,
+      "name": "西四27#阀室",
+      "mileage": 855.2,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1221,
+      "name": "西四28#阀室",
+      "mileage": 879.8,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1222,
+      "name": "西四29#阀室",
+      "mileage": 898.5,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1223,
+      "name": "西四30#阀室",
+      "mileage": 922.5,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1224,
+      "name": "西四31#阀室",
+      "mileage": 954.5,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1225,
+      "name": "嘉峪关压气站",
+      "mileage": 983.3,
+      "type": "compressor",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1226,
+      "name": "西四32#阀室",
+      "mileage": 1008.9,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1227,
+      "name": "西四33#阀室",
+      "mileage": 1038.6,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1228,
+      "name": "西四34#阀室",
+      "mileage": 1070.6,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1229,
+      "name": "西四35#阀室",
+      "mileage": 1097.7,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1230,
+      "name": "西四36#阀室",
+      "mileage": 1125.4,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1231,
+      "name": "西四37#阀室",
+      "mileage": 1157.1,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1232,
+      "name": "西四38#阀室",
+      "mileage": 1171.1,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1233,
+      "name": "张掖压气站",
+      "mileage": 1183.3,
+      "type": "compressor",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1234,
+      "name": "西四39#阀室",
+      "mileage": 1203.5,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1235,
+      "name": "西四40#阀室",
+      "mileage": 1220.8,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1236,
+      "name": "西四41#阀室",
+      "mileage": 1251.6,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1237,
+      "name": "西四42#阀室",
+      "mileage": 1282.6,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1238,
+      "name": "西四43#阀室",
+      "mileage": 1312.8,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1239,
+      "name": "永昌压气站",
+      "mileage": 1344.4,
+      "type": "compressor",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1240,
+      "name": "西四44#阀室",
+      "mileage": 1359.4,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1241,
+      "name": "西四45#阀室",
+      "mileage": 1374.9,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1242,
+      "name": "西四46#阀室",
+      "mileage": 1396.2,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1243,
+      "name": "西四47#阀室",
+      "mileage": 1414.9,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1244,
+      "name": "西四48#阀室",
+      "mileage": 1438.5,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1245,
+      "name": "民勤清管站",
+      "mileage": 1460.0,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1246,
+      "name": "西四49#阀室",
+      "mileage": 1491.1,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1247,
+      "name": "西四50#阀室",
+      "mileage": 1522.9,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1248,
+      "name": "西四51#阀室",
+      "mileage": 1553.8,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1249,
+      "name": "西四52#阀室",
+      "mileage": 1575.6,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1250,
+      "name": "古浪压气站",
+      "mileage": 1592.7,
+      "type": "compressor",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1251,
+      "name": "西四53#阀室",
+      "mileage": 1623.8,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1252,
+      "name": "西四54#阀室",
+      "mileage": 1655.3,
+      "type": "valve",
+      "branch_name": "西四线干线甘肃段"
+    },
+    {
+      "id": 1253,
+      "name": "西四55#阀室",
+      "mileage": 1674.0,
+      "type": "valve",
+      "branch_name": "西四线干线宁夏段"
+    },
+    {
+      "id": 1254,
+      "name": "西四56#阀室",
+      "mileage": 1701.0,
+      "type": "valve",
+      "branch_name": "西四线干线宁夏段"
+    },
+    {
+      "id": 1255,
+      "name": "西四57#阀室",
+      "mileage": 1728.7,
+      "type": "valve",
+      "branch_name": "西四线干线宁夏段"
+    },
+    {
+      "id": 1256,
+      "name": "西四58#阀室",
+      "mileage": 1736.3,
+      "type": "valve",
+      "branch_name": "西四线干线宁夏段"
+    },
+    {
+      "id": 1257,
+      "name": "中卫压气站",
+      "mileage": 1745.0,
+      "type": "compressor",
+      "branch_name": "西四线干线宁夏段"
+    }
+  ],
+  "branches": [],
+  "branch_names": []
+}
