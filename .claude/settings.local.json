@@ -19,7 +19,8 @@
       "WebFetch(domain:docs.claude.code)",
       "Bash(ls -la:*)",
       "Bash(head:*)",
-      "Bash(claude --version:*)"
+      "Bash(claude --version:*)",
+      "Bash(git add:*)"
     ]
   }
 }
