@@ -1,0 +1,149 @@
+/* 地图容器 */
+.mapContainer {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+/* 加载遮罩层 */
+.loadingOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+    transition: opacity 0.3s ease;
+}
+
+.loadingContent {
+    text-align: center;
+    color: #fff;
+}
+
+/* 加载动画 */
+.loadingSpinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid rgba(59, 130, 246, 0.2);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* 加载文字 */
+.loadingText {
+    font-size: 14px;
+    color: #94a3b8;
+    margin-bottom: 16px;
+}
+
+/* 进度条容器 */
+.progressBar {
+    width: 200px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 0 auto 8px;
+}
+
+/* 进度条填充 */
+.progressFill {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+}
+
+/* 进度百分比 */
+.progressText {
+    font-size: 12px;
+    color: #64748b;
+}
+
+/* 错误遮罩层 */
+.errorOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+}
+
+.errorContent {
+    text-align: center;
+    color: #fff;
+    padding: 24px;
+}
+
+.errorIcon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.errorText {
+    font-size: 14px;
+    color: #f87171;
+    margin-bottom: 24px;
+    max-width: 300px;
+}
+
+.retryButton {
+    padding: 8px 24px;
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.retryButton:hover {
+    background: #2563eb;
+}
+
+/* 分阶段加载指示器（可选） */
+.phaseIndicator {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 16px;
+}
+
+.phaseDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.phaseDot.active {
+    background: #3b82f6;
+    transform: scale(1.2);
+}
+
+.phaseDot.completed {
+    background: #10b981;
+}

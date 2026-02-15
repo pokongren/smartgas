@@ -1,0 +1,114 @@
+=== 数据库表 ===
+  stations: 0 条记录
+  pipelines: 0 条记录
+  emergency_events: 0 条记录
+  trunk_pipeline_details: 64 条记录
+  branch_pipeline_details: 408 条记录
+  node_relation_details: 4075 条记录
+  distribution_point_details: 1645 条记录
+  compressor_details: 425 条记录
+  storage_details: 21 条记录
+  dispatch_console_details: 6 条记录
+
+=== 表 [stations] 结构 ===
+  id (VARCHAR)
+  name (VARCHAR)
+  type (VARCHAR)
+  longitude (FLOAT)
+  latitude (FLOAT)
+  design_pressure (FLOAT)
+  properties (VARCHAR)
+
+=== 表 [pipelines] 结构 ===
+  id (VARCHAR)
+  name (VARCHAR)
+  start_station_id (VARCHAR)
+  end_station_id (VARCHAR)
+  diameter (INTEGER)
+  length (FLOAT)
+  category (VARCHAR)
+  properties (VARCHAR)
+
+=== 表 [emergency_events] 结构 ===
+  id (INTEGER)
+  event_type (VARCHAR)
+  location (VARCHAR)
+  severity (VARCHAR)
+  status (VARCHAR)
+  description (VARCHAR)
+  created_at (VARCHAR)
+
+=== 表 [trunk_pipeline_details] 结构 ===
+  id (INTEGER)
+  name (VARCHAR)
+  control_level (VARCHAR)
+  length (FLOAT)
+  capacity (FLOAT)
+  station_count (INTEGER)
+  valve_count (INTEGER)
+  compressor_count (INTEGER)
+
+=== 表 [branch_pipeline_details] 结构 ===
+  id (INTEGER)
+  name (VARCHAR)
+  trunk_link (VARCHAR)
+  start_point (VARCHAR)
+  end_point (VARCHAR)
+  length (FLOAT)
+  diameter (INTEGER)
+  thickness (FLOAT)
+  design_pressure (FLOAT)
+  design_flow (FLOAT)
+  commission_date (VARCHAR)
+  dispatch_console (VARCHAR)
+
+=== 表 [node_relation_details] 结构 ===
+  id (INTEGER)
+  trunk_name (VARCHAR)
+  branch_name (VARCHAR)
+  node_name (VARCHAR)
+  node_name_calc (VARCHAR)
+  company (VARCHAR)
+  work_area (VARCHAR)
+  mileage (FLOAT)
+  spacing (FLOAT)
+  elevation (FLOAT)
+  node_type_2025 (VARCHAR)
+
+=== 表 [distribution_point_details] 结构 ===
+  id (INTEGER)
+  name (VARCHAR)
+  trunk_name (VARCHAR)
+  node_link (VARCHAR)
+  station_abbr (VARCHAR)
+  dispatch_console (VARCHAR)
+  metering_info (VARCHAR)
+  pressure_reg_info (VARCHAR)
+  commission_date (VARCHAR)
+
+=== 表 [compressor_details] 结构 ===
+  id (INTEGER)
+  station_name (VARCHAR)
+  trunk_name (VARCHAR)
+  branch_name (VARCHAR)
+  unit_config (VARCHAR)
+  unit_id (VARCHAR)
+  drive_type (VARCHAR)
+  manufacturer (VARCHAR)
+  model (VARCHAR)
+  power (FLOAT)
+  commission_status (VARCHAR)
+
+=== 表 [storage_details] 结构 ===
+  id (INTEGER)
+  name (VARCHAR)
+  storage_type (VARCHAR)
+  commission_date (VARCHAR)
+  working_capacity (FLOAT)
+  daily_extract_max (FLOAT)
+  daily_inject_max (FLOAT)
+  company (VARCHAR)
+
+=== 表 [dispatch_console_details] 结构 ===
+  id (INTEGER)
+  name (VARCHAR)

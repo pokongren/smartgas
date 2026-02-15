@@ -1,9 +1,9 @@
 ---
-name: 管道拓扑提取器
+name: pipeline-extraction
 description: 自动分析数据库中的复杂管线数据，识别并分离主干线与支线，生成结构化拓扑文件
 ---
 
-# 管道拓扑提取器 Skill
+# 管道拓扑提取器
 
 这个 Skill 专注于从数据库中提取和分析复杂的管线网络结构，特别是针对包含多条支线的管网（如中缅线）。它能解决"干线与支线数据混杂"的问题。
 
@@ -49,7 +49,7 @@ from scripts.extract_trunk_and_branches import extract_pipelines
 
 extract_pipelines(
     db_path='backend/data/smartgas.db',
-    trunk_name_pattern='中缅线', 
+    trunk_name_pattern='中缅线',
     output_file='backend/data/output.json'
 )
 ```

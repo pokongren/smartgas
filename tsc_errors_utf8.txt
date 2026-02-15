@@ -1,0 +1,4 @@
+src/utils/mapRenderer.ts(386,9): error TS2322: Type '"#ef4444"' is not assignable to type '"#3b82f6"'.
+src/utils/mapRenderer.ts(388,9): error TS2322: Type '"#f59e0b"' is not assignable to type '"#3b82f6"'.
+src/utils/routePrefetch.ts(118,3): error TS2304: Cannot find name 'React'.
+src/views/GlobalPipelineView.optimized.tsx(10,32): error TS2307: Cannot find module '../components/LoadingSpinner' or its corresponding type declarations.

@@ -1,0 +1,40 @@
+/* Tailwind CSS v4 配置 */
+@import "tailwindcss";
+
+@theme {
+  /* Corporate Theme Colors */
+  --color-corp-primary: #D0BB95;
+  --color-corp-bg-light: #f7f7f6;
+  --color-corp-bg-dark: #1d1a15;
+  
+  /* Tech Theme Colors */
+  --color-tech-primary: #137fec;
+  --color-tech-bg: #101922;
+  --color-tech-panel: #1c2430;
+  --color-tech-border: #2d3b4e;
+  --color-tech-alert-high: #ef4444;
+  --color-tech-alert-med: #f59e0b;
+  --color-tech-alert-low: #3b82f6;
+  
+  /* Font Families */
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "Noto Sans SC", sans-serif;
+  
+  /* Animations */
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Custom utility classes */
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  
+  .font-body {
+    font-family: var(--font-body);
+  }
+  
+  .animate-pulse-slow {
+    animation: var(--animate-pulse-slow);
+  }
+}

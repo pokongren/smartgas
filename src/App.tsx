@@ -1,11 +1,30 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import CorpView from './views/CorpView';
-import TechView from './views/TechView';
-import MapDemo from './views/MapDemo';
-import GlobalPipelineView from './views/GlobalPipelineView';
 
-const ViewSwitcher = () => {
+// ✅ 路由级代码分割 - 动态导入视图组件
+const CorpView = lazy(() => import('./views/CorpView'));
+const TechView = lazy(() => import('./views/TechView'));
+const MapDemo = lazy(() => import('./views/MapDemo'));
+const GlobalPipelineView = lazy(() => import('./views/GlobalPipelineView'));
+
+/**
+ * 页面加载状态组件
+ * 在视图组件懒加载时显示
+ */
+const PageLoader: React.FC = () => (
+  <div className="flex items-center justify-center h-screen bg-[#101922]">
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-gray-400 text-sm">页面加载中...</span>
+    </div>
+  </div>
+);
+
+/**
+ * 视图切换按钮组件
+ * 固定在右下角，用于在不同视图间切换
+ */
+const ViewSwitcher: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isTech = location.pathname === '/tech';
@@ -47,16 +66,23 @@ const ViewSwitcher = () => {
   );
 };
 
+/**
+ * 应用主组件
+ * 配置路由和 Suspense 加载状态
+ */
 const App: React.FC = () => {
   return (
     <HashRouter>
       <ViewSwitcher />
-      <Routes>
-        <Route path="/" element={<CorpView />} />
-        <Route path="/tech" element={<TechView />} />
-        <Route path="/map-demo" element={<MapDemo />} />
-        <Route path="/global" element={<GlobalPipelineView />} />
-      </Routes>
+      {/* ✅ Suspense 包裹路由，提供懒加载状态 */}
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<CorpView />} />
+          <Route path="/tech" element={<TechView />} />
+          <Route path="/map-demo" element={<MapDemo />} />
+          <Route path="/global" element={<GlobalPipelineView />} />
+        </Routes>
+      </Suspense>
     </HashRouter>
   );
 };

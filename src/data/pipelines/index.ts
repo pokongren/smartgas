@@ -1,12 +1,18 @@
 
 import { PipelinePackage } from './types'
 import { we1Package } from './we1'
+import { we2Package } from './we2'
+import { credPackage } from './cred'
+import { ptPackage } from './pt'
 
 export * from './types'
 
 // 所有管线数据包
 export const ALL_PIPELINES: PipelinePackage[] = [
-    we1Package
+    we1Package,
+    we2Package,
+    credPackage,
+    ptPackage
 ]
 
 // 辅助函数：根据ID获取管线

@@ -20,7 +20,8 @@
       "Bash(ls -la:*)",
       "Bash(head:*)",
       "Bash(claude --version:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

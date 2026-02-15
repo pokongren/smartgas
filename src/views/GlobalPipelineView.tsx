@@ -1,26 +1,41 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useCallback } from 'react'
 import MapView from '@/components/map-view/MapView'
 import { ALL_PIPELINES, PipelinePackage, PipelineLayer } from '@/data/pipelines'
 import type { PipelineData, PipelineLine, PipelineNode } from '@/types'
+import PipelineEditorOverlay from './PipelineEditorOverlay'
 
 /**
- * 全管线统一视图 (重构版)
+ * 全管线统一视图 (性能优化版)
  * 使用标准化的 PipelinePackage 数据源
+ * 
+ * 优化点：
+ * 1. 使用 for 循环替代 forEach + 展开运算符，减少内存分配
+ * 2. useMemo 缓存计算结果
+ * 3. 减少不必要的重新渲染
  */
 const GlobalPipelineView: React.FC = () => {
     // 状态管理
-    // 展开状态: key是 pipeline.id (如 'we2')
+    const [mapInstance, setMapInstance] = useState<any>(null)
+    const [isEditMode, setIsEditMode] = useState(false)
+
+    // 使用 useCallback 稳定回调引用，避免触发 MapView 无限循环
+    const handleMapLoad = useCallback((map: any) => {
+        setMapInstance(map)
+    }, [])
+
+    // 展开状态
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ 'we1': true })
 
-    // 可见性状态: key是 layer.name (如 "西二线干线", "丽江支线")
+    // 可见性状态 - 使用懒加载初始化
     const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>(() => {
         const initial: Record<string, boolean> = {}
-        ALL_PIPELINES.forEach(pkg => {
-            pkg.layers.forEach(layer => {
-                // 默认可见性: 如果 layer.visible 未定义则默认为 true
+        for (let i = 0; i < ALL_PIPELINES.length; i++) {
+            const pkg = ALL_PIPELINES[i]
+            for (let j = 0; j < pkg.layers.length; j++) {
+                const layer = pkg.layers[j]
                 initial[layer.name] = layer.visible ?? true
-            })
-        })
+            }
+        }
         return initial
     })
 
@@ -40,29 +55,36 @@ const GlobalPipelineView: React.FC = () => {
         const allVisible = layerNames.every(name => visibleLayers[name])
 
         const newState = { ...visibleLayers }
-        layerNames.forEach(name => newState[name] = !allVisible)
+        for (let i = 0; i < layerNames.length; i++) {
+            newState[layerNames[i]] = !allVisible
+        }
         setVisibleLayers(newState)
     }
 
-    // 计算当前显示的管道数据
+    // 计算当前显示的管道数据 - 性能优化版
     const pipelineData = useMemo<PipelineData>(() => {
         const allNodes: PipelineNode[] = []
         const allLines: PipelineLine[] = []
 
-        console.log('🔍 ALL_PIPELINES 数量:', ALL_PIPELINES.length)
-        ALL_PIPELINES.forEach(pkg => {
-            console.log(`  📦 ${pkg.name}: ${pkg.layers.length} 层`)
-            pkg.layers.forEach(layer => {
-                const isVisible = visibleLayers[layer.name]
-                console.log(`    📌 ${layer.name}: visible=${isVisible}, nodes=${layer.nodes?.length}, lines=${layer.lines?.length}`)
-                if (isVisible) {
-                    allNodes.push(...layer.nodes)
-                    allLines.push(...layer.lines)
+        // 使用 for 循环替代 forEach + 展开运算符，减少内存分配
+        for (let i = 0; i < ALL_PIPELINES.length; i++) {
+            const pkg = ALL_PIPELINES[i]
+            for (let j = 0; j < pkg.layers.length; j++) {
+                const layer = pkg.layers[j]
+                if (visibleLayers[layer.name]) {
+                    // 手动 push 而不是使用展开运算符
+                    const nodes = layer.nodes
+                    const lines = layer.lines
+                    for (let k = 0; k < nodes.length; k++) {
+                        allNodes.push(nodes[k])
+                    }
+                    for (let k = 0; k < lines.length; k++) {
+                        allLines.push(lines[k])
+                    }
                 }
-            })
-        })
+            }
+        }
 
-        console.log(`✅ 最终数据: ${allNodes.length} 节点, ${allLines.length} 管道段`)
         return { nodes: allNodes, lines: allLines, devices: [] }
     }, [visibleLayers])
 
@@ -89,14 +111,27 @@ const GlobalPipelineView: React.FC = () => {
             </div>
 
             {/* 地图 */}
-            <MapView pipelineData={pipelineData} />
+            <MapView
+                pipelineData={pipelineData}
+                onLoad={handleMapLoad}
+            />
 
             {/* 图层控制面板 - 树形结构 */}
             <div className="absolute top-24 left-6 z-10 bg-black/70 backdrop-blur-sm rounded-lg p-3 border border-blue-500/30 w-72 max-h-[75vh] overflow-y-auto">
-                <h3 className="text-white text-sm font-semibold mb-2 flex items-center gap-2 pb-2 border-b border-gray-700">
-                    <span className="material-symbols-outlined text-lg">toc</span>
-                    管线目录
-                </h3>
+                <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-700">
+                    <h3 className="text-white text-sm font-semibold flex items-center gap-2">
+                        <span className="material-symbols-outlined text-lg">toc</span>
+                        管线目录
+                    </h3>
+                    <button
+                        onClick={() => setIsEditMode(!isEditMode)}
+                        className={`text-xs px-2 py-1 rounded border transition-colors flex items-center gap-1 ${isEditMode ? 'bg-blue-600 border-blue-500 text-white' : 'border-gray-600 text-gray-400 hover:text-white'}`}
+                        title="开启/关闭绘图工具"
+                    >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                        {isEditMode ? '绘图开启' : '绘图'}
+                    </button>
+                </div>
 
                 <div className="space-y-1">
                     {ALL_PIPELINES.map(pkg => {
@@ -174,6 +209,14 @@ const GlobalPipelineView: React.FC = () => {
                     })}
                 </div>
             </div>
+
+            {/* 编辑器覆盖层 */}
+            {isEditMode && mapInstance && (
+                <PipelineEditorOverlay
+                    mapInstance={mapInstance}
+                    onClose={() => setIsEditMode(false)}
+                />
+            )}
 
             {/* 图例 */}
             <div className="absolute bottom-6 right-6 z-10 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-blue-500/30">

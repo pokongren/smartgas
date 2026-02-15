@@ -1,10 +1,50 @@
 import type { PipelineNode, PipelineLine, PipelineDevice } from '@/types'
 import { NodeType, PipelineStatus, PressureLevel, DeviceType } from '@/types'
+import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
+import { calculateSwarmLayout, calculateOrbitLayout, calculateForceLayout, calculateOptimalSwarmLayout, type SwarmPosition } from './swarmAnalysis'
 
 /**
- * 地图渲染工具函数
+ * 地图渲染工具函数 - 性能优化版
  * 用于在高德地图上渲染管网数据
+ * 
+ * 优化点：
+ * 1. 分批渲染，避免阻塞主线程
+ * 2. 缓存聚合计算结果
+ * 3. 使用 requestAnimationFrame
  */
+
+/**
+ * 聚合渲染配置参数
+ */
+const CLUSTER_CONFIG = {
+    /** 坐标分组精度（小数位数） */
+    COORDINATE_PRECISION: 6,
+
+    /** 阀室最小显示缩放级别 */
+    VALVE_MIN_ZOOM: 8,
+
+    /** 分散显示缩放级别阈值 */
+    EXPAND_CLUSTER_ZOOM: 12,
+
+    /** 螺旋偏移半径（像素） */
+    SPIRAL_RADIUS: 30,
+
+    /** 螺旋偏移间距（像素） */
+    SPIRAL_SEPARATION: 25,
+
+    /** 聚合标记最大显示数量 */
+    MAX_CLUSTER_COUNT: 99,
+
+    /** 聚合标记颜色 */
+    CLUSTER_COLORS: {
+        FEW: '#3b82f6',      // 1-5个节点：蓝色
+        MEDIUM: '#f59e0b',   // 6-15个节点：橙色
+        MANY: '#ef4444'      // 16+个节点：红色
+    },
+
+    /** 蜂群布局算法 */
+    SWARM_ALGORITHM: 'optimal' as 'spiral' | 'swarm' | 'orbit' | 'force' | 'optimal'
+} as const
 
 // 压力等级颜色映射
 export const PRESSURE_COLORS = {
@@ -12,6 +52,16 @@ export const PRESSURE_COLORS = {
     [PressureLevel.MEDIUM_HIGH]: '#f97316',    // 橙色 - 次高压
     [PressureLevel.MEDIUM]: '#eab308',         // 黄色 - 中压
     [PressureLevel.LOW]: '#22c55e',            // 绿色 - 低压
+} as const
+
+/**
+ * 压气站图标配置 - 右小左宽梯形
+ */
+const COMPRESSOR_ICON_CONFIG = {
+    WIDTH: 32,
+    HEIGHT: 24,
+    COLOR: '#00d4ff',
+    DPR: Math.min(window.devicePixelRatio || 1, 2),
 } as const
 
 /**
@@ -24,37 +74,49 @@ function injectMarkerStyles() {
     const style = document.createElement('style')
     style.id = styleId
     style.textContent = `
-        @keyframes flash-animation {
-            0% { opacity: 1; filter: drop-shadow(0 0 5px #00d4ff); transform: scale(1); }
-            50% { opacity: 0.6; filter: drop-shadow(0 0 15px #00d4ff); transform: scale(1.1); }
-            100% { opacity: 1; filter: drop-shadow(0 0 5px #00d4ff); transform: scale(1); }
-        }
-        
-        .compressor-marker {
-            width: 0;
-            height: 0;
-            border-bottom: 24px solid #00d4ff;
-            border-left: 10px solid transparent;
-            border-right: 10px solid transparent;
+        /* 压气站标记容器 - 无动画 */
+        .compressor-marker-container {
             position: relative;
-            animation: flash-animation 2s infinite ease-in-out;
-            cursor: pointer;
-            width: 30px; /* Width of the bottom */
+            width: ${COMPRESSOR_ICON_CONFIG.WIDTH}px;
+            height: ${COMPRESSOR_ICON_CONFIG.HEIGHT}px;
             display: flex;
             justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        /* 压气站图标 */
+        .compressor-marker-icon {
+            width: ${COMPRESSOR_ICON_CONFIG.WIDTH}px;
+            height: ${COMPRESSOR_ICON_CONFIG.HEIGHT}px;
+            object-fit: contain;
+            pointer-events: none;
         }
 
-        .compressor-marker::after {
-            content: '';
-            position: absolute;
-            top: 24px;
-            left: -10px;
-            width: 50px; /* 30 + 10 + 10 */
-            height: 4px;
-            background: rgba(0, 212, 255, 0.3);
-            border-radius: 50%;
-            filter: blur(4px);
+        /* 聚合标记样式 */
+        .pipeline-cluster-marker {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        .pipeline-cluster-marker:hover {
+            transform: scale(1.1);
+            z-index: 200;
+        }
+        .cluster-indicator {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            font-size: 10px;
+            color: white;
+            font-weight: bold;
+            border: 1px solid rgba(255,255,255,0.8);
+        }
+        .cluster-indicator.compressor { background: #06b6d4; }
+        .cluster-indicator.distribution { background: #eab308; }
+        .cluster-indicator.valve { background: #6b7280; }
     `
     document.head.appendChild(style)
 }
@@ -72,26 +134,27 @@ export const STATUS_COLORS = {
 
 // 管线类别颜色映射(深色主题优化)
 export const PIPELINE_CATEGORY_COLORS: Record<string, string> = {
-    '西一线': '#FF5722',      // 深橙色 - 西气东输一线
-    '中缅线': '#4caf50',      // 绿色
-    '中缅支线': '#8bc34a',    // 浅绿色 (支线颜色)
-    '中贵线': '#00d4ff',      // 青色
-    '西二线': '#ff9800',      // 橙色
-    '西三线': '#9c27b0',      // 紫色
-    '西四线': '#e040fb',      // 亮紫色，与西三线(#9c27b0)区分开
+    '西一线': '#FF5722',
+    '中缅线': '#4caf50',
+    '中缅支线': '#8bc34a',
+    '中贵线': '#00d4ff',
+    '西二线': '#ff9800',
+    '西三线': '#9c27b0',
+    '西四线': '#e040fb',
     '西气东输四线': '#e040fb',
-    '陕二线': '#4caf50',      // 绿色
-    '阿拉支干线': '#00bcd4',  // 深青色
-    '闽粤支干线': '#e91e63',  // 粉红色
-    '广南/广西': '#ff00ff',   // 品红色
-    '广南支干线': '#ff5722',  // 深橙色
-    '广深支干线': '#9c27b0',  // 紫色
-    '广西管道': '#00bcd4',    // 青色
-    '海南': '#00ff00',        // 亮绿色
-    'LNG外输': '#ffff00',     // 黄色
-    '其他': '#999999',        // 灰色
+    '陕二线': '#4caf50',
+    '阿拉支干线': '#00bcd4',
+    '闽粤支干线': '#e91e63',
+    '广南/广西': '#ff00ff',
+    '广南支干线': '#ff5722',
+    '广深支干线': '#9c27b0',
+    '广西管道': '#00bcd4',
+    '海南': '#00ff00',
+    'LNG外输': '#ffff00',
+    '中俄东线': '#e91e63',
+    '平泰支干线': '#E91E63',
+    '其他': '#999999',
 }
-
 
 /**
  * 获取压力等级对应的颜色
@@ -112,17 +175,12 @@ export function getStatusColor(status: PipelineStatus): string {
  */
 export function getPipelineCategoryColor(category: string): string {
     const normalizedCategory = category.trim()
-
-    // 如果有精确匹配，直接返回
     if (PIPELINE_CATEGORY_COLORS[normalizedCategory]) {
         return PIPELINE_CATEGORY_COLORS[normalizedCategory]
     }
-
-    // 模糊匹配: 包含"支线"的统一使用中缅支线颜色
     if (normalizedCategory.includes('支线')) {
         return PIPELINE_CATEGORY_COLORS['中缅支线']
     }
-
     return PIPELINE_CATEGORY_COLORS['其他']
 }
 
@@ -130,26 +188,15 @@ export function getPipelineCategoryColor(category: string): string {
  * 获取节点类型对应的图标
  */
 export function getNodeIcon(type: NodeType, isSource: boolean = false, isCompressor: boolean = false): string {
-    // 如果是气源或压气站,使用特殊图标
-    if (isSource) {
-        return 'diamond' // 菱形 - 气源/首站
-    }
-    if (isCompressor) {
-        return 'rect' // 方形 - 压气站
-    }
+    if (isSource) return 'diamond'
+    if (isCompressor) return 'rect'
 
-    // 根据节点类型选择图标
     switch (type) {
-        case NodeType.VALVE:
-            return 'triangle' // 三角形 - 阀门
-        case NodeType.REGULATOR:
-            return 'rect' // 方形 - 调压站
-        case NodeType.METERING:
-            return 'pin' // 水滴形 - 计量站
-        case NodeType.JUNCTION:
-            return 'circle' // 圆形 - 连接点
-        default:
-            return 'circle'
+        case NodeType.VALVE: return 'triangle'
+        case NodeType.REGULATOR: return 'rect'
+        case NodeType.METERING: return 'pin'
+        case NodeType.JUNCTION: return 'circle'
+        default: return 'circle'
     }
 }
 
@@ -193,87 +240,506 @@ export function getPressureLevelName(level: PressureLevel): string {
     return names[level] || '未知'
 }
 
+// -----------------------------------------------------------------------------
+// 聚合与螺旋分布逻辑 - 带缓存优化
+// -----------------------------------------------------------------------------
+
+// 缓存：坐标分组结果
+let cachedClusterGroups: Map<string, ClusterGroup> | null = null
+let cachedNodesKey: string = ''
+
 /**
- * 渲染管网管线
+ * 将坐标转换为分组键
+ */
+function coordinateToKey(
+    coord: { longitude: number; latitude: number },
+    precision: number = CLUSTER_CONFIG.COORDINATE_PRECISION
+): string {
+    const lng = coord.longitude.toFixed(precision)
+    const lat = coord.latitude.toFixed(precision)
+    return `${lng},${lat}`
+}
+
+/**
+ * 生成节点缓存键
+ */
+function generateNodesKey(nodes: PipelineNode[]): string {
+    return `${nodes.length}-${nodes[0]?.id || ''}-${nodes[nodes.length - 1]?.id || ''}`
+}
+
+/**
+ * 按坐标分组节点 - 带缓存
+ */
+function groupNodesByCoordinate(nodes: PipelineNode[]): Map<string, ClusterGroup> {
+    // 检查缓存
+    const nodesKey = generateNodesKey(nodes)
+    if (cachedClusterGroups && cachedNodesKey === nodesKey) {
+        return cachedClusterGroups
+    }
+
+    const groups = new Map<string, ClusterGroup>()
+
+    for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i]
+        const key = coordinateToKey(node.coordinate)
+
+        if (!groups.has(key)) {
+            groups.set(key, {
+                id: `cluster-${key}`,
+                coordinate: node.coordinate,
+                nodes: [],
+                typeStats: {
+                    compressor: 0,
+                    distribution: 0,
+                    valve: 0,
+                    other: 0
+                },
+                hasImportantStation: false
+            })
+        }
+
+        const group = groups.get(key)!
+        group.nodes.push(node)
+
+        // 更新类型统计
+        const name = node.name
+        if (name.includes('压气站')) {
+            group.typeStats.compressor++
+            group.hasImportantStation = true
+        } else if (name.includes('分输站') || name.includes('门站')) {
+            group.typeStats.distribution++
+            group.hasImportantStation = true
+        } else if (name.includes('阀室') || name.includes('阀门')) {
+            group.typeStats.valve++
+        } else {
+            group.typeStats.other++
+        }
+    }
+
+    // 更新缓存
+    cachedClusterGroups = groups
+    cachedNodesKey = nodesKey
+
+    return groups
+}
+
+/**
+ * 清除聚合缓存
+ */
+export function clearClusterCache(): void {
+    cachedClusterGroups = null
+    cachedNodesKey = ''
+}
+
+/**
+ * 使用 Canvas 绘制压气站梯形图标 - 右小左宽
+ * @returns DataURL 格式的图片
+ */
+export function createCompressorIcon(): string {
+    const { WIDTH, HEIGHT, COLOR, DPR } = COMPRESSOR_ICON_CONFIG
+    const canvas = document.createElement('canvas')
+
+    canvas.width = WIDTH * DPR
+    canvas.height = HEIGHT * DPR
+    canvas.style.width = `${WIDTH}px`
+    canvas.style.height = `${HEIGHT}px`
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return ''
+
+    ctx.scale(DPR, DPR)
+
+    const w = WIDTH
+    const h = HEIGHT
+
+    // 等腰梯形：上底短，下底长，两腰等长对称
+    const topWidth = w * 0.5      // 上底宽度 50%
+    const bottomWidth = w         // 下底宽度 100%
+    const topLeft = (w - topWidth) / 2   // 上底居中
+    const topRight = topLeft + topWidth
+    const bottomLeft = 0
+    const bottomRight = w
+
+    // 绘制等腰梯形
+    ctx.beginPath()
+    ctx.moveTo(topLeft, 0)           // 左上
+    ctx.lineTo(topRight, 0)          // 右上
+    ctx.lineTo(bottomRight, h)       // 右下
+    ctx.lineTo(bottomLeft, h)        // 左下
+    ctx.closePath()
+
+    // 渐变填充（从上到下）
+    const gradient = ctx.createLinearGradient(0, 0, 0, h)
+    gradient.addColorStop(0, '#00e5ff')   // 顶部亮色
+    gradient.addColorStop(0.5, COLOR)      // 中间
+    gradient.addColorStop(1, '#0099cc')   // 底部深色
+    ctx.fillStyle = gradient
+    ctx.fill()
+
+    // 边框
+    ctx.lineWidth = 1
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'
+    ctx.stroke()
+
+    return canvas.toDataURL('image/png')
+}
+
+/**
+ * 使用 SVG 绘制矢量压气站图标 - 短边在右侧
+ * @returns SVG DataURL
+ */
+export function createCompressorIconSVG(): string {
+    const { WIDTH, HEIGHT, COLOR } = COMPRESSOR_ICON_CONFIG
+    const rightTop = HEIGHT * 0.3
+    const rightBottom = HEIGHT * 0.7
+
+    const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
+        <defs>
+            <linearGradient id="trapezoidGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:#00e5ff;stop-opacity:1" />
+                <stop offset="50%" style="stop-color:${COLOR};stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#0099cc;stop-opacity:1" />
+            </linearGradient>
+        </defs>
+        <polygon points="0,0 0,${HEIGHT} ${WIDTH},${rightBottom} ${WIDTH},${rightTop}" 
+                 fill="url(#trapezoidGrad)" 
+                 stroke="rgba(255,255,255,0.5)" 
+                 stroke-width="1"/>
+    </svg>`
+
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
+// 缓存图标 DataURL，避免重复绘制
+let cachedCompressorIcon: string | null = null
+
+/**
+ * 获取压气站图标（带缓存）
+ */
+function getCompressorIcon(): string {
+    if (!cachedCompressorIcon) {
+        // 优先使用 Canvas，兼容性更好；如需最高清晰度可改用 SVG
+        cachedCompressorIcon = createCompressorIcon()
+    }
+    return cachedCompressorIcon
+}
+
+/**
+ * 计算螺旋偏移位置
+ * 使用阿基米德螺旋线算法：r = a + b * θ
+ */
+function calculateSpiralOffset(
+    index: number,
+    total: number,
+    radius: number = CLUSTER_CONFIG.SPIRAL_RADIUS
+): { x: number; y: number } {
+    const angleStep = (2 * Math.PI) / Math.max(total, 6)
+    const angle = angleStep * index
+    const spiralRadius = radius + (CLUSTER_CONFIG.SPIRAL_SEPARATION * (index / Math.max(total, 1)))
+
+    return {
+        x: spiralRadius * Math.cos(angle),
+        y: spiralRadius * Math.sin(angle)
+    }
+}
+
+/**
+ * 像素偏移转换为经纬度偏移
+ */
+function pixelOffsetToLngLat(
+    map: any,
+    center: { longitude: number; latitude: number },
+    offsetX: number,
+    offsetY: number
+): { longitude: number; latitude: number } {
+    const AMap = (window as any).AMap
+    if (!AMap) return center
+
+    const zoom = map.getZoom()
+    const scale = Math.pow(2, 18 - zoom)
+    const lngOffset = (offsetX * scale * 0.00001)
+    const latOffset = (offsetY * scale * 0.00001)
+
+    return {
+        longitude: center.longitude + lngOffset,
+        latitude: center.latitude - latOffset
+    }
+}
+
+/**
+ * 创建聚合标记内容
+ */
+function createClusterMarkerContent(group: ClusterGroup): string {
+    const count = group.nodes.length
+    const { typeStats } = group
+
+    let color: string = CLUSTER_CONFIG.CLUSTER_COLORS.FEW
+    if (count > 15) {
+        color = CLUSTER_CONFIG.CLUSTER_COLORS.MANY
+    } else if (count > 5) {
+        color = CLUSTER_CONFIG.CLUSTER_COLORS.MEDIUM
+    }
+
+    const indicators = []
+    if (typeStats.compressor > 0) {
+        indicators.push(`<span class="cluster-indicator compressor" title="压气站">压</span>`)
+    }
+    if (typeStats.distribution > 0) {
+        indicators.push(`<span class="cluster-indicator distribution" title="分输站">输</span>`)
+    }
+    if (typeStats.valve > 0) {
+        indicators.push(`<span class="cluster-indicator valve" title="阀室">阀</span>`)
+    }
+
+    return `
+        <div class="pipeline-cluster-marker" style="
+            background: ${color};
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            border: 3px solid white;
+            cursor: pointer;
+        ">
+            <span style="font-size: 16px; line-height: 1;">${Math.min(count, CLUSTER_CONFIG.MAX_CLUSTER_COUNT)}</span>
+            <div style="display: flex; gap: 2px; margin-top: 2px;">
+                ${indicators.join('')}
+            </div>
+        </div>
+    `
+}
+
+/**
+ * 创建聚合标记
+ */
+function createClusterMarker(
+    map: any,
+    group: ClusterGroup,
+    onClick?: (event: ClusterClickEvent) => void
+): any {
+    const AMap = (window as any).AMap
+    if (!AMap) return null
+
+    const marker = new AMap.Marker({
+        position: [group.coordinate.longitude, group.coordinate.latitude],
+        content: createClusterMarkerContent(group),
+        offset: new AMap.Pixel(-20, -20),
+        zIndex: 150,
+        extData: { type: 'cluster', group }
+    })
+
+    if (onClick) {
+        marker.on('click', (e: any) => {
+            onClick({
+                cluster: group,
+                position: group.coordinate,
+                originalEvent: e
+            })
+        })
+    }
+
+    return marker
+}
+
+/**
+ * 创建压气站标记内容（Canvas/SVG 高清晰度版）
+ */
+function createCompressorMarkerContent(rotation: number = 0): HTMLElement {
+    // 创建容器
+    const container = document.createElement('div')
+    container.className = 'compressor-marker-container'
+    container.style.transform = `rotate(${rotation}deg)`
+
+    // 图标（无动画、无发光层、无阴影）
+    const icon = document.createElement('img')
+    icon.className = 'compressor-marker-icon'
+    icon.src = getCompressorIcon()
+    icon.alt = '压气站'
+    container.appendChild(icon)
+
+    return container
+}
+
+/**
+ * 创建偏移后的节点标记
+ */
+function createOffsetNodeMarker(
+    map: any,
+    node: PipelineNode,
+    position: { longitude: number; latitude: number },
+    onClick?: (event: { node: PipelineNode; position: any }) => void
+): any[] {
+    const AMap = (window as any).AMap
+    if (!AMap) return []
+
+    const isCompressor = node.name.includes('压气站')
+    const isDistribution = node.name.includes('分输站') || node.name.includes('门站')
+
+    let marker: any
+
+    if (isCompressor) {
+        const rotation = node.properties?.rotation || 0
+        const content = createCompressorMarkerContent(rotation)
+
+        marker = new AMap.Marker({
+            position: [position.longitude, position.latitude],
+            content: content,
+            offset: new AMap.Pixel(
+                -COMPRESSOR_ICON_CONFIG.WIDTH / 2,
+                -COMPRESSOR_ICON_CONFIG.HEIGHT / 2
+            ),
+            zIndex: 140,
+            extData: { node }
+        })
+    } else if (isDistribution) {
+        marker = new AMap.CircleMarker({
+            center: [position.longitude, position.latitude],
+            radius: 8,
+            fillColor: '#ffd700',
+            fillOpacity: 0.9,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+            zIndex: 130
+        })
+    } else {
+        marker = new AMap.CircleMarker({
+            center: [position.longitude, position.latitude],
+            radius: 5,
+            fillColor: '#e0e0e0',
+            fillOpacity: 0.8,
+            strokeColor: '#666',
+            strokeWeight: 1,
+            zIndex: 120
+        })
+    }
+
+    if (onClick && marker) {
+        marker.on('click', () => {
+            onClick({ node, position })
+        })
+    }
+
+    const text = new AMap.Text({
+        text: node.name,
+        position: [position.longitude, position.latitude],
+        offset: isCompressor
+            ? new AMap.Pixel(0, COMPRESSOR_ICON_CONFIG.HEIGHT / 2 + 5)
+            : new AMap.Pixel(0, -15),
+        style: {
+            'font-size': '10px',
+            'color': '#ccc',
+            'background-color': 'rgba(0,0,0,0.5)',
+            'border-radius': '2px',
+            'padding': '1px 3px',
+            'border': 'none'
+        },
+        zIndex: 121
+    })
+
+    return [marker, text]
+}
+
+// -----------------------------------------------------------------------------
+// 分批渲染管线 - 性能优化核心
+// -----------------------------------------------------------------------------
+
+/**
+ * 分批渲染管线
+ * 使用 requestAnimationFrame 避免阻塞主线程
  */
 export function renderPipelineLines(
     map: any,
     lines: PipelineLine[],
-    onLineClick?: (event: { line: PipelineLine; position: { longitude: number; latitude: number } }) => void
-) {
-    console.log('🏁 renderPipelineLines 被调用，管线数量:', lines.length)
-    const AMap = (window as any).AMap
-    if (!AMap) {
-        console.error('❌ AMap 对象未找到')
-        return []
-    }
-
-    const polylines: any[] = []
-
-    lines.forEach((line, index) => {
-        try {
-            // 根据管线类别获取颜色
-            const category = line.properties?.category as string || '其他'
-            const color = getPipelineCategoryColor(category)
-
-            // 根据状态选择样式
-            const strokeStyle = line.status === PipelineStatus.MAINTENANCE ? 'dashed' : 'solid'
-
-            // 根据压力等级调整粗细
-            // 特殊逻辑：如果是支线，则线条更细 (2px)
-            const isBranch = category.includes('支线')
-            const baseWidth = isBranch ? 2 : (line.pressureLevel === PressureLevel.HIGH ? 6 : 4)
-
-            const path = line.path.map(p => [p.longitude, p.latitude])
-
-            if (index === 0) {
-                console.log('📝 第一条管线路径详情:', JSON.stringify(path))
-            }
-
-            const polyline = new AMap.Polyline({
-                path: path,
-                strokeColor: color,
-                strokeWeight: baseWidth,
-                strokeStyle: strokeStyle,
-                strokeOpacity: 1.0, // 确保完全不透明
-                zIndex: 50,
-                lineJoin: 'round',
-                lineCap: 'round',
-            })
-
-            // 绑定点击事件
-            if (onLineClick) {
-                polyline.on('click', (e: any) => {
-                    onLineClick({ line, position: { longitude: e.lnglat.lng, latitude: e.lnglat.lat } })
-                })
-            }
-
-            map.add(polyline)
-            polylines.push(polyline)
-
-            // 流动动效光点
-            const flowMarker = createFlowAnimation(map, line, color)
-            if (flowMarker) {
-                polylines.push(flowMarker)
-            }
-
-        } catch (error) {
-            console.error(`❌ 渲染管线 ${line.id} 失败:`, error)
+    onLineClick?: (event: { line: PipelineLine; position: { longitude: number; latitude: number } }) => void,
+    signal?: AbortSignal
+): Promise<any[]> {
+    return new Promise((resolve) => {
+        const AMap = (window as any).AMap
+        if (!AMap || !lines || lines.length === 0) {
+            resolve([])
+            return
         }
-    })
 
-    console.log(`✅ renderPipelineLines 完成，成功添加了 ${polylines.length} 条管线`)
-    return polylines
+        const polylines: any[] = []
+        const BATCH_SIZE = 50 // 每批渲染50条管线
+        let index = 0
+
+        function renderBatch() {
+            // NOTE: 检查是否已取消，防止旧渲染继续往地图加覆盖物
+            if (signal?.aborted) {
+                resolve(polylines)
+                return
+            }
+            const batchEnd = Math.min(index + BATCH_SIZE, lines.length)
+
+            for (let i = index; i < batchEnd; i++) {
+                const line = lines[i]
+                try {
+                    const category = line.properties?.category as string || '其他'
+                    const color = line.properties?.color || getPipelineCategoryColor(category)
+                    const strokeStyle = line.status === PipelineStatus.MAINTENANCE ? 'dashed' : 'solid'
+                    const isBranch = category.includes('支线')
+                    const baseWidth = isBranch ? 2 : (line.pressureLevel === PressureLevel.HIGH ? 6 : 4)
+                    const path = line.path.map(p => [p.longitude, p.latitude])
+
+                    const polyline = new AMap.Polyline({
+                        path: path,
+                        strokeColor: color,
+                        strokeWeight: baseWidth,
+                        strokeStyle: strokeStyle,
+                        strokeOpacity: 1.0,
+                        zIndex: 50,
+                        lineJoin: 'round',
+                        lineCap: 'round',
+                    })
+
+                    if (onLineClick) {
+                        polyline.on('click', (e: any) => {
+                            onLineClick({ line, position: { longitude: e.lnglat.lng, latitude: e.lnglat.lat } })
+                        })
+                    }
+
+                    map.add(polyline)
+                    polylines.push(polyline)
+
+                    // 仅为主要管段创建流动动画
+                    if (line.length > 30000) {
+                        const flowMarker = createFlowAnimation(map, line, color)
+                        if (flowMarker) {
+                            polylines.push(flowMarker)
+                        }
+                    }
+                } catch (error) {
+                    // 渲染失败，继续下一条
+                }
+            }
+
+            index = batchEnd
+
+            if (index < lines.length) {
+                // 还有未渲染的，下一帧继续
+                requestAnimationFrame(renderBatch)
+            } else {
+                // 全部渲染完成
+                resolve(polylines)
+            }
+        }
+
+        // 开始渲染
+        requestAnimationFrame(renderBatch)
+    })
 }
 
-/**
- * 创建管线流动动画
- */
 function createFlowAnimation(map: any, line: PipelineLine, color: string): any {
     const AMap = (window as any).AMap
     if (!AMap || line.path.length < 2) return null
 
-    // 创建流动光点 Marker
     const flowMarker = new AMap.Marker({
         position: [line.path[0].longitude, line.path[0].latitude],
         icon: new AMap.Icon({
@@ -287,34 +753,23 @@ function createFlowAnimation(map: any, line: PipelineLine, color: string): any {
 
     map.add(flowMarker)
 
-    // 路径数组
     const path = line.path.map(p => [p.longitude, p.latitude])
+    const speed = Math.max(50, line.length * 0.5)
 
-    // 计算动画速度 (基于管线长度,越长速度越快)
-    const speed = Math.max(50, line.length * 0.5) // 单位: 千米/秒
-
-    // 启动循环动画
     const startAnimation = () => {
         flowMarker.moveAlong(path, {
-            duration: (line.length / speed) * 1000, // 转换为毫秒
+            duration: (line.length / speed) * 1000,
             autoRotation: false,
         })
     }
 
-    // 动画结束后重新开始
     flowMarker.on('movealong', startAnimation)
-
-    // 首次启动
     startAnimation()
 
     return flowMarker
 }
 
-/**
- * 创建流动光点的 Base64 图像
- */
 function createFlowDot(color: string): string {
-    // 创建一个 8x8 的 canvas
     const canvas = document.createElement('canvas')
     canvas.width = 8
     canvas.height = 8
@@ -322,11 +777,10 @@ function createFlowDot(color: string): string {
 
     if (!ctx) return ''
 
-    // 绘制发光圆点
     const gradient = ctx.createRadialGradient(4, 4, 0, 4, 4, 4)
     gradient.addColorStop(0, color)
-    gradient.addColorStop(0.5, color + 'cc') // 80% 透明度
-    gradient.addColorStop(1, color + '00') // 完全透明
+    gradient.addColorStop(0.5, color + 'cc')
+    gradient.addColorStop(1, color + '00')
 
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, 8, 8)
@@ -334,300 +788,238 @@ function createFlowDot(color: string): string {
     return canvas.toDataURL()
 }
 
-
-/**
- * 判断节点是否为阀室
- */
 function isValveRoom(nodeName: string): boolean {
     return nodeName.includes('阀室') || nodeName.includes('阀门') || nodeName.includes('#')
 }
 
-/**
- * 判断节点是否为重要站场（压气站、分输站等）
- */
-function isImportantStation(nodeName: string): boolean {
-    return nodeName.includes('压气站') ||
-        nodeName.includes('分输站') ||
-        nodeName.includes('首站') ||
-        nodeName.includes('末站') ||
-        nodeName.includes('计量站')
-}
+// -----------------------------------------------------------------------------
+// 分批渲染节点 - 性能优化核心
+// -----------------------------------------------------------------------------
 
 /**
- * 根据缩放级别获取字体大小
+ * 渲染管网节点（新版，支持智能聚合）- 分批渲染
  */
-function getFontSizeByZoom(zoom: number, isImportant: boolean): string {
-    if (zoom >= 10) {
-        return isImportant ? '14px' : '11px'
-    } else if (zoom >= 8) {
-        return isImportant ? '13px' : '10px'
-    } else if (zoom >= 6) {
-        return isImportant ? '12px' : '9px'
-    } else {
-        return isImportant ? '11px' : '8px'
-    }
-}
-
-/**
- * 根据缩放级别获取标记半径
- */
-function getMarkerRadiusByZoom(zoom: number, isImportant: boolean): number {
-    if (zoom >= 10) {
-        return isImportant ? 12 : 8
-    } else if (zoom >= 8) {
-        return isImportant ? 10 : 6
-    } else if (zoom >= 6) {
-        return isImportant ? 8 : 5
-    } else {
-        return isImportant ? 6 : 4
-    }
-}
-
-/**
- * 渲染管网节点（支持缩放级别智能显示）
- */
-export function renderPipelineNodes(
+export function renderPipelineNodesWithClustering(
     map: any,
     nodes: PipelineNode[],
     sourceNodes: string[] = [],
     compressorStations: string[] = [],
-    onNodeClick?: (event: { node: PipelineNode; position: { longitude: number; latitude: number } }) => void
-) {
-    console.log('🏁 renderPipelineNodes 被调用，节点数量:', nodes.length)
-    const AMap = (window as any).AMap
-    if (!AMap) return []
+    onNodeClick?: (event: { node: PipelineNode; position: any }) => void,
+    onClusterClick?: (event: ClusterClickEvent) => void,
+    signal?: AbortSignal
+): Promise<any[]> {
+    return new Promise((resolve) => {
+        const AMap = (window as any).AMap
+        if (!AMap || !nodes || nodes.length === 0) {
+            resolve([])
+            return
+        }
 
-    const overlays: any[] = []
-    const nodeOverlayMap = new Map<string, { markers: any[]; isValve: boolean }>()
+        const overlays: any[] = []
+        const currentZoom = map.getZoom()
 
-    // 获取当前缩放级别
-    const currentZoom = map.getZoom()
-    console.log('📐 当前缩放级别:', currentZoom)
+        // 1. 按坐标分组（带缓存）
+        const clusterGroups = groupNodesByCoordinate(nodes)
 
-    nodes.forEach(node => {
-        try {
-            // 判定节点类型
-            const isCompressor = node.name.includes('压气站') || compressorStations.includes(node.name) || (node.type as any) === 'compressor'
-            const isDistribution = node.name.includes('分输站') || node.name.includes('门站') || node.name.includes('末站') || (node.type as any) === 'distribution' || (node.type as any) === 'station'
-            const isValve = isValveRoom(node.name) || (node.type as any) === 'valve'
-            const isImportant = isCompressor || isDistribution
+        // 2. 分批渲染聚合组
+        const groups = Array.from(clusterGroups.values())
+        const BATCH_SIZE = 10 // 每批处理10个聚合组
+        let index = 0
 
-            // 1. 压气站：梯形、大尺寸、闪烁
-            if (isCompressor) {
-                // 获取旋转角度 (如果存在)
-                const rotation = node.properties?.rotation || 0
-
-                // 创建容器用于旋转
-                const container = document.createElement('div')
-                container.style.transform = `rotate(${rotation}deg)`
-                container.style.transformOrigin = 'center center'
-
-                // 创建梯形标记
-                const markerContent = document.createElement('div')
-                markerContent.className = 'compressor-marker'
-                container.appendChild(markerContent)
-
-                const marker = new AMap.Marker({
-                    position: [node.coordinate.longitude, node.coordinate.latitude],
-                    content: container,
-                    // 修正 offset:
-                    // 原始: offset: new AMap.Pixel(-15, -24)
-                    // 旋转后: 
-                    // 0度(向上): 底部中心在(0,0), visual(-25, -24)?
-                    // 90度(向右): visual center becomes left center?
-                    // Let's stick with center alignment for simplicity.
-                    // If we rotate around center, we need offset to point to center of the icon.
-                    // compressor-marker 30px w, 24px h.
-                    // Center is (15, 12).
-                    // offset should be (-15, -12).
-                    offset: new AMap.Pixel(-15, -12),
-                    zIndex: 120,
-                    extData: { type: 'compressor' }
-                })
-
-                // 调整文字位置
-                const text = new AMap.Text({
-                    text: node.name,
-                    position: [node.coordinate.longitude, node.coordinate.latitude],
-                    offset: new AMap.Pixel(0, 10), // 梯形下方
-                    style: {
-                        'font-size': '14px',
-                        'font-weight': 'bold',
-                        'color': '#00d4ff',
-                        'background-color': 'rgba(0,0,0,0.7)',
-                        'border-radius': '4px',
-                        'padding': '2px 6px',
-                        'border': '1px solid #00d4ff'
-                    },
-                    zIndex: 121
-                })
-
-                bindClickEvents(marker, text, node, onNodeClick)
-                map.add([marker, text])
-                overlays.push(marker, text)
-                nodeOverlayMap.set(node.id, { markers: [marker, text], isValve: false })
+        function renderBatch() {
+            // NOTE: 检查是否已取消，防止旧渲染继续往地图加覆盖物
+            if (signal?.aborted) {
+                resolve(overlays)
+                return
             }
-            // 2. 分输站/输气站：中等尺寸、方形或圆形
-            else if (isDistribution) {
-                // 使用较大的方形或圆形
-                const radius = 8 // 比阀室大
-                const color = '#ffd700' // 金黄色
+            const batchEnd = Math.min(index + BATCH_SIZE, groups.length)
 
-                const marker = new AMap.CircleMarker({
-                    center: [node.coordinate.longitude, node.coordinate.latitude],
-                    radius: radius,
-                    fillColor: color,
-                    fillOpacity: 0.9,
-                    strokeColor: '#ffffff',
-                    strokeWeight: 2,
-                    zIndex: 110,
-                })
+            for (let i = index; i < batchEnd; i++) {
+                const group = groups[i]
 
-                const text = new AMap.Text({
-                    text: node.name,
-                    position: [node.coordinate.longitude, node.coordinate.latitude],
-                    offset: new AMap.Pixel(0, -15),
-                    style: {
-                        'font-size': '12px',
-                        'color': color,
-                        'background-color': 'rgba(0,0,0,0.6)',
-                        'border-radius': '2px',
-                        'padding': '2px 4px',
-                        'border': 'none'
-                    },
-                    zIndex: 111
-                })
+                try {
+                    if (group.nodes.length === 1) {
+                        const node = group.nodes[0]
 
-                bindClickEvents(marker, text, node, onNodeClick)
-                map.add([marker, text])
-                overlays.push(marker, text)
-                nodeOverlayMap.set(node.id, { markers: [marker, text], isValve: false })
-            }
-            // 3. 阀室：小尺寸、圆形
-            else { // 默认为阀室或其他小节点
-                const radius = 5 // 较小
-                const color = '#e0e0e0' // 灰白色
+                        // 阀室隐藏机制：低缩放级别下阀室节点跳过创建
+                        if (isValveRoom(node.name) && currentZoom < CLUSTER_CONFIG.VALVE_MIN_ZOOM) {
+                            continue
+                        }
 
-                const marker = new AMap.CircleMarker({
-                    center: [node.coordinate.longitude, node.coordinate.latitude],
-                    radius: radius,
-                    fillColor: color,
-                    fillOpacity: 0.8,
-                    strokeColor: '#666',
-                    strokeWeight: 1,
-                    zIndex: 100,
-                })
+                        const markers = createOffsetNodeMarker(map, node, node.coordinate, onNodeClick)
+                        if (markers && markers.length > 0) {
+                            map.add(markers)
+                            overlays.push(...markers)
+                        }
+                    }
+                    else if (currentZoom >= CLUSTER_CONFIG.EXPAND_CLUSTER_ZOOM) {
+                        // 高缩放级别：使用简单固定偏移展开（替代蜂群）
+                        const nodeCount = group.nodes.length
+                        const scale = Math.pow(2, currentZoom) * 256 / 360
+                        const offsetDistance = 40 // 固定偏移距离（像素）
 
-                const text = new AMap.Text({
-                    text: node.name,
-                    position: [node.coordinate.longitude, node.coordinate.latitude],
-                    offset: new AMap.Pixel(8, 0),
-                    style: {
-                        'font-size': '10px',
-                        'color': '#ccc',
-                        'background-color': 'transparent',
-                        'border': 'none'
-                    },
-                    zIndex: 101
-                })
+                        for (let idx = 0; idx < nodeCount; idx++) {
+                            const node = group.nodes[idx]
 
-                bindClickEvents(marker, text, node, onNodeClick)
-                map.add([marker, text])
-                overlays.push(marker, text)
-                nodeOverlayMap.set(node.id, { markers: [marker, text], isValve: true })
+                            // 阀室隐藏机制：低缩放级别下阀室节点跳过创建
+                            if (isValveRoom(node.name) && currentZoom < CLUSTER_CONFIG.VALVE_MIN_ZOOM) {
+                                continue
+                            }
 
-                // 初始显示状态
-                if (currentZoom < 8) {
-                    marker.hide()
-                    text.hide()
+                            const angle = (idx / nodeCount) * Math.PI * 2 // 均匀分布角度
+
+                            // 计算偏移位置
+                            const offsetX = Math.cos(angle) * offsetDistance
+                            const offsetY = Math.sin(angle) * offsetDistance
+
+                            const newPosition = {
+                                longitude: node.coordinate.longitude + offsetX / scale,
+                                latitude: node.coordinate.latitude - offsetY / scale
+                            }
+
+                            const markers = createOffsetNodeMarker(map, node, newPosition, onNodeClick)
+                            if (markers && markers.length > 0) {
+                                // 简化的连接线
+                                const line = new AMap.Polyline({
+                                    path: [
+                                        [node.coordinate.longitude, node.coordinate.latitude],
+                                        [newPosition.longitude, newPosition.latitude]
+                                    ],
+                                    strokeColor: 'rgba(255,255,255,0.3)',
+                                    strokeWeight: 1,
+                                    zIndex: 100
+                                })
+                                map.add(line)
+                                overlays.push(line)
+
+                                map.add(markers)
+                                overlays.push(...markers)
+                            }
+                        }
+                    }
+                    else {
+                        // 低缩放级别：显示聚合标记
+                        const clusterMarker = createClusterMarker(map, group, onClusterClick)
+                        if (clusterMarker) {
+                            map.add(clusterMarker)
+                            overlays.push(clusterMarker)
+                        }
+                    }
+                } catch (error) {
+                    // 渲染失败，继续下一个
                 }
             }
 
-        } catch (error) {
-            console.error(`❌ 渲染节点 ${node.name} 失败:`, error)
-        }
-    })
+            index = batchEnd
 
-    // 辅助函数：绑定事件
-    function bindClickEvents(marker: any, text: any, node: PipelineNode, callback?: Function) {
-        const handleClick = () => {
-            if (callback) callback({ node, position: node.coordinate })
-        }
-        marker.on('click', handleClick)
-        text.on('click', handleClick)
-    }
-
-    // 监听缩放事件，动态显示/隐藏阀室
-    const zoomHandler = () => {
-        const zoom = map.getZoom()
-        const showValves = zoom >= 8 // 缩放级别 >= 8 时显示阀室
-
-        nodeOverlayMap.forEach(({ markers, isValve }) => {
-            if (isValve) {
-                markers.forEach(m => showValves ? m.show() : m.hide())
+            if (index < groups.length) {
+                // 还有未渲染的，下一帧继续
+                requestAnimationFrame(renderBatch)
+            } else {
+                // 全部渲染完成
+                resolve(overlays)
             }
-        })
-    }
+        }
 
-    map.on('zoomend', zoomHandler)
-
-    console.log(`✅ renderPipelineNodes 完成，成功添加了 ${overlays.length} 个对象`)
-    return overlays
+        // 开始渲染
+        requestAnimationFrame(renderBatch)
+    })
 }
 
+// -----------------------------------------------------------------------------
+// 渲染设备
+// -----------------------------------------------------------------------------
 
 /**
- * 渲染管网设备
+ * 渲染管线设备 - 分批渲染
  */
 export function renderPipelineDevices(
     map: any,
     devices: PipelineDevice[],
     onDeviceClick?: (event: { device: PipelineDevice; position: { longitude: number; latitude: number } }) => void
-) {
-    const AMap = (window as any).AMap
-    if (!AMap) return []
-
-    const markers: any[] = []
-
-    devices.forEach(device => {
-        // 根据设备在线状态选择颜色
-        const color = device.online ? '#52c41a' : '#ff4d4f'
-
-        const marker = new AMap.CircleMarker({
-            center: [device.coordinate.longitude, device.coordinate.latitude],
-            radius: 4,
-            fillColor: color,
-            fillOpacity: 0.8,
-            strokeColor: '#ffffff',
-            strokeWeight: 1,
-            zIndex: 90,
-        })
-
-        // 绑定点击事件
-        if (onDeviceClick) {
-            marker.on('click', () => {
-                onDeviceClick({ device, position: device.coordinate })
-            })
+): Promise<any[]> {
+    return new Promise((resolve) => {
+        const AMap = (window as any).AMap
+        if (!AMap || !devices || devices.length === 0) {
+            resolve([])
+            return
         }
 
-        map.add(marker)
-        markers.push(marker)
-    })
+        const overlays: any[] = []
+        const BATCH_SIZE = 20
+        let index = 0
 
-    return markers
+        function renderBatch() {
+            const batchEnd = Math.min(index + BATCH_SIZE, devices.length)
+
+            for (let i = index; i < batchEnd; i++) {
+                const device = devices[i]
+                try {
+                    const color = device.status === 'normal' ? '#22c55e' : '#ef4444'
+
+                    const circle = new AMap.CircleMarker({
+                        center: [device.coordinate.longitude, device.coordinate.latitude],
+                        radius: 6,
+                        fillColor: color,
+                        fillOpacity: 0.8,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2,
+                        zIndex: 110
+                    })
+
+                    if (onDeviceClick) {
+                        circle.on('click', (e: any) => {
+                            onDeviceClick({
+                                device,
+                                position: { longitude: e.lnglat.lng, latitude: e.lnglat.lat }
+                            })
+                        })
+                    }
+
+                    map.add(circle)
+                    overlays.push(circle)
+                } catch (error) {
+                    // 渲染失败，继续下一个
+                }
+            }
+
+            index = batchEnd
+
+            if (index < devices.length) {
+                requestAnimationFrame(renderBatch)
+            } else {
+                resolve(overlays)
+            }
+        }
+
+        requestAnimationFrame(renderBatch)
+    })
 }
 
+// -----------------------------------------------------------------------------
+// 工具函数
+// -----------------------------------------------------------------------------
+
 /**
- * 清除地图上的所有覆盖物
+ * 清除地图覆盖物
  */
-export function clearMapOverlays(map: any, overlays: any[]) {
+export function clearMapOverlays(map: any, overlays: any[]): void {
     if (!map || !overlays || overlays.length === 0) return
 
-    overlays.forEach(overlay => {
-        if (overlay && typeof overlay.setMap === 'function') {
-            overlay.setMap(null)
-        }
-    })
+    // 过滤掉无效覆盖物，批量移除更高效
+    const validOverlays = overlays.filter(o => o != null)
+    if (validOverlays.length === 0) return
 
-    map.clearMap()
+    try {
+        map.remove(validOverlays)
+    } catch (e) {
+        // 如果批量移除失败，尝试逐个移除
+        for (let i = 0; i < validOverlays.length; i++) {
+            try {
+                map.remove(validOverlays[i])
+            } catch (e) {
+                // 忽略移除错误
+            }
+        }
+    }
 }

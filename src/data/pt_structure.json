@@ -1,0 +1,222 @@
+{
+    "pipeline_name": "平泰支干线",
+    "trunk": [
+        {
+            "id": 767,
+            "name": "鲁山压气站",
+            "mileage": 0.0,
+            "type": "compressor",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 768,
+            "name": "平泰1#阀室",
+            "mileage": 22.4345,
+            "type": "valve",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 769,
+            "name": "平泰2#阀室",
+            "mileage": 43.6439,
+            "type": "valve",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 770,
+            "name": "平泰3#阀室",
+            "mileage": 66.0,
+            "type": "valve",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 771,
+            "name": "禹州分输站",
+            "mileage": 66.0,
+            "type": "distribution",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 772,
+            "name": "平泰4#阀室",
+            "mileage": 90.2222,
+            "type": "valve",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 773,
+            "name": "平泰5#阀室",
+            "mileage": 110.3367,
+            "type": "valve",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 774,
+            "name": "薛店分输站",
+            "mileage": 129.34,
+            "type": "distribution",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 775,
+            "name": "中牟分输站",
+            "mileage": 151.34,
+            "type": "distribution",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 776,
+            "name": "平泰6#阀室",
+            "mileage": 169.9515,
+            "type": "valve",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 777,
+            "name": "开封分输站",
+            "mileage": 188.34,
+            "type": "distribution",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 778,
+            "name": "平泰7#阀室",
+            "mileage": 210.6498,
+            "type": "valve",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 779,
+            "name": "杞县分输站",
+            "mileage": 232.6382,
+            "type": "distribution",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 780,
+            "name": "兰考分输站",
+            "mileage": 253.34,
+            "type": "distribution",
+            "branch_name": "平泰河南段"
+        },
+        {
+            "id": 781,
+            "name": "平泰10#阀室",
+            "mileage": 272.22,
+            "type": "valve",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 782,
+            "name": "平泰11#阀室",
+            "mileage": 292.4444,
+            "type": "valve",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 783,
+            "name": "平泰12#阀室",
+            "mileage": 315.703,
+            "type": "valve",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 784,
+            "name": "菏泽分输站",
+            "mileage": 355.25,
+            "type": "distribution",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 785,
+            "name": "平泰13#阀室",
+            "mileage": 380.5296,
+            "type": "valve",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 786,
+            "name": "平泰14#阀室",
+            "mileage": 405.0161,
+            "type": "valve",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 787,
+            "name": "巨野分输站",
+            "mileage": 421.77,
+            "type": "distribution",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 788,
+            "name": "平泰15#阀室",
+            "mileage": 445.9325,
+            "type": "valve",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 789,
+            "name": "济宁分输站",
+            "mileage": 464.28,
+            "type": "distribution",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 790,
+            "name": "平泰16#阀室",
+            "mileage": 486.9281,
+            "type": "valve",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 791,
+            "name": "平泰17#阀室",
+            "mileage": 508.3683,
+            "type": "valve",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 792,
+            "name": "平泰18#阀室",
+            "mileage": 526.1848,
+            "type": "valve",
+            "branch_name": "平泰山东段"
+        },
+        {
+            "id": 793,
+            "name": "泰安压气站",
+            "mileage": 545.3099,
+            "type": "compressor",
+            "branch_name": "平泰山东段"
+        }
+    ],
+    "branches": [
+        [
+            {
+                "id": 794,
+                "name": "中开线开封站",
+                "mileage": 0.0,
+                "type": "distribution",
+                "branch_name": "西二中开-中开平泰联络线"
+            },
+            {
+                "id": 795,
+                "name": "中开平泰1#阀室",
+                "mileage": 13.6,
+                "type": "valve",
+                "branch_name": "西二中开-中开平泰联络线"
+            },
+            {
+                "id": 796,
+                "name": "杞县分输站",
+                "mileage": 25.6,
+                "type": "distribution",
+                "branch_name": "西二中开-中开平泰联络线"
+            }
+        ]
+    ],
+    "branch_names": [
+        "西二中开-中开平泰联络线"
+    ]
+}

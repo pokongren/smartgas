@@ -1,0 +1,155 @@
+{
+  "schema": [
+    {
+      "cid": 0,
+      "name": "id",
+      "type": "INTEGER"
+    },
+    {
+      "cid": 1,
+      "name": "trunk_name",
+      "type": "VARCHAR"
+    },
+    {
+      "cid": 2,
+      "name": "branch_name",
+      "type": "VARCHAR"
+    },
+    {
+      "cid": 3,
+      "name": "node_name",
+      "type": "VARCHAR"
+    },
+    {
+      "cid": 4,
+      "name": "node_name_calc",
+      "type": "VARCHAR"
+    },
+    {
+      "cid": 5,
+      "name": "company",
+      "type": "VARCHAR"
+    },
+    {
+      "cid": 6,
+      "name": "work_area",
+      "type": "VARCHAR"
+    },
+    {
+      "cid": 7,
+      "name": "mileage",
+      "type": "FLOAT"
+    },
+    {
+      "cid": 8,
+      "name": "spacing",
+      "type": "FLOAT"
+    },
+    {
+      "cid": 9,
+      "name": "elevation",
+      "type": "FLOAT"
+    },
+    {
+      "cid": 10,
+      "name": "node_type_2025",
+      "type": "VARCHAR"
+    }
+  ],
+  "columns": [
+    "id",
+    "trunk_name",
+    "branch_name",
+    "node_name",
+    "node_name_calc",
+    "company",
+    "work_area",
+    "mileage",
+    "spacing",
+    "elevation",
+    "node_type_2025"
+  ],
+  "sample_rows": [
+    {
+      "id": 2067,
+      "trunk_name": "中俄东线",
+      "branch_name": "中俄东线跨境段",
+      "node_name": "交气点",
+      "node_name_calc": "交气点",
+      "company": "东北公司",
+      "work_area": "黑河作业区",
+      "mileage": 0.0,
+      "spacing": 0.0,
+      "elevation": 131.0,
+      "node_type_2025": null
+    },
+    {
+      "id": 2068,
+      "trunk_name": "中俄东线",
+      "branch_name": "中俄东线跨境段",
+      "node_name": "中俄跨境00#阀室",
+      "node_name_calc": "00#阀室",
+      "company": "东北公司",
+      "work_area": "黑河作业区",
+      "mileage": 4.03,
+      "spacing": 4.03,
+      "elevation": 232.0,
+      "node_type_2025": "监视阀室"
+    },
+    {
+      "id": 2069,
+      "trunk_name": "中俄东线",
+      "branch_name": "中俄东线跨境段",
+      "node_name": "黑河压气站",
+      "node_name_calc": "黑河压气站",
+      "company": "东北公司",
+      "work_area": "黑河作业区",
+      "mileage": 13.0,
+      "spacing": 8.97,
+      "elevation": 252.7,
+      "node_type_2025": null
+    },
+    {
+      "id": 2070,
+      "trunk_name": "中俄东线",
+      "branch_name": "中俄东线北段干线",
+      "node_name": "黑河压气站",
+      "node_name_calc": "黑河压气站",
+      "company": "东北公司",
+      "work_area": "黑河作业区",
+      "mileage": 0.0,
+      "spacing": 0.0,
+      "elevation": 252.7,
+      "node_type_2025": "压气站"
+    },
+    {
+      "id": 2071,
+      "trunk_name": "中俄东线",
+      "branch_name": "中俄东线北段干线",
+      "node_name": "HC1#阀室",
+      "node_name_calc": "HC1#阀室★",
+      "company": "东北公司",
+      "work_area": "黑河作业区",
+      "mileage": 25.8,
+      "spacing": 25.8,
+      "elevation": 316.9,
+      "node_type_2025": "监控阀室"
+    }
+  ],
+  "branch_names": [
+    "中俄东天津-武清联络线",
+    "中俄东线与济青二线齐河联通线",
+    "中俄东线中段干线",
+    "中俄东线北段干线",
+    "中俄东线南段干线（南通-甪直）",
+    "中俄东线南段干线（安平-泰兴）",
+    "中俄东线跨境段",
+    "兰西-绥化支线",
+    "双台子储气库双向输气管道",
+    "大庆-双合支线",
+    "明水-哈尔滨支线",
+    "长岭-长春支线",
+    "齐齐哈尔支线"
+  ],
+  "total_count": 218
+}
