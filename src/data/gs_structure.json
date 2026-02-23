@@ -1,0 +1,180 @@
+{
+  "pipeline_name": "广深支干线",
+  "trunk": [
+    {
+      "id": 86169,
+      "name": "广州压气站",
+      "mileage": 0.0,
+      "type": "compressor",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 36107,
+      "name": "广深1#阀室",
+      "mileage": 8.1453,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 36051,
+      "name": "广深2#阀室",
+      "mileage": 30.6686,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 38632,
+      "name": "广深3#阀室",
+      "mileage": 43.3044,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 40514,
+      "name": "广深4#阀室",
+      "mileage": 58.434,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 28008,
+      "name": "广深5#阀室",
+      "mileage": 75.7228,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 35392,
+      "name": "广深6#阀室",
+      "mileage": 90.0,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 18832,
+      "name": "广深8#阀室",
+      "mileage": 106.2532,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 17465,
+      "name": "广深9#阀室",
+      "mileage": 130.9072,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 91645,
+      "name": "广深10#阀室",
+      "mileage": 149.3191,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 28402,
+      "name": "东莞分输站",
+      "mileage": 162.9999,
+      "type": "distribution",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 17829,
+      "name": "广深11#阀室",
+      "mileage": 169.9999,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 41331,
+      "name": "广深12#阀室",
+      "mileage": 183.7179,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 6682,
+      "name": "广深13#阀室",
+      "mileage": 187.3566,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 15231,
+      "name": "广深14#阀室",
+      "mileage": 192.335,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 56442,
+      "name": "求雨岭分输站",
+      "mileage": 196.0399,
+      "type": "distribution",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 33624,
+      "name": "广深15#阀室",
+      "mileage": 201.7424,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 38128,
+      "name": "广深16#阀室",
+      "mileage": 211.2991,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 23384,
+      "name": "广深17#阀室",
+      "mileage": 220.298,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 73040,
+      "name": "广深18#阀室",
+      "mileage": 231.0189,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 67650,
+      "name": "广深19#阀室",
+      "mileage": 236.9734,
+      "type": "valve",
+      "branch_name": "广深支干线"
+    },
+    {
+      "id": 42951,
+      "name": "大铲岛压气站",
+      "mileage": 258.3999,
+      "type": "compressor",
+      "branch_name": "广深支干线"
+    }
+  ],
+  "branches": [
+    [
+      {
+        "id": 58850,
+        "name": "11#和12#阀室之间",
+        "mileage": 0.0,
+        "type": "valve",
+        "branch_name": "樟木头支线"
+      },
+      {
+        "id": 77706,
+        "name": "樟木头分输站",
+        "mileage": 0.8,
+        "type": "distribution",
+        "branch_name": "樟木头支线"
+      }
+    ]
+  ],
+  "branch_names": [
+    "樟木头支线"
+  ]
+}

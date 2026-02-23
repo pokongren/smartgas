@@ -20,8 +20,8 @@ const CLUSTER_CONFIG = {
     /** 坐标分组精度（小数位数） */
     COORDINATE_PRECISION: 6,
 
-    /** 阀室最小显示缩放级别 */
-    VALVE_MIN_ZOOM: 8,
+    /** 阀室最小显示缩放级别（zoom < 此值时隐藏所有阀室节点） */
+    VALVE_MIN_ZOOM: 11,
 
     /** 分散显示缩放级别阈值 */
     EXPAND_CLUSTER_ZOOM: 12,
@@ -818,8 +818,13 @@ export function renderPipelineNodesWithClustering(
         const overlays: any[] = []
         const currentZoom = map.getZoom()
 
+        // 阀室全局过滤：在分组前就移除阀室节点，防止它们出现在任何渲染分支中
+        const filteredNodes = currentZoom < CLUSTER_CONFIG.VALVE_MIN_ZOOM
+            ? nodes.filter(n => !isValveRoom(n.name))
+            : nodes
+
         // 1. 按坐标分组（带缓存）
-        const clusterGroups = groupNodesByCoordinate(nodes)
+        const clusterGroups = groupNodesByCoordinate(filteredNodes)
 
         // 2. 分批渲染聚合组
         const groups = Array.from(clusterGroups.values())

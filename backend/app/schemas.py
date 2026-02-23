@@ -51,3 +51,30 @@ class KnowledgeQueryResponse(BaseModel):
     answer: str
     source: Optional[str]
     confidence: float
+
+# ============ 仿真模型 (阶段一) ============
+
+class SimulationRequest(BaseModel):
+    """断流推演请求"""
+    failure_node_id: str                    # 故障节点 ID
+    failure_type: str = "complete"          # complete / partial
+    max_ticks: int = 500                    # 最大推演步数
+
+class SimulationFrame(BaseModel):
+    """推演时间轴帧"""
+    tick: int
+    timestamp: str
+    changed_pipes: dict                     # pipe_id → {from, to, pipe_name}
+
+class SimulationResponse(BaseModel):
+    """断流推演响应"""
+    total_ticks: int
+    affected_pipes: int
+    frames: List[SimulationFrame]
+
+class TopologySummary(BaseModel):
+    """拓扑概览"""
+    nodes: int
+    edges: int
+    total_linepack_m3: float
+    is_directed: bool

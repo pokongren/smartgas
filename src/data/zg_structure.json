@@ -1,0 +1,821 @@
+{
+  "pipeline_name": "中贵线",
+  "trunk": [
+    {
+      "id": 47594,
+      "name": "中卫压气站",
+      "mileage": 0.0,
+      "type": "compressor",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 10346,
+      "name": "中贵1#阀室",
+      "mileage": 32.949,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 87768,
+      "name": "中贵2#阀室",
+      "mileage": 63.938,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 57304,
+      "name": "中贵3#阀室",
+      "mileage": 96.26,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 91861,
+      "name": "中贵4#阀室",
+      "mileage": 117.003,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 95319,
+      "name": "中贵5#阀室",
+      "mileage": 139.974,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 36435,
+      "name": "中贵6#阀室",
+      "mileage": 162.804,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 60576,
+      "name": "中贵7#阀室",
+      "mileage": 180.48,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 80119,
+      "name": "中贵8#阀室",
+      "mileage": 196.789,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 95820,
+      "name": "固原压气站",
+      "mileage": 214.24,
+      "type": "compressor",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 56930,
+      "name": "中贵9#阀室",
+      "mileage": 245.69,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 56702,
+      "name": "硝河分输站",
+      "mileage": 245.69,
+      "type": "distribution",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 23626,
+      "name": "中贵10#阀室",
+      "mileage": 260.537,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 29226,
+      "name": "西吉清管站",
+      "mileage": 278.99,
+      "type": "other",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 5495,
+      "name": "中贵11#阀室",
+      "mileage": 295.42,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 67477,
+      "name": "中贵12#阀室",
+      "mileage": 312.347,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 85072,
+      "name": "中贵13#阀室",
+      "mileage": 329.23,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 10370,
+      "name": "中贵14#阀室",
+      "mileage": 352.083,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 44102,
+      "name": "中贵15#阀室",
+      "mileage": 371.646,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 73462,
+      "name": "中贵16#阀室",
+      "mileage": 392.5,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 53820,
+      "name": "中贵17#阀室",
+      "mileage": 416.139,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 86054,
+      "name": "中贵18#阀室",
+      "mileage": 437.311,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 80089,
+      "name": "天水压气站",
+      "mileage": 457.62,
+      "type": "compressor",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 82740,
+      "name": "中贵19#阀室",
+      "mileage": 481.52,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 20339,
+      "name": "中贵20#阀室",
+      "mileage": 502.87,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 98239,
+      "name": "中贵21#阀室",
+      "mileage": 526.852,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 67662,
+      "name": "中贵22#阀室",
+      "mileage": 548.12,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 84913,
+      "name": "中贵23#阀室",
+      "mileage": 567.927,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 25757,
+      "name": "中贵24#阀室",
+      "mileage": 586.735,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 48442,
+      "name": "陇南分输站",
+      "mileage": 600.12,
+      "type": "distribution",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 2114,
+      "name": "中贵25#阀室",
+      "mileage": 611.177,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 19006,
+      "name": "中贵26#阀室",
+      "mileage": 630.609,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 59294,
+      "name": "中贵27#阀室",
+      "mileage": 651.272,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 98671,
+      "name": "中贵28#阀室",
+      "mileage": 673.56,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 15254,
+      "name": "中贵29#阀室",
+      "mileage": 687.549,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 90359,
+      "name": "中贵30#阀室",
+      "mileage": 708.357,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 18370,
+      "name": "中贵31#阀室",
+      "mileage": 722.19,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 64670,
+      "name": "广元压气站",
+      "mileage": 730.65,
+      "type": "compressor",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 79323,
+      "name": "中贵32#阀室",
+      "mileage": 736.627,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 50054,
+      "name": "中贵33#阀室",
+      "mileage": 759.671,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 59930,
+      "name": "中贵34#阀室",
+      "mileage": 780.156,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 29297,
+      "name": "中贵35#阀室",
+      "mileage": 803.508,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 27205,
+      "name": "中贵36#阀室",
+      "mileage": 825.83,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 3880,
+      "name": "中贵37#阀室",
+      "mileage": 847.52,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 7446,
+      "name": "中贵38#阀室",
+      "mileage": 867.04,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 69670,
+      "name": "南部分输站",
+      "mileage": 890.42,
+      "type": "distribution",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 76825,
+      "name": "中贵39#阀室",
+      "mileage": 909.84,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 97694,
+      "name": "中贵40#阀室",
+      "mileage": 929.89,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 43266,
+      "name": "南充压气站",
+      "mileage": 952.46,
+      "type": "compressor",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 69354,
+      "name": "中贵41#阀室",
+      "mileage": 975.804,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 6059,
+      "name": "武胜分输站",
+      "mileage": 998.64,
+      "type": "distribution",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 32174,
+      "name": "中贵42#阀室",
+      "mileage": 1003.69,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 48280,
+      "name": "中贵43#阀室",
+      "mileage": 1016.12,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 18733,
+      "name": "中贵44#阀室",
+      "mileage": 1038.61,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 67448,
+      "name": "铜梁分输站",
+      "mileage": 1059.0,
+      "type": "distribution",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 55697,
+      "name": "中贵45#阀室",
+      "mileage": 1075.12,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 80404,
+      "name": "中贵46#阀室",
+      "mileage": 1095.506,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 80478,
+      "name": "中贵47#阀室",
+      "mileage": 1112.09,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 88222,
+      "name": "中贵马坊分输站",
+      "mileage": 1130.87,
+      "type": "distribution",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 75401,
+      "name": "中贵49#阀室",
+      "mileage": 1149.177,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 20914,
+      "name": "中贵50#阀室",
+      "mileage": 1160.594,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 27870,
+      "name": "江津压气站",
+      "mileage": 1175.4,
+      "type": "compressor",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 39491,
+      "name": "中贵51#阀室",
+      "mileage": 1192.952,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 8114,
+      "name": "中贵52#阀室",
+      "mileage": 1225.882,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 10493,
+      "name": "中贵53#阀室",
+      "mileage": 1240.535,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 41279,
+      "name": "中贵54#阀室",
+      "mileage": 1249.222,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 46553,
+      "name": "中贵55#阀室",
+      "mileage": 1267.0,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 42860,
+      "name": "中贵56#阀室",
+      "mileage": 1290.889,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 53622,
+      "name": "中贵57#阀室",
+      "mileage": 1309.054,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 80397,
+      "name": "中贵58#阀室",
+      "mileage": 1322.15,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 49304,
+      "name": "中贵59#阀室",
+      "mileage": 1334.058,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 69912,
+      "name": "中贵60#阀室",
+      "mileage": 1346.918,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 70480,
+      "name": "中贵61#阀室",
+      "mileage": 1363.366,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 78921,
+      "name": "遵义压气站",
+      "mileage": 1385.29,
+      "type": "compressor",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 60308,
+      "name": "中贵62#阀室",
+      "mileage": 1407.103,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 53590,
+      "name": "中贵63#阀室",
+      "mileage": 1426.38,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 97727,
+      "name": "中贵64#阀室",
+      "mileage": 1451.419,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 37419,
+      "name": "中贵65#阀室",
+      "mileage": 1460.83,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 50594,
+      "name": "中贵66#阀室",
+      "mileage": 1483.91,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 90313,
+      "name": "中贵67#阀室",
+      "mileage": 1505.842,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 81536,
+      "name": "中贵68#阀室",
+      "mileage": 1522.22,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 88541,
+      "name": "中贵69#阀室",
+      "mileage": 1534.831,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 84707,
+      "name": "贵阳北分输站",
+      "mileage": 1544.8606,
+      "type": "distribution",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 21094,
+      "name": "中贵70#阀室",
+      "mileage": 1557.4498,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 22447,
+      "name": "中贵71#阀室",
+      "mileage": 1567.1703,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 14833,
+      "name": "中贵72#阀室",
+      "mileage": 1579.2715,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 9722,
+      "name": "中贵73#阀室",
+      "mileage": 1594.5237,
+      "type": "valve",
+      "branch_name": "中贵线干线"
+    },
+    {
+      "id": 1581,
+      "name": "贵阳压气站",
+      "mileage": 1605.662,
+      "type": "compressor",
+      "branch_name": "中贵线干线"
+    }
+  ],
+  "branches": [
+    [
+      {
+        "id": 59471,
+        "name": "元坝首站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "中贵元坝普光-元坝陵江联络线"
+      },
+      {
+        "id": 69109,
+        "name": "陵江清管站",
+        "mileage": 14.5,
+        "type": "other",
+        "branch_name": "中贵元坝普光-元坝陵江联络线"
+      }
+    ],
+    [
+      {
+        "id": 45291,
+        "name": "固原压气站",
+        "mileage": 0.0,
+        "type": "compressor",
+        "branch_name": "固原-原州联络线"
+      },
+      {
+        "id": 51470,
+        "name": "原州联络站",
+        "mileage": 5.6,
+        "type": "other",
+        "branch_name": "固原-原州联络线"
+      }
+    ],
+    [
+      {
+        "id": 25801,
+        "name": "天水压气站",
+        "mileage": 0.0,
+        "type": "compressor",
+        "branch_name": "天水支线"
+      },
+      {
+        "id": 78202,
+        "name": "天水1#阀室",
+        "mileage": 22.947,
+        "type": "valve",
+        "branch_name": "天水支线"
+      },
+      {
+        "id": 45006,
+        "name": "天水末站",
+        "mileage": 51.55,
+        "type": "distribution",
+        "branch_name": "天水支线"
+      }
+    ],
+    [
+      {
+        "id": 20081,
+        "name": "广元压气站",
+        "mileage": 0.0,
+        "type": "compressor",
+        "branch_name": "广元燃机工程供气管道"
+      },
+      {
+        "id": 41778,
+        "name": "广元电厂末站",
+        "mileage": 5.8,
+        "type": "distribution",
+        "branch_name": "广元燃机工程供气管道"
+      }
+    ],
+    [
+      {
+        "id": 57984,
+        "name": "江津压气站",
+        "mileage": 0.0,
+        "type": "compressor",
+        "branch_name": "重燃支坪支线"
+      },
+      {
+        "id": 84480,
+        "name": "支坪分输站",
+        "mileage": 18.19,
+        "type": "distribution",
+        "branch_name": "重燃支坪支线"
+      }
+    ],
+    [
+      {
+        "id": 31502,
+        "name": "陇南分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "陇南支线"
+      },
+      {
+        "id": 37764,
+        "name": "陇南1#阀室",
+        "mileage": 23.155,
+        "type": "valve",
+        "branch_name": "陇南支线"
+      },
+      {
+        "id": 72558,
+        "name": "陇南2#阀室",
+        "mileage": 47.952,
+        "type": "valve",
+        "branch_name": "陇南支线"
+      },
+      {
+        "id": 33354,
+        "name": "陇南3#阀室",
+        "mileage": 68.956,
+        "type": "valve",
+        "branch_name": "陇南支线"
+      },
+      {
+        "id": 72960,
+        "name": "陇南末站",
+        "mileage": 90.351,
+        "type": "distribution",
+        "branch_name": "陇南支线"
+      }
+    ],
+    [
+      {
+        "id": 66031,
+        "name": "天水压气站",
+        "mileage": 0.0,
+        "type": "compressor",
+        "branch_name": "陇西支线"
+      },
+      {
+        "id": 31830,
+        "name": "陇西1#阀室",
+        "mileage": 19.431,
+        "type": "valve",
+        "branch_name": "陇西支线"
+      },
+      {
+        "id": 40592,
+        "name": "陇西2#阀室",
+        "mileage": 40.723,
+        "type": "valve",
+        "branch_name": "陇西支线"
+      },
+      {
+        "id": 2994,
+        "name": "陇西3#阀室",
+        "mileage": 63.583,
+        "type": "valve",
+        "branch_name": "陇西支线"
+      },
+      {
+        "id": 78989,
+        "name": "陇西4#阀室",
+        "mileage": 74.98,
+        "type": "valve",
+        "branch_name": "陇西支线"
+      },
+      {
+        "id": 83556,
+        "name": "陇西5#阀室",
+        "mileage": 93.322,
+        "type": "valve",
+        "branch_name": "陇西支线"
+      },
+      {
+        "id": 77098,
+        "name": "陇西6#阀室",
+        "mileage": 105.53,
+        "type": "valve",
+        "branch_name": "陇西支线"
+      },
+      {
+        "id": 38319,
+        "name": "陇西7#阀室",
+        "mileage": 128.829,
+        "type": "valve",
+        "branch_name": "陇西支线"
+      },
+      {
+        "id": 33878,
+        "name": "陇西末站",
+        "mileage": 144.36,
+        "type": "distribution",
+        "branch_name": "陇西支线"
+      }
+    ]
+  ],
+  "branch_names": [
+    "中贵元坝普光-元坝陵江联络线",
+    "固原-原州联络线",
+    "天水支线",
+    "广元燃机工程供气管道",
+    "重燃支坪支线",
+    "陇南支线",
+    "陇西支线"
+  ]
+}

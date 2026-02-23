@@ -18,16 +18,76 @@ class Station(SQLModel, table=True):
     properties: Optional[str] = None  # JSON string for extra data
 
 class Pipeline(SQLModel, table=True):
-    """通用管线表 (通过各 Sheet 汇总)"""
+    """通用管线表 (通过各 Sheet 汇总) - 阶段一：物理基座重塑
+    
+    新增物理属性字段，支持管存计算和断流延迟推演
+    """
     __tablename__ = "pipelines"
     id: str = Field(primary_key=True)
     name: str = Field(index=True)
     start_station_id: str
     end_station_id: str
-    diameter: Optional[int] = None
-    length: float = 0.0
-    category: str  # 'trunk', 'branch'
+    
+    # 基础物理属性
+    diameter_mm: Optional[float] = Field(default=None, description="管径 (毫米)")
+    length_km: float = Field(default=0.0, description="管长 (公里)")
+    
+    # 兼容旧字段 (迁移后移除)
+    diameter: Optional[int] = Field(default=None, description="[兼容旧版] 管径")
+    length: float = Field(default=0.0, description="[兼容旧版] 管长")
+    
+    category: str = Field(default='branch', description="管线类别: trunk(干线)/branch(支线)")
     properties: Optional[str] = None
+    
+    # 物理推演相关 (运行时计算，不存储)
+    def calculate_linepack_volume(self) -> float:
+        """
+        管存算子 (Linepack Calculator)
+        公式: V = π × (D/2)² × L
+        
+        其中:
+        - D: 管内径 (米) = diameter_mm / 1000
+        - L: 管长 (米) = length_km * 1000
+        
+        返回: 管道内部体积容量 (立方米 m³)
+        """
+        if not self.diameter_mm or self.length_km <= 0:
+            return 0.0
+        
+        import math
+        diameter_m = self.diameter_mm / 1000.0  # mm → m
+        length_m = self.length_km * 1000.0       # km → m
+        radius_m = diameter_m / 2.0
+        
+        volume = math.pi * (radius_m ** 2) * length_m
+        return round(volume, 2)
+    
+    def calculate_delay_ticks(self, tick_minutes: int = 10) -> int:
+        """
+        延迟权重算子 (Delay Weight Calculator)
+        
+        将管存容量转换为"抵抗断流的时间延迟" (Delay Ticks)
+        
+        业务逻辑:
+        - 管存越大，上游断气后下游能撑的时间越久
+        - 假设标准消耗速率下，每 1000m³ 管存可支撑 1 个 Tick
+        
+        参数:
+        - tick_minutes: 每个 Tick 代表现实时间 (分钟)，默认 10 分钟
+        
+        返回: 延迟 Tick 数 (整数)
+        """
+        volume = self.calculate_linepack_volume()
+        if volume <= 0:
+            return 1  # 最小延迟 1 Tick
+        
+        # 业务系数: 每 1000m³ 支撑 1 个 Tick
+        # 粗管(1m直径, 100km) ≈ 78,500 m³ ≈ 78 Ticks ≈ 13 小时
+        # 细管(0.3m直径, 10km) ≈ 706 m³ ≈ 1 Tick ≈ 10 分钟
+        CONSUMPTION_RATE = 1000.0  # m³ per tick
+        
+        delay_ticks = max(1, int(volume / CONSUMPTION_RATE))
+        return delay_ticks
 
 class EmergencyEvent(SQLModel, table=True):
     """应急事件表"""
