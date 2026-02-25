@@ -25,7 +25,7 @@ export const ClusterDetailPanel: React.FC<ClusterDetailPanelProps> = ({
         n.name.includes('分输站') || n.name.includes('门站')
     )
     const valveNodes = nodes.filter(n =>
-        n.name.includes('阀室') || n.name.includes('阀门') || n.name.includes('#')
+        n.type === 'valve' || n.name.includes('阀室') || n.name.includes('阀门') || n.name.includes('#')
     )
 
     return (
@@ -56,9 +56,9 @@ export const ClusterDetailPanel: React.FC<ClusterDetailPanelProps> = ({
                             </h4>
                             <div className="space-y-2">
                                 {compressorNodes.map(node => (
-                                    <NodeItem 
-                                        key={node.id} 
-                                        node={node} 
+                                    <NodeItem
+                                        key={node.id}
+                                        node={node}
                                         onClick={() => {
                                             onNodeSelect?.(node)
                                             onClose()
@@ -78,9 +78,9 @@ export const ClusterDetailPanel: React.FC<ClusterDetailPanelProps> = ({
                             </h4>
                             <div className="space-y-2">
                                 {distributionNodes.map(node => (
-                                    <NodeItem 
-                                        key={node.id} 
-                                        node={node} 
+                                    <NodeItem
+                                        key={node.id}
+                                        node={node}
                                         onClick={() => {
                                             onNodeSelect?.(node)
                                             onClose()
@@ -100,9 +100,9 @@ export const ClusterDetailPanel: React.FC<ClusterDetailPanelProps> = ({
                             </h4>
                             <div className="space-y-2">
                                 {valveNodes.map(node => (
-                                    <NodeItem 
-                                        key={node.id} 
-                                        node={node} 
+                                    <NodeItem
+                                        key={node.id}
+                                        node={node}
                                         onClick={() => {
                                             onNodeSelect?.(node)
                                             onClose()
@@ -154,7 +154,7 @@ const NodeItem: React.FC<NodeItemProps> = ({ node, onClick }) => (
         <span className={`text-xs px-2 py-1 rounded-full ${node.status === 'normal'
             ? 'bg-green-500/10 text-green-400 border border-green-500/20'
             : 'bg-red-500/10 text-red-400 border border-red-500/20'
-        }`}>
+            }`}>
             {node.status === 'normal' ? '正常' : '异常'}
         </span>
     </div>

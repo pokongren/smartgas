@@ -4,3 +4,4 @@
 
 export * from './pipeline'
 export * from './cluster'
+export * from './hub'

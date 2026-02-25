@@ -788,7 +788,9 @@ function createFlowDot(color: string): string {
     return canvas.toDataURL()
 }
 
-function isValveRoom(nodeName: string): boolean {
+function isValveRoom(node: PipelineNode): boolean {
+    if (node.type === NodeType.VALVE) return true
+    const nodeName = node.name || ''
     return nodeName.includes('阀室') || nodeName.includes('阀门') || nodeName.includes('#')
 }
 
@@ -820,7 +822,7 @@ export function renderPipelineNodesWithClustering(
 
         // 阀室全局过滤：在分组前就移除阀室节点，防止它们出现在任何渲染分支中
         const filteredNodes = currentZoom < CLUSTER_CONFIG.VALVE_MIN_ZOOM
-            ? nodes.filter(n => !isValveRoom(n.name))
+            ? nodes.filter(n => !isValveRoom(n))
             : nodes
 
         // 1. 按坐标分组（带缓存）
@@ -847,7 +849,7 @@ export function renderPipelineNodesWithClustering(
                         const node = group.nodes[0]
 
                         // 阀室隐藏机制：低缩放级别下阀室节点跳过创建
-                        if (isValveRoom(node.name) && currentZoom < CLUSTER_CONFIG.VALVE_MIN_ZOOM) {
+                        if (isValveRoom(node) && currentZoom < CLUSTER_CONFIG.VALVE_MIN_ZOOM) {
                             continue
                         }
 
@@ -867,7 +869,7 @@ export function renderPipelineNodesWithClustering(
                             const node = group.nodes[idx]
 
                             // 阀室隐藏机制：低缩放级别下阀室节点跳过创建
-                            if (isValveRoom(node.name) && currentZoom < CLUSTER_CONFIG.VALVE_MIN_ZOOM) {
+                            if (isValveRoom(node) && currentZoom < CLUSTER_CONFIG.VALVE_MIN_ZOOM) {
                                 continue
                             }
 

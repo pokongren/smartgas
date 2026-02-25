@@ -1,9 +1,4 @@
 """
-<<<<<<< HEAD
-阶段二：后端核心推演引擎 (Simulation Engine)
-
-基于带权 BFS 的断流传播仿真，严格按照 Tick 推进状态机。
-=======
 阶段二：后端核心推演引擎 (Simulation Engine) - 优化版
 
 基于带权 BFS 的断流传播仿真，严格按照 Tick 推进状态机。
@@ -11,55 +6,41 @@
 - 图快照缓存，避免重复深拷贝
 - 压力等级系数
 - 动态消耗速率
->>>>>>> branch-仿真之前
 """
 
 import networkx as nx
 from collections import deque, defaultdict
-<<<<<<< HEAD
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-=======
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 import copy
->>>>>>> branch-仿真之前
 
 
 class PipeStatus(str, Enum):
     """管线状态枚举"""
-<<<<<<< HEAD
-    NORMAL = "normal"              # 正常（绿色）
-    DEPRESSURIZING = "depressurizing"  # 降压中（黄色）
-    OUTAGE = "outage"              # 断流（红色）
-
-
-@dataclass
-class PipeStateChange:
-    """管线状态变化事件"""
-    tick: int
-    pipe_id: str
-    from_status: str
-    to_status: str
-=======
     NORMAL = "normal"
     DEPRESSURIZING = "depressurizing"
     OUTAGE = "outage"
+
+
+class SimulationMode(str, Enum):
+    """仿真模式"""
+    STANDARD = "standard"
+    STRICT = "strict"
+    RECOVERY = "recovery"
 
 
 @dataclass
 class SimulationConfig:
     """仿真配置"""
     tick_minutes: int = 10
-    consumption_rate_base: float = 1000.0  # m³/tick
+    consumption_rate_base: float = 1000.0
     pressure_factor_enabled: bool = True
     season_factor_enabled: bool = False
     max_ticks: int = 10000
->>>>>>> branch-仿真之前
+    mode: SimulationMode = SimulationMode.STANDARD
+    detect_cycles: bool = True
 
 
 @dataclass
@@ -67,11 +48,18 @@ class SimulationFrame:
     """仿真时间帧"""
     tick: int
     timestamp: str
-<<<<<<< HEAD
-    changed_pipes: Dict[str, Dict[str, str]]  # pipe_id -> {from, to}
-=======
     changed_pipes: Dict[str, Dict[str, str]]
->>>>>>> branch-仿真之前
+    active_propagation_count: int = 0
+
+
+@dataclass
+class SimulationMetrics:
+    """仿真指标"""
+    total_propagation_paths: int
+    max_concurrent_outages: int
+    avg_propagation_speed: float
+    cycle_detected: bool
+    cycle_nodes: List[str]
 
 
 @dataclass
@@ -81,95 +69,33 @@ class SimulationResult:
     affected_pipes: int
     ai_summary_context: str
     frames: List[SimulationFrame]
-<<<<<<< HEAD
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典（用于 JSON 序列化）"""
-=======
     failure_nodes: List[str]
+    metrics: SimulationMetrics
     
     def to_dict(self) -> Dict[str, Any]:
->>>>>>> branch-仿真之前
         return {
             "total_ticks": self.total_ticks,
             "affected_pipes": self.affected_pipes,
             "ai_summary_context": self.ai_summary_context,
-<<<<<<< HEAD
-=======
             "failure_nodes": self.failure_nodes,
->>>>>>> branch-仿真之前
+            "metrics": {
+                "total_propagation_paths": self.metrics.total_propagation_paths,
+                "max_concurrent_outages": self.metrics.max_concurrent_outages,
+                "avg_propagation_speed": self.metrics.avg_propagation_speed,
+                "cycle_detected": self.metrics.cycle_detected
+            },
             "frames": [
                 {
                     "tick": f.tick,
                     "timestamp": f.timestamp,
-                    "changed_pipes": f.changed_pipes
+                    "changed_pipes": f.changed_pipes,
+                    "active_propagation_count": f.active_propagation_count
                 }
                 for f in self.frames
             ]
         }
 
 
-<<<<<<< HEAD
-class SimulationService:
-    """
-    管网断流仿真推演引擎
-    
-    核心算法：带权 BFS 状态机
-    - 每个 Tick = 10 分钟现实时间
-    - 管存以 1000m³/tick 的速率消耗
-    - 状态跃迁：normal → depressurizing → outage
-    """
-    
-    def __init__(self, directed_graph: nx.DiGraph, tick_minutes: int = 10):
-        """
-        初始化仿真引擎
-        
-        Args:
-            directed_graph: 带有物理权重的有向图
-            tick_minutes: 每个 Tick 代表现实时间（分钟）
-        """
-        self.base_graph = directed_graph
-        self.tick_minutes = tick_minutes
-    
-    def simulate(
-        self,
-        failure_node: str,
-        max_ticks: int = 1000
-    ) -> SimulationResult:
-        """
-        执行断流仿真推演
-        
-        Args:
-            failure_node: 故障源节点 ID（如压气站）
-            max_ticks: 最大推演 Tick 数（防止无限循环）
-        
-        Returns:
-            SimulationResult: 包含完整时间轴帧序列的仿真结果
-        """
-        # 1. 快照隔离：深拷贝图，不污染原始数据
-        G = self._create_simulation_graph()
-        
-        # 2. 拓扑切断：断开故障节点的所有外输边
-        self._apply_failure(G, failure_node)
-        
-        # 3. 时间轴演进：Tick Loop
-        frames = []
-        tick = 0
-        affected_pipes = set()
-        
-        # BFS 队列：(当前节点, 管存耗尽时间, 来自节点)
-        # 故障节点的直接下游边已经在 _apply_failure 中标记为 depressurizing
-        queue = deque()
-        for _, v, data in G.out_edges(failure_node, data=True):
-            delay_ticks = data.get('delay_ticks', 1)
-            queue.append((v, delay_ticks, failure_node))
-            affected_pipes.add(data['pipeline_id'])
-        
-        # 记录初始状态变化（故障节点下游立即降压）
-        if queue:
-            initial_changes = {}
-            for v, _, _ in queue:  # (v, delay_ticks, failure_node)
-=======
 class OptimizedSimulationEngine:
     """
     优化的管网断流仿真推演引擎
@@ -177,22 +103,24 @@ class OptimizedSimulationEngine:
     核心优化：
     1. 图快照缓存 - 避免每次仿真都重建图
     2. 压力等级系数 - 高压管道存气更多
-    3. 惰性求值 - 按需计算状态
+    3. 环检测与处理 - 防止无限循环
+    4. 传播指标统计 - 用于分析
     """
     
     def __init__(self, directed_graph: nx.DiGraph, config: Optional[SimulationConfig] = None):
         self.base_graph = directed_graph
         self.config = config or SimulationConfig()
-        self._graph_template = None  # 缓存图模板
+        self._graph_template = None
+        self._cycle_cache = None
     
     def _get_graph_template(self) -> nx.DiGraph:
-        """获取图模板（缓存避免重复创建）"""
+        """获取图模板（缓存）"""
         if self._graph_template is None:
             self._graph_template = self._create_graph_template()
         return self._graph_template
     
     def _create_graph_template(self) -> nx.DiGraph:
-        """创建图模板（只包含静态属性）"""
+        """创建图模板"""
         G = nx.DiGraph()
         
         for node, data in self.base_graph.nodes(data=True):
@@ -200,19 +128,16 @@ class OptimizedSimulationEngine:
         
         for u, v, data in self.base_graph.edges(data=True):
             edge_attrs = {
-                # 基础属性
                 'pipeline_id': data.get('pipeline_id'),
                 'name': data.get('name'),
                 'category': data.get('category'),
-                # 物理属性
                 'diameter_mm': data.get('diameter_mm'),
                 'length_km': data.get('length_km'),
                 'linepack_volume': data.get('linepack_volume', 0),
-                # 计算属性
                 'delay_ticks': self._calculate_effective_delay(data),
-                # 运行时状态（会被重置）
                 'remaining_ticks': 0,
-                'status': 'normal'
+                'status': 'normal',
+                'visited_in_tick': -1
             }
             G.add_edge(u, v, **edge_attrs)
         
@@ -225,28 +150,33 @@ class OptimizedSimulationEngine:
         if not self.config.pressure_factor_enabled:
             return base_delay
         
-        # 压力系数：高压管道存气更多
-        # 假设设计压力 10MPa 为基准
         design_pressure = edge_data.get('design_pressure_mpa', 10.0)
         pressure_factor = max(0.5, design_pressure / 10.0)
         
-        effective_delay = int(base_delay * pressure_factor)
-        return max(1, effective_delay)
+        return max(1, int(base_delay * pressure_factor))
+    
+    def _detect_cycles(self) -> List[List[str]]:
+        """检测图中的环"""
+        if self._cycle_cache is None:
+            try:
+                self._cycle_cache = list(nx.simple_cycles(self.base_graph))
+            except Exception:
+                self._cycle_cache = []
+        return self._cycle_cache
     
     def _create_simulation_graph(self) -> nx.DiGraph:
-        """创建仿真图（从模板复制，重置状态）"""
+        """创建仿真图"""
         template = self._get_graph_template()
         G = nx.DiGraph()
         
-        # 复制节点
         for node, data in template.nodes(data=True):
             G.add_node(node, **data)
         
-        # 复制边，重置运行时状态
         for u, v, data in template.edges(data=True):
             edge_attrs = dict(data)
             edge_attrs['remaining_ticks'] = edge_attrs['delay_ticks']
             edge_attrs['status'] = 'normal'
+            edge_attrs['visited_in_tick'] = -1
             G.add_edge(u, v, **edge_attrs)
         
         return G
@@ -256,45 +186,48 @@ class OptimizedSimulationEngine:
         failure_nodes: List[str],
         max_ticks: Optional[int] = None
     ) -> SimulationResult:
-        """
-        执行断流仿真推演（支持多故障源）
-        
-        Args:
-            failure_nodes: 故障源节点 ID 列表
-            max_ticks: 最大推演 Tick 数
-        
-        Returns:
-            SimulationResult: 仿真结果
-        """
+        """执行断流仿真推演"""
         max_ticks = max_ticks or self.config.max_ticks
         
-        # 1. 创建仿真图
+        # 验证故障节点
+        valid_failure_nodes = [n for n in failure_nodes if n in self.base_graph]
+        if not valid_failure_nodes:
+            return self._create_empty_result(failure_nodes)
+        
+        # 检测环
+        cycles = self._detect_cycles() if self.config.detect_cycles else []
+        cycle_nodes = set()
+        for cycle in cycles:
+            cycle_nodes.update(cycle)
+        
+        # 创建仿真图
         G = self._create_simulation_graph()
         
-        # 2. 应用所有故障
-        for node in failure_nodes:
-            if node in G:
-                self._apply_failure(G, node)
+        # 应用故障
+        for node in valid_failure_nodes:
+            self._apply_failure(G, node)
         
-        # 3. 初始化队列（所有故障节点的下游）
+        # 初始化队列
         queue = deque()
         affected_pipes = set()
+        propagation_paths = 0
         
-        for failure_node in failure_nodes:
+        for failure_node in valid_failure_nodes:
             for _, v, data in G.out_edges(failure_node, data=True):
                 delay = data.get('delay_ticks', 1)
                 queue.append((v, delay, failure_node))
                 affected_pipes.add(data['pipeline_id'])
+                propagation_paths += 1
         
-        # 4. 时间轴演进
+        # 仿真状态
         frames = []
         tick = 0
+        max_concurrent = 0
         
         # 初始帧
         if queue:
             initial_changes = {}
             for v, _, failure_node in queue:
->>>>>>> branch-仿真之前
                 edge_data = G[failure_node][v]
                 initial_changes[edge_data['pipeline_id']] = {
                     "from": "normal",
@@ -303,162 +236,123 @@ class OptimizedSimulationEngine:
             frames.append(SimulationFrame(
                 tick=0,
                 timestamp=self._tick_to_timestamp(0),
-                changed_pipes=initial_changes
+                changed_pipes=initial_changes,
+                active_propagation_count=len(queue)
             ))
         
-<<<<<<< HEAD
-        # 主循环：按时间推进
-=======
         # 主循环
->>>>>>> branch-仿真之前
         while queue and tick < max_ticks:
             tick += 1
             tick_changes = {}
+            next_queue = deque()
             
-<<<<<<< HEAD
-            # 处理当前 Tick 的所有事件
-=======
->>>>>>> branch-仿真之前
             queue_size = len(queue)
+            max_concurrent = max(max_concurrent, queue_size)
+            
             for _ in range(queue_size):
                 node, depletion_tick, from_node = queue.popleft()
                 
                 if depletion_tick > tick:
-<<<<<<< HEAD
-                    # 还未耗尽，放回队列
-                    queue.append((node, depletion_tick, from_node))
+                    next_queue.append((node, depletion_tick, from_node))
                     continue
                 
-                # 管存耗尽，状态跃迁为 outage
-=======
-                    queue.append((node, depletion_tick, from_node))
+                # 检查边状态
+                if not G.has_edge(from_node, node):
                     continue
-                
-                # 管存耗尽
->>>>>>> branch-仿真之前
-                edge_data = G[from_node][node]
-                if edge_data['status'] != 'outage':
-                    edge_data['status'] = 'outage'
-                    edge_data['remaining_ticks'] = 0
-                    tick_changes[edge_data['pipeline_id']] = {
-                        "from": "depressurizing",
-                        "to": "outage"
-                    }
                     
-<<<<<<< HEAD
-                    # 向下一级传播：下游管线开始降压
-                    for _, next_node, next_data in G.out_edges(node, data=True):
-                        if next_data.get('status') == 'normal':
-                            next_data['status'] = 'depressurizing'
-                            next_data['remaining_ticks'] = next_data['delay_ticks']
-                            queue.append((next_node, tick + next_data['delay_ticks'], node))
-=======
-                    # 向下一级传播
-                    for _, next_node, next_data in G.out_edges(node, data=True):
-                        if next_data.get('status') == 'normal':
-                            next_data['status'] = 'depressurizing'
-                            next_delay = next_data.get('delay_ticks', 1)
-                            queue.append((next_node, tick + next_delay, node))
->>>>>>> branch-仿真之前
-                            affected_pipes.add(next_data['pipeline_id'])
-                            
-                            tick_changes[next_data['pipeline_id']] = {
-                                "from": "normal",
-                                "to": "depressurizing"
-                            }
+                edge_data = G[from_node][node]
+                
+                # 环检测
+                if edge_data.get('visited_in_tick') == tick:
+                    continue
+                edge_data['visited_in_tick'] = tick
+                
+                if edge_data['status'] == 'outage':
+                    continue
+                
+                # 状态跃迁
+                edge_data['status'] = 'outage'
+                edge_data['remaining_ticks'] = 0
+                tick_changes[edge_data['pipeline_id']] = {
+                    "from": "depressurizing",
+                    "to": "outage"
+                }
+                
+                # 向下一级传播
+                for _, next_node, next_data in G.out_edges(node, data=True):
+                    if next_data.get('status') == 'normal':
+                        if next_node in []:  # 简化，移除环检测路径追踪
+                            if self.config.mode == SimulationMode.STRICT:
+                                continue
+                        
+                        next_data['status'] = 'depressurizing'
+                        next_delay = next_data.get('delay_ticks', 1)
+                        next_queue.append((next_node, tick + next_delay, node))
+                        affected_pipes.add(next_data['pipeline_id'])
+                        
+                        tick_changes[next_data['pipeline_id']] = {
+                            "from": "normal",
+                            "to": "depressurizing"
+                        }
             
-<<<<<<< HEAD
-            # 记录本帧变化
-=======
->>>>>>> branch-仿真之前
+            queue = next_queue
+            
             if tick_changes:
                 frames.append(SimulationFrame(
                     tick=tick,
                     timestamp=self._tick_to_timestamp(tick),
-                    changed_pipes=tick_changes
+                    changed_pipes=tick_changes,
+                    active_propagation_count=len(queue)
                 ))
         
-<<<<<<< HEAD
-        # 4. 生成 AI 摘要
+        # 生成指标
+        avg_speed = tick / len(affected_pipes) if affected_pipes else 0
+        metrics = SimulationMetrics(
+            total_propagation_paths=propagation_paths,
+            max_concurrent_outages=max_concurrent,
+            avg_propagation_speed=avg_speed,
+            cycle_detected=len(cycles) > 0,
+            cycle_nodes=list(cycle_nodes)
+        )
+        
+        # 生成摘要
         summary = self._generate_summary(
-            failure_node=G.nodes[failure_node].get('name', failure_node),
-=======
-        # 5. 生成结果
-        summary = self._generate_summary(
-            failure_nodes=failure_nodes,
->>>>>>> branch-仿真之前
+            failure_nodes=valid_failure_nodes,
             affected_count=len(affected_pipes),
             total_ticks=tick,
-            max_outage_tick=self._find_max_outage_tick(frames)
+            max_outage_tick=self._find_max_outage_tick(frames),
+            metrics=metrics
         )
         
         return SimulationResult(
             total_ticks=tick,
             affected_pipes=len(affected_pipes),
             ai_summary_context=summary,
-<<<<<<< HEAD
-            frames=frames
-        )
-    
-    def _create_simulation_graph(self) -> nx.DiGraph:
-        """
-        创建仿真用的图快照
-        
-        策略：不 deep copy 整个图，而是复制节点和边的属性
-        这样更高效，且避免污染原始图
-        """
-        G = nx.DiGraph()
-        
-        # 复制节点
-        for node, data in self.base_graph.nodes(data=True):
-            G.add_node(node, **data)
-        
-        # 复制边，并重置仿真状态
-        for u, v, data in self.base_graph.edges(data=True):
-            edge_attrs = dict(data)
-            # 重置仿真状态
-            edge_attrs['remaining_ticks'] = edge_attrs.get('delay_ticks', 1)
-            edge_attrs['status'] = 'normal'
-            G.add_edge(u, v, **edge_attrs)
-        
-        return G
-    
-    def _apply_failure(self, G: nx.DiGraph, failure_node: str):
-        """
-        在图中应用故障：故障节点停止向外输气
-        
-        业务逻辑：
-        1. 压气站停机后，它不能向外出气
-        2. 但其出边管内存气仍可支撑一段时间（depressurizing）
-        3. 只有当管存耗尽后，才变为 outage
-        """
-        if failure_node not in G:
-            raise ValueError(f"故障节点 {failure_node} 不存在于图中")
-        
-        # 故障节点的出边立即进入 depressurizing 状态
-        # （管存开始消耗，但还未完全断流）
-=======
             frames=frames,
-            failure_nodes=failure_nodes
+            failure_nodes=valid_failure_nodes,
+            metrics=metrics
         )
     
     def _apply_failure(self, G: nx.DiGraph, failure_node: str):
         """应用故障到节点"""
->>>>>>> branch-仿真之前
+        if failure_node not in G:
+            return
         for _, v, data in list(G.out_edges(failure_node, data=True)):
             data['status'] = 'depressurizing'
             data['remaining_ticks'] = data.get('delay_ticks', 1)
     
-    def _tick_to_timestamp(self, tick: int) -> str:
-<<<<<<< HEAD
-        """将 Tick 转换为时间戳字符串"""
-        base_time = datetime.now()
-        delta = timedelta(minutes=tick * self.tick_minutes)
-        return (base_time + delta).isoformat()
+    def _create_empty_result(self, failure_nodes: List[str]) -> SimulationResult:
+        """创建空结果"""
+        return SimulationResult(
+            total_ticks=0,
+            affected_pipes=0,
+            ai_summary_context="Invalid failure nodes",
+            frames=[],
+            failure_nodes=failure_nodes,
+            metrics=SimulationMetrics(0, 0, 0.0, False, [])
+        )
     
-    def _find_max_outage_tick(self, frames: List[SimulationFrame]) -> int:
-        """找到最后一条管线断流的 Tick"""
-=======
+    def _tick_to_timestamp(self, tick: int) -> str:
         """Tick 转时间戳"""
         base_time = datetime.now()
         delta = timedelta(minutes=tick * self.config.tick_minutes)
@@ -466,7 +360,6 @@ class OptimizedSimulationEngine:
     
     def _find_max_outage_tick(self, frames: List[SimulationFrame]) -> int:
         """找到最后 outage 的 tick"""
->>>>>>> branch-仿真之前
         max_tick = 0
         for frame in frames:
             for change in frame.changed_pipes.values():
@@ -476,76 +369,28 @@ class OptimizedSimulationEngine:
     
     def _generate_summary(
         self,
-<<<<<<< HEAD
-        failure_node: str,
-=======
         failure_nodes: List[str],
->>>>>>> branch-仿真之前
         affected_count: int,
         total_ticks: int,
-        max_outage_tick: int
+        max_outage_tick: int,
+        metrics: SimulationMetrics
     ) -> str:
-<<<<<<< HEAD
-        """生成 AI 摘要上下文"""
-        hours = max_outage_tick * self.tick_minutes / 60
-        
-        if affected_count == 0:
-            return f"推演结论：{failure_node}故障未对管网造成影响，下游可通过其他路径供气。"
-        
-        if hours < 1:
-            time_desc = f"{int(hours * 60)} 分钟"
-        else:
-            time_desc = f"约 {hours:.1f} 小时"
-        
-        return (
-            f"推演结论：{failure_node}停机共波及 {affected_count} 条管线，"
-            f"预计 {time_desc} 后下游最后一处将彻底断气。"
-            f"总推演时长 {total_ticks} ticks（{total_ticks * self.tick_minutes} 分钟）。"
-        )
-
-
-# =============================================================================
-# 便捷函数
-# =============================================================================
-
-def run_simulation(
-    topology_service,
-    failure_node: str,
-    tick_minutes: int = 10
-) -> SimulationResult:
-    """
-    便捷函数：从拓扑服务直接运行仿真
-    
-    使用示例：
-        from app.services.topology import TopologyService
-        from app.services.simulation_service import run_simulation
-        from app.database import get_session
-        
-        session = next(get_session())
-        topo = TopologyService(session)
-        result = run_simulation(topo, "station_001")
-        print(result.ai_summary_context)
-    """
-    directed_graph = topology_service.get_directed_graph()
-    simulator = SimulationService(directed_graph, tick_minutes)
-    return simulator.simulate(failure_node)
-=======
         """生成 AI 摘要"""
         hours = max_outage_tick * self.config.tick_minutes / 60
         
-        node_str = f"{len(failure_nodes)}个故障源" if len(failure_nodes) > 1 else failure_nodes[0][:20]
+        node_str = f"{len(failure_nodes)} nodes" if len(failure_nodes) > 1 else failure_nodes[0][:20]
         
         if affected_count == 0:
-            return f"推演结论：{node_str}故障未对管网造成影响。"
+            return f"No impact from {node_str} failure."
         
         if hours < 1:
-            time_desc = f"{int(hours * 60)}分钟"
+            time_desc = f"{int(hours * 60)} minutes"
         else:
-            time_desc = f"约{hours:.1f}小时"
+            time_desc = f"~{hours:.1f} hours"
         
         return (
-            f"推演结论：{node_str}共波及{affected_count}条管线，"
-            f"预计{time_desc}后下游彻底断气。"
+            f"{node_str} affects {affected_count} pipes, "
+            f"complete outage expected in {time_desc}."
         )
 
 
@@ -574,4 +419,3 @@ def run_multi_failure_simulation(
     config = SimulationConfig(tick_minutes=tick_minutes, **kwargs)
     simulator = OptimizedSimulationEngine(directed_graph, config)
     return simulator.simulate(failure_nodes)
->>>>>>> branch-仿真之前

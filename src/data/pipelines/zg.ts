@@ -12,7 +12,7 @@ import { PipelineNode, PipelineLine, PressureLevel, PipelineStatus, NodeType } f
 // ================== 坐标定义 ==================
 const ZG_COORDS: Record<string, { lng: number; lat: number }> = {
     // 干线
-    '中卫压气站': { lng: 105.18, lat: 37.51 },
+    '中卫压气站': { lng: 105.19, lat: 37.51 },
     '固原压气站': { lng: 106.28, lat: 36.01 },
     '硝河分输站': { lng: 106.02, lat: 35.53 },
     '天水压气站': { lng: 105.72, lat: 34.58 },

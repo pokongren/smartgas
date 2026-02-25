@@ -3,9 +3,14 @@ import AMapLoader from '@amap/amap-jsapi-loader'
 import type { MapViewProps, MapConfig } from './types'
 import styles from './MapView.module.css'
 import { renderPipelineLines, renderPipelineNodesWithClustering, renderPipelineDevices, clearMapOverlays, clearClusterCache } from '@/utils/mapRenderer'
+import { renderHubNode, clearHubNodeRender } from '@/utils/hubRenderer'
 import { sourceNodes as defaultSourceNodes, compressorStations as defaultCompressorStations } from '@/data'
+import { hubNodesSample } from '@/data/hubNodes'
 import { ClusterDetailPanel } from '../ClusterDetailPanel'
+import { HubDetailPanel } from '../HubDetailPanel'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
+import type { HubNode } from '@/types/hub'
+import { DEFAULT_HUB_VISUAL_CONFIG } from '@/types/hub'
 
 /**
  * 默认地图配置
@@ -108,6 +113,10 @@ function MapView({
     const [renderTrigger, setRenderTrigger] = useState(0)
     const [selectedCluster, setSelectedCluster] = useState<ClusterGroup | null>(null)
     const [isClusterPanelVisible, setIsClusterPanelVisible] = useState(false)
+
+    // 枢纽节点相关状态
+    const [selectedHubNode, setSelectedHubNode] = useState<HubNode | null>(null)
+    const hubRenderRef = useRef<{ ports: any[]; connections: any[] }[]>([])
 
     const mapConfig = { ...DEFAULT_CONFIG, ...config }
 
@@ -422,6 +431,13 @@ function MapView({
             // 清除旧覆盖物和缓存
             clearMapOverlays(mapInstanceRef.current, nodeOverlaysRef.current)
             nodeOverlaysRef.current = []
+
+            // 清除旧的枢纽节点渲染
+            hubRenderRef.current.forEach(renderResult => {
+                clearHubNodeRender(mapInstanceRef.current, renderResult)
+            })
+            hubRenderRef.current = []
+
             clearClusterCache()
 
             try {
@@ -444,6 +460,31 @@ function MapView({
                     if (!abortController.signal.aborted) {
                         nodeOverlaysRef.current = nodeOverlays
                     }
+                }
+
+                // 渲染枢纽节点
+                if (hubNodesSample.length > 0 && !abortController.signal.aborted) {
+                    hubNodesSample.forEach(hubNode => {
+                        const renderResult = renderHubNode(
+                            mapInstanceRef.current,
+                            hubNode,
+                            DEFAULT_HUB_VISUAL_CONFIG,
+                            {
+                                onPortClick: (event) => {
+                                    console.log('点击端口:', event.port)
+                                },
+                                onConnectionClick: (event) => {
+                                    console.log('点击连接:', event.connection)
+                                },
+                                onNodeClick: (event) => {
+                                    setSelectedHubNode(event.node)
+                                }
+                            }
+                        )
+                        if (renderResult) {
+                            hubRenderRef.current.push(renderResult)
+                        }
+                    })
                 }
             } catch (error) {
                 // 渲染失败
@@ -500,6 +541,19 @@ function MapView({
                             originalEvent: null
                         })
                     }
+                }}
+            />
+
+            {/* 枢纽节点详情面板 */}
+            <HubDetailPanel
+                node={selectedHubNode}
+                visible={!!selectedHubNode}
+                onClose={() => setSelectedHubNode(null)}
+                onPortClick={(portId) => {
+                    console.log('点击端口:', portId)
+                }}
+                onPipelineClick={(pipelineId) => {
+                    console.log('点击管线:', pipelineId)
                 }}
             />
         </div>
