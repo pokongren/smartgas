@@ -1,0 +1,821 @@
+{
+  "pipeline_name": "陕京四线",
+  "trunk": [
+    {
+      "id": 958,
+      "name": "陕京靖边首站",
+      "mileage": 0.0,
+      "type": "distribution",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 1803,
+      "name": "陕四1#阀室",
+      "mileage": 16.1817,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 80468,
+      "name": "红墩界压气站",
+      "mileage": 32.817,
+      "type": "compressor",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 16478,
+      "name": "陕四2#阀室",
+      "mileage": 49.6618,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 75852,
+      "name": "陕四3#阀室",
+      "mileage": 70.4776,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 67872,
+      "name": "陕四4#阀室",
+      "mileage": 97.7754,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 35538,
+      "name": "陕四5#阀室",
+      "mileage": 125.7656,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 77649,
+      "name": "陕四6#阀室",
+      "mileage": 159.295,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 68226,
+      "name": "陕四7#阀室",
+      "mileage": 186.7906,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 16379,
+      "name": "陕四8#阀室",
+      "mileage": 217.9787,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 53966,
+      "name": "陕四9#阀室",
+      "mileage": 242.8049,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 14991,
+      "name": "鄂尔多斯压气站",
+      "mileage": 262.932,
+      "type": "compressor",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 54346,
+      "name": "陕四10#阀室",
+      "mileage": 282.549,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 57054,
+      "name": "陕四11#阀室",
+      "mileage": 304.6096,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 38183,
+      "name": "陕四12#阀室",
+      "mileage": 320.8,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 55115,
+      "name": "陕四13#阀室",
+      "mileage": 341.0243,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 99276,
+      "name": "陕四14#阀室",
+      "mileage": 364.8143,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 39719,
+      "name": "陕四15#阀室",
+      "mileage": 375.6589,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 7249,
+      "name": "陕四16#阀室",
+      "mileage": 395.2495,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 77822,
+      "name": "陕四17#阀室",
+      "mileage": 422.0779,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 70124,
+      "name": "陕四18#阀室",
+      "mileage": 445.5804,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 37120,
+      "name": "陕四19#阀室",
+      "mileage": 453.1744,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 6813,
+      "name": "托克托压气站",
+      "mileage": 475.307,
+      "type": "compressor",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 34227,
+      "name": "陕四20#阀室",
+      "mileage": 495.7698,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 21845,
+      "name": "陕四21#阀室",
+      "mileage": 521.807,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 96618,
+      "name": "呼和浩特分输站",
+      "mileage": 521.807,
+      "type": "distribution",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 50803,
+      "name": "陕四22#阀室",
+      "mileage": 546.2252,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 95635,
+      "name": "陕四23#阀室",
+      "mileage": 564.4157,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 50520,
+      "name": "陕四24#阀室",
+      "mileage": 584.5206,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 35961,
+      "name": "陕四25#阀室",
+      "mileage": 613.4413,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 96255,
+      "name": "陕四26#阀室",
+      "mileage": 628.7272,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 78603,
+      "name": "陕四27#阀室",
+      "mileage": 640.2749,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 79291,
+      "name": "乌兰察布压气站",
+      "mileage": 674.0071,
+      "type": "compressor",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 54475,
+      "name": "陕四28#阀室",
+      "mileage": 695.2214,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 31158,
+      "name": "陕四29#阀室",
+      "mileage": 711.0278,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 14567,
+      "name": "陕四29-1#阀室",
+      "mileage": 738.7193,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 1929,
+      "name": "兴和分输站",
+      "mileage": 738.7193,
+      "type": "distribution",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 34043,
+      "name": "陕四30#阀室",
+      "mileage": 758.8452,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 22158,
+      "name": "陕四31#阀室",
+      "mileage": 786.6636,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 57729,
+      "name": "陕四32#阀室",
+      "mileage": 807.6179,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 29041,
+      "name": "陕四33#阀室",
+      "mileage": 829.9179,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 24111,
+      "name": "陕四34#阀室",
+      "mileage": 848.1179,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 19783,
+      "name": "张家口压气站",
+      "mileage": 855.5179,
+      "type": "compressor",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 65530,
+      "name": "陕四35#阀室",
+      "mileage": 871.3243,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 89557,
+      "name": "陕四36#阀室",
+      "mileage": 892.2996,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 92944,
+      "name": "陕四37#阀室",
+      "mileage": 903.7188,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 78588,
+      "name": "陕四38#阀室",
+      "mileage": 921.7179,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 3288,
+      "name": "怀来首站",
+      "mileage": 935.4179,
+      "type": "distribution",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 96997,
+      "name": "陕四40#阀室",
+      "mileage": 945.8106,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 45936,
+      "name": "陕四41#阀室",
+      "mileage": 967.5533,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 87185,
+      "name": "延庆分输站",
+      "mileage": 981.4179,
+      "type": "distribution",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 86905,
+      "name": "陕四42#阀室",
+      "mileage": 1001.8894,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 59036,
+      "name": "陕四43#阀室",
+      "mileage": 1023.4961,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 27960,
+      "name": "陕四44#阀室",
+      "mileage": 1046.2444,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 21179,
+      "name": "陕四45#阀室",
+      "mileage": 1063.0937,
+      "type": "valve",
+      "branch_name": "陕京四线干线"
+    },
+    {
+      "id": 22863,
+      "name": "高丽营分输站",
+      "mileage": 1071.2478,
+      "type": "distribution",
+      "branch_name": "陕京四线干线"
+    }
+  ],
+  "branches": [
+    [
+      {
+        "id": 70279,
+        "name": "陕四33#阀室",
+        "mileage": 0.0,
+        "type": "valve",
+        "branch_name": "万全支线"
+      },
+      {
+        "id": 82722,
+        "name": "安家堡分输站",
+        "mileage": 0.55,
+        "type": "distribution",
+        "branch_name": "万全支线"
+      }
+    ],
+    [
+      {
+        "id": 13464,
+        "name": "陕四38#阀室",
+        "mileage": 0.0,
+        "type": "valve",
+        "branch_name": "下花园支线"
+      },
+      {
+        "id": 26564,
+        "name": "下花园首站",
+        "mileage": 3.0,
+        "type": "distribution",
+        "branch_name": "下花园支线"
+      },
+      {
+        "id": 38361,
+        "name": "张家堡分输站",
+        "mileage": 21.0,
+        "type": "distribution",
+        "branch_name": "下花园支线"
+      },
+      {
+        "id": 84405,
+        "name": "涿鹿末站",
+        "mileage": 28.0,
+        "type": "distribution",
+        "branch_name": "下花园支线"
+      }
+    ],
+    [
+      {
+        "id": 60692,
+        "name": "巴克什营首站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "大唐煤制气管道"
+      },
+      {
+        "id": 79216,
+        "name": "大唐1#阀室",
+        "mileage": 15.6447,
+        "type": "valve",
+        "branch_name": "大唐煤制气管道"
+      },
+      {
+        "id": 67152,
+        "name": "大唐2#阀室",
+        "mileage": 37.0879,
+        "type": "valve",
+        "branch_name": "大唐煤制气管道"
+      },
+      {
+        "id": 68385,
+        "name": "密云分输站",
+        "mileage": 59.0,
+        "type": "distribution",
+        "branch_name": "大唐煤制气管道"
+      },
+      {
+        "id": 63523,
+        "name": "大唐3#阀室",
+        "mileage": 66.9227,
+        "type": "valve",
+        "branch_name": "大唐煤制气管道"
+      },
+      {
+        "id": 46939,
+        "name": "大唐4#阀室",
+        "mileage": 72.8351,
+        "type": "valve",
+        "branch_name": "大唐煤制气管道"
+      },
+      {
+        "id": 11605,
+        "name": "大唐5#阀室",
+        "mileage": 81.5683,
+        "type": "valve",
+        "branch_name": "大唐煤制气管道"
+      },
+      {
+        "id": 95845,
+        "name": "大唐6#阀室",
+        "mileage": 87.5,
+        "type": "valve",
+        "branch_name": "大唐煤制气管道"
+      },
+      {
+        "id": 98890,
+        "name": "木林分输站",
+        "mileage": 87.5,
+        "type": "distribution",
+        "branch_name": "大唐煤制气管道"
+      },
+      {
+        "id": 32351,
+        "name": "大唐7#阀室",
+        "mileage": 95.9318,
+        "type": "valve",
+        "branch_name": "大唐煤制气管道"
+      },
+      {
+        "id": 10360,
+        "name": "大唐8#阀室",
+        "mileage": 102.0742,
+        "type": "valve",
+        "branch_name": "大唐煤制气管道"
+      },
+      {
+        "id": 60641,
+        "name": "高丽营分输站",
+        "mileage": 110.0,
+        "type": "distribution",
+        "branch_name": "大唐煤制气管道"
+      }
+    ],
+    [
+      {
+        "id": 90925,
+        "name": "宝坻分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "宝香西联络线"
+      },
+      {
+        "id": 83883,
+        "name": "宝香西1#阀室",
+        "mileage": 35.3603,
+        "type": "valve",
+        "branch_name": "宝香西联络线"
+      },
+      {
+        "id": 26094,
+        "name": "苑家庄门站",
+        "mileage": 35.3603,
+        "type": "distribution",
+        "branch_name": "宝香西联络线"
+      },
+      {
+        "id": 73089,
+        "name": "宝香西2#阀室",
+        "mileage": 44.975945,
+        "type": "valve",
+        "branch_name": "宝香西联络线"
+      },
+      {
+        "id": 87580,
+        "name": "香河分输站",
+        "mileage": 51.497445,
+        "type": "distribution",
+        "branch_name": "宝香西联络线"
+      },
+      {
+        "id": 58357,
+        "name": "钱旺分输站",
+        "mileage": 51.497445,
+        "type": "distribution",
+        "branch_name": "宝香西联络线"
+      },
+      {
+        "id": 38285,
+        "name": "宝香西3#阀室",
+        "mileage": 64.282945,
+        "type": "valve",
+        "branch_name": "宝香西联络线"
+      },
+      {
+        "id": 581,
+        "name": "西集分输站",
+        "mileage": 83.197445,
+        "type": "distribution",
+        "branch_name": "宝香西联络线"
+      }
+    ],
+    [
+      {
+        "id": 7915,
+        "name": "密云分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "密马香联络线"
+      },
+      {
+        "id": 38275,
+        "name": "密马段1#阀室",
+        "mileage": 7.76,
+        "type": "valve",
+        "branch_name": "密马香联络线"
+      },
+      {
+        "id": 7193,
+        "name": "密马段2#阀室",
+        "mileage": 15.6424,
+        "type": "valve",
+        "branch_name": "密马香联络线"
+      },
+      {
+        "id": 709,
+        "name": "密马段3#阀室",
+        "mileage": 23.0436,
+        "type": "valve",
+        "branch_name": "密马香联络线"
+      },
+      {
+        "id": 81572,
+        "name": "密马段4#阀室",
+        "mileage": 31.491,
+        "type": "valve",
+        "branch_name": "密马香联络线"
+      },
+      {
+        "id": 23231,
+        "name": "马坊分输站",
+        "mileage": 39.0,
+        "type": "distribution",
+        "branch_name": "密马香联络线"
+      },
+      {
+        "id": 22859,
+        "name": "马香2#阀室",
+        "mileage": 43.8119,
+        "type": "valve",
+        "branch_name": "密马香联络线"
+      },
+      {
+        "id": 22183,
+        "name": "三河分输站",
+        "mileage": 53.3418,
+        "type": "distribution",
+        "branch_name": "密马香联络线"
+      },
+      {
+        "id": 45324,
+        "name": "马香1#阀室",
+        "mileage": 69.5614,
+        "type": "valve",
+        "branch_name": "密马香联络线"
+      },
+      {
+        "id": 40134,
+        "name": "香河分输站",
+        "mileage": 77.0,
+        "type": "distribution",
+        "branch_name": "密马香联络线"
+      }
+    ],
+    [
+      {
+        "id": 60032,
+        "name": "陕四31#阀室",
+        "mileage": 0.0,
+        "type": "valve",
+        "branch_name": "尚义支线"
+      },
+      {
+        "id": 88749,
+        "name": "尚义支线首站",
+        "mileage": 2.3,
+        "type": "distribution",
+        "branch_name": "尚义支线"
+      },
+      {
+        "id": 85653,
+        "name": "1#阀室",
+        "mileage": 20.3,
+        "type": "valve",
+        "branch_name": "尚义支线"
+      },
+      {
+        "id": 47677,
+        "name": "尚义末站",
+        "mileage": 36.9,
+        "type": "distribution",
+        "branch_name": "尚义支线"
+      }
+    ],
+    [
+      {
+        "id": 75329,
+        "name": "张家口压气站",
+        "mileage": 0.0,
+        "type": "compressor",
+        "branch_name": "应张联络线"
+      },
+      {
+        "id": 59599,
+        "name": "应张末站",
+        "mileage": 11.0,
+        "type": "distribution",
+        "branch_name": "应张联络线"
+      }
+    ],
+    [
+      {
+        "id": 78720,
+        "name": "陕四34#阀室",
+        "mileage": 0.0,
+        "type": "valve",
+        "branch_name": "怀安支线"
+      },
+      {
+        "id": 49915,
+        "name": "南山分输站",
+        "mileage": 0.75,
+        "type": "distribution",
+        "branch_name": "怀安支线"
+      },
+      {
+        "id": 89876,
+        "name": "左卫分输站",
+        "mileage": 18.85,
+        "type": "distribution",
+        "branch_name": "怀安支线"
+      },
+      {
+        "id": 63658,
+        "name": "怀安末站",
+        "mileage": 43.7,
+        "type": "distribution",
+        "branch_name": "怀安支线"
+      }
+    ],
+    [
+      {
+        "id": 26556,
+        "name": "怀来首站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "怀来支线"
+      },
+      {
+        "id": 86001,
+        "name": "怀来末站",
+        "mileage": 3.0,
+        "type": "distribution",
+        "branch_name": "怀来支线"
+      }
+    ],
+    [
+      {
+        "id": 79379,
+        "name": "高丽营分输站",
+        "mileage": 0.0,
+        "type": "distribution",
+        "branch_name": "高西联络线"
+      },
+      {
+        "id": 6230,
+        "name": "高西1#阀室",
+        "mileage": 6.6082,
+        "type": "valve",
+        "branch_name": "高西联络线"
+      },
+      {
+        "id": 47975,
+        "name": "高西2#阀室",
+        "mileage": 12.8,
+        "type": "valve",
+        "branch_name": "高西联络线"
+      },
+      {
+        "id": 69729,
+        "name": "香屯分输站",
+        "mileage": 12.8,
+        "type": "distribution",
+        "branch_name": "高西联络线"
+      },
+      {
+        "id": 85711,
+        "name": "高西3#阀室",
+        "mileage": 20.2372,
+        "type": "valve",
+        "branch_name": "高西联络线"
+      },
+      {
+        "id": 501,
+        "name": "高西4#阀室",
+        "mileage": 26.3095,
+        "type": "valve",
+        "branch_name": "高西联络线"
+      },
+      {
+        "id": 64309,
+        "name": "西沙屯分输站",
+        "mileage": 29.8,
+        "type": "distribution",
+        "branch_name": "高西联络线"
+      }
+    ]
+  ],
+  "branch_names": [
+    "万全支线",
+    "下花园支线",
+    "大唐煤制气管道",
+    "宝香西联络线",
+    "密马香联络线",
+    "尚义支线",
+    "应张联络线",
+    "怀安支线",
+    "怀来支线",
+    "高西联络线"
+  ],
+  "stats": {
+    "trunk_count": 56,
+    "branch_count": 10,
+    "total_nodes": 111
+  }
+}

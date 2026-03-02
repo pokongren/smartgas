@@ -8,6 +8,7 @@ import { zgPackage } from './zg'
 import { zmPackage } from './zm'
 import { gnPackage } from './gn'
 import { gsPackage } from './gs'
+import { sj4Package } from './sj4'
 
 export * from './types'
 
@@ -16,41 +17,34 @@ export * from './types'
  *
  * 同一个物理站场（如"广州压气站"）可能同时是多条管线的起终点，
  * 各管线文件会独立生成同名但不同 ID 的节点，导致地图上叠加多个图标。
- * 此函数保留首次出现的节点，后续重复的节点被移除，
- * 并将引用它的线段 startNodeId/endNodeId 重定向到首次 ID。
+ * 此函数保留首次出现的节点，后续同名重复节点将被全局移除，
+ * 并确保所有图层线段中对其引用都会被正确重定向。
  */
 function deduplicateNodes(pipelines: PipelinePackage[]): void {
-    // 站名 → 首次出现的节点 ID
     const seen = new Map<string, string>()
+    const idRemap = new Map<string, string>()
 
-    for (const pkg of pipelines) {
-        for (const layer of pkg.layers) {
-            // 收集本层中需要重映射的 ID: 旧 ID → 首次 ID
-            const idRemap = new Map<string, string>()
-
-            layer.nodes = layer.nodes.filter(node => {
-                const firstId = seen.get(node.name)
-                if (firstId) {
-                    // 此站名已被其他管线注册过，记录重映射关系后移除
-                    idRemap.set(node.id, firstId)
-                    return false
-                }
-                // 首次出现，保留并注册
-                seen.set(node.name, node.id)
-                return true
-            })
-
-            // 重定向线段中引用了被移除节点的 ID
-            if (idRemap.size > 0) {
-                for (const line of layer.lines) {
-                    const remappedStart = idRemap.get(line.startNodeId)
-                    if (remappedStart) line.startNodeId = remappedStart
-
-                    const remappedEnd = idRemap.get(line.endNodeId)
-                    if (remappedEnd) line.endNodeId = remappedEnd
-                }
+    // 1. 遍历所有管线图层，进行全局节点去重并生成统一重映射表
+    pipelines.forEach(pkg => pkg.layers.forEach(layer => {
+        layer.nodes = layer.nodes.filter(node => {
+            const firstId = seen.get(node.name)
+            if (firstId) {
+                idRemap.set(node.id, firstId) // 记录重映射关系：重复节点ID -> 首次节点ID
+                return false
             }
-        }
+            seen.set(node.name, node.id)
+            return true
+        })
+    }))
+
+    // 2. 全局无差别重定向所有线段端点引用（解决跨管线节点引用问题）
+    if (idRemap.size > 0) {
+        pipelines.forEach(pkg => pkg.layers.forEach(layer => {
+            layer.lines.forEach(line => {
+                line.startNodeId = idRemap.get(line.startNodeId) ?? line.startNodeId
+                line.endNodeId = idRemap.get(line.endNodeId) ?? line.endNodeId
+            })
+        }))
     }
 }
 
@@ -63,7 +57,8 @@ export const ALL_PIPELINES: PipelinePackage[] = [
     zgPackage,
     zmPackage,
     gnPackage,
-    gsPackage
+    gsPackage,
+    sj4Package
 ]
 
 // 执行全局去重（模块加载时自动运行一次）

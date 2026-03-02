@@ -6,6 +6,7 @@ const CorpView = lazy(() => import('./views/CorpView'));
 const TechView = lazy(() => import('./views/TechView'));
 const MapDemo = lazy(() => import('./views/MapDemo'));
 const GlobalPipelineView = lazy(() => import('./views/GlobalPipelineView'));
+const QaView = lazy(() => import('./views/QaView'));
 
 /**
  * 页面加载状态组件
@@ -30,6 +31,7 @@ const ViewSwitcher: React.FC = () => {
   const isTech = location.pathname === '/tech';
   const isMapDemo = location.pathname === '/map-demo';
   const isGlobal = location.pathname === '/global';
+  const isQa = location.pathname === '/qa';
 
   // 地图演示页面不显示切换按钮
   if (isMapDemo) return null;
@@ -39,6 +41,18 @@ const ViewSwitcher: React.FC = () => {
       <div className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-black/80 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
         Switch Dashboard View
       </div>
+
+      <button
+        onClick={() => navigate('/qa')}
+        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isQa
+          ? 'bg-cyan-600 text-white shadow-cyan-500/50'
+          : 'bg-gray-700 text-white hover:bg-cyan-500'
+          }`}
+        title="智能管网问答助手"
+      >
+        <span className="material-symbols-outlined text-2xl">smart_toy</span>
+      </button>
+
       <button
         onClick={() => navigate('/global')}
         className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isGlobal
@@ -81,6 +95,7 @@ const App: React.FC = () => {
           <Route path="/tech" element={<TechView />} />
           <Route path="/map-demo" element={<MapDemo />} />
           <Route path="/global" element={<GlobalPipelineView />} />
+          <Route path="/qa" element={<QaView />} />
         </Routes>
       </Suspense>
     </HashRouter>

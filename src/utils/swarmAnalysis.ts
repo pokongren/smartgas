@@ -15,19 +15,19 @@ import type { PipelineNode } from '@/types'
 export const SWARM_CONFIG = {
     /** 节点半径（像素） */
     NODE_RADIUS: 12,
-    
+
     /** 节点间距（像素） */
     NODE_PADDING: 4,
-    
+
     /** 最大分散半径（像素） */
     MAX_RADIUS: 150,
-    
+
     /** 轨道层间距（像素） */
     ORBIT_SEPARATION: 28,
-    
+
     /** 最小分散缩放级别 */
     MIN_ZOOM_FOR_SWARM: 10,
-    
+
     /** 使用角度排序（true）或距离排序（false） */
     SORT_BY_ANGLE: true,
 } as const
@@ -61,37 +61,7 @@ function distance(p1: Point2D, p2: Point2D): number {
     return Math.sqrt(dx * dx + dy * dy)
 }
 
-/**
- * 将经纬度转换为像素坐标（简化版，用于相对位置计算）
- * 注意：这只是粗略估算，用于防止重叠
- */
-function latLngToPixel(
-    coord: { longitude: number; latitude: number },
-    center: { longitude: number; latitude: number },
-    zoom: number
-): Point2D {
-    // 在指定缩放级别下，粗略计算像素偏移
-    // 在 zoom=10 时，约 1度 ≈ 256 * 2^10 / 360 ≈ 728 像素
-    const scale = Math.pow(2, zoom) * 256 / 360
-    return {
-        x: (coord.longitude - center.longitude) * scale,
-        y: (coord.latitude - center.latitude) * scale
-    }
-}
 
-/**
- * 将像素偏移转换回经纬度偏移
- */
-function pixelToLatLngOffset(
-    pixel: Point2D,
-    zoom: number
-): { lng: number; lat: number } {
-    const scale = Math.pow(2, zoom) * 256 / 360
-    return {
-        lng: pixel.x / scale,
-        lat: pixel.y / scale
-    }
-}
 
 /**
  * 计算蜂群布局 - 扫描线算法
@@ -144,9 +114,9 @@ export function calculateSwarmLayout(
         // 尝试不同的轨道层级
         while (orbit * SWARM_CONFIG.ORBIT_SEPARATION < SWARM_CONFIG.MAX_RADIUS && !placedSuccessfully) {
             const baseRadius = orbit * SWARM_CONFIG.ORBIT_SEPARATION
-            
+
             // 在该轨道上尝试多个角度偏移
-            const angleOffsets = orbit === 0 
+            const angleOffsets = orbit === 0
                 ? [0]  // 中心位置只试一次
                 : [0, 0.3, -0.3, 0.6, -0.6, 0.9, -0.9]  // 尝试不同的角度偏移
 
@@ -189,9 +159,9 @@ export function calculateSwarmLayout(
             orbit = maxOrbit
         }
 
-        placed.push({ 
-            point: finalOffset, 
-            radius: SWARM_CONFIG.NODE_RADIUS 
+        placed.push({
+            point: finalOffset,
+            radius: SWARM_CONFIG.NODE_RADIUS
         })
 
         positions.push({
@@ -229,18 +199,18 @@ export function calculateOrbitLayout(
 
     const positions: SwarmPosition[] = []
     const angleStep = (2 * Math.PI) / Math.min(nodes.length, 6)  // 每圈最多6个节点
-    
+
     nodes.forEach((node, index) => {
         // 计算所在圈和在该圈中的位置
         const orbit = Math.floor(index / 6)  // 每圈6个节点
         const indexInOrbit = index % 6
-        
+
         // 添加随机偏移，避免完全对齐
         const randomOffset = (index * 0.1) % 0.3
         const angle = angleStep * indexInOrbit + randomOffset
-        
+
         const radius = (orbit + 1) * SWARM_CONFIG.ORBIT_SEPARATION
-        
+
         positions.push({
             node,
             offsetX: radius * Math.cos(angle),
@@ -348,7 +318,7 @@ export function calculateForceLayout(
         const angle = Math.atan2(p.y, p.x)
         const distance = Math.sqrt(p.x * p.x + p.y * p.y)
         const orbit = Math.floor(distance / SWARM_CONFIG.ORBIT_SEPARATION)
-        
+
         return {
             node: p.node,
             offsetX: p.x,
@@ -384,7 +354,7 @@ export function calculateOptimalSwarmLayout(
     zoom: number
 ): SwarmPosition[] {
     const count = nodes.length
-    
+
     if (count <= 3) {
         // 少量节点：简单同心圆
         return calculateOrbitLayout(nodes, centerCoord)
@@ -431,7 +401,7 @@ export function analyzeSwarmQuality(positions: SwarmPosition[]): SwarmAnalysisSt
     const totalNodes = positions.length
     const maxOrbit = Math.max(...positions.map(p => p.orbit))
     const avgDistance = positions.reduce((sum, p) => sum + p.distance, 0) / totalNodes
-    
+
     // 计算估计的覆盖面积（圆形）
     const maxRadius = Math.max(...positions.map(p => p.distance)) + SWARM_CONFIG.NODE_RADIUS
     const area = Math.PI * maxRadius * maxRadius
@@ -474,7 +444,7 @@ export function analyzeNodesByType(
     for (const pos of positions) {
         const nodeName = pos.node.name
         let type = '其他'
-        
+
         if (nodeName.includes('压气站')) type = '压气站'
         else if (nodeName.includes('分输站') || nodeName.includes('门站')) type = '分输站'
         else if (nodeName.includes('阀室') || nodeName.includes('阀门')) type = '阀室'
@@ -489,8 +459,8 @@ export function analyzeNodesByType(
 
     // 计算平均值
     for (const type in stats) {
-        stats[type].avgOrbit = stats[type].count > 0 
-            ? stats[type].totalOrbit / stats[type].count 
+        stats[type].avgOrbit = stats[type].count > 0
+            ? stats[type].totalOrbit / stats[type].count
             : 0
     }
 

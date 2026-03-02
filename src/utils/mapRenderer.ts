@@ -1,7 +1,6 @@
 import type { PipelineNode, PipelineLine, PipelineDevice } from '@/types'
 import { NodeType, PipelineStatus, PressureLevel, DeviceType } from '@/types'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
-import { calculateSwarmLayout, calculateOrbitLayout, calculateForceLayout, calculateOptimalSwarmLayout, type SwarmPosition } from './swarmAnalysis'
 
 /**
  * 地图渲染工具函数 - 性能优化版
@@ -153,6 +152,8 @@ export const PIPELINE_CATEGORY_COLORS: Record<string, string> = {
     'LNG外输': '#ffff00',
     '中俄东线': '#e91e63',
     '平泰支干线': '#E91E63',
+    '陕京四线': '#00d4ff',
+    '陕京四线支线': '#8bc34a',
     '其他': '#999999',
 }
 
@@ -860,10 +861,12 @@ export function renderPipelineNodesWithClustering(
                         }
                     }
                     else if (currentZoom >= CLUSTER_CONFIG.EXPAND_CLUSTER_ZOOM) {
-                        // 高缩放级别：使用简单固定偏移展开（替代蜂群）
+                        // 高缩放级别：使用轻量化极简黄金螺旋展开（极简高效，自适应任意多的密度）
                         const nodeCount = group.nodes.length
                         const scale = Math.pow(2, currentZoom) * 256 / 360
-                        const offsetDistance = 40 // 固定偏移距离（像素）
+
+                        // 黄金角（约 137.5 度），用于生成向日葵式均匀螺旋布局
+                        const goldenAngle = Math.PI * (3 - Math.sqrt(5))
 
                         for (let idx = 0; idx < nodeCount; idx++) {
                             const node = group.nodes[idx]
@@ -873,7 +876,9 @@ export function renderPipelineNodesWithClustering(
                                 continue
                             }
 
-                            const angle = (idx / nodeCount) * Math.PI * 2 // 均匀分布角度
+                            // 轻量级自适应不重叠算法：角度步进黄金角，距离按索引平方根递增
+                            const angle = idx * goldenAngle
+                            const offsetDistance = nodeCount <= 1 ? 0 : 18 + Math.sqrt(idx) * 14
 
                             // 计算偏移位置
                             const offsetX = Math.cos(angle) * offsetDistance

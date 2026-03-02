@@ -17,7 +17,7 @@ def extract_pipeline(pipeline_name: str, output_path: str) -> None:
 
     # 查询所有节点及其分支名
     cursor.execute("""
-        SELECT DISTINCT node_name, mileage, node_type, branch_name
+        SELECT DISTINCT node_name, mileage, node_type_2025, branch_name
         FROM node_relation_details
         WHERE trunk_name = ?
         ORDER BY branch_name, mileage
