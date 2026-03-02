@@ -1,4 +1,5 @@
-import { PipelinePackage, NodeType } from './types'
+import { PipelinePackage } from './types'
+import { NodeType } from '../../types'
 import { generateStations, generatePipelines } from './utils'
 
 // 陕京四线核心坐标字典
