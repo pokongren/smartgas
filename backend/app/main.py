@@ -3,7 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import create_db_and_tables
-from app.routers import basic, emergency
+from app.routers import basic, emergency, workflow, data_import, ai_assistant
+# NOTE: 导入工作流模型以触发 SQLModel 建表
+import app.workflow_models  # noqa: F401
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -16,7 +18,7 @@ async def lifespan(app: FastAPI):
     # 关闭时可补充资源释放逻辑
 
 app = FastAPI(
-    title="SmartGas Grid - 应急指挥系统",
+    title="智脉平台 - 应急指挥系统",
     version="1.0.0",
     description="基于图算法和 RAG 的管网应急指挥系统",
     lifespan=lifespan
@@ -25,7 +27,7 @@ app = FastAPI(
 # 配置 CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,7 +38,7 @@ app.add_middleware(
 @app.get("/")
 def root():
     return {
-        "message": "SmartGas Grid 应急指挥系统 API",
+        "message": "智脉平台 应急指挥系统 API",
         "version": "1.0.0",
         "docs": "/docs"
     }
@@ -48,4 +50,7 @@ def health_check():
 # 注册路由
 app.include_router(basic.router, prefix="/api", tags=["基础数据"])
 app.include_router(emergency.router, prefix="/api/emergency", tags=["应急指挥"])
+app.include_router(workflow.router)
+app.include_router(data_import.router)
+app.include_router(ai_assistant.router)
 

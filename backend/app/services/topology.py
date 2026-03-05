@@ -214,3 +214,13 @@ class TopologyService:
                 reverse=True
             )[:5]
         }
+    
+    def get_graph_summary(self) -> Dict:
+        """获取物理拓扑概览"""
+        g = self.get_directed_graph()
+        total_linepack = sum(data.get('linepack_volume', 0) for u, v, data in g.edges(data=True))
+        return {
+            "node_count": g.number_of_nodes(),
+            "edge_count": g.number_of_edges(),
+            "total_linepack": round(total_linepack, 2)
+        }

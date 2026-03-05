@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import AMapLoader from '@amap/amap-jsapi-loader'
 import type { MapViewProps, MapConfig } from './types'
 import styles from './MapView.module.css'
-import { renderPipelineLines, renderPipelineNodesWithClustering, renderPipelineDevices, clearMapOverlays, clearClusterCache } from '@/utils/mapRenderer'
+import { renderPipelineLines, renderPipelineNodesWithClustering, renderPipelineDevices, clearMapOverlays, clearClusterCache, clearDragMappings } from '@/utils/mapRenderer'
 import { renderHubNode, clearHubNodeRender } from '@/utils/hubRenderer'
 import { sourceNodes as defaultSourceNodes, compressorStations as defaultCompressorStations } from '@/data'
 import { hubNodesSample } from '@/data/hubNodes'
@@ -354,6 +354,7 @@ function MapView({
             }
             isInitializedRef.current = false
             clearClusterCache()
+            clearDragMappings()
         }
         // 注意：只依赖稳定的值，回调函数通过 ref 访问
     }, [mapConfig.center.longitude, mapConfig.center.latitude, mapConfig.zoom, debouncedZoomEnd, loadControls, loadDistrictLayer, loadProvinceLabels])
@@ -366,6 +367,9 @@ function MapView({
 
         // NOTE: 使用 AbortController 取消旧渲染，防止竞态导致覆盖物泄漏
         const abortController = new AbortController()
+
+        // 清除旧的拖拽映射，防止拖拽指向已销毁的 polyline
+        clearDragMappings()
 
         const renderLines = async () => {
             clearMapOverlays(mapInstanceRef.current, lineOverlaysRef.current)

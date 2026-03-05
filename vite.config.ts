@@ -7,7 +7,7 @@ import { visualizer } from 'rollup-plugin-visualizer';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const isDev = mode === 'development';
-  
+
   return {
     // ===== 开发服务器优化 =====
     server: {
@@ -17,12 +17,20 @@ export default defineConfig(({ mode }) => {
       hmr: {
         overlay: false,
       },
+      // API 代理 - 将工作流 API 转发到后端
+      // NOTE: 将所有 /api 请求代理到后端，包括工作流、AI 助手等所有 API
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+        },
+      },
       // 预编译常用文件
       warmup: {
         clientFiles: ['./src/main.tsx', './src/App.tsx'],
       },
     },
-    
+
     plugins: [
       react(),
       // 自动 vendor chunk 分割
@@ -36,7 +44,7 @@ export default defineConfig(({ mode }) => {
         template: 'treemap',
       }),
     ].filter(Boolean),
-    
+
     // ===== 依赖预构建优化（解决冷启动慢） =====
     optimizeDeps: {
       // 强制预构建的依赖
@@ -56,14 +64,14 @@ export default defineConfig(({ mode }) => {
         target: 'es2020',
       },
     },
-    
+
     define: {
       'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       // 消除 __DEV__ 等标志
       __DEV__: JSON.stringify(isDev),
     },
-    
+
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
@@ -71,7 +79,7 @@ export default defineConfig(({ mode }) => {
       // 优化模块解析 - 优先使用浏览器版本
       mainFields: ['browser', 'module', 'jsnext:main', 'jsnext'],
     },
-    
+
     css: {
       modules: {
         localsConvention: 'camelCase',
@@ -79,7 +87,7 @@ export default defineConfig(({ mode }) => {
       // 开发时使用 SourceMap
       devSourcemap: isDev,
     },
-    
+
     // ===== 生产构建优化 =====
     build: {
       // 目标浏览器
@@ -96,16 +104,16 @@ export default defineConfig(({ mode }) => {
           comments: false, // 移除注释
         },
       },
-      
+
       // Source Map 策略：开发用 inline，生产关闭
       sourcemap: isDev ? 'inline' : false,
-      
+
       // CSS 优化
       cssMinify: true,
-      
+
       // 资源内联阈值：4KB 以下内联
       assetsInlineLimit: 4096,
-      
+
       // 代码分割策略
       rollupOptions: {
         output: {
@@ -165,23 +173,23 @@ export default defineConfig(({ mode }) => {
           propertyReadSideEffects: false,
         },
       },
-      
+
       // 分块大小警告阈值
       chunkSizeWarningLimit: 500, // KB
-      
+
       // 报告压缩后大小（关闭以加速构建）
       reportCompressedSize: false,
-      
+
       // 清空输出目录
       emptyOutDir: true,
     },
-    
+
     // ===== 预览配置 =====
     preview: {
       port: 4173,
       host: '0.0.0.0',
     },
-    
+
     // ===== ESBuild 优化 =====
     esbuild: {
       drop: isDev ? [] : ['console', 'debugger'],

@@ -1,12 +1,13 @@
 import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import AiAssistant from './components/ai-assistant/AiAssistant';
 
 // ✅ 路由级代码分割 - 动态导入视图组件
 const CorpView = lazy(() => import('./views/CorpView'));
 const TechView = lazy(() => import('./views/TechView'));
 const MapDemo = lazy(() => import('./views/MapDemo'));
 const GlobalPipelineView = lazy(() => import('./views/GlobalPipelineView'));
-const QaView = lazy(() => import('./views/QaView'));
+const WorkflowView = lazy(() => import('./views/WorkflowView'));
 
 /**
  * 页面加载状态组件
@@ -31,7 +32,7 @@ const ViewSwitcher: React.FC = () => {
   const isTech = location.pathname === '/tech';
   const isMapDemo = location.pathname === '/map-demo';
   const isGlobal = location.pathname === '/global';
-  const isQa = location.pathname === '/qa';
+  const isWorkflow = location.pathname === '/workflow';
 
   // 地图演示页面不显示切换按钮
   if (isMapDemo) return null;
@@ -43,14 +44,14 @@ const ViewSwitcher: React.FC = () => {
       </div>
 
       <button
-        onClick={() => navigate('/qa')}
-        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isQa
-          ? 'bg-cyan-600 text-white shadow-cyan-500/50'
-          : 'bg-gray-700 text-white hover:bg-cyan-500'
+        onClick={() => navigate('/workflow')}
+        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isWorkflow
+          ? 'bg-violet-600 text-white shadow-violet-500/50'
+          : 'bg-gray-700 text-white hover:bg-violet-500'
           }`}
-        title="智能管网问答助手"
+        title="AI 工作流"
       >
-        <span className="material-symbols-outlined text-2xl">smart_toy</span>
+        <span className="material-symbols-outlined text-2xl">neurology</span>
       </button>
 
       <button
@@ -88,6 +89,7 @@ const App: React.FC = () => {
   return (
     <HashRouter>
       <ViewSwitcher />
+      <AiAssistant />
       {/* ✅ Suspense 包裹路由，提供懒加载状态 */}
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -95,7 +97,7 @@ const App: React.FC = () => {
           <Route path="/tech" element={<TechView />} />
           <Route path="/map-demo" element={<MapDemo />} />
           <Route path="/global" element={<GlobalPipelineView />} />
-          <Route path="/qa" element={<QaView />} />
+          <Route path="/workflow" element={<WorkflowView />} />
         </Routes>
       </Suspense>
     </HashRouter>
