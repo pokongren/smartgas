@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import create_db_and_tables
 from app.routers import basic, emergency, workflow, data_import, ai_assistant
+from app.mcp_server import setup_mcp
 # NOTE: 导入工作流模型以触发 SQLModel 建表
 import app.workflow_models  # noqa: F401
 
@@ -53,4 +54,7 @@ app.include_router(emergency.router, prefix="/api/emergency", tags=["应急指�
 app.include_router(workflow.router)
 app.include_router(data_import.router)
 app.include_router(ai_assistant.router)
+
+# 挂载 MCP Server（/mcp 端点）
+setup_mcp(app)
 

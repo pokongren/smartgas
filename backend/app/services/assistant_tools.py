@@ -28,6 +28,13 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "get_station_details",
+        "description": "获取指定站场的详细物理属性（如坐标、进出站压力、温度、处理能力等）。",
+        "parameters": {
+            "station_id": {"description": "站场 ID 或精确名称", "required": True},
+        },
+    },
+    {
         "name": "query_pipelines",
         "description": "查询管线列表。可按类别(category)或名称关键字(keyword)过滤。",
         "parameters": {
@@ -323,6 +330,7 @@ def _handle_simulate_failure(args: dict, session: Session) -> str:
 # 工具名 → 处理函数的映射
 TOOL_HANDLERS = {
     "query_stations": _handle_query_stations,
+    "get_station_details": _handle_get_station_details,
     "query_pipelines": _handle_query_pipelines,
     "count_by_type": _handle_count_by_type,
     "analyze_impact": _handle_analyze_impact,
