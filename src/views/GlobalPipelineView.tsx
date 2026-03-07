@@ -240,11 +240,13 @@ const GlobalPipelineView: React.FC = () => {
                 </div>
             </div>
 
-            {/* 编辑器覆盖层 */}
+            {/* 编辑器覆盖层 —— 传入当前可见管线数据供"导入"功能使用 */}
             {isEditMode && mapInstance && (
                 <PipelineEditorOverlay
                     mapInstance={mapInstance}
                     onClose={() => setIsEditMode(false)}
+                    existingNodes={pipelineData.nodes}
+                    existingLines={pipelineData.lines}
                 />
             )}
 

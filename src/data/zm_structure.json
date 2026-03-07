@@ -2,553 +2,553 @@
   "pipeline_name": "中缅线（国内段）",
   "trunk": [
     {
-      "id": 70862,
+      "id": 65874,
       "name": "跨境点",
       "mileage": 0.0,
       "type": "other",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 12521,
+      "id": 49854,
       "name": "瑞丽分输站",
       "mileage": 4.51,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 61619,
+      "id": 44497,
       "name": "中缅1#阀室",
       "mileage": 21.462,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 99079,
+      "id": 51803,
       "name": "中缅2#阀室",
       "mileage": 43.573,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 77866,
+      "id": 18672,
       "name": "中缅3#阀室",
       "mileage": 59.774,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 95447,
+      "id": 57739,
       "name": "中缅4#阀室",
       "mileage": 85.929,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 19541,
+      "id": 24278,
       "name": "芒市分输站",
       "mileage": 109.07,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 55760,
+      "id": 53400,
       "name": "中缅5#阀室",
       "mileage": 117.907,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 53075,
+      "id": 41831,
       "name": "中缅6#阀室",
       "mileage": 135.127,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 54933,
+      "id": 79240,
       "name": "龙陵分输站",
       "mileage": 156.73,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 82348,
+      "id": 45641,
       "name": "中缅7#阀室",
       "mileage": 164.907,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 1625,
+      "id": 24009,
       "name": "中缅8#阀室",
       "mileage": 196.593,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 73186,
+      "id": 97101,
       "name": "中缅9#阀室",
       "mileage": 224.54,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 25912,
+      "id": 72743,
       "name": "中缅10#阀室",
       "mileage": 240.127,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 9221,
+      "id": 59681,
       "name": "保山压气站",
       "mileage": 253.29,
       "type": "compressor",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 61362,
+      "id": 69610,
       "name": "中缅11#阀室",
       "mileage": 264.028,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 7964,
+      "id": 96862,
       "name": "中缅12#阀室",
       "mileage": 276.99,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 40764,
+      "id": 35724,
       "name": "中缅13#阀室",
       "mileage": 308.13,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 89162,
+      "id": 32137,
       "name": "中缅14#阀室",
       "mileage": 334.72,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 84463,
+      "id": 40550,
       "name": "中缅15#阀室",
       "mileage": 361.84,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 89806,
+      "id": 488,
       "name": "中缅16#阀室",
       "mileage": 391.542,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 62460,
+      "id": 2017,
       "name": "弥渡分输站",
       "mileage": 412.8,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 33990,
+      "id": 26344,
       "name": "中缅17#阀室",
       "mileage": 437.6,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 69587,
+      "id": 26640,
       "name": "中缅18#阀室",
       "mileage": 469.682,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 11992,
+      "id": 88560,
       "name": "中缅19#阀室",
       "mileage": 504.188,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 70814,
+      "id": 51519,
       "name": "中缅20#阀室",
       "mileage": 525.64,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 69757,
+      "id": 22549,
       "name": "中缅21#阀室",
       "mileage": 547.65,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 63890,
+      "id": 98254,
       "name": "楚雄分输站",
       "mileage": 569.52,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 64655,
+      "id": 88221,
       "name": "中缅22#阀室",
       "mileage": 595.117,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 70869,
+      "id": 58152,
       "name": "禄丰分输站",
       "mileage": 617.82,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 42414,
+      "id": 71947,
       "name": "中缅23#阀室",
       "mileage": 648.697,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 73356,
+      "id": 65613,
       "name": "中缅24#阀室",
       "mileage": 681.03,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 74596,
+      "id": 91156,
       "name": "中缅25#阀室",
       "mileage": 712.348,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 58989,
+      "id": 96491,
       "name": "中缅26#阀室",
       "mileage": 735.108,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 16270,
+      "id": 22343,
       "name": "寻甸分输站",
       "mileage": 760.97,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 54499,
+      "id": 4798,
       "name": "中缅27#阀室",
       "mileage": 781.087,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 41103,
+      "id": 47362,
       "name": "中缅28#阀室",
       "mileage": 796.1,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 46642,
+      "id": 5211,
       "name": "曲靖分输站",
       "mileage": 820.93,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 20271,
+      "id": 183,
       "name": "中缅29#阀室",
       "mileage": 831.855,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 49044,
+      "id": 81614,
       "name": "中缅30#阀室",
       "mileage": 854.35,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 43817,
+      "id": 58755,
       "name": "中缅31#阀室",
       "mileage": 870.15,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 88175,
+      "id": 15130,
       "name": "中缅32#阀室",
       "mileage": 902.164,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 54642,
+      "id": 66003,
       "name": "中缅33#阀室",
       "mileage": 932.68,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 48486,
+      "id": 67942,
       "name": "中缅34#阀室",
       "mileage": 949.223,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 67908,
+      "id": 81638,
       "name": "中缅35#阀室",
       "mileage": 980.52,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 16427,
+      "id": 28917,
       "name": "中缅35A#阀室",
       "mileage": 1003.339,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 87539,
+      "id": 44613,
       "name": "中缅36#阀室",
       "mileage": 1017.564,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 29290,
+      "id": 42635,
       "name": "中缅37#阀室",
       "mileage": 1038.35,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 41874,
+      "id": 48684,
       "name": "中缅38#阀室",
       "mileage": 1062.04,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 45668,
+      "id": 94851,
       "name": "中缅39#阀室",
       "mileage": 1084.818,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 44913,
+      "id": 87326,
       "name": "安顺分输站",
       "mileage": 1104.03,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 61685,
+      "id": 97595,
       "name": "中缅40#阀室",
       "mileage": 1125.79,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 23951,
+      "id": 30674,
       "name": "中缅41#阀室",
       "mileage": 1147.48,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 27367,
+      "id": 94340,
       "name": "中缅42#阀室",
       "mileage": 1164.404,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 64687,
+      "id": 49581,
       "name": "贵阳压气站",
       "mileage": 1182.235,
       "type": "compressor",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 42175,
+      "id": 9391,
       "name": "中缅43#阀室",
       "mileage": 1201.429,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 88095,
+      "id": 24711,
       "name": "中缅44#阀室",
       "mileage": 1224.73,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 54507,
+      "id": 46959,
       "name": "中缅45#阀室",
       "mileage": 1247.279,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 56632,
+      "id": 41114,
       "name": "中缅46#阀室",
       "mileage": 1266.58,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 31363,
+      "id": 80819,
       "name": "都匀分输站",
       "mileage": 1285.85,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 8953,
+      "id": 40887,
       "name": "中缅47#阀室",
       "mileage": 1309.659,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 93250,
+      "id": 76788,
       "name": "中缅48#阀室",
       "mileage": 1334.11,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 64600,
+      "id": 32442,
       "name": "中缅49#阀室",
       "mileage": 1353.6911,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 98408,
+      "id": 30274,
       "name": "中缅50#阀室",
       "mileage": 1377.72,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 96773,
+      "id": 86324,
       "name": "中缅51#阀室",
       "mileage": 1409.342,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 78580,
+      "id": 89499,
       "name": "中缅52#阀室",
       "mileage": 1437.586,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 40130,
+      "id": 87032,
       "name": "中缅53#阀室",
       "mileage": 1465.957,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 87505,
+      "id": 57740,
       "name": "河池压气站",
       "mileage": 1493.96,
       "type": "compressor",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 31970,
+      "id": 90887,
       "name": "中缅54#阀室",
       "mileage": 1522.13,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 523,
+      "id": 50947,
       "name": "宜州分输站",
       "mileage": 1541.97,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 15578,
+      "id": 96121,
       "name": "中缅55#阀室",
       "mileage": 1554.84,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 82950,
+      "id": 68800,
       "name": "忻城分输站",
       "mileage": 1586.97,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 24827,
+      "id": 87951,
       "name": "中缅56#阀室",
       "mileage": 1613.888,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 15760,
+      "id": 90709,
       "name": "中缅57#阀室",
       "mileage": 1639.572,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 26874,
+      "id": 32198,
       "name": "中缅58#阀室",
       "mileage": 1651.493,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 18119,
+      "id": 96723,
       "name": "来宾分输站",
       "mileage": 1670.96,
       "type": "distribution",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 89037,
+      "id": 93966,
       "name": "中缅59#阀室",
       "mileage": 1702.671,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 85136,
+      "id": 23414,
       "name": "中缅60#阀室",
       "mileage": 1725.705,
       "type": "valve",
       "branch_name": "中缅线（国内段）"
     },
     {
-      "id": 75136,
+      "id": 53742,
       "name": "贵港压气站",
       "mileage": 1744.21,
       "type": "compressor",
@@ -558,35 +558,35 @@
   "branches": [
     [
       {
-        "id": 65153,
+        "id": 8424,
         "name": "荔波首站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "三都支线"
       },
       {
-        "id": 69251,
+        "id": 39449,
         "name": "1#阀室",
         "mileage": 17.14,
         "type": "valve",
         "branch_name": "三都支线"
       },
       {
-        "id": 68361,
+        "id": 37667,
         "name": "中和阀室",
         "mileage": 30.07,
         "type": "valve",
         "branch_name": "三都支线"
       },
       {
-        "id": 34541,
+        "id": 75588,
         "name": "2#阀室",
         "mileage": 43.1,
         "type": "valve",
         "branch_name": "三都支线"
       },
       {
-        "id": 34995,
+        "id": 31755,
         "name": "三都末站",
         "mileage": 59.8,
         "type": "distribution",
@@ -595,70 +595,70 @@
     ],
     [
       {
-        "id": 20422,
+        "id": 40844,
         "name": "忻城分输站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "中缅线桂林支线"
       },
       {
-        "id": 41155,
+        "id": 98208,
         "name": "桂林1#阀室",
         "mileage": 20.984,
         "type": "valve",
         "branch_name": "中缅线桂林支线"
       },
       {
-        "id": 53380,
+        "id": 76112,
         "name": "柳州分输站",
         "mileage": 42.73,
         "type": "distribution",
         "branch_name": "中缅线桂林支线"
       },
       {
-        "id": 37356,
+        "id": 52361,
         "name": "桂林2#阀室",
         "mileage": 66.932,
         "type": "valve",
         "branch_name": "中缅线桂林支线"
       },
       {
-        "id": 70239,
+        "id": 56104,
         "name": "桂林3#阀室",
         "mileage": 90.37,
         "type": "valve",
         "branch_name": "中缅线桂林支线"
       },
       {
-        "id": 60354,
+        "id": 1077,
         "name": "桂林4#阀室",
         "mileage": 112.394,
         "type": "valve",
         "branch_name": "中缅线桂林支线"
       },
       {
-        "id": 73191,
+        "id": 46754,
         "name": "桂林5#阀室",
         "mileage": 132.887,
         "type": "valve",
         "branch_name": "中缅线桂林支线"
       },
       {
-        "id": 67263,
+        "id": 73997,
         "name": "桂林6#阀室",
         "mileage": 155.587,
         "type": "valve",
         "branch_name": "中缅线桂林支线"
       },
       {
-        "id": 68758,
+        "id": 98481,
         "name": "永福分输站",
         "mileage": 173.05,
         "type": "distribution",
         "branch_name": "中缅线桂林支线"
       },
       {
-        "id": 84815,
+        "id": 40097,
         "name": "桂林末站",
         "mileage": 202.45,
         "type": "distribution",
@@ -667,70 +667,70 @@
     ],
     [
       {
-        "id": 52481,
+        "id": 78118,
         "name": "弥渡分输站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "丽江支线"
       },
       {
-        "id": 82306,
+        "id": 82739,
         "name": "大理分输站",
         "mileage": 14.6,
         "type": "distribution",
         "branch_name": "丽江支线"
       },
       {
-        "id": 52863,
+        "id": 80014,
         "name": "丽江1#阀室",
         "mileage": 45.893,
         "type": "valve",
         "branch_name": "丽江支线"
       },
       {
-        "id": 34035,
+        "id": 27991,
         "name": "丽江2#阀室",
         "mileage": 68.55,
         "type": "valve",
         "branch_name": "丽江支线"
       },
       {
-        "id": 71179,
+        "id": 19860,
         "name": "丽江3#阀室",
         "mileage": 94.31,
         "type": "valve",
         "branch_name": "丽江支线"
       },
       {
-        "id": 61882,
+        "id": 68649,
         "name": "丽江4#阀室",
         "mileage": 119.556,
         "type": "valve",
         "branch_name": "丽江支线"
       },
       {
-        "id": 28337,
+        "id": 4278,
         "name": "丽江5#阀室",
         "mileage": 148.385,
         "type": "valve",
         "branch_name": "丽江支线"
       },
       {
-        "id": 40077,
+        "id": 90293,
         "name": "丽江6#阀室",
         "mileage": 160.39,
         "type": "valve",
         "branch_name": "丽江支线"
       },
       {
-        "id": 22529,
+        "id": 53283,
         "name": "丽江7#阀室",
         "mileage": 177.071,
         "type": "valve",
         "branch_name": "丽江支线"
       },
       {
-        "id": 23391,
+        "id": 40557,
         "name": "丽江末站",
         "mileage": 199.2,
         "type": "distribution",
@@ -739,14 +739,14 @@
     ],
     [
       {
-        "id": 1647,
+        "id": 62346,
         "name": "独山首站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "平塘支线"
       },
       {
-        "id": 44233,
+        "id": 5975,
         "name": "平塘分输站",
         "mileage": 15.2,
         "type": "distribution",
@@ -755,14 +755,14 @@
     ],
     [
       {
-        "id": 29358,
+        "id": 91255,
         "name": "河池压气站",
         "mileage": 0.0,
         "type": "compressor",
         "branch_name": "河池支线"
       },
       {
-        "id": 7034,
+        "id": 84499,
         "name": "河池末站",
         "mileage": 23.2,
         "type": "distribution",
@@ -771,21 +771,21 @@
     ],
     [
       {
-        "id": 34767,
+        "id": 19659,
         "name": "中缅47#阀室",
         "mileage": 0.0,
         "type": "valve",
         "branch_name": "独山支线"
       },
       {
-        "id": 70435,
+        "id": 4473,
         "name": "独山首站",
         "mileage": 1.5,
         "type": "distribution",
         "branch_name": "独山支线"
       },
       {
-        "id": 69715,
+        "id": 7332,
         "name": "独山分输站",
         "mileage": 11.56,
         "type": "distribution",
@@ -794,42 +794,42 @@
     ],
     [
       {
-        "id": 81946,
+        "id": 17773,
         "name": "禄丰分输站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "玉溪支线"
       },
       {
-        "id": 84643,
+        "id": 70598,
         "name": "玉溪1#阀室",
         "mileage": 24.2,
         "type": "valve",
         "branch_name": "玉溪支线"
       },
       {
-        "id": 69678,
+        "id": 771,
         "name": "安宁分输站",
         "mileage": 42.66,
         "type": "distribution",
         "branch_name": "玉溪支线"
       },
       {
-        "id": 16864,
+        "id": 86016,
         "name": "玉溪2#阀室",
         "mileage": 69.637,
         "type": "valve",
         "branch_name": "玉溪支线"
       },
       {
-        "id": 73708,
+        "id": 5068,
         "name": "玉溪3#阀室",
         "mileage": 93.08,
         "type": "valve",
         "branch_name": "玉溪支线"
       },
       {
-        "id": 81561,
+        "id": 13118,
         "name": "玉溪末站",
         "mileage": 112.41,
         "type": "distribution",
@@ -838,49 +838,49 @@
     ],
     [
       {
-        "id": 62855,
+        "id": 7344,
         "name": "中缅45#阀室",
         "mileage": 0.0,
         "type": "valve",
         "branch_name": "福泉支线"
       },
       {
-        "id": 93395,
+        "id": 88463,
         "name": "云雾首站",
         "mileage": 0.5,
         "type": "distribution",
         "branch_name": "福泉支线"
       },
       {
-        "id": 927,
+        "id": 1290,
         "name": "昌明分输站",
         "mileage": 18.4,
         "type": "distribution",
         "branch_name": "福泉支线"
       },
       {
-        "id": 91608,
+        "id": 11371,
         "name": "福泉1#阀室",
         "mileage": 35.8,
         "type": "valve",
         "branch_name": "福泉支线"
       },
       {
-        "id": 39168,
+        "id": 47646,
         "name": "贵定分输站",
         "mileage": 52.4,
         "type": "distribution",
         "branch_name": "福泉支线"
       },
       {
-        "id": 93644,
+        "id": 44594,
         "name": "福泉2#阀室",
         "mileage": 70.2,
         "type": "valve",
         "branch_name": "福泉支线"
       },
       {
-        "id": 51550,
+        "id": 17980,
         "name": "福泉末站",
         "mileage": 92.1,
         "type": "distribution",
@@ -889,21 +889,21 @@
     ],
     [
       {
-        "id": 21676,
+        "id": 36068,
         "name": "中缅50#阀室",
         "mileage": 0.0,
         "type": "valve",
         "branch_name": "荔波支线"
       },
       {
-        "id": 57975,
+        "id": 59405,
         "name": "荔波首站",
         "mileage": 1.184,
         "type": "distribution",
         "branch_name": "荔波支线"
       },
       {
-        "id": 50223,
+        "id": 30668,
         "name": "荔波末站",
         "mileage": 18.826,
         "type": "distribution",
@@ -912,21 +912,21 @@
     ],
     [
       {
-        "id": 84343,
+        "id": 70207,
         "name": "都匀分输站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "都匀支线"
       },
       {
-        "id": 5680,
+        "id": 34731,
         "name": "都匀1#阀室",
         "mileage": 15.169,
         "type": "valve",
         "branch_name": "都匀支线"
       },
       {
-        "id": 33532,
+        "id": 43585,
         "name": "都匀末站",
         "mileage": 33.92,
         "type": "distribution",
@@ -935,84 +935,84 @@
     ],
     [
       {
-        "id": 97032,
+        "id": 67943,
         "name": "南宁分输站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "钦州支线"
       },
       {
-        "id": 30722,
+        "id": 17724,
         "name": "大番坡分输站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "钦州支线"
       },
       {
-        "id": 14773,
+        "id": 32549,
         "name": "河东分输站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "钦州支线"
       },
       {
-        "id": 52075,
+        "id": 3421,
         "name": "钦州1#阀室",
         "mileage": 19.668,
         "type": "valve",
         "branch_name": "钦州支线"
       },
       {
-        "id": 50973,
+        "id": 61089,
         "name": "钦州2#阀室",
         "mileage": 41.992,
         "type": "valve",
         "branch_name": "钦州支线"
       },
       {
-        "id": 6299,
+        "id": 15272,
         "name": "钦州3#阀室",
         "mileage": 59.787,
         "type": "valve",
         "branch_name": "钦州支线"
       },
       {
-        "id": 596,
+        "id": 52945,
         "name": "钦州分输站",
         "mileage": 80.699763,
         "type": "distribution",
         "branch_name": "钦州支线"
       },
       {
-        "id": 27133,
+        "id": 84785,
         "name": "钦州4#阀室",
         "mileage": 96.314,
         "type": "valve",
         "branch_name": "钦州支线"
       },
       {
-        "id": 64067,
+        "id": 72983,
         "name": "钦州5#阀室",
         "mileage": 103.97,
         "type": "valve",
         "branch_name": "钦州支线"
       },
       {
-        "id": 15589,
+        "id": 73150,
         "name": "钦州6#阀室",
         "mileage": 118.34,
         "type": "valve",
         "branch_name": "钦州支线"
       },
       {
-        "id": 11587,
+        "id": 232,
         "name": "钦州7#阀室",
         "mileage": 127.581,
         "type": "valve",
         "branch_name": "钦州支线"
       },
       {
-        "id": 87695,
+        "id": 32920,
         "name": "钦州港分输站",
         "mileage": 141.24,
         "type": "distribution",
@@ -1021,21 +1021,21 @@
     ],
     [
       {
-        "id": 84243,
+        "id": 37163,
         "name": "燕楼首站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "长顺支线"
       },
       {
-        "id": 7010,
+        "id": 3279,
         "name": "广顺分输站",
         "mileage": 20.68,
         "type": "distribution",
         "branch_name": "长顺支线"
       },
       {
-        "id": 78674,
+        "id": 99908,
         "name": "长顺分输站",
         "mileage": 43.39,
         "type": "distribution",
@@ -1044,35 +1044,35 @@
     ],
     [
       {
-        "id": 75247,
+        "id": 98042,
         "name": "钦州分输站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "防城港支线"
       },
       {
-        "id": 40981,
+        "id": 22899,
         "name": "防城港1#阀室",
         "mileage": 12.089,
         "type": "valve",
         "branch_name": "防城港支线"
       },
       {
-        "id": 64887,
+        "id": 23912,
         "name": "防城港2#阀室",
         "mileage": 32.315,
         "type": "valve",
         "branch_name": "防城港支线"
       },
       {
-        "id": 93927,
+        "id": 273,
         "name": "防城港3#阀室",
         "mileage": 48.051,
         "type": "valve",
         "branch_name": "防城港支线"
       },
       {
-        "id": 44841,
+        "id": 31613,
         "name": "防城港末站",
         "mileage": 62.51,
         "type": "distribution",

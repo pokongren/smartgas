@@ -129,6 +129,36 @@ def execute_tool(tool_name: str, args: dict[str, Any], session: Session) -> str:
         return f"工具执行出错: {str(e)}"
 
 
+def _handle_get_station_details(args: dict, session: Session) -> str:
+    """获取站场详细物理属性"""
+    station_id = args.get("station_id", "")
+    if not station_id:
+        return "请提供站场 ID 或名称"
+
+    # 先按 ID 查，查不到再按名称精确匹配
+    station = session.get(Station, station_id)
+    if not station:
+        station = session.exec(
+            select(Station).where(Station.name == station_id)
+        ).first()
+
+    if not station:
+        return f"未找到站场: {station_id}"
+
+    type_map = {"source": "气源站", "compressor": "压气站", "distribution": "分输站", "valve": "阀室", "shared": "转供站"}
+    lines = [f"站场详情 —— {station.name}（{type_map.get(station.type, station.type)}）"]
+    lines.append(f"  ID: {station.id}")
+    lines.append(f"  坐标: ({station.longitude}, {station.latitude})")
+    lines.append(f"  设计压力: {station.design_pressure or '未知'} MPa")
+    lines.append(f"  进站压力: {station.operating_pressure_in or '未知'} MPa")
+    lines.append(f"  出站压力: {station.operating_pressure_out or '未知'} MPa")
+    lines.append(f"  进站温度: {station.operating_temp_in or '未知'} °C")
+    lines.append(f"  出站温度: {station.operating_temp_out or '未知'} °C")
+    lines.append(f"  处理能力: {station.capacity or '未知'} 万方/天")
+    return "\n".join(lines)
+
+
+
 def _handle_query_stations(args: dict, session: Session) -> str:
     """查询站场"""
     stmt = select(Station)

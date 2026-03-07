@@ -8,6 +8,8 @@ const TechView = lazy(() => import('./views/TechView'));
 const MapDemo = lazy(() => import('./views/MapDemo'));
 const GlobalPipelineView = lazy(() => import('./views/GlobalPipelineView'));
 const WorkflowView = lazy(() => import('./views/WorkflowView'));
+const TopologyView = lazy(() => import('./views/TopologyView'));
+const MapTopologyView = lazy(() => import('./views/MapTopologyView'));
 
 /**
  * 页面加载状态组件
@@ -33,6 +35,8 @@ const ViewSwitcher: React.FC = () => {
   const isMapDemo = location.pathname === '/map-demo';
   const isGlobal = location.pathname === '/global';
   const isWorkflow = location.pathname === '/workflow';
+  const isTopology = location.pathname === '/topology';
+  const isMapTopology = location.pathname === '/map-topology';
 
   // 地图演示页面不显示切换按钮
   if (isMapDemo) return null;
@@ -42,6 +46,28 @@ const ViewSwitcher: React.FC = () => {
       <div className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-black/80 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
         Switch Dashboard View
       </div>
+
+      <button
+        onClick={() => navigate('/map-topology')}
+        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isMapTopology
+          ? 'bg-teal-600 text-white shadow-teal-500/50'
+          : 'bg-gray-700 text-white hover:bg-teal-500'
+          }`}
+        title="地图拓扑管理"
+      >
+        <span className="material-symbols-outlined text-2xl">conversion_path</span>
+      </button>
+
+      <button
+        onClick={() => navigate('/topology')}
+        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isTopology
+          ? 'bg-cyan-600 text-white shadow-cyan-500/50'
+          : 'bg-gray-700 text-white hover:bg-cyan-500'
+          }`}
+        title="Canvas 拓扑图"
+      >
+        <span className="material-symbols-outlined text-2xl">hub</span>
+      </button>
 
       <button
         onClick={() => navigate('/workflow')}
@@ -98,6 +124,8 @@ const App: React.FC = () => {
           <Route path="/map-demo" element={<MapDemo />} />
           <Route path="/global" element={<GlobalPipelineView />} />
           <Route path="/workflow" element={<WorkflowView />} />
+          <Route path="/topology" element={<TopologyView />} />
+          <Route path="/map-topology" element={<MapTopologyView />} />
         </Routes>
       </Suspense>
     </HashRouter>
