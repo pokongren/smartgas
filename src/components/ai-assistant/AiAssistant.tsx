@@ -5,12 +5,15 @@
  */
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import './ai-assistant.css';
+import { useNewWindow, usePopoutSync } from '../../hooks/useNewWindow';
 
 // ============ 类型定义 ============
 
 interface ChatMessage {
     role: 'user' | 'assistant';
     content: string;
+    retrieval_log?: string[];
+    isStreaming?: boolean;
 }
 
 interface ToolCallInfo {
@@ -22,6 +25,7 @@ interface ToolCallInfo {
 interface ChatResponse {
     reply: string;
     tool_calls: ToolCallInfo[];
+    retrieval_log?: string[];
 }
 
 // 工具名称的中文映射，方便前端展示
@@ -47,24 +51,55 @@ const EXAMPLE_QUESTIONS = [
 const API_URL = '/api/ai-assistant/chat';
 
 /**
- * 调用 AI 助手对话接口
- * @param message 用户消息文本
- * @param history 对话历史（最近几轮）
+ * 调用 AI 助手流式对话接口
  */
-async function sendMessage(
+async function* fetchChatStream(
     message: string,
     history: ChatMessage[],
-): Promise<ChatResponse> {
+): AsyncGenerator<{ type: 'REPLY' | 'TOOL' | 'LOG' | 'ERROR', content: string }> {
     const res = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, history }),
     });
+
     if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: '请求失败' }));
-        throw new Error(err.detail || `HTTP ${res.status}`);
+        throw new Error(`HTTP ${res.status}`);
     }
-    return res.json();
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('无法读取响应流');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+            if (!line.trim()) continue;
+
+            if (line.startsWith('[REPLY] ')) {
+                try {
+                    const parsed = JSON.parse(line.substring(8));
+                    yield { type: 'REPLY', content: parsed };
+                } catch (e) {
+                    yield { type: 'REPLY', content: line.substring(8) };
+                }
+            } else if (line.startsWith('[TOOL] ')) {
+                yield { type: 'TOOL', content: line.substring(7) };
+            } else if (line.startsWith('[LOG] ')) {
+                yield { type: 'LOG', content: line.substring(6) };
+            } else if (line.startsWith('[ERROR] ')) {
+                yield { type: 'ERROR', content: line.substring(8) };
+            }
+        }
+    }
 }
 
 // ============ 拖拽 Hook ============
@@ -133,13 +168,16 @@ const AiAssistant: React.FC = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // 新窗口 Pop-out Hook
+    const { isPoppedOut, popOut, closePopOut } = useNewWindow('ai-assistant-sync', '/popout/assistant');
+
     // 拖拽：面板初始位置在左下角
     const { position, isDragging, handleMouseDown } = useDrag({
         x: 24,
         y: typeof window !== 'undefined' ? window.innerHeight - 560 - 92 : 200,
     });
 
-    // 拖拽：浮动按钮也可拖动
+    // 拖拽：浮动按钮也可拖动 (如果是作为独立页面渲染则不需要这个 Hook 调用)
     const fabDrag = useDrag({
         x: 24,
         y: typeof window !== 'undefined' ? window.innerHeight - 80 : 600,
@@ -168,25 +206,68 @@ const AiAssistant: React.FC = () => {
         setLoading(true);
         setActiveToolName('');
 
-        try {
-            const response = await sendMessage(msg, messages);
+        // 预创建一个助手消息用于流式更新
+        const assistantMsg: ChatMessage = {
+            role: 'assistant',
+            content: '',
+            isStreaming: true
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
 
-            if (response.tool_calls.length > 0) {
-                const toolName = response.tool_calls[0].tool_name;
-                setActiveToolName(toolName);
+        try {
+            const stream = fetchChatStream(msg, messages);
+            let fullReply = '';
+            let logs: string[] = [];
+
+            for await (const chunk of stream) {
+                if (chunk.type === 'REPLY') {
+                    fullReply += chunk.content;
+                    setMessages((prev) => {
+                        const next = [...prev];
+                        const last = next[next.length - 1];
+                        if (last && last.role === 'assistant') {
+                            last.content = fullReply;
+                        }
+                        return next;
+                    });
+                } else if (chunk.type === 'TOOL') {
+                    setActiveToolName(chunk.content);
+                } else if (chunk.type === 'LOG') {
+                    logs = chunk.content.split(', ');
+                    setMessages((prev) => {
+                        const next = [...prev];
+                        const last = next[next.length - 1];
+                        if (last && last.role === 'assistant') {
+                            last.retrieval_log = logs;
+                        }
+                        return next;
+                    });
+                } else if (chunk.type === 'ERROR') {
+                    throw new Error(chunk.content);
+                }
             }
 
-            const assistantMsg: ChatMessage = {
-                role: 'assistant',
-                content: response.reply,
-            };
-            setMessages((prev) => [...prev, assistantMsg]);
+            // 完成流式传输
+            setMessages((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last && last.role === 'assistant') {
+                    last.isStreaming = false;
+                }
+                return next;
+            });
+
         } catch (e) {
-            const errorMsg: ChatMessage = {
-                role: 'assistant',
-                content: `❌ ${e instanceof Error ? e.message : '请求失败，请稍后重试'}`,
-            };
-            setMessages((prev) => [...prev, errorMsg]);
+            setMessages((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last && last.role === 'assistant' && !last.content) {
+                    last.content = `❌ ${e instanceof Error ? e.message : '请求失败'}`;
+                } else {
+                    next.push({ role: 'assistant', content: `❌ ${e instanceof Error ? e.message : '连接异常'}` });
+                }
+                return next;
+            });
         } finally {
             setLoading(false);
             setActiveToolName('');
@@ -231,6 +312,8 @@ const AiAssistant: React.FC = () => {
                     const dist = Math.sqrt((e.clientX - startX) ** 2 + (e.clientY - startY) ** 2);
                     if (dist < 5) {
                         setIsOpen(!isOpen);
+                        // 如果当前还在弹出窗口，点击关闭会导致其回弹或者直接关闭。
+                        if (isPoppedOut && isOpen) closePopOut();
                     }
                 }}
                 title={isOpen ? '关闭 AI 助手' : '打开 AI 助手'}
@@ -240,92 +323,34 @@ const AiAssistant: React.FC = () => {
                 </span>
             </button>
 
-            {/* 聊天面板 — 可拖动、半透明 */}
+            {/* 聊天面板 / 新窗口内容区域 抽象 */}
             {isOpen && (
-                <div
-                    className={`ai-assistant-panel ${isDragging ? 'dragging' : ''}`}
-                    id="ai-assistant-panel"
-                    style={{
-                        left: position.x,
-                        top: position.y,
-                        bottom: 'auto',
-                    }}
-                >
-                    {/* 头部 — 拖拽手柄 */}
-                    <div
-                        className="ai-panel-header"
-                        onMouseDown={handleMouseDown}
-                        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-                    >
-                        <div className="ai-avatar">
-                            <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#fff' }}>
-                                smart_toy
-                            </span>
-                        </div>
-                        <div className="ai-header-info">
-                            <div className="ai-title">AI 助手</div>
-                            <div className="ai-subtitle">智脉平台 · 拖动移动</div>
-                        </div>
-                        <div className="ai-status-dot" title="在线" />
-                        <button
-                            onClick={() => setIsOpen(false)}
-                            className="ai-close-btn"
-                            title="关闭"
-                        >
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
-                        </button>
-                    </div>
-
-                    {/* 消息区 */}
-                    <div className="ai-messages">
-                        {messages.length === 0 ? (
-                            <WelcomeScreen onExampleClick={handleExampleClick} />
-                        ) : (
-                            messages.map((msg, i) => (
-                                <div key={i} className={`ai-msg ${msg.role}`}>
-                                    {msg.content}
-                                </div>
-                            ))
-                        )}
-
-                        {loading && activeToolName && (
-                            <div className="ai-tool-badge">
-                                <span className="material-symbols-outlined">sync</span>
-                                正在{TOOL_LABELS[activeToolName] || activeToolName}...
-                            </div>
-                        )}
-                        {loading && !activeToolName && (
-                            <div className="ai-typing">
-                                <span /><span /><span />
-                            </div>
-                        )}
-
-                        <div ref={messagesEndRef} />
-                    </div>
-
-                    {/* 输入区 */}
-                    <div className="ai-input-area">
-                        <input
-                            ref={inputRef}
-                            id="ai-assistant-input"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder="输入你的问题..."
-                            disabled={loading}
+                <>
+                    {/* 我们不再依赖 Portal 将真实 DOM 挪过去，而是挂起当前页面的渲染 */}
+                    {isPoppedOut ? (
+                        <div className="hidden" aria-hidden="true" id="ai-assistant-suspended">{/* 主页被挂起隐藏 */}</div>
+                    ) : (
+                        <AssistantPanel
+                            isPoppedOut={false}
+                            position={position}
+                            isDragging={isDragging}
+                            handleMouseDown={handleMouseDown}
+                            closePopOut={closePopOut}
+                            popOut={() => popOut(450, 750, 'AI 调度工作流助手')}
+                            setIsOpen={setIsOpen}
+                            messages={messages}
+                            loading={loading}
+                            activeToolName={activeToolName}
+                            input={input}
+                            setInput={setInput}
+                            handleKeyDown={handleKeyDown}
+                            handleSend={handleSend}
+                            handleExampleClick={handleExampleClick}
+                            messagesEndRef={messagesEndRef}
+                            inputRef={inputRef}
                         />
-                        <button
-                            id="ai-assistant-send"
-                            className="ai-send-btn"
-                            onClick={() => handleSend()}
-                            disabled={!input.trim() || loading}
-                        >
-                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                                send
-                            </span>
-                        </button>
-                    </div>
-                </div>
+                    )}
+                </>
             )}
         </>
     );
@@ -355,5 +380,252 @@ const WelcomeScreen: React.FC<{ onExampleClick: (q: string) => void }> = ({ onEx
         </div>
     </div>
 );
+
+// 将 Panel 抽离为单独无状态组件，方便 Portal 挂载复用
+const AssistantPanel: React.FC<{
+    isPoppedOut: boolean;
+    position: { x: number; y: number };
+    isDragging: boolean;
+    handleMouseDown: (e: React.MouseEvent) => void;
+    popOut: () => void;
+    closePopOut: () => void;
+    setIsOpen: (open: boolean) => void;
+    messages: ChatMessage[];
+    loading: boolean;
+    activeToolName: string;
+    input: string;
+    setInput: (v: string) => void;
+    handleKeyDown: (e: React.KeyboardEvent) => void;
+    handleSend: (text?: string) => void;
+    handleExampleClick: (q: string) => void;
+    messagesEndRef: React.RefObject<HTMLDivElement>;
+    inputRef: React.RefObject<HTMLInputElement>;
+}> = ({
+    isPoppedOut, position, isDragging, handleMouseDown, popOut, closePopOut, setIsOpen,
+    messages, loading, activeToolName, input, setInput, handleKeyDown, handleSend, handleExampleClick, messagesEndRef, inputRef
+}) => {
+        return (
+            <div
+                className={`ai-assistant-panel ${isDragging ? 'dragging' : ''} ${isPoppedOut ? 'popped-out' : ''}`}
+                id="ai-assistant-panel"
+                style={isPoppedOut ? {
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%',
+                    borderRadius: 0,
+                    margin: 0,
+                    border: 'none',
+                    left: 0,
+                    top: 0
+                } : {
+                    left: `${position.x}px`,
+                    top: `${position.y}px`,
+                    bottom: 'auto',
+                }}
+            >
+                {/* 头部 — 拖拽手柄 */}
+                <div
+                    className="ai-panel-header"
+                    onMouseDown={isPoppedOut ? undefined : handleMouseDown}
+                    style={{ cursor: isPoppedOut ? 'default' : (isDragging ? 'grabbing' : 'grab') }}
+                >
+                    <div className="ai-avatar">
+                        <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#fff' }}>
+                            smart_toy
+                        </span>
+                    </div>
+                    <div className="ai-header-info">
+                        <div className="ai-title">AI 助手</div>
+                        <div className="ai-subtitle">智脉平台 {isPoppedOut ? '· 独立窗口' : '· 拖动移动'}</div>
+                    </div>
+                    <div className="ai-status-dot" title="在线" />
+
+                    {!isPoppedOut && (
+                        <button onClick={popOut} className="ai-close-btn" title="弹出为独立窗口" style={{ marginRight: 4 }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>open_in_new</span>
+                        </button>
+                    )}
+
+                    <button
+                        onClick={() => {
+                            if (isPoppedOut) closePopOut();
+                            else setIsOpen(false);
+                        }}
+                        className="ai-close-btn"
+                        title={isPoppedOut ? "恢复并回到主界面关闭" : "从主界面隐藏"}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+                    </button>
+                </div>
+
+                {/* 消息区 */}
+                <div className="ai-messages">
+                    {messages.length === 0 ? (
+                        <WelcomeScreen onExampleClick={handleExampleClick} />
+                    ) : (
+                        messages.map((msg, i) => (
+                            <div key={i} className={`ai-msg-wrapper ${msg.role}`}>
+                                <div className={`ai-msg ${msg.role}`}>
+                                    {msg.content}
+                                </div>
+                                {msg.retrieval_log && msg.retrieval_log.length > 0 && (
+                                    <div className="ai-retrieval-log">
+                                        <span className="material-symbols-outlined">folder_open</span>
+                                        检索文件: {msg.retrieval_log.join(', ')}
+                                    </div>
+                                )}
+                            </div>
+                        ))
+                    )
+                    }
+
+                    {loading && activeToolName && (
+                        <div className="ai-tool-badge">
+                            <span className="material-symbols-outlined">sync</span>
+                            正在{TOOL_LABELS[activeToolName] || activeToolName}...
+                        </div>
+                    )}
+                    {loading && !activeToolName && (
+                        <div className="ai-typing">
+                            <span /><span /><span />
+                        </div>
+                    )}
+
+                    <div ref={messagesEndRef} />
+                </div>
+
+                {/* 输入区 */}
+                <div className="ai-input-area">
+                    <input
+                        ref={inputRef}
+                        id="ai-assistant-input"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="输入你的问题..."
+                        disabled={loading}
+                    />
+                    <button
+                        id="ai-assistant-send"
+                        className="ai-send-btn"
+                        onClick={() => handleSend()}
+                        disabled={!input.trim() || loading}
+                    >
+                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                            send
+                        </span>
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
+// 供独立路由使用的单体组件
+export const AiAssistantStandalone: React.FC = () => {
+    // 专用 Hook 负责防白屏和发送心跳
+    usePopoutSync('ai-assistant-sync');
+
+    // 内部独立的数据状态（这里我们简化为开箱即用的白板状态，可以结合全局 Store）
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [input, setInput] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [activeToolName, setActiveToolName] = useState('');
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleSend = useCallback(async (text?: string) => {
+        const msg = (text || input).trim();
+        if (!msg || loading) return;
+
+        setInput('');
+        const userMsg: ChatMessage = { role: 'user', content: msg };
+        setMessages((prev) => [...prev, userMsg]);
+        setLoading(true);
+        setActiveToolName('');
+
+        // 预创建一个助手消息
+        const assistantMsg: ChatMessage = {
+            role: 'assistant',
+            content: '',
+            isStreaming: true
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+
+        try {
+            const stream = fetchChatStream(msg, messages);
+            let fullReply = '';
+            let logs: string[] = [];
+
+            for await (const chunk of stream) {
+                if (chunk.type === 'REPLY') {
+                    fullReply += chunk.content;
+                    setMessages((prev) => {
+                        const next = [...prev];
+                        const last = next[next.length - 1];
+                        if (last && last.role === 'assistant') {
+                            last.content = fullReply;
+                        }
+                        return next;
+                    });
+                } else if (chunk.type === 'TOOL') {
+                    setActiveToolName(chunk.content);
+                } else if (chunk.type === 'LOG') {
+                    logs = chunk.content.split(', ');
+                    setMessages((prev) => {
+                        const next = [...prev];
+                        const last = next[next.length - 1];
+                        if (last && last.role === 'assistant') {
+                            last.retrieval_log = logs;
+                        }
+                        return next;
+                    });
+                }
+            }
+
+            setMessages((prev) => {
+                const next = [...prev];
+                const last = next[next.length - 1];
+                if (last && last.role === 'assistant') {
+                    last.isStreaming = false;
+                }
+                return next;
+            });
+        } catch (e) {
+            setMessages((prev) => [...prev, { role: 'assistant', content: `❌ ${e instanceof Error ? e.message : '请求失败'}` }]);
+        } finally {
+            setLoading(false);
+            setActiveToolName('');
+        }
+    }, [input, loading, messages]);
+
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    }, [handleSend]);
+
+    return (
+        <AssistantPanel
+            isPoppedOut={true}
+            position={{ x: 0, y: 0 }}
+            isDragging={false}
+            handleMouseDown={() => { }}
+            closePopOut={() => window.close()}
+            popOut={() => { }}
+            setIsOpen={() => { }}
+            messages={messages}
+            loading={loading}
+            activeToolName={activeToolName}
+            input={input}
+            setInput={setInput}
+            handleKeyDown={handleKeyDown}
+            handleSend={handleSend}
+            handleExampleClick={(q) => handleSend(q)}
+            messagesEndRef={messagesEndRef}
+            inputRef={inputRef}
+        />
+    )
+}
 
 export default AiAssistant;

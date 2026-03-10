@@ -72,11 +72,23 @@ TOOL_DEFINITIONS = [
         "parameters": {},
     },
     {
+        "name": "find_critical_nodes",
+        "description": "通过介数中心性算法(Betweenness Centrality)，识别管网中最关键的卡脖子节点。这属于拓扑关系知识库。",
+        "parameters": {},
+    },
+    {
         "name": "simulate_failure",
         "description": "模拟某个站场发生故障后的断流推演，返回传播过程摘要。",
         "parameters": {
             "station_id": {"description": "故障站场 ID（如 node-001）", "required": True},
             "max_ticks": {"description": "最大推演步数，默认 50", "required": False},
+        },
+    },
+    {
+        "name": "search_knowledge_base",
+        "description": "专门用于检索《天然气管网操作规程》、《现场处置应急预案》等官方文档，以回答如何处理故障、参数对标、操作步骤等特定业务知识问题。",
+        "parameters": {
+            "query": {"description": "用户检索问题的关键字或完整句子", "required": True},
         },
     },
 ]
@@ -87,7 +99,12 @@ def build_tools_description() -> str:
     将工具定义格式化为 AI 可理解的文本说明。
     AI 会根据这些描述决定何时调用哪个工具。
     """
-    lines = ["你可以使用以下工具来回答用户的问题。当需要查询数据或执行分析时，请输出工具调用指令。\n"]
+    lines = ["你可以使用以下工具来获取事实数据以回答用户的问题。你应该像使用知识库一样使用它们。\n"]
+    lines.append("你的系统接入了【三大知识库】：")
+    lines.append("1. **业务数据库**（SQL）：通过 query_stations 等工具进行精确统计查询；")
+    lines.append("2. **规程向量库**（ChromaDB）：通过 search_knowledge_base 工具检索官方文档原文；")
+    lines.append("3. **拓扑关系库**（NetworkX）：通过 analyze_impact, find_routes, simulate_failure, find_critical_nodes 进行图计算推理。\n")
+    lines.append("当需要查询数据或执行分析时，请输出相应的工具调用指令。\n")
     lines.append("## 可用工具\n")
 
     for tool in TOOL_DEFINITIONS:
@@ -357,6 +374,54 @@ def _handle_simulate_failure(args: dict, session: Session) -> str:
     return "\n".join(lines)
 
 
+def _handle_search_knowledge_base(args: dict, session: Session) -> str:
+    """查询结构化 PDF 操作规程与应急预案库"""
+    query = args.get("query", "")
+    if not query:
+        return "请提供要查询的具体问题或关键字。"
+
+    try:
+        from app.services.rag_enhanced import EnhancedRAGService
+        rag_service = EnhancedRAGService()
+        
+        # 强制只走 ChromaDB 向量搜索，这里跳过 Text2SQL 以免干扰
+        vector_result = rag_service.query_vector_db(query, n_results=4)
+        
+        if vector_result and vector_result.get('documents'):
+            docs = vector_result['documents']
+            metas = vector_result['metadatas']
+            
+            lines = ["下面是从《操作规程》与《应急预案》库中为您检索到的相关原文片段：\n"]
+            for i, doc in enumerate(docs):
+                meta = metas[i] if i < len(metas) else {}
+                source = meta.get("source", "未知文件")
+                chunk_idx = meta.get("chunk", "?")
+                lines.append(f"【参考来源 {i+1} : {source} (切片位置: #{chunk_idx})】\n{doc}\n")
+                
+            lines.append("\n【系统提示：请综合上述官方文本，为用户提炼出重点步骤与专业数值进行回答。注意呈现 Markdown 表格以保持清晰。】")
+            return "\n".join(lines)
+        else:
+            return "抱歉，知识库中未检索到相关的规程与预案记载。"
+            
+    except Exception as e:
+        logger.error(f"知识库检索失败: {e}", exc_info=True)
+        return f"知识库检索工具执行出错: {str(e)}"
+
+
+def _handle_find_critical_nodes(args: dict, session: Session) -> str:
+    """识别管网中的关键节点（介数中心性）"""
+    topo = TopologyService(session)
+    critical_nodes = topo.find_critical_nodes()
+
+    if not critical_nodes:
+        return "未分析出关键节点"
+
+    lines = ["管网拓扑关系核心节点（基于介数中心性：承担最多最短输送路径的卡脖子站点）："]
+    for i, (node_name, score) in enumerate(critical_nodes.items(), 1):
+        lines.append(f"  {i}. {node_name} (中心性得分: {score})")
+    return "\n".join(lines)
+
+
 # 工具名 → 处理函数的映射
 TOOL_HANDLERS = {
     "query_stations": _handle_query_stations,
@@ -366,5 +431,7 @@ TOOL_HANDLERS = {
     "analyze_impact": _handle_analyze_impact,
     "find_routes": _handle_find_routes,
     "get_topology_summary": _handle_topology_summary,
+    "find_critical_nodes": _handle_find_critical_nodes,
     "simulate_failure": _handle_simulate_failure,
+    "search_knowledge_base": _handle_search_knowledge_base,
 }

@@ -47,6 +47,35 @@ interface TopoData {
 
 // ============ 常量 ============
 
+// 从监控系统截图中提取的西一线真实 SCADA 运行基准数据
+const REAL_SCADA_DATA: Record<string, { inP: number, outP: number, inT?: number, outT?: number }> = {
+    '中卫压气站': { inP: 6.391, outP: 7.856, inT: 7.7, outT: 30.8 },
+    '盐池压气站': { inP: 7.133, outP: 7.092, inT: 10.3, outT: 10.2 },
+    '靖边压气站': { inP: 6.681, outP: 8.947, inT: 5.7, outT: 34.9 },
+    '子长分输站': { inP: 8.098, outP: 8.098, inT: 19.9, outT: 19.9 },
+    '延川压气站': { inP: 7.880, outP: 9.175, inT: 21.4, outT: 31.9 },
+    '沁水压气站': { inP: 6.889, outP: 8.762, inT: 18.0, outT: 39.4 },
+    '阳城清管站': { inP: 7.936, outP: 7.912, inT: 16.4, outT: 16.4 },
+    '博爱分输站': { inP: 7.118, outP: 7.126, outT: 26.2 },
+    '郑州压气站': { inP: 6.166, outP: 7.830, inT: 20.1, outT: 41.9 },
+    '薛店分输站': { inP: 7.273, outP: 7.273, outT: 34.8 },
+    '淮阳压气站': { inP: 5.726, outP: 7.766, inT: 18.4, outT: 45.0 },
+    '利辛分输站': { inP: 6.354, outP: 6.232, inT: 21.6, outT: 16.9 },
+    '定远压气站': { inP: 4.818, outP: 6.245, inT: 12.8, outT: 35.0 },
+    '龙池分输站': { inP: 6.005, outP: 6.002, outT: 19.3 },
+    '龙源分输站': { inP: 5.971, outP: 5.590, outT: 20.4 },
+    '镇江分输站': { inP: 5.573, outP: 5.575, outT: 14.9 },
+    '常州分输站': { inP: 5.255, outP: 5.248, outT: 13.4 },
+    '芙蓉分输站': { inP: 5.167, outP: 5.162, inT: 15.9, outT: 5.2 },
+    '徐霞客分输站': { inP: 0.000, outP: 0.001, inT: 19.0, outT: 18.4 },
+    '无锡分输站': { inP: 4.244, outP: 5.101, outT: 12.2 },
+    '东桥分输站': { inP: 5.092, outP: 5.087, outT: 12.7 },
+    '苏州分输站': { inP: 5.078, outP: 5.089, outT: 15.5 },
+    '甪直分输站': { inP: 5.094, outP: 5.106, outT: 7.9 },
+    '昆山分输站': { inP: 5.073, outP: 5.065, outT: 12.4 },
+    '上海白鹤末站': { inP: 5.050, outP: 5.050, outT: 13.7 },
+}
+
 const NODE_COLORS: Record<string, string> = {
     compressor: '#f97316',
     distribution: '#3b82f6',
@@ -317,6 +346,24 @@ function drawGraph(
             ctx.font = `${11 / zoom}px Inter, sans-serif`;
             ctx.textAlign = 'center';
             ctx.fillText(node.name, node.x, node.y + radius + 12 / zoom);
+        }
+
+        // SCADA 实时参数挂载渲染（如果有数据则始终显示在节点正上方）
+        const scadaData = REAL_SCADA_DATA[node.name];
+        if (scadaData) {
+            const inText = `入 P:${scadaData.inP.toFixed(2)} ${scadaData.inT ? `T:${scadaData.inT}` : ''}`;
+            const outText = `出 P:${scadaData.outP.toFixed(2)} ${scadaData.outT ? `T:${scadaData.outT}` : ''}`;
+
+            ctx.textAlign = 'center';
+            ctx.font = `${9 / zoom}px Inter, sans-serif`;
+
+            // 绘制上方第一行：进站参数 (绿)
+            ctx.fillStyle = '#10b981';
+            ctx.fillText(inText, node.x, node.y - radius - 14 / zoom);
+
+            // 绘制上方第二行：出站参数 (蓝)
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillText(outText, node.x, node.y - radius - 4 / zoom);
         }
     }
 
@@ -883,6 +930,64 @@ const TopologyView: React.FC = () => {
                     重置
                 </button>
                 <span className="toolbar-zoom">{Math.round(zoom * 100)}%</span>
+            </div>
+
+            {/* ====== 西一线 SCADA 浮动参数表 ====== */}
+            <div className="scada-table-panel" style={{
+                position: 'absolute',
+                left: '24px',
+                bottom: '80px',
+                background: 'rgba(12, 18, 24, 0.85)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(71, 85, 105, 0.4)',
+                borderRadius: '8px',
+                padding: '12px',
+                width: '380px',
+                maxHeight: '300px',
+                display: 'flex',
+                flexDirection: 'column',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                zIndex: 100,
+                color: '#e2e8f0',
+                pointerEvents: 'auto',
+                userSelect: 'none'
+            }}>
+                <div style={{ paddingBottom: '8px', marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#10b981' }}>sensors</span>
+                        实时参数监控 - 西气东输一线
+                    </h3>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }} className="custom-scrollbar">
+                    <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <thead style={{ position: 'sticky', top: 0, background: 'rgba(12, 18, 24, 0.95)', zIndex: 1 }}>
+                            <tr>
+                                <th style={{ padding: '6px 4px', borderBottom: '1px solid #334155', color: '#94a3b8' }}>站名</th>
+                                <th style={{ padding: '6px 4px', borderBottom: '1px solid #334155', color: '#94a3b8' }}>进站 P/T</th>
+                                <th style={{ padding: '6px 4px', borderBottom: '1px solid #334155', color: '#94a3b8' }}>出站 P/T</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Object.entries(REAL_SCADA_DATA).map(([name, data]) => {
+                                const inTLabel = data.inT ? `${data.inT}℃` : '--';
+                                const outTLabel = data.outT ? `${data.outT}℃` : '--';
+                                return (
+                                    <tr key={name} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <td style={{ padding: '6px 4px', fontWeight: 'bold' }}>{name}</td>
+                                        <td style={{ padding: '6px 4px' }}>
+                                            <div style={{ color: '#10b981' }}>{data.inP.toFixed(3)} MPa</div>
+                                            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{inTLabel}</div>
+                                        </td>
+                                        <td style={{ padding: '6px 4px' }}>
+                                            <div style={{ color: '#3b82f6' }}>{data.outP.toFixed(3)} MPa</div>
+                                            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{outTLabel}</div>
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             {/* ====== 节点详情侧边栏 ====== */}

@@ -61,30 +61,41 @@ class ExecutionEngine:
             "total_steps": len(steps),
         }
 
+        from app.services.pipeline_data_service import pipeline_data_service
+        pipeline_data_service.reset_logs()
+
         # 构建知识库和数据库上下文
         database_context = "暂无数据库信息"
         rag_context = "暂无业务知识"
+        retrieval_log = []
 
         if session is not None:
             try:
-                from app.services.topology import TopologyService
-                topo = TopologyService(session)
-                summary = topo.get_graph_summary()
-                critical_nodes = topo.find_critical_nodes()
+                # 1. 尝试识别用户输入中的管线关键词 (例如 "西一线")
+                pipeline_codes = {
+                    "西一线": "we1", "西气东输一线": "we1",
+                    "中缅线": "zm", "中缅管道": "zm",
+                    "中贵线": "zg",
+                    "平泰线": "pt",
+                    "金苏线": "gs",
+                    "港宁线": "gn"
+                }
                 
-                db_info = f"【管网拓扑概览】\n"
-                db_info += f"总站场数: {summary.get('node_count')}\n"
-                db_info += f"总管段数: {summary.get('edge_count')}\n"
-                db_info += f"全网总管存预测: {summary.get('total_linepack')} 万标方\n\n"
+                matched_code = None
+                for kw, code in pipeline_codes.items():
+                    if kw in input_text:
+                        matched_code = code
+                        break
                 
-                if critical_nodes:
-                    db_info += "【当前全网排名前 5 的关键枢纽(瓶颈)节点】\n"
-                    for node, score in critical_nodes.items():
-                        db_info += f"- {node} (介数得分: {score})\n"
-                        
+                if matched_code:
+                    db_info = pipeline_data_service.get_pipeline_summary(matched_code)
+                else:
+                    db_info = pipeline_data_service.get_all_pipelines_overview()
+                
                 database_context = db_info
+                retrieval_log = pipeline_data_service.accessed_files
             except Exception as e:
-                logger.error(f"提取数据库上下文失败: {e}")
+                logger.error(f"提取文件级数据库上下文失败: {e}")
 
         try:
             from app.services.rag_mock import RAGService
@@ -100,6 +111,7 @@ class ExecutionEngine:
             "type": "context_ready",
             "database_context": database_context,
             "rag_context": rag_context,
+            "retrieval_log": retrieval_log,
         }
 
         for i, step in enumerate(steps):

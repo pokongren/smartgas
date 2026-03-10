@@ -47,24 +47,25 @@ class ChatResponse(BaseModel):
     """对话响应"""
     reply: str
     tool_calls: list[ToolCallInfo] = []
+    retrieval_log: list[str] = []
 
 
 # ============ System Prompt ============
 
-# NOTE: 系统 Prompt 定义 AI 助手的角色和工具使用规则
-SYSTEM_PROMPT = """你是 SmartGas Grid 智慧管网系统的 AI 助手。你的职责是帮助用户查询管网数据、分析故障影响、执行推演模拟。
+# NOTE: 系统 Prompt 定义 AI 助手的角色和工具使用规则，强化逻辑思考
+SYSTEM_PROMPT = """你是 SmartGas Grid 智慧管网系统的高级 AI 调度专家。你的职责是基于实时的管网拓扑数据和应急预案，为用户提供精确的分析和查询。
 
-你的回答风格：
-1. 简洁、专业、友好
-2. 使用中文回复
-3. 当回复包含数据列表时，用清晰的格式展示
-4. 如果用户的问题不需要查询数据（如闲聊、打招呼），直接回复即可，不要调用工具
+你的分析与回答规范：
+1. **按需思考 (Conditional CoT)**：
+   - 如果用户的问题涉及数据查询、拓扑分析、断流推演等复杂任务，请务必先在 `<think>` 标签内进行逻辑推理。
+   - 如果只是简单的打招呼、闲聊或通用咨询，请无需使用 `<think>` 标签，直接快速回答。
+2. **深度分析**：在进行故障影响分析时，请检索并比对 `database_context` 中的连接关系。
+3. **专业与简洁**：最终回复应专业、直截了当，使用中文。
+4. **意图识别**：若意图匹配下方工具，请优先生成工具调用 JSON。
 
-重要行为规则：
-- 当用户的意图与工具能力匹配时，必须立即调用工具，不要反问用户
-- 例如用户问「有多少个压气站」，直接调用 count_by_type 工具，不要追问
-- 例如用户问「列出管线」，直接调用 query_pipelines 工具
-- 只输出工具调用 JSON 或自然语言回复，不要输出任何思考过程
+重要规则：
+- **禁止反问**：意图清晰时直接执行。
+- **保留思维过程**：复杂的推理逻辑请完整保留在 `<think>` 标签内。
 
 {tools_description}
 """
@@ -72,91 +73,127 @@ SYSTEM_PROMPT = """你是 SmartGas Grid 智慧管网系统的 AI 助手。你的
 
 # ============ API 端点 ============
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat")
 async def chat(
     request: ChatRequest,
     session: Session = Depends(get_session),
 ):
     """
-    AI 对话接口
-    支持多轮对话，自动识别用户意图并调用对应的内部工具。
+    AI 对话接口 (流式版)
     """
-    if not request.message.strip():
+    from fastapi.responses import StreamingResponse
+    msg_clean = request.message.strip()
+    if not msg_clean:
         raise HTTPException(status_code=400, detail="消息不能为空")
 
-    logger.info(f"AI 助手收到消息: {request.message[:100]}")
+    # 快捷回复：针对简单的问候语直接返回，秒级响应
+    greetings = {"你好", "您好", "hello", "hi", "在吗", "早上好", "中午好", "下午好", "晚上好"}
+    if msg_clean.lower() in greetings:
+        async def quick_gen():
+            reply_text = "您好！我是 SmartGas Grid AI 调度辅助专家。您可以问我关于管网数据查询、拓扑分析或断流推演的问题，我会为您提供专业的解答。"
+            yield f"[REPLY] {json.dumps(reply_text, ensure_ascii=False)}\n"
+        return StreamingResponse(quick_gen(), media_type="text/event-stream")
 
-    tool_calls: list[ToolCallInfo] = []
+    logger.info(f"AI 助手收到消息 (流式): {msg_clean[:100]}")
 
-    try:
-        # 构建完整的 System Prompt（含工具描述）
+    async def event_generator():
         tools_desc = build_tools_description()
         system_prompt = SYSTEM_PROMPT.format(tools_description=tools_desc)
 
-        # 构建消息历史
         messages = [{"role": "system", "content": system_prompt}]
-        for msg in request.history[-10:]:  # 只保留最近 10 条历史
+        for msg in request.history[-10:]:
             messages.append({"role": msg.role, "content": msg.content})
         messages.append({"role": "user", "content": request.message})
 
-        # 第一次 AI 调用：判断意图
-        first_response = await _call_ai(messages)
+        try:
+            full_first_response = ""
+            is_tool_call_likely = False
+            has_started_replying = False
 
-        # 检测是否包含工具调用指令
-        tool_call = _extract_tool_call(first_response)
+            # 第一步：意图识别 (改为流式，以支持快速闲聊)
+            async for chunk in ai_client.chat_stream(
+                prompt=_messages_to_prompt(messages),
+                temperature=0.3
+            ):
+                full_first_response += chunk
+                
+                # 启发式判断：如果开头像 JSON，则可能是工具调用，先不流式输出给用户
+                if not has_started_replying and not is_tool_call_likely:
+                    stripped = full_first_response.strip()
+                    # 如果包含 { 或 ```json，可能是工具调用
+                    if '{' in stripped or '```json' in stripped:
+                        is_tool_call_likely = True
+                    else:
+                        # 确定是闲聊，开始流式输出
+                        yield f"[REPLY] {json.dumps(chunk, ensure_ascii=False)}\n"
+                        has_started_replying = True
+                elif has_started_replying:
+                    yield f"[REPLY] {json.dumps(chunk, ensure_ascii=False)}\n"
 
-        if tool_call:
-            tool_name = tool_call["tool"]
-            tool_args = tool_call.get("args", {})
+            # 第一步结束，解析是否有工具调用
+            tool_call = _extract_tool_call(full_first_response)
+            from app.services.pipeline_data_service import pipeline_data_service
+            
+            if tool_call:
+                tool_name = tool_call["tool"]
+                tool_args = tool_call.get("args", {})
+                
+                yield f"[TOOL] {tool_name}\n"
+                
+                logger.info(f"执行工具: {tool_name}")
+                tool_result = execute_tool(tool_name, tool_args, session)
+                
+                logs = getattr(pipeline_data_service, 'accessed_files', [])
+                if logs:
+                    yield f"[LOG] {', '.join(logs)}\n"
 
-            logger.info(f"AI 决定调用工具: {tool_name}, 参数: {tool_args}")
+                # 第二步：基于工具结果生成流式回复
+                messages.append({"role": "assistant", "content": full_first_response})
+                messages.append({
+                    "role": "user",
+                    "content": f"工具 {tool_name} 的执行结果如下：\n\n{tool_result}\n\n请根据以上结果，用自然、友好的语言回答用户的原始问题。",
+                })
 
-            # 执行工具
-            tool_result = execute_tool(tool_name, tool_args, session)
+                async for chunk in ai_client.chat_stream(
+                    prompt=_messages_to_prompt(messages),
+                    temperature=0.3
+                ):
+                    yield f"[REPLY] {json.dumps(chunk, ensure_ascii=False)}\n"
+            else:
+                # 已经流式输出过了，或者是 tool_call 误判但最终不是 tool_call
+                if not has_started_replying:
+                    # 如果之前因为怀疑是工具调用而没输出，现在补上
+                    cleaned = _strip_think_tags(full_first_response)
+                    yield f"[REPLY] {json.dumps(cleaned, ensure_ascii=False)}\n"
+                
+                logs = getattr(pipeline_data_service, 'accessed_files', [])
+                if logs:
+                    yield f"[LOG] {', '.join(logs)}\n"
 
-            tool_calls.append(ToolCallInfo(
-                tool_name=tool_name,
-                tool_args=tool_args,
-                tool_result=tool_result,
-            ))
+        except Exception as e:
+            logger.error(f"流式处理失败: {e}", exc_info=True)
+            err_text = f"❌ 处理出错: {str(e)}"
+            yield f"[REPLY] {json.dumps(err_text, ensure_ascii=False)}\n"
 
-            # 第二次 AI 调用：基于工具结果生成自然语言回复
-            messages.append({"role": "assistant", "content": first_response})
-            messages.append({
-                "role": "user",
-                "content": f"工具 {tool_name} 的执行结果如下：\n\n{tool_result}\n\n请根据以上结果，用自然、友好的语言回答用户的原始问题。",
-            })
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
-            final_response = await _call_ai(messages)
 
-            # 防止二次工具调用陷入递归
-            if _extract_tool_call(final_response):
-                final_response = tool_result
-
-            return ChatResponse(reply=final_response, tool_calls=tool_calls)
-        else:
-            # 不需要工具调用，直接返回 AI 回复
-            return ChatResponse(reply=first_response, tool_calls=[])
-
-    except Exception as e:
-        logger.error(f"AI 助手处理失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"AI 处理失败: {str(e)}")
+def _messages_to_prompt(messages: list[dict]) -> str:
+    """将消息列表转为单提示词"""
+    prompt_parts = []
+    for msg in messages:
+        role_label = {"system": "[系统]", "user": "[用户]", "assistant": "[助手]"}.get(msg["role"], "")
+        prompt_parts.append(f"{role_label} {msg['content']}")
+    return "\n\n".join(prompt_parts)
 
 
 # ============ 内部工具函数 ============
 
 async def _call_ai(messages: list[dict]) -> str:
     """
-    调用 AI API
-    将 messages 格式转为单一 prompt 发送给 ai_client
+    调用 AI API (完整版)
     """
-    # 拼接所有消息为单一 prompt（当前 ai_client 只支持单 prompt）
-    prompt_parts = []
-    for msg in messages:
-        role_label = {"system": "[系统]", "user": "[用户]", "assistant": "[助手]"}.get(msg["role"], "")
-        prompt_parts.append(f"{role_label} {msg['content']}")
-
-    full_prompt = "\n\n".join(prompt_parts)
+    full_prompt = _messages_to_prompt(messages)
 
     result = await ai_client.chat_completion(
         prompt=full_prompt,
@@ -164,8 +201,8 @@ async def _call_ai(messages: list[dict]) -> str:
         max_tokens=2000,
     )
 
-    # 过滤掉某些模型（如 Minimax）输出的 <think> 思考过程标签
-    return _strip_think_tags(result)
+    # 正常返回结果，不再过滤思考过程，以便显示逻辑
+    return result.strip()
 
 
 def _extract_tool_call(response: str) -> dict | None:

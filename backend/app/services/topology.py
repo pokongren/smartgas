@@ -207,7 +207,7 @@ class TopologyService:
         betweenness = nx.betweenness_centrality(self.graph, weight='weight')
         
         return {
-            self.graph.nodes[node]['name']: round(score, 4)
+            self.graph.nodes[node].get('name', str(node)): round(score, 4)
             for node, score in sorted(
                 betweenness.items(),
                 key=lambda x: x[1],

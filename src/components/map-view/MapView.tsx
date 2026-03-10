@@ -391,6 +391,9 @@ function MapView({
                     )
                     if (!abortController.signal.aborted) {
                         lineOverlaysRef.current = lineOverlays
+                    } else {
+                        // 及时清理由于 abort 遗留在地图上的覆盖物
+                        clearMapOverlays(mapInstanceRef.current, lineOverlays)
                     }
                 }
 
@@ -408,6 +411,8 @@ function MapView({
                     )
                     if (!abortController.signal.aborted) {
                         lineOverlaysRef.current.push(...deviceOverlays)
+                    } else {
+                        clearMapOverlays(mapInstanceRef.current, deviceOverlays)
                     }
                 }
             } catch (error) {
@@ -463,6 +468,9 @@ function MapView({
                     )
                     if (!abortController.signal.aborted) {
                         nodeOverlaysRef.current = nodeOverlays
+                    } else {
+                        // 如果被提前取消，立即清理遗留节点的覆盖物
+                        clearMapOverlays(mapInstanceRef.current, nodeOverlays)
                     }
                 }
 

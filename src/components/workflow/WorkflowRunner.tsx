@@ -63,9 +63,9 @@ export default function WorkflowRunner() {
 
                     {/* 能力状态指示 */}
                     <div className="flex items-center justify-center gap-4">
-                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400">
+                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400" title="已切换至极速文件检索模式">
                             <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                            内部管网数据库已桥接
+                            内部管网文件数据库已桥接 (极速)
                         </div>
                         <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-400">
                             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />

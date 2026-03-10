@@ -1,9 +1,11 @@
 """
 增强版 RAG 服务
 支持向量搜索和 Text-to-SQL 混合查询
+使用 MiniMax embo-01 模型生成查询向量（与入库保持一致）
 """
 from typing import Dict, List, Optional
 import os
+import requests
 from pathlib import Path
 
 try:
@@ -13,13 +15,6 @@ try:
 except ImportError:
     CHROMADB_AVAILABLE = False
     print("⚠️  ChromaDB 未安装,向量搜索功能不可用")
-
-try:
-    import google.generativeai as genai
-    GENAI_AVAILABLE = True
-except ImportError:
-    GENAI_AVAILABLE = False
-    print("⚠️  Google Generative AI 未安装,AI 功能不可用")
 
 from sqlmodel import Session, select
 from app.database import engine
@@ -32,13 +27,19 @@ class EnhancedRAGService:
     def __init__(self, api_key: Optional[str] = None):
         """
         初始化 RAG 服务
-        
-        参数:
-            api_key: Gemini API Key (可选,从环境变量读取)
+
+        使用 MiniMax embo-01 模型生成查询向量，与入库脚本保持一致（1536维）。
         """
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        
-        # 初始化向量数据库(如果可用)
+        # 确保加载 .env 文件，以防被外部直接调用时未加载环境变量
+        from dotenv import load_dotenv
+        env_path = Path(__file__).parent.parent.parent / ".env"
+        load_dotenv(env_path)
+
+        # MiniMax API 配置（复用现有 .env 中的 AI_API_KEY / AI_BASE_URL）
+        self.minimax_api_key = os.getenv("AI_API_KEY")
+        self.minimax_base_url = os.getenv("AI_BASE_URL", "https://api.minimax.chat/v1")
+
+        # 初始化向量数据库
         self.vector_db = None
         if CHROMADB_AVAILABLE:
             try:
@@ -48,18 +49,13 @@ class EnhancedRAGService:
                         path=str(db_path),
                         settings=Settings(anonymized_telemetry=False)
                     )
-                    self.vector_db = client.get_collection("smartgas_knowledge")
-                    print("✅ 向量数据库已加载")
+                    self.vector_db = client.get_or_create_collection("smartgas_knowledge_docs")
+                    print(f"✅ 向量数据库已加载，当前记录数: {self.vector_db.count()}")
             except Exception as e:
                 print(f"⚠️  向量数据库加载失败: {e}")
-        
-        # 初始化 Gemini API(如果可用)
-        if GENAI_AVAILABLE and self.api_key:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
-            print("✅ Gemini API 已初始化")
-        else:
-            self.model = None
+
+        # model 设为 None（Text-to-SQL 功能依赖 Gemini，暂时禁用）
+        self.model = None
         
         # 应急预案知识库(保留原有功能)
         self.emergency_knowledge = {
@@ -105,39 +101,67 @@ class EnhancedRAGService:
             }
         }
     
+    def _embed_with_minimax(self, text: str) -> Optional[List[float]]:
+        """
+        使用 MiniMax embo-01 生成查询向量（type=query）。
+        与入库时 type=db 配合使用，保证向量空间一致。
+        """
+        if not self.minimax_api_key:
+            return None
+        try:
+            url = self.minimax_base_url.rstrip("/") + "/embeddings"
+            resp = requests.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {self.minimax_api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={"model": "embo-01", "texts": [text], "type": "query"},
+                timeout=15
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            # MiniMax 返回格式：{"vectors": [[...]], "base_resp": {"status_code": 0}}
+            if data.get("base_resp", {}).get("status_code", 0) != 0:
+                raise RuntimeError(f"API 错误: {data['base_resp']}")
+            return data["vectors"][0]
+        except Exception as e:
+            print(f"⚠️ MiniMax Embedding 失败，将降级使用内置查询: {e}")
+            return None
+
     def query_vector_db(self, question: str, n_results: int = 3) -> Optional[Dict]:
         """
-        使用向量数据库进行语义搜索
-        
-        参数:
-            question: 用户问题
-            n_results: 返回结果数量
-            
-        返回:
-            搜索结果
+        使用向量数据库进行语义搜索。
+
+        优先用 MiniMax embo-01 生成查询向量（与入库一致），
+        失败时降级为 ChromaDB 内置 Embedding（维度不同可能影响精度）。
         """
-        if not self.vector_db or not GENAI_AVAILABLE:
+        if not self.vector_db:
             return None
-        
+
         try:
-            # 生成查询向量
-            result = genai.embed_content(
-                model="models/embedding-001",
-                content=question,
-                task_type="retrieval_query"
-            )
-            query_embedding = result['embedding']
-            
-            # 查询向量数据库
-            results = self.vector_db.query(
-                query_embeddings=[query_embedding],
-                n_results=n_results
-            )
-            
+            # 优先：MiniMax 查询向量（与入库向量同维度，精度最高）
+            query_embedding = self._embed_with_minimax(question)
+            if query_embedding:
+                results = self.vector_db.query(
+                    query_embeddings=[query_embedding],
+                    n_results=n_results
+                )
+            else:
+                # 降级：ChromaDB 内置 Embedding（句向量模型，维度可能不匹配）
+                print("⚠️ 降级到 ChromaDB 内置查询")
+                results = self.vector_db.query(
+                    query_texts=[question],
+                    n_results=n_results
+                )
+
+            if not results or not results.get('documents') or not results['documents'][0]:
+                return None
+
             return {
                 'documents': results['documents'][0],
-                'metadatas': results['metadatas'][0],
-                'distances': results['distances'][0]
+                'metadatas': results['metadatas'][0] if results.get('metadatas') else [],
+                'distances': results['distances'][0] if results.get('distances') else []
             }
         except Exception as e:
             print(f"⚠️  向量搜索失败: {e}")

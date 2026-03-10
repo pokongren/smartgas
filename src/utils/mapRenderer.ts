@@ -341,6 +341,14 @@ export function clearClusterCache(): void {
 /** nodeId → AMap.Marker 实例 */
 const nodeMarkerMap = new Map<string, any>()
 
+/** 
+ * 获取所有节点的 Marker 实例映射表
+ * 暴露给外部用于基于操作 DOM 的实时状态更新（绕过 React 渲染周期避免卡顿）
+ */
+export function getNodeMarkerMap(): Map<string, any> {
+    return nodeMarkerMap
+}
+
 /** nodeId → 关联的 polyline 及其角色（start=管线起点 / end=管线终点） */
 const nodePolylinesMap = new Map<string, { polyline: any; role: 'start' | 'end'; line: PipelineLine }[]>()
 

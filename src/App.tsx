@@ -10,6 +10,11 @@ const GlobalPipelineView = lazy(() => import('./views/GlobalPipelineView'));
 const WorkflowView = lazy(() => import('./views/WorkflowView'));
 const TopologyView = lazy(() => import('./views/TopologyView'));
 const MapTopologyView = lazy(() => import('./views/MapTopologyView'));
+const TopologyDemoView = lazy(() => import('./views/TopologyDemoView'));
+
+// 独立弹窗组件
+import { AiAssistantStandalone } from './components/ai-assistant/AiAssistant';
+import { ScadaStandalone } from './views/GlobalPipelineView';
 
 /**
  * 页面加载状态组件
@@ -111,9 +116,25 @@ const ViewSwitcher: React.FC = () => {
  * 应用主组件
  * 配置路由和 Suspense 加载状态
  */
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const location = useLocation();
+  const isPopout = location.pathname.startsWith('/popout');
+
+  // 如果处于独立弹出窗口模式，不渲染主应用的叠加组件 (侧边栏/Switcher 等)
+  if (isPopout) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/popout/assistant" element={<AiAssistantStandalone />} />
+          <Route path="/popout/scada" element={<ScadaStandalone />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  // 常规主应用渲染逻辑
   return (
-    <HashRouter>
+    <>
       <ViewSwitcher />
       <AiAssistant />
       {/* ✅ Suspense 包裹路由，提供懒加载状态 */}
@@ -126,8 +147,17 @@ const App: React.FC = () => {
           <Route path="/workflow" element={<WorkflowView />} />
           <Route path="/topology" element={<TopologyView />} />
           <Route path="/map-topology" element={<MapTopologyView />} />
+          <Route path="/topology-demo" element={<TopologyDemoView />} />
         </Routes>
       </Suspense>
+    </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <HashRouter>
+      <AppContent />
     </HashRouter>
   );
 };

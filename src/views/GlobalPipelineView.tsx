@@ -1,8 +1,39 @@
-import React, { useMemo, useState, useCallback, lazy, Suspense } from 'react'
+import React, { useMemo, useState, useCallback, lazy, Suspense, useEffect } from 'react'
 import MapView from '@/components/map-view/MapView'
 import { ALL_PIPELINES, PipelinePackage, PipelineLayer } from '@/data/pipelines'
 import type { PipelineData, PipelineLine, PipelineNode } from '@/types'
 import PipelineEditorOverlay from './PipelineEditorOverlay'
+import { getNodeMarkerMap } from '@/utils/mapRenderer'
+import { useNewWindow, usePopoutSync } from '@/hooks/useNewWindow'
+
+// 从监控系统截图中提取的西一线真实 SCADA 运行基准数据
+const REAL_SCADA_DATA: Record<string, { inP: number, outP: number, inT?: number, outT?: number }> = {
+    '中卫压气站': { inP: 6.391, outP: 7.856, inT: 7.7, outT: 30.8 },
+    '盐池压气站': { inP: 7.133, outP: 7.092, inT: 10.3, outT: 10.2 },
+    '靖边压气站': { inP: 6.681, outP: 8.947, inT: 5.7, outT: 34.9 },
+    '子长分输站': { inP: 8.098, outP: 8.098, inT: 19.9, outT: 19.9 },
+    '延川压气站': { inP: 7.880, outP: 9.175, inT: 21.4, outT: 31.9 },
+    '沁水压气站': { inP: 6.889, outP: 8.762, inT: 18.0, outT: 39.4 },
+    '阳城清管站': { inP: 7.936, outP: 7.912, inT: 16.4, outT: 16.4 },
+    '博爱分输站': { inP: 7.118, outP: 7.126, outT: 26.2 },
+    '郑州压气站': { inP: 6.166, outP: 7.830, inT: 20.1, outT: 41.9 },
+    '薛店分输站': { inP: 7.273, outP: 7.273, outT: 34.8 },
+    '淮阳压气站': { inP: 5.726, outP: 7.766, inT: 18.4, outT: 45.0 },
+    '利辛分输站': { inP: 6.354, outP: 6.232, inT: 21.6, outT: 16.9 },
+    '定远压气站': { inP: 4.818, outP: 6.245, inT: 12.8, outT: 35.0 },
+    '龙池分输站': { inP: 6.005, outP: 6.002, outT: 19.3 },
+    '龙源分输站': { inP: 5.971, outP: 5.590, outT: 20.4 },
+    '镇江分输站': { inP: 5.573, outP: 5.575, outT: 14.9 },
+    '常州分输站': { inP: 5.255, outP: 5.248, outT: 13.4 },
+    '芙蓉分输站': { inP: 5.167, outP: 5.162, inT: 15.9, outT: 5.2 },
+    '徐霞客分输站': { inP: 0.000, outP: 0.001, inT: 19.0, outT: 18.4 },
+    '无锡分输站': { inP: 4.244, outP: 5.101, outT: 12.2 },
+    '东桥分输站': { inP: 5.092, outP: 5.087, outT: 12.7 },
+    '苏州分输站': { inP: 5.078, outP: 5.089, outT: 15.5 },
+    '甪直分输站': { inP: 5.094, outP: 5.106, outT: 7.9 },
+    '昆山分输站': { inP: 5.073, outP: 5.065, outT: 12.4 },
+    '上海白鹤末站': { inP: 5.050, outP: 5.050, outT: 13.7 },
+}
 
 // 懒加载 AI 工作流组件
 const WorkflowRunner = lazy(() => import('@/components/workflow/WorkflowRunner'))
@@ -20,11 +51,44 @@ const GlobalPipelineView: React.FC = () => {
     const [mapInstance, setMapInstance] = useState<any>(null)
     const [isEditMode, setIsEditMode] = useState(false)
     const [showWorkflow, setShowWorkflow] = useState(false)
+    const [showScada, setShowScada] = useState(true)
 
     // 使用 useCallback 稳定回调引用，避免触发 MapView 无限循环
     const handleMapLoad = useCallback((map: any) => {
         setMapInstance(map)
     }, [])
+
+    // SCADA 面板拖拽状态
+    const { isPoppedOut: isScadaPoppedOut, popOut: popOutScada, closePopOut: closeScadaPopOut } = useNewWindow('scada-sync', '/popout/scada');
+    const [scadaPos, setScadaPos] = useState({
+        x: 330,
+        y: typeof window !== 'undefined' ? window.innerHeight - 340 : 500
+    })
+    const [isDraggingScada, setIsDraggingScada] = useState(false)
+    const dragOffsetRef = React.useRef({ x: 0, y: 0 })
+
+    const handleScadaMouseDown = (e: React.MouseEvent) => {
+        setIsDraggingScada(true)
+        dragOffsetRef.current = {
+            x: e.clientX - scadaPos.x,
+            y: e.clientY - scadaPos.y
+        }
+    }
+
+    const handleGlobalMouseMove = (e: React.MouseEvent) => {
+        if (isDraggingScada) {
+            setScadaPos({
+                x: e.clientX - dragOffsetRef.current.x,
+                y: e.clientY - dragOffsetRef.current.y
+            })
+        }
+    }
+
+    const handleGlobalMouseUp = () => {
+        if (isDraggingScada) {
+            setIsDraggingScada(false)
+        }
+    }
 
     // 展开状态
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ 'we1': true })
@@ -64,6 +128,18 @@ const GlobalPipelineView: React.FC = () => {
         setVisibleLayers(newState)
     }
 
+    // 全选 / 全部取消功能
+    const toggleAllLayers = (visible: boolean) => {
+        const newState: Record<string, boolean> = {}
+        for (let i = 0; i < ALL_PIPELINES.length; i++) {
+            const pkg = ALL_PIPELINES[i]
+            for (let j = 0; j < pkg.layers.length; j++) {
+                newState[pkg.layers[j].name] = visible
+            }
+        }
+        setVisibleLayers(newState)
+    }
+
     // 计算当前显示的管道数据 - 性能优化版
     const pipelineData = useMemo<PipelineData>(() => {
         const allNodes: PipelineNode[] = []
@@ -98,8 +174,75 @@ const GlobalPipelineView: React.FC = () => {
         groups: ALL_PIPELINES.length
     }), [pipelineData])
 
+    // ==========================================
+    // 将 SCADA 数据直接渲染在对应管网节点上 (无动画/单纯显示)
+    // ==========================================
+    useEffect(() => {
+        if (!mapInstance) return
+
+        let timer: any
+
+        // 使用 timer 定期重新挂载属性（考虑用户缩放或平移时地图重新生成 marker）
+        timer = setInterval(() => {
+            const markerMap = getNodeMarkerMap()
+            if (markerMap.size === 0) return
+
+            markerMap.forEach((marker) => {
+                if (!marker || !marker.getContent) return
+
+                const node = marker.getExtData()?.node as PipelineNode
+                if (!node) return
+
+                let originalContent = typeof marker.getContent === 'function' ? marker.getContent() : marker.getContent?.() || ''
+                if (typeof originalContent !== 'string') return
+
+                const hasRealtime = originalContent.includes('<!--scada-label-->')
+                if (hasRealtime) {
+                    originalContent = originalContent.split('<!--scada-label-->')[0]
+                }
+
+                const scadaData = REAL_SCADA_DATA[node.name]
+                if (!scadaData) {
+                    if (hasRealtime) marker.setContent(originalContent)
+                    return
+                }
+
+                const inTLabel = scadaData.inT ? ` T: ${scadaData.inT}` : ''
+                const outTLabel = scadaData.outT ? ` T: ${scadaData.outT}` : ''
+
+                const scadaHTML = `
+                    <!--scada-label-->
+                    <div class="absolute left-1/2 -top-1 -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none whitespace-nowrap z-50 overflow-visible" 
+                         style="line-height: 1.1; display:flex;">
+                        <span style="font-size:10px; font-weight:bold; color:#10b981; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;">
+                            入 P: ${scadaData.inP.toFixed(2)}${inTLabel}
+                        </span>
+                        <span style="font-size:10px; font-weight:bold; color:#3b82f6; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;">
+                            出 P: ${scadaData.outP.toFixed(2)}${outTLabel}
+                        </span>
+                    </div>
+                `
+
+                if (originalContent.includes('class="compressor-marker-container"')) {
+                    originalContent = originalContent.replace('class="compressor-marker-container"', 'class="compressor-marker-container" style="position:relative; overflow:visible;"')
+                    marker.setContent(originalContent + scadaHTML)
+                } else if (originalContent.startsWith('<div')) {
+                    originalContent = originalContent.replace('<div', '<div style="position:relative; overflow:visible;"')
+                    marker.setContent(originalContent + scadaHTML)
+                }
+            })
+        }, 800)
+
+        return () => clearInterval(timer)
+    }, [mapInstance])
+
     return (
-        <div className="h-screen w-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 overflow-hidden relative">
+        <div
+            className="h-screen w-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 overflow-hidden relative"
+            onMouseMove={handleGlobalMouseMove}
+            onMouseUp={handleGlobalMouseUp}
+            onMouseLeave={handleGlobalMouseUp}
+        >
             {/* 标题栏 */}
             <div className="absolute top-0 left-0 right-0 z-30 bg-black/50 backdrop-blur-sm border-b border-blue-500/30">
                 <div className="container mx-auto px-6 py-4 flex justify-between items-center">
@@ -142,14 +285,30 @@ const GlobalPipelineView: React.FC = () => {
                         <span className="material-symbols-outlined text-xl">toc</span>
                         管线目录
                     </h3>
-                    <button
-                        onClick={() => setIsEditMode(!isEditMode)}
-                        className={`text-xs px-2 py-1 rounded border transition-colors flex items-center gap-1 ${isEditMode ? 'bg-blue-600 border-blue-500 text-white' : 'border-gray-600 text-gray-400 hover:text-white'}`}
-                        title="开启/关闭绘图工具"
-                    >
-                        <span className="material-symbols-outlined text-sm">edit</span>
-                        {isEditMode ? '绘图开启' : '绘图'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => toggleAllLayers(true)}
+                            className="text-xs px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-700 hover:text-white transition-colors"
+                            title="显示全部管线"
+                        >
+                            全选
+                        </button>
+                        <button
+                            onClick={() => toggleAllLayers(false)}
+                            className="text-xs px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded border border-gray-700 hover:text-white transition-colors"
+                            title="隐藏全部管线"
+                        >
+                            全部取消
+                        </button>
+                        <button
+                            onClick={() => setIsEditMode(!isEditMode)}
+                            className={`text-xs px-2 py-1 rounded border transition-colors flex items-center gap-1 ${isEditMode ? 'bg-blue-600 border-blue-500 text-white' : 'border-gray-600 text-gray-400 hover:text-white'}`}
+                            title="开启/关闭绘图工具"
+                        >
+                            <span className="material-symbols-outlined text-sm">edit</span>
+                            {isEditMode ? '绘图开启' : '绘图'}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
@@ -193,14 +352,35 @@ const GlobalPipelineView: React.FC = () => {
                                         )}
                                     </div>
 
-                                    {/* 文本标签 */}
-                                    <span className="text-white font-medium text-sm flex-1 flex items-center gap-2.5">
-                                        <span
-                                            className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]"
-                                            style={{ backgroundColor: pkg.color }}
-                                        ></span>
-                                        {pkg.name}
-                                    </span>
+                                    {/* 文本标签及额外的弹出按钮 */}
+                                    <div className="flex-1 flex items-center justify-between">
+                                        <span className="text-white font-medium text-sm flex items-center gap-2.5">
+                                            <span
+                                                className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]"
+                                                style={{ backgroundColor: pkg.color }}
+                                            ></span>
+                                            {pkg.name}
+                                        </span>
+                                        {/* 仅针对西气东输一线显示 SCADA 图标 */}
+                                        {pkg.name === '西气东输一线' && !isScadaPoppedOut && (
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setShowScada(!showScada); }}
+                                                    className={`transition-colors flex items-center justify-center w-6 h-6 rounded hover:bg-white/10 ${showScada ? 'text-emerald-400 hover:text-emerald-300' : 'text-gray-500 hover:text-gray-300'}`}
+                                                    title={showScada ? "隐藏原位面板" : "显示原位面板"}
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">{showScada ? 'visibility' : 'visibility_off'}</span>
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); popOutScada(400, 500); setShowScada(false); }}
+                                                    className="text-gray-400 hover:text-white transition-colors flex items-center justify-center w-6 h-6 rounded hover:bg-white/10"
+                                                    title="弹出独立窗口"
+                                                >
+                                                    <span className="material-symbols-outlined text-sm">open_in_new</span>
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* 图层列表 (子节点) */}
@@ -250,6 +430,36 @@ const GlobalPipelineView: React.FC = () => {
                 />
             )}
 
+            {/* ====== 西一线 SCADA 浮动参数表 (支持弹窗新窗口) ====== */}
+            {isScadaPoppedOut && (
+                <div className="hidden">{/* 主页面隐藏该面板，在 Popup 窗口中渲染 */}</div>
+            )}
+            {showScada && !isScadaPoppedOut && (
+                <div
+                    className={`absolute z-10 bg-[#0c1218]/85 backdrop-blur-md rounded-lg border border-slate-600/40 p-4 w-[380px] min-w-[350px] min-h-[200px] h-[300px] flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.5)] select-none resize overflow-hidden ${isDraggingScada ? 'cursor-grabbing' : ''}`}
+                    style={{
+                        left: `${scadaPos.x}px`,
+                        top: `${scadaPos.y}px`,
+                    }}
+                >
+                    <div
+                        className="pb-2 mb-2 border-b border-white/10 flex justify-between items-center shrink-0 cursor-grab active:cursor-grabbing"
+                        onMouseDown={handleScadaMouseDown}
+                    >
+                        <h3 className="m-0 text-sm font-bold flex items-center gap-1.5 text-slate-200">
+                            <span className="material-symbols-outlined text-emerald-500 text-lg">sensors</span>
+                            实时监控 - 西一线
+                        </h3>
+                        <div className="flex gap-1" onMouseDown={e => e.stopPropagation()}>
+                            <button onClick={() => setShowScada(false)} className="text-gray-400 hover:text-white transition-colors" title="关闭">
+                                <span className="material-symbols-outlined text-sm">close</span>
+                            </button>
+                        </div>
+                    </div>
+                    <ScadaTableContent isPoppedOut={false} closePopOut={closeScadaPopOut} popOut={popOutScada} />
+                </div>
+            )}
+
             {/* 图例 */}
             <div className="absolute bottom-6 right-6 z-10 bg-black/70 backdrop-blur-sm rounded-lg px-4 py-3 border border-blue-500/30">
                 <div className="space-y-2 text-sm">
@@ -291,6 +501,61 @@ const GlobalPipelineView: React.FC = () => {
                     </Suspense>
                 </div>
             </div>
+        </div>
+    )
+}
+
+// 抽取 SCADA 内容渲染部分，供复用
+const ScadaTableContent: React.FC<{ isPoppedOut: boolean, closePopOut: () => void, popOut: (w: number, h: number) => void }> = ({ isPoppedOut, closePopOut, popOut }) => {
+    return (
+        <div className={`flex-1 overflow-y-auto overflow-x-hidden pr-2 custom-scrollbar mt-1 ${isPoppedOut ? 'h-full w-full bg-[#0c1218] p-4 text-white' : ''}`}>
+            {isPoppedOut && (
+                <div className="pb-3 mb-3 border-b border-white/10 flex justify-between items-center">
+                    <h3 className="m-0 text-sm font-bold flex items-center gap-1.5 text-slate-200">
+                        <span className="material-symbols-outlined text-emerald-500 text-lg">sensors</span>
+                        西气东输一线
+                    </h3>
+                    <button onClick={closePopOut} className="text-gray-400 hover:text-white transition-colors" title="恢复回主窗口">
+                        <span className="material-symbols-outlined text-sm">open_in_browser</span>
+                    </button>
+                </div>
+            )}
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-2.5 pb-2">
+                {Object.entries(REAL_SCADA_DATA).map(([name, data]) => {
+                    const inTLabel = data.inT ? `${data.inT}℃` : '--';
+                    const outTLabel = data.outT ? `${data.outT}℃` : '--';
+                    return (
+                        <div key={name} className="bg-white/5 border border-white/10 rounded p-2.5 flex items-center justify-between hover:bg-white/10 transition-colors">
+                            <div className="font-bold text-slate-200 text-sm w-24 shrink-0 truncate" title={name}>{name}</div>
+                            <div className="flex items-center">
+                                <div className="flex flex-col items-end">
+                                    <div className="text-[10px] text-slate-400 mb-0.5">进站 P/T</div>
+                                    <div className="text-emerald-500 text-sm font-mono">{data.inP.toFixed(3)} <span className="text-[10px] text-emerald-500/70">MPa</span></div>
+                                    <div className="text-[10px] text-slate-400">{inTLabel}</div>
+                                </div>
+                                <div className="h-6 w-px bg-white/10 mx-2"></div>
+                                <div className="flex flex-col items-end">
+                                    <div className="text-[10px] text-slate-400 mb-0.5">出站 P/T</div>
+                                    <div className="text-blue-500 text-sm font-mono">{data.outP.toFixed(3)} <span className="text-[10px] text-blue-500/70">MPa</span></div>
+                                    <div className="text-[10px] text-slate-400">{outTLabel}</div>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+        </div>
+    )
+}
+
+// 供独立路由使用的单体组件
+export const ScadaStandalone: React.FC = () => {
+    // 专用 Hook 负责防白屏和发送心跳
+    usePopoutSync('scada-sync');
+
+    return (
+        <div className="h-screen w-screen bg-[#0c1218] flex flex-col">
+            <ScadaTableContent isPoppedOut={true} closePopOut={() => window.close()} popOut={() => { }} />
         </div>
     )
 }

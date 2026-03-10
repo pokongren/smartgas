@@ -173,15 +173,15 @@
     animation: ai-status-blink 3s ease-in-out infinite;
 }
 
-@keyframes ai-status-blink {
-
-    0%,
-    100% {
-        opacity: 1;
+@keyframes ai-msg-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
     }
 
-    50% {
-        opacity: 0.4;
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }
 
@@ -233,6 +233,21 @@
     background: rgba(255, 255, 255, 0.14);
 }
 
+/* 消息容器包装 */
+.ai-msg-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ai-msg-wrapper.user {
+    align-items: flex-end;
+}
+
+.ai-msg-wrapper.assistant {
+    align-items: flex-start;
+}
+
 /* 消息气泡 */
 .ai-msg {
     max-width: 82%;
@@ -243,22 +258,27 @@
     word-break: break-word;
     white-space: pre-wrap;
     animation: ai-msg-in 0.25s ease-out;
+    user-select: text;
+    /* 允许选择文字 */
+    cursor: text;
 }
 
-@keyframes ai-msg-in {
-    from {
-        opacity: 0;
-        transform: translateY(6px);
-    }
+/* 检索日志样式 */
+.ai-retrieval-log {
+    font-size: 11px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 4px;
+    opacity: 0.8;
+}
 
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.ai-retrieval-log .material-symbols-outlined {
+    font-size: 13px;
 }
 
 .ai-msg.user {
-    align-self: flex-end;
     background: linear-gradient(135deg, #3b82f6, #2563eb);
     color: #fff;
     border-bottom-right-radius: 6px;
@@ -266,7 +286,6 @@
 }
 
 .ai-msg.assistant {
-    align-self: flex-start;
     background: rgba(255, 255, 255, 0.05);
     color: #cbd5e1;
     border: 1px solid rgba(255, 255, 255, 0.06);
