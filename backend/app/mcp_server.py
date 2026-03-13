@@ -307,26 +307,33 @@ def setup_mcp(app: Any) -> None:
     """
     将 MCP Server 挂载到 FastAPI 应用上。
 
-    挂载后，MCP 客户端可通过 Streamable HTTP 连接到 /mcp 端点，
+    挂载后，MCP 客户端可通过 SSE 连接到 /mcp 端点，
     发现并调用管网系统提供的工具、资源和提示模板。
-
-    NOTE: 必须将 MCP 子应用的 lifespan 与 FastAPI 的 lifespan 结合，
-    否则 StreamableHTTPSessionManager 的 TaskGroup 不会被正确初始化。
     """
-    mcp_app = mcp.streamable_http_app()
-
-    # NOTE: 将 MCP 子应用的 lifespan 注入到 FastAPI 的生命周期中
-    # 这样 MCP 的 SessionManager 的 asyncio.TaskGroup 才会被正确初始化
-    original_lifespan = app.router.lifespan_context
-
-    @asynccontextmanager
-    async def combined_lifespan(app_instance: Any):
-        async with original_lifespan(app_instance) as original_state:
-            # 启动 MCP 子应用的 lifespan
-            async with mcp_app.router.lifespan_context(mcp_app) as _mcp_state:
-                logger.info("MCP Server 已挂载到 /mcp 端点，lifespan 已初始化")
-                yield original_state
-
-    app.router.lifespan_context = combined_lifespan
+    from mcp.server.sse import SseServerTransport
+    from starlette.routing import Route
+    from starlette.applications import Starlette
+    
+    sse = SseServerTransport("/mcp/messages/")
+    
+    async def handle_sse(request):
+        async with sse.connect_sse(
+            request.scope, request.receive, request._send
+        ) as (read_stream, write_stream):
+            await mcp._mcp_server.run(
+                read_stream,
+                write_stream,
+                mcp._mcp_server.create_initialization_options(),
+            )
+    
+    async def handle_messages(request):
+        await sse.handle_post_message(request.scope, request.receive, request._send)
+    
+    mcp_routes = [
+        Route("/sse", endpoint=handle_sse),
+        Route("/messages/", endpoint=handle_messages, methods=["POST"]),
+    ]
+    
+    mcp_app = Starlette(routes=mcp_routes)
     app.mount("/mcp", mcp_app)
-    logger.info("MCP Server 路由已注册到 /mcp")
+    logger.info("MCP Server 路由已注册到 /mcp/sse")

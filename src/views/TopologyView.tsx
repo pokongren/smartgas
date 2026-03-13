@@ -932,58 +932,62 @@ const TopologyView: React.FC = () => {
                 <span className="toolbar-zoom">{Math.round(zoom * 100)}%</span>
             </div>
 
-            {/* ====== 西一线 SCADA 浮动参数表 ====== */}
-            <div className="scada-table-panel" style={{
+            {/* ====== 西一线 SCADA 浮动参数表（新版） ====== */}
+            <div style={{
                 position: 'absolute',
                 left: '24px',
                 bottom: '80px',
-                background: 'rgba(12, 18, 24, 0.85)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(71, 85, 105, 0.4)',
-                borderRadius: '8px',
-                padding: '12px',
-                width: '380px',
-                maxHeight: '300px',
+                width: '480px',
+                height: '295px',
                 display: 'flex',
                 flexDirection: 'column',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                 zIndex: 100,
-                color: '#e2e8f0',
                 pointerEvents: 'auto',
-                userSelect: 'none'
+                userSelect: 'none',
+                background: 'linear-gradient(135deg, rgba(10,20,30,0.92) 0%, rgba(15,30,20,0.92) 100%)',
+                backdropFilter: 'blur(12px)',
+                borderRadius: '10px',
+                border: '1px solid rgba(16,185,129,0.3)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
+                overflow: 'hidden',
             }}>
-                <div style={{ paddingBottom: '8px', marginBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#10b981' }}>sensors</span>
-                        实时参数监控 - 西气东输一线
-                    </h3>
+                {/* 顶部装饰条 */}
+                <div style={{ height: '3px', background: 'linear-gradient(90deg, #10b981, #059669, #10b981)', borderRadius: '10px 10px 0 0' }} />
+                <div style={{ padding: '8px 14px', borderBottom: '1px solid rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#10b981' }}>sensors</span>
+                    <span style={{ fontWeight: 'bold', color: '#a7f3d0', fontSize: '13px' }}>西气东输一线</span>
+                    <span style={{ color: '#10b981', fontSize: '10px', background: 'rgba(16,185,129,0.15)', padding: '1px 6px', borderRadius: '9999px', border: '1px solid rgba(16,185,129,0.3)' }}>SCADA 实时</span>
                 </div>
-                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }} className="custom-scrollbar">
-                    <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse', textAlign: 'left' }}>
-                        <thead style={{ position: 'sticky', top: 0, background: 'rgba(12, 18, 24, 0.95)', zIndex: 1 }}>
-                            <tr>
-                                <th style={{ padding: '6px 4px', borderBottom: '1px solid #334155', color: '#94a3b8' }}>站名</th>
-                                <th style={{ padding: '6px 4px', borderBottom: '1px solid #334155', color: '#94a3b8' }}>进站 P/T</th>
-                                <th style={{ padding: '6px 4px', borderBottom: '1px solid #334155', color: '#94a3b8' }}>出站 P/T</th>
+                <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px', scrollbarWidth: 'thin', scrollbarColor: '#10b98140 transparent' } as React.CSSProperties}>
+                    <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 3px', fontSize: '12px' }}>
+                        <thead>
+                            <tr style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+                                <th style={{ padding: '2px 6px', textAlign: 'left', fontWeight: 600 }}>站名</th>
+                                <th style={{ padding: '2px 4px', textAlign: 'center', fontWeight: 600 }}>类型</th>
+                                <th style={{ padding: '2px 8px', textAlign: 'right', fontWeight: 600 }}>进站压力</th>
+                                <th style={{ padding: '2px 4px', textAlign: 'center', fontWeight: 600 }}>进温</th>
+                                <th style={{ padding: '2px 8px', textAlign: 'right', fontWeight: 600 }}>出站压力</th>
+                                <th style={{ padding: '2px 4px', textAlign: 'center', fontWeight: 600 }}>出温</th>
                             </tr>
                         </thead>
                         <tbody>
                             {Object.entries(REAL_SCADA_DATA).map(([name, data]) => {
-                                const inTLabel = data.inT ? `${data.inT}℃` : '--';
-                                const outTLabel = data.outT ? `${data.outT}℃` : '--';
+                                const isCompressor = /压气站/.test(name);
+                                const typeBadge = isCompressor ? '压' : '分';
+                                const rowBg = isCompressor ? 'rgba(16,185,129,0.07)' : 'rgba(255,255,255,0.03)';
+                                const pColor = (p: number) => p < 6 ? '#f97316' : p > 10 ? '#ef4444' : '#34d399';
                                 return (
-                                    <tr key={name} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                        <td style={{ padding: '6px 4px', fontWeight: 'bold' }}>{name}</td>
-                                        <td style={{ padding: '6px 4px' }}>
-                                            <div style={{ color: '#10b981' }}>{data.inP.toFixed(3)} MPa</div>
-                                            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{inTLabel}</div>
+                                    <tr key={name} style={{ background: rowBg }}>
+                                        <td style={{ padding: '5px 6px', borderRadius: '6px 0 0 6px', fontWeight: isCompressor ? 600 : 400, color: '#e2e8f0', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>{name}</td>
+                                        <td style={{ padding: '5px 4px', textAlign: 'center' }}>
+                                            <span style={{ fontSize: '10px', background: isCompressor ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.2)', color: isCompressor ? '#10b981' : '#94a3b8', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>{typeBadge}</span>
                                         </td>
-                                        <td style={{ padding: '6px 4px' }}>
-                                            <div style={{ color: '#3b82f6' }}>{data.outP.toFixed(3)} MPa</div>
-                                            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{outTLabel}</div>
-                                        </td>
+                                        <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', color: pColor(data.inP), fontWeight: 600 }}>{data.inP.toFixed(3)}</td>
+                                        <td style={{ padding: '5px 4px', textAlign: 'center', color: '#f97316', fontSize: '11px' }}>{data.inT != null ? `${data.inT}°` : '—'}</td>
+                                        <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', color: pColor(data.outP), fontWeight: 600 }}>{data.outP.toFixed(3)}</td>
+                                        <td style={{ padding: '5px 4px', textAlign: 'center', color: '#fb923c', fontSize: '11px', borderRadius: '0 6px 6px 0' }}>{data.outT != null ? `${data.outT}°` : '—'}</td>
                                     </tr>
-                                )
+                                );
                             })}
                         </tbody>
                     </table>
