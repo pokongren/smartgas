@@ -153,8 +153,13 @@ const WE1_FULL_STATIONS: { name: string; inP: number; outP: number; type: string
 ]
 
 /**
- * 西气东输一线沿线压力趋势图（SVG 折线图）
- * 展示管网典型的锯齿形压力特征：压气站增压 → 沿线衰减 → 下一站再增压
+ * 西气东输一线 · 水力坡降线（SVG）
+ *
+ * 绘制逻辑：
+ *   - 压气站：显示 inP 和 outP 两个点，竖线跃变（增压）
+ *   - 其余站场：只显示 inP
+ *   - 用一条连续线串起来：上一站 outP → 下一站 inP → (如果是压气站) outP → ...
+ *   - 形成经典的 SCADA 水力坡降锯齿形
  */
 const PressureTrendChart: React.FC<{
     onClose: () => void
@@ -163,65 +168,68 @@ const PressureTrendChart: React.FC<{
 }> = ({ onClose, onMouseDown, isDragging }) => {
     const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
 
-    const stations = WE1_FULL_STATIONS.filter(s => s.inP > 0.1) // 过滤无效值（如徐霞客）
+    const stations = WE1_FULL_STATIONS.filter(s => s.inP > 0.1)
 
     // SVG 绘图参数
-    const W = 820, H = 300
-    const padL = 50, padR = 20, padT = 20, padB = 60
+    const W = 860, H = 320
+    const padL = 50, padR = 25, padT = 25, padB = 70
     const chartW = W - padL - padR
     const chartH = H - padT - padB
 
-    // 压力范围
-    const allP = stations.flatMap(s => [s.inP, s.outP])
-    const minP = Math.floor(Math.min(...allP)) - 0.5
-    const maxP = Math.ceil(Math.max(...allP)) + 0.5
+    // 压力范围（只需要覆盖实际出现的值）
+    const allP = stations.flatMap(s => s.type === 'compressor' ? [s.inP, s.outP] : [s.inP])
+    const minP = Math.floor(Math.min(...allP) * 2) / 2  // 对齐到0.5
+    const maxP = Math.ceil(Math.max(...allP) * 2) / 2 + 0.5
     const rangeP = maxP - minP
 
     // 坐标转换
     const xScale = (i: number) => padL + (i / (stations.length - 1)) * chartW
     const yScale = (p: number) => padT + chartH - ((p - minP) / rangeP) * chartH
 
-    // 生成进站和出站压力的折线路径
-    // 锯齿形pattern：每个站显示inP->outP的跃变（压气站增压）
-    const buildSawtoothPath = () => {
+    // 构建水力坡降线路径（单线）
+    // 逻辑：从左往右，
+    //   压气站 → 画到 inP，再竖线到 outP（增压）
+    //   非压气站 → 只画到 inP
+    // 连线：上一个点的"出口值"连到下一个点的 inP
+    const buildHydraulicPath = () => {
         let path = ''
         stations.forEach((s, i) => {
             const x = xScale(i)
             const yIn = yScale(s.inP)
-            const yOut = yScale(s.outP)
+            const isCompressor = s.type === 'compressor'
+
             if (i === 0) {
-                path += `M ${x} ${yIn} L ${x} ${yOut}`
+                path += `M ${x} ${yIn}`
+                if (isCompressor) path += ` L ${x} ${yScale(s.outP)}`
             } else {
-                // 从上一站出站压力衰减到当前进站压力，再跳到当前出站压力
-                path += ` L ${x} ${yIn} L ${x} ${yOut}`
+                // 从上一个点连线到当前站的 inP
+                path += ` L ${x} ${yIn}`
+                // 压气站增压：竖线跳到 outP
+                if (isCompressor) path += ` L ${x} ${yScale(s.outP)}`
             }
         })
         return path
     }
 
-    // 生成水平网格线（压力刻度）
+    // 面积填充路径（坡降线下方填充）
+    const hydraulicPath = buildHydraulicPath()
+    const areaPath = hydraulicPath + ` L ${xScale(stations.length - 1)} ${padT + chartH} L ${padL} ${padT + chartH} Z`
+
+    // 网格线（每1 MPa一条）
     const gridLines: number[] = []
     for (let p = Math.ceil(minP); p <= Math.floor(maxP); p++) {
         gridLines.push(p)
     }
 
-    // 生成进站压力折线+出站压力折线（独立线）
-    const inPPath = stations.map((s, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i)} ${yScale(s.inP)}`).join(' ')
-    const outPPath = stations.map((s, i) => `${i === 0 ? 'M' : 'L'} ${xScale(i)} ${yScale(s.outP)}`).join(' ')
-
-    // 渐变填充区域
-    const inPArea = inPPath + ` L ${xScale(stations.length-1)} ${padT + chartH} L ${padL} ${padT + chartH} Z`
-    const outPArea = outPPath + ` L ${xScale(stations.length-1)} ${padT + chartH} L ${padL} ${padT + chartH} Z`
-
     return (
         <div
             className={`absolute z-20 flex flex-col select-none overflow-hidden ${isDragging ? 'cursor-grabbing' : ''}`}
             style={{
-                width: '880px', height: '390px',
-                background: 'linear-gradient(135deg, rgba(5,12,20,0.96) 0%, rgba(8,18,12,0.96) 100%)',
+                width: '920px', height: '420px',
+                background: 'linear-gradient(180deg, rgba(5,10,18,0.97) 0%, rgba(8,15,12,0.97) 100%)',
                 backdropFilter: 'blur(16px)', borderRadius: '12px',
-                border: '1px solid rgba(16,185,129,0.25)',
-                boxShadow: '0 12px 48px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 80px rgba(16,185,129,0.04)',
+                border: '1px solid rgba(16,185,129,0.2)',
+                boxShadow: '0 16px 64px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.05)',
             }}
         >
             {/* 顶部渐变装饰条 */}
@@ -229,26 +237,24 @@ const PressureTrendChart: React.FC<{
             {/* 头部 */}
             <div
                 className="px-5 py-2.5 flex justify-between items-center shrink-0 cursor-grab active:cursor-grabbing"
-                style={{ borderBottom: '1px solid rgba(16,185,129,0.12)' }}
+                style={{ borderBottom: '1px solid rgba(16,185,129,0.1)' }}
                 onMouseDown={onMouseDown}
             >
                 <h3 className="m-0 text-sm font-bold flex items-center gap-2" style={{ color: '#a7f3d0' }}>
                     <span className="material-symbols-outlined text-lg" style={{ color: '#10b981' }}>show_chart</span>
-                    <span>西气东输一线 · 沿线压力趋势</span>
-                    <span style={{ color: '#10b981', fontSize: '10px', fontWeight: 'normal', background: 'rgba(16,185,129,0.12)', padding: '1px 8px', borderRadius: '9999px', border: '1px solid rgba(16,185,129,0.2)' }}>
-                        {stations.length} 站
-                    </span>
+                    <span>西气东输一线 · 水力坡降线</span>
+                    <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 'normal' }}>单位: MPa</span>
                 </h3>
                 <div className="flex items-center gap-3" onMouseDown={e => e.stopPropagation()}>
                     {/* 图例 */}
                     <div className="flex items-center gap-4 mr-2" style={{ fontSize: '11px' }}>
-                        <span className="flex items-center gap-1">
-                            <span style={{ display: 'inline-block', width: 14, height: 3, background: '#f59e0b', borderRadius: 2 }} />
-                            <span style={{ color: '#fcd34d' }}>进站压力</span>
+                        <span className="flex items-center gap-1.5">
+                            <span style={{ display: 'inline-block', width: 8, height: 8, background: '#10b981', borderRadius: '50%' }} />
+                            <span style={{ color: '#94a3b8' }}>压气站 (进/出)</span>
                         </span>
-                        <span className="flex items-center gap-1">
-                            <span style={{ display: 'inline-block', width: 14, height: 3, background: '#10b981', borderRadius: 2 }} />
-                            <span style={{ color: '#34d399' }}>出站压力</span>
+                        <span className="flex items-center gap-1.5">
+                            <span style={{ display: 'inline-block', width: 6, height: 6, background: '#f59e0b', borderRadius: '50%' }} />
+                            <span style={{ color: '#94a3b8' }}>分输/阀室 (进)</span>
                         </span>
                     </div>
                     <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10" title="关闭">
@@ -261,96 +267,130 @@ const PressureTrendChart: React.FC<{
             <div className="flex-1 px-4 py-2 overflow-hidden">
                 <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%' }}>
                     <defs>
-                        {/* 进站压力渐变填充 */}
-                        <linearGradient id="inPGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.2" />
-                            <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.02" />
-                        </linearGradient>
-                        {/* 出站压力渐变填充 */}
-                        <linearGradient id="outPGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.18" />
-                            <stop offset="100%" stopColor="#10b981" stopOpacity="0.02" />
+                        <linearGradient id="hydraulicGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
+                            <stop offset="60%" stopColor="#10b981" stopOpacity="0.05" />
+                            <stop offset="100%" stopColor="#10b981" stopOpacity="0.01" />
                         </linearGradient>
                     </defs>
 
                     {/* 网格线 */}
                     {gridLines.map(p => (
                         <g key={p}>
-                            <line x1={padL} y1={yScale(p)} x2={padL + chartW} y2={yScale(p)} stroke="rgba(100,116,139,0.15)" strokeWidth={1} />
-                            <text x={padL - 6} y={yScale(p) + 4} textAnchor="end" fill="#64748b" fontSize="10" fontFamily="monospace">{p}</text>
+                            <line x1={padL} y1={yScale(p)} x2={padL + chartW} y2={yScale(p)} stroke="rgba(100,116,139,0.12)" strokeWidth={1} />
+                            <text x={padL - 8} y={yScale(p) + 4} textAnchor="end" fill="#475569" fontSize="10" fontFamily="monospace">{p}</text>
                         </g>
                     ))}
-                    {/* Y轴标签 */}
-                    <text x={12} y={padT + chartH / 2} textAnchor="middle" fill="#94a3b8" fontSize="10" transform={`rotate(-90, 12, ${padT + chartH / 2})`}>MPa</text>
 
                     {/* 面积填充 */}
-                    <path d={inPArea} fill="url(#inPGrad)" />
-                    <path d={outPArea} fill="url(#outPGrad)" />
+                    <path d={areaPath} fill="url(#hydraulicGrad)" />
 
-                    {/* 锯齿形连线（进站→出站跃变） */}
-                    <path d={buildSawtoothPath()} fill="none" stroke="rgba(16,185,129,0.15)" strokeWidth={1} strokeDasharray="3,3" />
+                    {/* 主线：水力坡降线 */}
+                    <path d={hydraulicPath} fill="none" stroke="#10b981" strokeWidth={2} strokeLinejoin="round" />
 
-                    {/* 进站压力折线 */}
-                    <path d={inPPath} fill="none" stroke="#f59e0b" strokeWidth={1.8} strokeLinejoin="round" />
-                    {/* 出站压力折线 */}
-                    <path d={outPPath} fill="none" stroke="#10b981" strokeWidth={1.8} strokeLinejoin="round" />
-
-                    {/* 站点标记 + 悬停交互 */}
+                    {/* 站点标记 */}
                     {stations.map((s, i) => {
                         const x = xScale(i)
                         const yIn = yScale(s.inP)
-                        const yOut = yScale(s.outP)
-                        const isHovered = hoveredIdx === i
                         const isCompressor = s.type === 'compressor'
-                        // 站名：只显示压气站和悬停站，避免太密
+                        const yOut = isCompressor ? yScale(s.outP) : yIn
+                        const isHovered = hoveredIdx === i
+                        // 所有站都显示名字，但非 hover 时用旋转小字
                         const showLabel = isCompressor || isHovered || i === 0 || i === stations.length - 1
+
                         return (
                             <g key={i}
                                 onMouseEnter={() => setHoveredIdx(i)}
                                 onMouseLeave={() => setHoveredIdx(null)}
                                 style={{ cursor: 'pointer' }}
                             >
-                                {/* 悬停区域 */}
-                                <rect x={x - 8} y={padT} width={16} height={chartH} fill="transparent" />
+                                {/* 悬停探测区域 */}
+                                <rect x={x - 10} y={padT} width={20} height={chartH} fill="transparent" />
+
                                 {/* 悬停竖线 */}
-                                {isHovered && <line x1={x} y1={padT} x2={x} y2={padT + chartH} stroke="rgba(255,255,255,0.15)" strokeWidth={1} />}
-                                {/* 进站压力点 */}
-                                <circle cx={x} cy={yIn} r={isHovered ? 4 : 2.5} fill="#f59e0b" stroke={isHovered ? '#fde68a' : 'none'} strokeWidth={1.5} opacity={isHovered ? 1 : 0.8} />
-                                {/* 出站压力点 */}
-                                <circle cx={x} cy={yOut} r={isHovered ? 4 : 2.5} fill="#10b981" stroke={isHovered ? '#a7f3d0' : 'none'} strokeWidth={1.5} opacity={isHovered ? 1 : 0.8} />
-                                {/* 压气站增压竖线 */}
-                                {isCompressor && (
-                                    <line x1={x} y1={yIn} x2={x} y2={yOut} stroke="rgba(16,185,129,0.25)" strokeWidth={1} />
+                                {isHovered && <line x1={x} y1={padT} x2={x} y2={padT + chartH} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />}
+
+                                {/* 压气站：进站点+竖线+出站点 */}
+                                {isCompressor ? (
+                                    <>
+                                        {/* 增压竖线 */}
+                                        <line x1={x} y1={yIn} x2={x} y2={yOut}
+                                            stroke={isHovered ? '#34d399' : '#10b981'}
+                                            strokeWidth={isHovered ? 2.5 : 1.5}
+                                            opacity={isHovered ? 1 : 0.6}
+                                        />
+                                        {/* 进站点（底部，较暗）*/}
+                                        <circle cx={x} cy={yIn} r={isHovered ? 4.5 : 3}
+                                            fill="#10b981" stroke={isHovered ? '#a7f3d0' : '#064e3b'} strokeWidth={1.5} />
+                                        {/* 出站点（顶部，较亮）*/}
+                                        <circle cx={x} cy={yOut} r={isHovered ? 5 : 3.5}
+                                            fill="#34d399" stroke={isHovered ? '#ecfdf5' : '#065f46'} strokeWidth={1.5} />
+                                        {/* 进站压力数值（点旁边显示） */}
+                                        {isHovered && (
+                                            <>
+                                                <text x={x + 8} y={yIn + 3} fill="#f59e0b" fontSize="9" fontFamily="monospace">
+                                                    {s.inP.toFixed(2)}
+                                                </text>
+                                                <text x={x + 8} y={yOut + 3} fill="#34d399" fontSize="9" fontFamily="monospace">
+                                                    {s.outP.toFixed(2)}
+                                                </text>
+                                            </>
+                                        )}
+                                    </>
+                                ) : (
+                                    /* 非压气站：只显示进站点 */
+                                    <circle cx={x} cy={yIn} r={isHovered ? 4 : 2}
+                                        fill="#f59e0b" stroke={isHovered ? '#fde68a' : 'none'} strokeWidth={1.5}
+                                        opacity={isHovered ? 1 : 0.7}
+                                    />
                                 )}
+
                                 {/* 站名标注 */}
                                 {showLabel && (
                                     <text
-                                        x={x} y={padT + chartH + 12}
-                                        textAnchor="middle" fill={isHovered ? '#e2e8f0' : '#64748b'}
+                                        x={x} y={padT + chartH + 14}
+                                        textAnchor="end" fill={isHovered ? '#e2e8f0' : '#4b5563'}
                                         fontSize={isHovered ? '10' : '8'}
                                         fontWeight={isHovered ? 600 : 400}
-                                        transform={`rotate(${showLabel && !isHovered ? -45 : -30}, ${x}, ${padT + chartH + 12})`}
+                                        transform={`rotate(-50, ${x}, ${padT + chartH + 14})`}
                                     >
-                                        {s.name.replace(/压气站|分输站|清管站|末站/, '')}
+                                        {s.name.replace(/压气站|分输压气站|分输站|清管站|分输联络站|分输清管站|末站/, '')}
                                     </text>
                                 )}
-                                {/* 悬停Tooltip */}
+
+                                {/* 悬停 Tooltip */}
                                 {isHovered && (
                                     <g>
-                                        <rect x={x - 65} y={Math.min(yIn, yOut) - 58} width={130} height={52} rx={6}
-                                            fill="rgba(15,23,42,0.95)" stroke="rgba(16,185,129,0.3)" strokeWidth={1} />
-                                        <text x={x} y={Math.min(yIn, yOut) - 42} textAnchor="middle" fill="#e2e8f0" fontSize="11" fontWeight={600}>
+                                        {/* 背景框 */}
+                                        <rect x={Math.min(x - 70, W - padR - 145)} y={Math.max(padT, Math.min(yIn, yOut) - 52)}
+                                            width={140} height={isCompressor ? 48 : 34} rx={6}
+                                            fill="rgba(15,23,42,0.95)" stroke="rgba(16,185,129,0.25)" strokeWidth={1} />
+                                        {/* 站名 */}
+                                        <text x={Math.min(x, W - padR - 75)} y={Math.max(padT + 14, Math.min(yIn, yOut) - 34)}
+                                            textAnchor="middle" fill="#e2e8f0" fontSize="11" fontWeight={600}>
                                             {s.name}
                                         </text>
-                                        <text x={x - 55} y={Math.min(yIn, yOut) - 26} fill="#fcd34d" fontSize="10">
-                                            进: {s.inP.toFixed(3)} MPa
-                                        </text>
-                                        <text x={x + 8} y={Math.min(yIn, yOut) - 26} fill="#34d399" fontSize="10">
-                                            出: {s.outP.toFixed(3)} MPa
-                                        </text>
-                                        <text x={x} y={Math.min(yIn, yOut) - 12} textAnchor="middle" fill="#94a3b8" fontSize="9">
-                                            ΔP: {(s.outP - s.inP) >= 0 ? '+' : ''}{(s.outP - s.inP).toFixed(3)} MPa
-                                        </text>
+                                        {isCompressor ? (
+                                            <>
+                                                <text x={Math.min(x - 60, W - padR - 135)} y={Math.max(padT + 29, Math.min(yIn, yOut) - 18)}
+                                                    fill="#f59e0b" fontSize="10" fontFamily="monospace">
+                                                    进 {s.inP.toFixed(3)}
+                                                </text>
+                                                <text x={Math.min(x + 5, W - padR - 70)} y={Math.max(padT + 29, Math.min(yIn, yOut) - 18)}
+                                                    fill="#34d399" fontSize="10" fontFamily="monospace">
+                                                    出 {s.outP.toFixed(3)}
+                                                </text>
+                                                <text x={Math.min(x, W - padR - 75)} y={Math.max(padT + 42, Math.min(yIn, yOut) - 6)}
+                                                    textAnchor="middle" fill="#94a3b8" fontSize="9">
+                                                    增压 +{(s.outP - s.inP).toFixed(3)} MPa
+                                                </text>
+                                            </>
+                                        ) : (
+                                            <text x={Math.min(x, W - padR - 75)} y={Math.max(padT + 29, Math.min(yIn, yOut) - 20)}
+                                                textAnchor="middle" fill="#f59e0b" fontSize="10" fontFamily="monospace">
+                                                进站 {s.inP.toFixed(3)} MPa
+                                            </text>
+                                        )}
                                     </g>
                                 )}
                             </g>
@@ -361,6 +401,7 @@ const PressureTrendChart: React.FC<{
         </div>
     )
 }
+
 
 // 懒加载 AI 工作流组件
 const WorkflowRunner = lazy(() => import('@/components/workflow/WorkflowRunner'))

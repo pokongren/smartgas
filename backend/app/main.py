@@ -3,10 +3,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import create_db_and_tables
-from app.routers import basic, emergency, workflow, data_import, ai_assistant, topology_editor, topology_computation
+from app.routers import basic, emergency, workflow, data_import, ai_assistant, topology_editor, topology_computation, scada
 from app.mcp_server import setup_mcp
-# NOTE: 导入工作流模型以触发 SQLModel 建表
+# NOTE: 导入模型以触发 SQLModel 建表
 import app.workflow_models  # noqa: F401
+import app.scada_models     # noqa: F401
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -56,6 +57,7 @@ app.include_router(data_import.router)
 app.include_router(ai_assistant.router)
 app.include_router(topology_editor.router)
 app.include_router(topology_computation.router)
+app.include_router(scada.router)
 
 # 挂载 MCP Server（/mcp 端点）
 setup_mcp(app)
