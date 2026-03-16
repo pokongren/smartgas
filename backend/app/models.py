@@ -15,23 +15,23 @@ class Station(SQLModel, table=True):
     - 处理能力
     """
     __tablename__ = "stations"
-    id: str = Field(primary_key=True)
-    name: str = Field(index=True)
-    type: str  # 'source', 'compressor', 'distribution', 'valve', etc.
-    longitude: float = 0.0
-    latitude: float = 0.0
+    id: str = Field(primary_key=True, title="站场编号")
+    name: str = Field(index=True, title="站场名称")
+    type: str = Field(title="站场类型")  # 'source', 'compressor', 'distribution', 'valve', etc.
+    longitude: float = Field(default=0.0, title="经度")
+    latitude: float = Field(default=0.0, title="纬度")
     
     # 压力参数 (MPa)
-    design_pressure: Optional[float] = Field(default=10.0, description="设计压力 (MPa)")
-    operating_pressure_in: Optional[float] = Field(default=None, description="进站运行压力 (MPa)")
-    operating_pressure_out: Optional[float] = Field(default=None, description="出站运行压力 (MPa)")
+    design_pressure: Optional[float] = Field(default=10.0, title="设计压力(MPa)", description="设计压力 (MPa)")
+    operating_pressure_in: Optional[float] = Field(default=None, title="进站运行压力(MPa)", description="进站运行压力 (MPa)")
+    operating_pressure_out: Optional[float] = Field(default=None, title="出站运行压力(MPa)", description="出站运行压力 (MPa)")
     
     # 温度参数 (°C)
-    operating_temp_in: Optional[float] = Field(default=None, description="进站温度 (°C)")
-    operating_temp_out: Optional[float] = Field(default=None, description="出站温度 (°C)")
+    operating_temp_in: Optional[float] = Field(default=None, title="进站温度(°C)", description="进站温度 (°C)")
+    operating_temp_out: Optional[float] = Field(default=None, title="出站温度(°C)", description="出站温度 (°C)")
     
     # 处理能力 (万方/天)
-    capacity: Optional[float] = Field(default=None, description="设计处理能力 (万方/天)")
+    capacity: Optional[float] = Field(default=None, title="设计处理能力(万方/天)", description="设计处理能力 (万方/天)")
     
     properties: Optional[str] = None  # JSON string for extra data
     
@@ -61,26 +61,26 @@ class Pipeline(SQLModel, table=True):
     优化：支持压力等级系数、动态消耗速率
     """
     __tablename__ = "pipelines"
-    id: str = Field(primary_key=True)
-    name: str = Field(index=True)
-    start_station_id: str
-    end_station_id: str
+    id: str = Field(primary_key=True, title="管线编号")
+    name: str = Field(index=True, title="管线名称")
+    start_station_id: str = Field(title="起点站场编号")
+    end_station_id: str = Field(title="终点站场编号")
     
     # 基础物理属性 (新)
-    diameter_mm: Optional[float] = Field(default=None, description="管径 (毫米)")
-    length_km: float = Field(default=0.0, description="管长 (公里)")
+    diameter_mm: Optional[float] = Field(default=None, title="管径(毫米)", description="管径 (毫米)")
+    length_km: float = Field(default=0.0, title="管长(公里)", description="管长 (公里)")
     
     # 压力等级 (计算使用)
-    design_pressure_mpa: Optional[float] = Field(default=10.0, description="设计压力 (MPa)")
-    start_pressure_mpa: Optional[float] = Field(default=None, description="首站压力 (MPa)")
-    end_pressure_mpa: Optional[float] = Field(default=None, description="末站压力 (MPa)")
+    design_pressure_mpa: Optional[float] = Field(default=10.0, title="设计压力(MPa)", description="设计压力 (MPa)")
+    start_pressure_mpa: Optional[float] = Field(default=None, title="首站压力(MPa)", description="首站压力 (MPa)")
+    end_pressure_mpa: Optional[float] = Field(default=None, title="末站压力(MPa)", description="末站压力 (MPa)")
 
     # 兼容旧字段
-    diameter: Optional[int] = Field(default=None, description="[兼容旧版] 管径")
-    length: float = Field(default=0.0, description="[兼容旧版] 管长")
+    diameter: Optional[int] = Field(default=None, title="管径(旧版)", description="[兼容旧版] 管径")
+    length: float = Field(default=0.0, title="管长(旧版)", description="[兼容旧版] 管长")
     
-    category: str = Field(default='branch', description="管线类别: trunk(干线)/branch(支线)")
-    properties: Optional[str] = None
+    category: str = Field(default='branch', title="管线类别", description="管线类别: trunk(干线)/branch(支线)")
+    properties: Optional[str] = Field(default=None, title="附加属性")
     
     # 物理计算方法
     def calculate_z_factor(self, pressure_mpa: float, temperature_c: float = 20.0) -> float:

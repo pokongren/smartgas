@@ -17,7 +17,7 @@ from app.database import get_session, engine
 from app.scada_models import ScadaStation, ScadaHistory
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/scada", tags=["SCADA 数据"])
+router = APIRouter(prefix="/api/scada")
 
 # ============ 告警规则 ============
 
