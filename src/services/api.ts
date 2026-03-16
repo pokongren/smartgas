@@ -61,3 +61,45 @@ export const emergencyAPI = {
     getCriticalNodes: () =>
         api.get('/api/emergency/critical-nodes'),
 }
+
+// ============ 拓扑与仿真 API ============
+
+export interface TopoNode {
+    id: string
+    name: string
+    type: string
+    longitude: number
+    latitude: number
+    centrality?: number
+}
+
+export interface SimulationResult {
+    step: number
+    affected_nodes: string[]
+    pressure_drops: Record<string, number>
+    is_stable: boolean
+}
+
+export const topologyAPI = {
+    // 获取后端分析结果 (中心性等)
+    analyze: () => api.get<{ nodes: TopoNode[] }>('/api/topology/analyze'),
+    
+    // 执行故障仿真
+    simulate: (params: { failed_node_id: string; steps?: number }) =>
+        api.post<SimulationResult[]>('/api/topology/simulate', params),
+        
+    // 全球拓扑概览
+    getSummary: () => api.get('/api/topology/summary'),
+
+    // 修正预览（不写入数据库）
+    correctPreview: (params: { pipeline_data: any; jump_threshold_km?: number }) =>
+        api.post('/api/topology/correct/preview', params),
+
+    // 确认修正并应用
+    correctApply: (params: { pipeline_data: any; jump_threshold_km?: number }) =>
+        api.post('/api/topology/correct/apply', params),
+
+    // 修正历史
+    correctionHistory: (pipeline_name?: string) =>
+        api.get('/api/topology/correct/history', { params: { pipeline_name } }),
+}

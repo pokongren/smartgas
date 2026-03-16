@@ -352,3 +352,21 @@ class DispatchConsoleDetail(SQLModel, table=True):
     __tablename__ = "dispatch_console_details"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
+
+
+class TopologyCorrectionLog(SQLModel, table=True):
+    """拓扑修正记录表
+    
+    记录每次拓扑修正的详细信息，用于审计和回溯。
+    """
+    __tablename__ = "topology_correction_logs"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    pipeline_name: str = Field(index=True, title="关联管线名称")
+    correction_type: str = Field(title="修正类型", description="trunk_jump / branch_attach / orphan_node / duplicate_edge")
+    severity: str = Field(default="warning", title="严重程度", description="error / warning / info")
+    description: str = Field(default="", title="修正描述")
+    before_json: Optional[str] = Field(default=None, title="修正前快照 (JSON)")
+    after_json: Optional[str] = Field(default=None, title="修正后快照 (JSON)")
+    status: str = Field(default="pending", title="状态", description="pending / applied / rejected")
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    applied_at: Optional[str] = Field(default=None, title="应用时间")

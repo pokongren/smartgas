@@ -450,3 +450,126 @@ async def clear_cache(graph_name: Optional[str] = None):
         return {"success": True, "message": f"Cache cleared for '{graph_name}'"}
     else:
         return {"success": True, "message": "All cache cleared"}
+
+
+# =============================================================================
+# 路径修正 API
+# =============================================================================
+
+class CorrectionPreviewRequest(BaseModel):
+    """修正预览请求"""
+    pipeline_data: Dict[str, Any] = Field(..., description="extract_pipeline 输出的 JSON")
+    jump_threshold_km: float = Field(default=200.0, description="跳跃距离阈值 (km)")
+    attach_radius_km: float = Field(default=50.0, description="支线挂接搜索半径 (km)")
+
+
+class CorrectionApplyRequest(BaseModel):
+    """修正应用请求"""
+    pipeline_data: Dict[str, Any] = Field(..., description="原始管线数据")
+    jump_threshold_km: float = Field(default=200.0)
+    attach_radius_km: float = Field(default=50.0)
+
+
+@router.post("/correct/preview")
+async def preview_correction(request: CorrectionPreviewRequest):
+    """
+    预览拓扑修正结果（不写入数据库）
+    
+    扫描管线数据中的跳跃连接、支线挂接异常和孤立节点，
+    返回修正建议供人工审核。
+    """
+    from app.services.topology_correction import TopologyCorrectionEngine
+
+    engine = TopologyCorrectionEngine(
+        jump_threshold_km=request.jump_threshold_km,
+        attach_radius_km=request.attach_radius_km
+    )
+    report = engine.correct_pipeline(request.pipeline_data, dry_run=True)
+    return report.to_dict()
+
+
+@router.post("/correct/apply")
+async def apply_correction(request: CorrectionApplyRequest):
+    """
+    执行拓扑修正并应用到数据
+    
+    自动修正可自动处理的问题（如干线排序跳跃），
+    并将修正记录持久化到数据库。
+    """
+    from app.services.topology_correction import TopologyCorrectionEngine
+
+    engine = TopologyCorrectionEngine(
+        jump_threshold_km=request.jump_threshold_km,
+        attach_radius_km=request.attach_radius_km
+    )
+    
+    # 执行修正（dry_run=False 会修改 pipeline_data）
+    report = engine.correct_pipeline(request.pipeline_data, dry_run=False)
+    
+    # 持久化修正记录（遍历 corrections）
+    import json
+    from app.database import get_session
+    from app.models import TopologyCorrectionLog
+
+    try:
+        session = next(get_session())
+        for c in report.corrections:
+            log = TopologyCorrectionLog(
+                pipeline_name=report.pipeline_name,
+                correction_type=c.correction_type.value,
+                severity=c.severity,
+                description=c.description,
+                before_json=json.dumps(c.before, ensure_ascii=False),
+                after_json=json.dumps(c.after, ensure_ascii=False),
+                status="applied" if c.auto_fixable else "pending"
+            )
+            session.add(log)
+        session.commit()
+    except Exception as e:
+        # 持久化失败不影响修正结果返回
+        import logging
+        logging.getLogger(__name__).warning(f"修正记录持久化失败: {e}")
+
+    return {
+        "success": True,
+        "report": report.to_dict(),
+        "corrected_data": request.pipeline_data
+    }
+
+
+@router.get("/correct/history")
+async def get_correction_history(pipeline_name: Optional[str] = None, limit: int = 50):
+    """
+    获取修正历史记录
+    """
+    from sqlmodel import select
+    from app.database import get_session
+    from app.models import TopologyCorrectionLog
+
+    try:
+        session = next(get_session())
+        stmt = select(TopologyCorrectionLog).order_by(
+            TopologyCorrectionLog.id.desc()
+        ).limit(limit)
+        
+        if pipeline_name:
+            stmt = stmt.where(TopologyCorrectionLog.pipeline_name == pipeline_name)
+        
+        logs = session.exec(stmt).all()
+        return {
+            "count": len(logs),
+            "logs": [
+                {
+                    "id": log.id,
+                    "pipeline_name": log.pipeline_name,
+                    "correction_type": log.correction_type,
+                    "severity": log.severity,
+                    "description": log.description,
+                    "status": log.status,
+                    "created_at": log.created_at
+                }
+                for log in logs
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")

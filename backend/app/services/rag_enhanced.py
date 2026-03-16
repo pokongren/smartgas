@@ -106,8 +106,10 @@ class EnhancedRAGService:
         使用 MiniMax embo-01 生成查询向量（type=query）。
         与入库时 type=db 配合使用，保证向量空间一致。
         """
-        if not self.minimax_api_key:
+        if not self.minimax_api_key or self.minimax_api_key == "your_api_key_here":
+            print("⚠️ 未配置有效的 AI_API_KEY，跳过 MiniMax Embedding")
             return None
+            
         try:
             url = self.minimax_base_url.rstrip("/") + "/embeddings"
             resp = requests.post(
@@ -117,16 +119,16 @@ class EnhancedRAGService:
                     "Content-Type": "application/json"
                 },
                 json={"model": "embo-01", "texts": [text], "type": "query"},
-                timeout=15
+                timeout=5  # 设置较短的超时时间，防止卡死
             )
             resp.raise_for_status()
             data = resp.json()
-            # MiniMax 返回格式：{"vectors": [[...]], "base_resp": {"status_code": 0}}
             if data.get("base_resp", {}).get("status_code", 0) != 0:
-                raise RuntimeError(f"API 错误: {data['base_resp']}")
+                print(f"⚠️ MiniMax API 返回错误: {data.get('base_resp')}")
+                return None
             return data["vectors"][0]
         except Exception as e:
-            print(f"⚠️ MiniMax Embedding 失败，将降级使用内置查询: {e}")
+            print(f"⚠️ MiniMax Embedding 请求失败，将降级使用内置查询: {str(e)}")
             return None
 
     def query_vector_db(self, question: str, n_results: int = 3) -> Optional[Dict]:

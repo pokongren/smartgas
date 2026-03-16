@@ -7,6 +7,31 @@ import json
 import sys
 import os
 
+# 定义常见管线的段序（西→东，北→南）
+# 解决 trunk 节点排序时不同段里程重置导致的“跳跃连接”问题
+TRUNK_SEGMENT_ORDERS = {
+    "西气东输二线": [
+        "西二线新疆段",
+        "西二线甘肃段",
+        "西二线宁夏段",
+        "西二线陕西段",
+        "西二线河南段",
+        "西二线湖北段",
+        "西二线江西段",
+        "西二线广东段",
+        "西二线广西段",
+        "西二线浙江段",
+        "西二线上海段",
+        "中卫-吉安段", # 特殊段名
+        "吉安-广州段",
+    ],
+    "中缅线": [
+        "中缅线云南段",
+        "中缅线贵州段",
+        "中缅缅段",
+    ]
+}
+
 def extract_pipeline(pipeline_name: str, output_path: str) -> None:
     """
     根据 trunk_name 提取管线拓扑结构
@@ -54,8 +79,24 @@ def extract_pipeline(pipeline_name: str, output_path: str) -> None:
                 branch_names_set.add(branch_name)
             branches_dict[branch_name].append(node)
 
-    # 干线按里程排序
-    trunk_nodes.sort(key=lambda x: x["mileage"])
+    # 干线排序：段序第一优先级，里程第二优先级
+    segment_order = TRUNK_SEGMENT_ORDERS.get(pipeline_name, [])
+    
+    def get_sort_key(node):
+        bn = node["branch_name"]
+        # 获取段在序列中的索引，未定义的排在最后
+        try:
+            order = -1
+            for i, pattern in enumerate(segment_order):
+                if pattern in bn:
+                    order = i
+                    break
+            if order == -1: order = 999
+        except:
+            order = 999
+        return (order, node["mileage"])
+
+    trunk_nodes.sort(key=get_sort_key)
 
     # 构建输出结构
     branch_names = sorted(branches_dict.keys())

@@ -94,6 +94,11 @@ class AiClient:
         """
         流式调用 AI API
         """
+        if not self.api_key or self.api_key == "your_api_key_here":
+            logger.warning("未配置有效的 AI_API_KEY，直接返回模拟回复。")
+            yield "【系统提示】由于当前系统未配置有效的大模型 API Key，AI 助手目前处于脱机状态。相关知识库与逻辑推演查询已记录日志。\n如果你是开发者，请在 `.env.local` 文件中配置 `AI_API_KEY` 以激活完整功能。"
+            return
+
         use_model = model if model else self.default_model
 
         headers = {

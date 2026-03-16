@@ -404,8 +404,10 @@ def _handle_search_knowledge_base(args: dict, session: Session) -> str:
             return "抱歉，知识库中未检索到相关的规程与预案记载。"
             
     except Exception as e:
-        logger.error(f"知识库检索失败: {e}", exc_info=True)
-        return f"知识库检索工具执行出错: {str(e)}"
+        import traceback
+        err_msg = traceback.format_exc()
+        logger.error(f"知识库检索失败: {e}\n{err_msg}")
+        return f"知识库检索工具执行出错: {str(e)}\n详细错误信息: {err_msg}"
 
 
 def _handle_find_critical_nodes(args: dict, session: Session) -> str:

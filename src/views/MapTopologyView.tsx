@@ -15,6 +15,9 @@ import {
     findIsolatedNodes,
 } from '@/utils/topology-validator'
 import type { ValidationReport } from '@/utils/topology-validator'
+import { stationAPI, pipelineAPI, emergencyAPI, topologyAPI, SimulationResult } from '../services/api'
+import { message, Modal, Table, Tag, Input, Button, Card, Space, Divider, Drawer, Tooltip } from 'antd'
+import { SearchOutlined, SafetyCertificateOutlined, AlertOutlined, PlayCircleOutlined, SettingOutlined } from '@ant-design/icons'
 
 // ================== 类型 ==================
 type PointType = 'station' | 'valve' | 'distribution' | 'compressor'
@@ -98,6 +101,13 @@ const MapTopologyView: React.FC = () => {
     const [searchText, setSearchText] = useState('')
     const [report, setReport] = useState<ValidationReport | null>(null)
     const [centralityData, setCentralityData] = useState<Array<{ id: string; name: string; value: number }>>([])
+
+    // 仿真状态 (Sim Status)
+    const [simDrawerVisible, setSimDrawerVisible] = useState(false)
+    const [isSimulating, setIsSimulating] = useState(false)
+    const [simResults, setSimResults] = useState<SimulationResult[]>([])
+    const [currentSimStep, setCurrentSimStep] = useState(0)
+    const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
 
     // Refs — 解决闭包陈旧引用
     const nodesRef = useRef<TopoNode[]>([])
