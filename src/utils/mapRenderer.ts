@@ -2,6 +2,20 @@ import type { PipelineNode, PipelineLine, PipelineDevice } from '@/types'
 import { NodeType, PipelineStatus, PressureLevel, DeviceType } from '@/types'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
 
+// ============ 流向动画全局开关 ============
+/** 是否启用流动动画，默认开启；通过 setFlowAnimationEnabled() 控制 */
+let _flowAnimationEnabled = true
+
+/** 启用/禁用流动动画 */
+export function setFlowAnimationEnabled(enabled: boolean): void {
+    _flowAnimationEnabled = enabled
+}
+
+/** 获取当前流动动画状态 */
+export function isFlowAnimationEnabled(): boolean {
+    return _flowAnimationEnabled
+}
+
 /**
  * 地图渲染工具函数 - 性能优化版
  * 用于在高德地图上渲染管网数据
@@ -698,6 +712,8 @@ export function renderPipelineLines(
                         zIndex: 50,
                         lineJoin: 'round',
                         lineCap: 'round',
+                        showDir: true,    // 开启方向箭头显示流向
+                        dirColor: '#ffffff',  // 箭头白色
                     })
 
                     if (onLineClick) {
@@ -709,8 +725,9 @@ export function renderPipelineLines(
                     map.add(polyline)
                     polylines.push(polyline)
 
-                    // 仅为主要管段创建流动动画
-                    if (line.length > 30000) {
+                    // 所有干线触发流动动画；支线长度 > 5000m 也触发；全局开关关闭时跳过
+                    const shouldAnimate = _flowAnimationEnabled && (!isBranch || (line.length ?? 0) > 5000)
+                    if (shouldAnimate) {
                         const flowMarker = createFlowAnimation(map, line, color)
                         if (flowMarker) {
                             polylines.push(flowMarker)
@@ -741,25 +758,30 @@ function createFlowAnimation(map: any, line: PipelineLine, color: string): any {
     const AMap = (window as any).AMap
     if (!AMap || line.path.length < 2) return null
 
+    // 流动点图标大小根据管线类别适配
+    const isBranch = (line.properties?.category as string || '').includes('支线')
+    const dotSize = isBranch ? 6 : 8
+
     const flowMarker = new AMap.Marker({
         position: [line.path[0].longitude, line.path[0].latitude],
         icon: new AMap.Icon({
-            size: new AMap.Size(8, 8),
+            size: new AMap.Size(dotSize, dotSize),
             image: createFlowDot(color),
-            imageSize: new AMap.Size(8, 8),
+            imageSize: new AMap.Size(dotSize, dotSize),
         }),
-        offset: new AMap.Pixel(-4, -4),
+        offset: new AMap.Pixel(-dotSize / 2, -dotSize / 2),
         zIndex: 100,
     })
 
     map.add(flowMarker)
 
     const path = line.path.map(p => [p.longitude, p.latitude])
-    const speed = Math.max(50, line.length * 0.5)
+    // 干线流动周期 30s，支线 45s，让小管段看起来运动更慢
+    const duration = isBranch ? 45000 : 30000
 
     const startAnimation = () => {
         flowMarker.moveAlong(path, {
-            duration: (line.length / speed) * 1000,
+            duration: duration,
             autoRotation: false,
         })
     }
@@ -772,19 +794,21 @@ function createFlowAnimation(map: any, line: PipelineLine, color: string): any {
 
 function createFlowDot(color: string): string {
     const canvas = document.createElement('canvas')
-    canvas.width = 8
-    canvas.height = 8
+    canvas.width = 10
+    canvas.height = 10
     const ctx = canvas.getContext('2d')
 
     if (!ctx) return ''
 
-    const gradient = ctx.createRadialGradient(4, 4, 0, 4, 4, 4)
-    gradient.addColorStop(0, color)
-    gradient.addColorStop(0.5, color + 'cc')
-    gradient.addColorStop(1, color + '00')
+    // 圆形火焰效果：中心白色亮灯，外圈渐变为管线颜色
+    const gradient = ctx.createRadialGradient(5, 5, 0, 5, 5, 5)
+    gradient.addColorStop(0, '#ffffff')       // 中心白光
+    gradient.addColorStop(0.4, color)          // 管线颜色
+    gradient.addColorStop(0.7, color + 'aa')  // 加透明
+    gradient.addColorStop(1, color + '00')    // 完全透明
 
     ctx.fillStyle = gradient
-    ctx.fillRect(0, 0, 8, 8)
+    ctx.fillRect(0, 0, 10, 10)
 
     return canvas.toDataURL()
 }

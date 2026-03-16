@@ -3,6 +3,7 @@ import MapView from '@/components/map-view/MapView'
 import { ALL_PIPELINES, PipelinePackage, PipelineLayer } from '@/data/pipelines'
 import type { PipelineData, PipelineLine, PipelineNode } from '@/types'
 import PipelineEditorOverlay from './PipelineEditorOverlay'
+import { setFlowAnimationEnabled } from '@/utils/mapRenderer'
 
 /**
  * 全管线统一视图 (性能优化版)
@@ -17,11 +18,22 @@ const GlobalPipelineView: React.FC = () => {
     // 状态管理
     const [mapInstance, setMapInstance] = useState<any>(null)
     const [isEditMode, setIsEditMode] = useState(false)
+    // 流向动画开关（默认开启）
+    const [flowEnabled, setFlowEnabled] = useState(true)
 
     // 使用 useCallback 稳定回调引用，避免触发 MapView 无限循环
     const handleMapLoad = useCallback((map: any) => {
         setMapInstance(map)
     }, [])
+
+    // 切换流向动画
+    const toggleFlowAnimation = useCallback(() => {
+        const next = !flowEnabled
+        setFlowEnabled(next)
+        setFlowAnimationEnabled(next)
+        // pipelineData 由 visibleLayers 驱动，针对流动动画的变化
+        // 在下一次切换图层时自然生效。如需立即生效，可手动切换任意图层
+    }, [flowEnabled])
 
     // 展开状态
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ 'we1': true })
@@ -99,14 +111,31 @@ const GlobalPipelineView: React.FC = () => {
         <div className="h-screen w-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900">
             {/* 标题栏 */}
             <div className="absolute top-0 left-0 right-0 z-10 bg-black/50 backdrop-blur-sm border-b border-blue-500/30">
-                <div className="container mx-auto px-6 py-4">
-                    <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-                        <span className="material-symbols-outlined text-3xl text-blue-400">public</span>
-                        全国管网统一视图
-                    </h1>
-                    <p className="text-sm text-gray-300 mt-1">
-                        站场: {stats.stations} | 管道段: {stats.pipelines} | 管线组: {stats.groups}
-                    </p>
+                <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+                    <div>
+                        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                            <span className="material-symbols-outlined text-3xl text-blue-400">public</span>
+                            全国管网统一视图
+                        </h1>
+                        <p className="text-sm text-gray-300 mt-1">
+                            站场: {stats.stations} | 管道段: {stats.pipelines} | 管线组: {stats.groups}
+                        </p>
+                    </div>
+                    {/* 右侧工具按钮 */}
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={toggleFlowAnimation}
+                            title={flowEnabled ? '关闭流向动画' : '开启流向动画'}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                                flowEnabled
+                                    ? 'bg-cyan-600/80 border-cyan-400/50 text-white shadow-[0_0_10px_rgba(34,211,238,0.3)]'
+                                    : 'bg-gray-800/80 border-gray-600/50 text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            <span className="material-symbols-outlined text-base">water</span>
+                            流向 {flowEnabled ? 'ON' : 'OFF'}
+                        </button>
+                    </div>
                 </div>
             </div>
 
