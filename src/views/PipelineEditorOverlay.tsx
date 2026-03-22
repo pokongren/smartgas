@@ -2,7 +2,6 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { validateTopology, computeBetweennessCentrality } from '@/utils/topology-validator'
 import type { ValidationReport } from '@/utils/topology-validator'
-import { ALL_PIPELINES } from '@/data/pipelines'
 
 // ================== 类型定义 ==================
 type EditMode = 'view' | 'draw-point' | 'connect-mode'

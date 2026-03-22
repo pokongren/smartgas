@@ -7,7 +7,6 @@ const CorpView = lazy(() => import('./views/CorpView'));
 const TechView = lazy(() => import('./views/TechView'));
 const MapDemo = lazy(() => import('./views/MapDemo'));
 const GlobalPipelineView = lazy(() => import('./views/GlobalPipelineView'));
-const WorkflowView = lazy(() => import('./views/WorkflowView'));
 const TopologyView = lazy(() => import('./views/TopologyView'));
 const MapTopologyView = lazy(() => import('./views/MapTopologyView'));
 const TopologyDemoView = lazy(() => import('./views/TopologyDemoView'));
@@ -39,7 +38,6 @@ const ViewSwitcher: React.FC = () => {
   const isTech = location.pathname === '/tech';
   const isMapDemo = location.pathname === '/map-demo';
   const isGlobal = location.pathname === '/global';
-  const isWorkflow = location.pathname === '/workflow';
   const isTopology = location.pathname === '/topology';
   const isMapTopology = location.pathname === '/map-topology';
 
@@ -74,16 +72,6 @@ const ViewSwitcher: React.FC = () => {
         <span className="material-symbols-outlined text-2xl">hub</span>
       </button>
 
-      <button
-        onClick={() => navigate('/workflow')}
-        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isWorkflow
-          ? 'bg-violet-600 text-white shadow-violet-500/50'
-          : 'bg-gray-700 text-white hover:bg-violet-500'
-          }`}
-        title="AI 工作流"
-      >
-        <span className="material-symbols-outlined text-2xl">neurology</span>
-      </button>
 
       <button
         onClick={() => navigate('/global')}
@@ -144,7 +132,6 @@ const AppContent: React.FC = () => {
           <Route path="/tech" element={<TechView />} />
           <Route path="/map-demo" element={<MapDemo />} />
           <Route path="/global" element={<GlobalPipelineView />} />
-          <Route path="/workflow" element={<WorkflowView />} />
           <Route path="/topology" element={<TopologyView />} />
           <Route path="/map-topology" element={<MapTopologyView />} />
           <Route path="/topology-demo" element={<TopologyDemoView />} />

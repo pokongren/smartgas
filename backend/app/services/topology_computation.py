@@ -605,10 +605,14 @@ class TopologyComputationService:
         
         # 添加节点
         for node_data in nodes:
+            try:
+                _node_type = NodeType(node_data.get("type", "junction"))
+            except ValueError:
+                _node_type = NodeType.JUNCTION
             node = TopoNode(
                 id=node_data["id"],
                 name=node_data.get("name", node_data["id"]),
-                node_type=NodeType(node_data.get("type", "junction")),
+                node_type=_node_type,
                 longitude=node_data.get("longitude", 0.0),
                 latitude=node_data.get("latitude", 0.0),
                 pressure_mpa=node_data.get("pressure_mpa", 10.0),

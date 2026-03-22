@@ -9,27 +9,6 @@
       "branch_name": "广南广东段"
     },
     {
-      "id": 68295,
-      "name": "横县分输站",
-      "mileage": 0.0,
-      "type": "distribution",
-      "branch_name": "广南广西段"
-    },
-    {
-      "id": 90568,
-      "name": "广西管道南宁分输站",
-      "mileage": 0.0,
-      "type": "distribution",
-      "branch_name": "广西管道与广南支干线南宁联络线"
-    },
-    {
-      "id": 21071,
-      "name": "广南支干线南宁分输站",
-      "mileage": 8.0,
-      "type": "distribution",
-      "branch_name": "广西管道与广南支干线南宁联络线"
-    },
-    {
       "id": 47700,
       "name": "清远分输站",
       "mileage": 21.1,
@@ -205,6 +184,13 @@
       "branch_name": "广南广西段"
     },
     {
+      "id": 68295,
+      "name": "横县分输站",
+      "mileage": 540,
+      "type": "distribution",
+      "branch_name": "广南广西段"
+    },
+    {
       "id": 85052,
       "name": "广南22#阀室",
       "mileage": 557.7529,
@@ -224,6 +210,20 @@
       "mileage": 599.6399,
       "type": "distribution",
       "branch_name": "广南广西段"
+    },
+    {
+      "id": 90568,
+      "name": "广西管道南宁分输站",
+      "mileage": 600,
+      "type": "distribution",
+      "branch_name": "广西管道与广南支干线南宁联络线"
+    },
+    {
+      "id": 21071,
+      "name": "广南支干线南宁分输站",
+      "mileage": 608,
+      "type": "distribution",
+      "branch_name": "广西管道与广南支干线南宁联络线"
     }
   ],
   "branches": [

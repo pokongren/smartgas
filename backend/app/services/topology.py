@@ -8,8 +8,9 @@
 """
 
 import networkx as nx
+import json
 from sqlmodel import Session, select
-from app.models import Station, Pipeline
+from app.models import Station, Pipeline, JunctionGroup
 from typing import List, Dict, Optional, Any
 from app.services.topology_computation import (
     topology_service, 
@@ -44,7 +45,7 @@ class TopologyService:
 
     def get_computation_graph(self, directed: bool = True) -> TopologyGraph:
         """获取已构建的 TopologyGraph 实例（带缓存管理）"""
-        cache_key = f"db_graph_{'directed' if directed else 'undirected'}"
+        cache_key = f"db_graph_v2_{'directed' if directed else 'undirected'}"
         graph = topology_service.get_graph(cache_key)
         if graph is None:
             graph = self._build_computation_graph(directed)
@@ -60,32 +61,84 @@ class TopologyService:
             del topology_service._graphs[key]
     
     def _build_computation_graph(self, directed: bool = True) -> TopologyGraph:
-        """从数据库物理模型构建高性能拓扑图"""
+        """从数据库物理模型构建高性能拓扑图，并执行节点收缩（JunctionGroup）"""
         graph = TopologyGraph(directed=directed)
         
+        # 0. 预加载 JunctionGroup 进行节点收缩映射
+        junctions = self.session.exec(select(JunctionGroup)).all()
+        station_to_junction = {}  # station_id -> super_node_id
+        junction_nodes = {}       # super_node_id -> info
+        
+        for j in junctions:
+            try:
+                sids = json.loads(j.station_ids)
+                if not sids: continue
+                super_node_id = f"JUNC_{j.id}"
+                junction_nodes[super_node_id] = {
+                    "id": super_node_id,
+                    "name": j.name,
+                    "sids": sids
+                }
+                for sid in sids:
+                    station_to_junction[sid] = super_node_id
+            except Exception:
+                pass
+                
         # 1. 注入节点 (站场)
         stations = self.session.exec(select(Station)).all()
+        added_super_nodes = set()
+        
         for s in stations:
-            graph.add_node(TopoNode(
-                id=s.id,
-                name=s.name,
-                node_type=NodeType(s.type),
-                longitude=s.longitude,
-                latitude=s.latitude,
-                pressure_mpa=s.design_pressure or 10.0,
-                capacity=s.capacity or 0.0
-            ))
+            super_node_id = station_to_junction.get(s.id)
+            
+            if super_node_id:
+                # 属于枢纽的节点，合并为超级节点
+                if super_node_id not in added_super_nodes:
+                    j_info = junction_nodes[super_node_id]
+                    graph.add_node(TopoNode(
+                        id=super_node_id,
+                        name=j_info["name"],
+                        node_type=NodeType.JUNCTION,
+                        longitude=s.longitude,
+                        latitude=s.latitude,
+                        pressure_mpa=s.design_pressure or 10.0,
+                        capacity=s.capacity or 0.0,
+                        properties={"is_super_junction": True, "original_stations": j_info["sids"]}
+                    ))
+                    added_super_nodes.add(super_node_id)
+            else:
+                # 安全转换类型：DB 中可能有 'other'/'shared' 等不在枚举内的值
+                try:
+                    node_type = NodeType(s.type)
+                except ValueError:
+                    node_type = NodeType.JUNCTION
+                graph.add_node(TopoNode(
+                    id=s.id,
+                    name=s.name,
+                    node_type=node_type,
+                    longitude=s.longitude,
+                    latitude=s.latitude,
+                    pressure_mpa=s.design_pressure or 10.0,
+                    capacity=s.capacity or 0.0
+                ))
             
         # 2. 注入边 (管线)
         pipelines = self.session.exec(select(Pipeline)).all()
         for p in pipelines:
+            source_id = station_to_junction.get(p.start_station_id, p.start_station_id)
+            target_id = station_to_junction.get(p.end_station_id, p.end_station_id)
+            
+            # 防自环：若起止点均归属同一个超级枢纽内部，视为内部短路，消除断头路/自环
+            if source_id == target_id:
+                continue
+                
             diameter_mm = p.diameter_mm or (float(p.diameter) if p.diameter else 0.0)
             length_km = p.length_km or p.length or 0.0
             
             graph.add_edge(TopoEdge(
                 id=p.id,
-                source=p.start_station_id,
-                target=p.end_station_id,
+                source=source_id,
+                target=target_id,
                 name=p.name,
                 edge_type=EdgeType.TRUNK if p.category == 'trunk' else EdgeType.BRANCH,
                 length_km=length_km,

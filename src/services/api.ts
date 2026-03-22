@@ -103,3 +103,16 @@ export const topologyAPI = {
     correctionHistory: (pipeline_name?: string) =>
         api.get('/api/topology/correct/history', { params: { pipeline_name } }),
 }
+
+// ============ 管线数据包 API（替代前端硬编码） ============
+
+import type { PipelinePackage } from '@/data/pipelines/types'
+
+export const pipelinePackageAPI = {
+    /** 获取全部管线数据包（PipelinePackage 格式，含节点坐标和管段路径） */
+    getAll: () => api.get<PipelinePackage[]>('/api/pipeline-packages'),
+
+    /** 获取单个管线系统数据 */
+    getBySystemId: (systemId: string) =>
+        api.get<PipelinePackage[]>('/api/pipeline-packages', { params: { system_id: systemId } }),
+}

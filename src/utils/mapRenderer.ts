@@ -116,6 +116,23 @@ function injectMarkerStyles() {
         .cluster-indicator.compressor { background: #06b6d4; }
         .cluster-indicator.distribution { background: #eab308; }
         .cluster-indicator.valve { background: #6b7280; }
+
+        /* 枢纽节点样式 */
+        .hub-marker {
+            position: relative;
+            cursor: pointer;
+        }
+        .hub-marker-diamond {
+            transform: rotate(45deg);
+            border: 2px solid #fff;
+        }
+        .hub-marker-junction .hub-marker-diamond {
+            animation: hub-pulse 2s ease-in-out infinite;
+        }
+        @keyframes hub-pulse {
+            0%, 100% { box-shadow: 0 0 4px rgba(0,229,255,0.6); }
+            50% { box-shadow: 0 0 12px rgba(0,229,255,1), 0 0 24px rgba(0,229,255,0.4); }
+        }
     `
     document.head.appendChild(style)
 }
@@ -682,12 +699,49 @@ function createOffsetNodeMarker(
 
     const isCompressor = node.name.includes('压气站')
     const isDistribution = node.name.includes('分输站') || node.name.includes('门站')
+    // 枢纽判断：API 返回的 isHub 标记
+    const nodeAny = node as any
+    const isHub = nodeAny.isHub === true
+    const isJunction = nodeAny.hubInfo?.isJunction === true
 
     let marker: any
     let markerSize: number  // 用于计算 offset 居中
 
     if (isCompressor) {
-        const rotation = node.properties?.rotation || 0
+        let rotation = 0;
+        
+        // 自动根据相连的管线计算朝向角度，修正固定90度导致的重叠和错误横置问题
+        const connections = nodePolylinesMap.get(node.id);
+        if (connections && connections.length > 0) {
+            const conn = connections[0];
+            const path = conn.polyline.getPath?.();
+            if (path && path.length > 1) {
+                let dx = 0, dy = 0;
+                if (conn.role === 'start') {
+                    const p1 = path[1];
+                    const nextLng = p1.lng ?? p1.getLng?.();
+                    const nextLat = p1.lat ?? p1.getLat?.();
+                    if (nextLng !== undefined && nextLat !== undefined) {
+                        dx = nextLng - position.longitude;
+                        dy = nextLat - position.latitude;
+                    }
+                } else {
+                    const pPrev = path[path.length - 2];
+                    const prevLng = pPrev.lng ?? pPrev.getLng?.();
+                    const prevLat = pPrev.lat ?? pPrev.getLat?.();
+                    if (prevLng !== undefined && prevLat !== undefined) {
+                        dx = position.longitude - prevLng;
+                        dy = position.latitude - prevLat;
+                    }
+                }
+                if (dx !== 0 || dy !== 0) {
+                    rotation = Math.atan2(dx, dy) * 180 / Math.PI;
+                }
+            }
+        } else if (node.properties?.rotation !== undefined) {
+            rotation = node.properties.rotation;
+        }
+
         const content = createCompressorMarkerContent(rotation)
         markerSize = COMPRESSOR_ICON_CONFIG.WIDTH
 
@@ -712,6 +766,21 @@ function createOffsetNodeMarker(
             draggable: true,
             cursor: 'move',
             zIndex: 130,
+            extData: { node }
+        })
+    } else if (isHub) {
+        // 枢纽节点：菱形图标
+        const hubSize = isJunction ? 18 : 14
+        const hubColor = isJunction ? '#00e5ff' : '#ffd700'
+        const junctionClass = isJunction ? ' hub-marker-junction' : ''
+        markerSize = hubSize + 4
+        marker = new AMap.Marker({
+            position: [position.longitude, position.latitude],
+            content: `<div class="hub-marker${junctionClass}" style="width:${markerSize}px;height:${markerSize}px;display:flex;align-items:center;justify-content:center;"><div class="hub-marker-diamond" style="width:${hubSize}px;height:${hubSize}px;background:${hubColor};"></div></div>`,
+            offset: new AMap.Pixel(-markerSize / 2, -markerSize / 2),
+            draggable: true,
+            cursor: 'move',
+            zIndex: 145,
             extData: { node }
         })
     } else {

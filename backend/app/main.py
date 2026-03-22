@@ -3,8 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import create_db_and_tables
-from app.routers import basic, emergency, workflow, data_import, ai_assistant, topology_editor, topology_computation, scada
-from app.mcp_server import setup_mcp
+from app.routers import basic, emergency, workflow, ai_assistant, topology_editor, topology_computation, scada, pipeline_packages
+from app.mcp import setup_mcp
 # NOTE: 导入模型以触发 SQLModel 建表
 import app.workflow_models  # noqa: F401
 import app.scada_models     # noqa: F401
@@ -44,7 +44,7 @@ async def custom_swagger_ui_html():
 # 配置 CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:5173", "http://127.0.0.1:3002", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,11 +69,11 @@ def health_check():
 app.include_router(basic.router, prefix="/api", tags=["基础数据：站场与管线"])
 app.include_router(emergency.router, prefix="/api/emergency", tags=["应急指挥：事件与推演"])
 app.include_router(workflow.router, tags=["工作流自动化"])
-app.include_router(data_import.router, tags=["数据中心：导入与同步"])
 app.include_router(ai_assistant.router, tags=["人工智能助手"])
 app.include_router(topology_editor.router, tags=["拓扑网络：可视化编辑器"])
 app.include_router(topology_computation.router, tags=["拓扑网络：计算分析与溯源"])
 app.include_router(scada.router, tags=["SCADA：实时监测与数据集成"])
+app.include_router(pipeline_packages.router, tags=["管线数据包：分组与图层"])
 
 # 挂载 MCP Server（/mcp 端点）
 setup_mcp(app)

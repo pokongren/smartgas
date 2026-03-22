@@ -7,7 +7,8 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import MapView from '@/components/map-view/MapView'
-import { ALL_PIPELINES } from '@/data/pipelines'
+import { loadAllPipelines } from '@/data/pipelines'
+import type { PipelinePackage } from '@/data/pipelines/types'
 import type { PipelineNode, PipelineLine } from '@/types'
 import {
     validateTopology,
@@ -15,14 +16,16 @@ import {
     findIsolatedNodes,
 } from '@/utils/topology-validator'
 import type { ValidationReport } from '@/utils/topology-validator'
+import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+import type { CutoffResult } from '@/utils/cutoff-simulator'
 import { stationAPI, pipelineAPI, emergencyAPI, topologyAPI, SimulationResult } from '../services/api'
 import { message, Modal, Table, Tag, Input, Button, Card, Space, Divider, Drawer, Tooltip } from 'antd'
 import { SearchOutlined, SafetyCertificateOutlined, AlertOutlined, PlayCircleOutlined, SettingOutlined } from '@ant-design/icons'
 
 // ================== 类型 ==================
 type PointType = 'station' | 'valve' | 'distribution' | 'compressor'
-type EditMode = 'view' | 'draw-point' | 'connect'
-type PanelTab = 'edit' | 'validate' | 'search' | 'centrality'
+type EditMode = 'view' | 'draw-point' | 'connect' | 'merge'
+type PanelTab = 'edit' | 'validate' | 'search' | 'centrality' | 'cutoff'
 
 interface TopoNode {
     id: string
@@ -90,6 +93,14 @@ const MapTopologyView: React.FC = () => {
     const [mapInstance, setMapInstance] = useState<any>(null)
     const handleMapLoad = useCallback((map: any) => setMapInstance(map), [])
 
+    // 管线数据异步加载
+    const [pipelines, setPipelines] = useState<PipelinePackage[]>([])
+    useEffect(() => {
+        loadAllPipelines()
+            .then(data => setPipelines(data))
+            .catch(err => console.error('[MapTopologyView] 管线数据加载失败:', err))
+    }, [])
+
     // 编辑器状态
     const [topoNodes, setTopoNodes] = useState<TopoNode[]>([])
     const [topoEdges, setTopoEdges] = useState<TopoEdge[]>([])
@@ -109,6 +120,26 @@ const MapTopologyView: React.FC = () => {
     const [currentSimStep, setCurrentSimStep] = useState(0)
     const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
 
+    // 撤销栈
+    type UndoAction = 
+        | { type: 'add-node'; nodeId: string }
+        | { type: 'add-edge'; edgeId: string }
+    const [undoStack, setUndoStack] = useState<UndoAction[]>([])
+
+    // 截断仿真状态
+    const [cutoffNodeId, setCutoffNodeId] = useState<string | null>(null)
+    const [cutoffResult, setCutoffResult] = useState<CutoffResult | null>(null)
+    const [cutoffSearch, setCutoffSearch] = useState('')
+
+    // 保存机制：跟踪拖拽修改的坐标
+    const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
+    const [isSaving, setIsSaving] = useState(false)
+
+    // 合建站：合并模式状态
+    const [mergeFirst, setMergeFirst] = useState<string | null>(null)
+    // 已高亮的 marker 原始 content，用于恢复
+    const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
+
     // Refs — 解决闭包陈旧引用
     const nodesRef = useRef<TopoNode[]>([])
     const edgesRef = useRef<TopoEdge[]>([])
@@ -124,14 +155,14 @@ const MapTopologyView: React.FC = () => {
     const rawPipelineData = useMemo(() => {
         const nodes: PipelineNode[] = []
         const lines: PipelineLine[] = []
-        for (const pkg of ALL_PIPELINES) {
+        for (const pkg of pipelines) {
             for (const layer of pkg.layers) {
                 for (const n of layer.nodes) nodes.push(n)
                 for (const l of layer.lines) lines.push(l)
             }
         }
         return { nodes, lines }
-    }, [])
+    }, [pipelines])
 
     // ================== 地图点击 ==================
     useEffect(() => {
@@ -176,11 +207,14 @@ const MapTopologyView: React.FC = () => {
             const np: [number, number] = [e.lnglat.getLng(), e.lnglat.getLat()]
             setTopoNodes(prev => prev.map(n => n.id === id ? { ...n, position: np } : n))
             syncEdges(id, np)
+            // 记录脏坐标
+            setDirtyPositions(prev => new Map(prev).set(id, np))
         })
         marker.on('click', () => doNodeClick(id))
 
         const node: TopoNode = { id, type, name: `${TOPO_LABELS[type]}-${nodesRef.current.length + 1}`, position: pos, marker }
         setTopoNodes(prev => [...prev, node])
+        setUndoStack(prev => [...prev, { type: 'add-node', nodeId: id }])
         setStatusMsg(`已添加: ${node.name}`)
     }
 
@@ -196,17 +230,28 @@ const MapTopologyView: React.FC = () => {
     }
 
     const doNodeClick = (nodeId: string) => {
-        if (modeRef.current !== 'connect') return
-        const from = cfRef.current
-        if (!from) {
-            setConnectFrom(nodeId)
+        if (modeRef.current === 'connect') {
+            const from = cfRef.current
+            if (!from) {
+                setConnectFrom(nodeId)
+                const nd = nodesRef.current.find(n => n.id === nodeId)
+                setStatusMsg(`起点「${nd?.name}」→ 点击终点`)
+            } else {
+                if (nodeId === from) { setStatusMsg('不能连接自身'); return }
+                doAddEdge(from, nodeId)
+                setConnectFrom(null)
+                setStatusMsg('连线成功，继续点击起点')
+            }
+            return
+        }
+        // 截断模式：点击节点设为截断点
+        if (modeRef.current === 'view') {
             const nd = nodesRef.current.find(n => n.id === nodeId)
-            setStatusMsg(`起点「${nd?.name}」→ 点击终点`)
-        } else {
-            if (nodeId === from) { setStatusMsg('不能连接自身'); return }
-            doAddEdge(from, nodeId)
-            setConnectFrom(null)
-            setStatusMsg('连线成功，继续点击起点')
+            if (!nd) return
+            setCutoffNodeId(nodeId)
+            setCutoffResult(null)
+            setActiveTab('cutoff')
+            setStatusMsg(`截断点已选：${nd.name}`)
         }
     }
 
@@ -227,9 +272,48 @@ const MapTopologyView: React.FC = () => {
         })
         poly.setMap(mapInstance)
         setTopoEdges(prev => [...prev, { id, startNodeId: startId, endNodeId: endId, name: '新建管线', poly }])
+        setUndoStack(prev => [...prev, { type: 'add-edge', edgeId: id }])
     }
 
     // ================== 导入：将 ALL_PIPELINES 数据转为纯拓扑点+线（阀室链路合并） ==================
+
+    // ================== 撤销操作 ==================
+    const doUndo = useCallback(() => {
+        const stack = [...undoStack]
+        const action = stack.pop()
+        if (!action) { setStatusMsg('无可撤销的操作'); return }
+        setUndoStack(stack)
+
+        if (action.type === 'add-edge') {
+            // 撤销添加边：移除 polyline 并删除 state
+            const edge = edgesRef.current.find(e => e.id === action.edgeId)
+            if (edge?.poly) edge.poly.setMap(null)
+            setTopoEdges(prev => prev.filter(e => e.id !== action.edgeId))
+            setStatusMsg('已撤销: 删除连线')
+        } else if (action.type === 'add-node') {
+            // 撤销添加节点：先删关联边，再删 marker
+            const relEdges = edgesRef.current.filter(e => e.startNodeId === action.nodeId || e.endNodeId === action.nodeId)
+            relEdges.forEach(e => e.poly?.setMap(null))
+            setTopoEdges(prev => prev.filter(e => e.startNodeId !== action.nodeId && e.endNodeId !== action.nodeId))
+            
+            const node = nodesRef.current.find(n => n.id === action.nodeId)
+            if (node?.marker) node.marker.setMap(null)
+            setTopoNodes(prev => prev.filter(n => n.id !== action.nodeId))
+            setStatusMsg(`已撤销: 删除 ${node?.name || '节点'}`)
+        }
+    }, [undoStack])
+
+    // Ctrl+Z 快捷键
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault()
+                doUndo()
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [doUndo])
     const importTopology = useCallback(() => {
         if (!mapInstance) return
         const AMap = (window as any).AMap
@@ -355,6 +439,63 @@ const MapTopologyView: React.FC = () => {
         setStatusMsg(`已导入 ${imported.length} 节点, ${importedEdges.length} 条连线（阀室链路已合并）`)
     }, [mapInstance, rawPipelineData, topoNodes.length])
 
+    // ================== 截断仿真 ==================
+    const runCutoffSimulation = useCallback(() => {
+        if (!cutoffNodeId || topoNodes.length === 0) return
+        const gn = topoNodes.map(n => ({ id: n.id, name: n.name, type: n.type }))
+        const ge = topoEdges.map(e => ({ id: e.id, startNodeId: e.startNodeId, endNodeId: e.endNodeId }))
+        const result = simulateCutoff(gn, ge, cutoffNodeId)
+        setCutoffResult(result)
+
+        // ---- 地图高亮渲染 ----
+        // 先恢复所有已高亮节点
+        for (const [nid, origContent] of highlightedMarkersRef.current) {
+            const nd = nodesRef.current.find(n => n.id === nid)
+            nd?.marker?.setContent(origContent)
+        }
+        highlightedMarkersRef.current.clear()
+
+        // 截断节点：大红圆
+        const cutNode = nodesRef.current.find(n => n.id === cutoffNodeId)
+        if (cutNode?.marker) {
+            const orig = cutNode.marker.getContent()
+            highlightedMarkersRef.current.set(cutoffNodeId, orig)
+            cutNode.marker.setContent(
+                `<div style="width:18px;height:18px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 10px #ef4444;"></div>`
+            )
+        }
+
+        // 断供节点：深红
+        for (const aNode of result.affectedNodes) {
+            const nd = nodesRef.current.find(n => n.id === aNode.id)
+            if (!nd?.marker) continue
+            const orig = nd.marker.getContent()
+            if (!highlightedMarkersRef.current.has(aNode.id)) {
+                highlightedMarkersRef.current.set(aNode.id, orig)
+            }
+            const color = aNode.status === 'supply_lost' ? '#991b1b' : '#f97316'
+            const size = aNode.status === 'supply_lost' ? 12 : 10
+            nd.marker.setContent(
+                `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:1.5px solid #fff;"></div>`
+            )
+        }
+
+        const lostCount = result.summary.supplyLost
+        setStatusMsg(`仿真完成：${lostCount} 个断供，${result.summary.rerouted} 个绕行，${result.summary.same} 个不受影响`)
+    }, [cutoffNodeId, topoNodes, topoEdges])
+
+    /** 清除截断仿真高亮，恢复原始样式 */
+    const clearCutoffHighlight = useCallback(() => {
+        for (const [nid, origContent] of highlightedMarkersRef.current) {
+            const nd = nodesRef.current.find(n => n.id === nid)
+            nd?.marker?.setContent(origContent)
+        }
+        highlightedMarkersRef.current.clear()
+        setCutoffNodeId(null)
+        setCutoffResult(null)
+        setStatusMsg('截断仿真已清除')
+    }, [])
+
     // ================== 验证 ==================
     const runValidation = useCallback(() => {
         const gn = topoNodes.map(n => ({ id: n.id, name: n.name, type: n.type }))
@@ -473,6 +614,7 @@ const MapTopologyView: React.FC = () => {
                             { id: 'validate' as PanelTab, label: '验证', icon: 'verified' },
                             { id: 'search' as PanelTab, label: '搜索', icon: 'search' },
                             { id: 'centrality' as PanelTab, label: '枢纽', icon: 'stars' },
+                            { id: 'cutoff' as PanelTab, label: '截断', icon: 'cut' },
                         ]).map(tab => (
                             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                                 className={`flex-1 py-2.5 text-[11px] flex items-center justify-center gap-1 transition-all border-b-2
@@ -538,6 +680,9 @@ const MapTopologyView: React.FC = () => {
                                 </div>
 
                                 <div className="flex gap-1.5 pt-1">
+                                    <button onClick={doUndo} disabled={undoStack.length === 0} className="flex-1 bg-blue-900/40 hover:bg-blue-800 text-blue-400 py-2 rounded-lg text-xs border border-blue-800/40 transition-colors disabled:opacity-40 flex items-center justify-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">undo</span>撤销{undoStack.length > 0 ? `(${undoStack.length})` : ''}
+                                    </button>
                                     <button onClick={exportJSON} disabled={topoNodes.length === 0} className="flex-1 bg-green-900/40 hover:bg-green-800 text-green-400 py-2 rounded-lg text-xs border border-green-800/40 transition-colors disabled:opacity-40">导出</button>
                                     <button onClick={clearAll} disabled={topoNodes.length === 0} className="flex-1 bg-red-900/40 hover:bg-red-800 text-red-400 py-2 rounded-lg text-xs border border-red-800/40 transition-colors disabled:opacity-40">清空</button>
                                 </div>
@@ -596,6 +741,149 @@ const MapTopologyView: React.FC = () => {
                                     ))}
                                     {!searchText.trim() && <p className="text-center text-gray-500 text-[10px] py-3">{topoNodes.length > 0 ? `${topoNodes.length} 个节点` : '请先导入拓扑'}</p>}
                                 </div>
+                            </div>
+                        )}
+
+                        {/* 截断仿真 */}
+                        {activeTab === 'cutoff' && (
+                            <div className="space-y-2">
+                                {/* 搜索截断点 */}
+                                <div>
+                                    <p className="text-[10px] text-gray-500 mb-1 uppercase tracking-wider">选择截断节点</p>
+                                    <input
+                                        className="w-full bg-gray-900/60 border border-gray-700/60 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500/50"
+                                        placeholder="搜索节点名称..."
+                                        value={cutoffSearch}
+                                        onChange={e => setCutoffSearch(e.target.value)}
+                                    />
+                                    {/* 搜索结果列表 */}
+                                    {cutoffSearch.trim() && (
+                                        <div className="mt-1 max-h-32 overflow-y-auto space-y-0.5">
+                                            {searchNodes(
+                                                topoNodes.map(n => ({ id: n.id, name: n.name, type: n.type })),
+                                                cutoffSearch
+                                            ).map(node => (
+                                                <button key={node.id}
+                                                    onClick={() => {
+                                                        setCutoffNodeId(node.id)
+                                                        setCutoffResult(null)
+                                                        setCutoffSearch('')
+                                                        setStatusMsg(`截断点已选：${node.name}`)
+                                                    }}
+                                                    className="w-full flex items-center gap-2 p-1.5 rounded text-xs hover:bg-white/5 text-left">
+                                                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: TOPO_COLORS[node.type as keyof typeof TOPO_COLORS] || '#888' }} />
+                                                    <span className="text-gray-300 flex-1 truncate">{node.name}</span>
+                                                    <span className="text-gray-600 text-[10px]">{node.type}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* 当前截断点 */}
+                                {cutoffNodeId && (
+                                    <div className="bg-red-900/20 border border-red-700/40 rounded-lg p-2">
+                                        <p className="text-[10px] text-red-400 mb-0.5">截断点</p>
+                                        <p className="text-xs text-white font-medium truncate">
+                                            {topoNodes.find(n => n.id === cutoffNodeId)?.name ?? cutoffNodeId}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* 操作按钮 */}
+                                <div className="flex gap-1.5">
+                                    <button
+                                        onClick={runCutoffSimulation}
+                                        disabled={!cutoffNodeId || topoNodes.length === 0}
+                                        className="flex-1 bg-red-800/50 hover:bg-red-700 text-red-300 py-2 rounded-lg text-xs border border-red-700/40 transition-colors disabled:opacity-40 flex items-center justify-center gap-1">
+                                        <span className="material-symbols-outlined text-sm">play_arrow</span>运行仿真
+                                    </button>
+                                    <button
+                                        onClick={clearCutoffHighlight}
+                                        disabled={!cutoffNodeId}
+                                        className="bg-gray-800/60 hover:bg-gray-700 text-gray-400 py-2 px-3 rounded-lg text-xs border border-gray-700/40 transition-colors disabled:opacity-40">
+                                        <span className="material-symbols-outlined text-sm">undo</span>
+                                    </button>
+                                </div>
+
+                                {/* 仿真结果 */}
+                                {cutoffResult && (
+                                    <div className="space-y-2">
+                                        {/* 气源简介 */}
+                                        {cutoffResult.sourceNodes.length > 0 && (
+                                            <div className="bg-blue-900/15 border border-blue-700/30 rounded-lg p-2 text-[10px]">
+                                                <p className="text-blue-400 mb-1">识别到 {cutoffResult.sourceNodes.length} 个气源</p>
+                                                <div className="text-gray-400 space-y-0.5 max-h-16 overflow-y-auto">
+                                                    {cutoffResult.sourceNodes.map(s => (
+                                                        <div key={s.id} className="truncate">· {s.name}</div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 摘要卡片 */}
+                                        <div className="bg-gray-900/60 border border-gray-700/30 rounded-lg p-2.5 text-[10px]">
+                                            <p className="text-gray-400 mb-1.5">分析了 {cutoffResult.totalDistributionNodes} 个分输站</p>
+                                            <div className="flex gap-2">
+                                                <span className="flex-1 bg-red-900/30 rounded px-2 py-1 text-center">
+                                                    <span className="block text-lg font-bold text-red-400">{cutoffResult.summary.supplyLost}</span>
+                                                    <span className="text-gray-500">断供</span>
+                                                </span>
+                                                <span className="flex-1 bg-orange-900/30 rounded px-2 py-1 text-center">
+                                                    <span className="block text-lg font-bold text-orange-400">{cutoffResult.summary.rerouted}</span>
+                                                    <span className="text-gray-500">绕行</span>
+                                                </span>
+                                                <span className="flex-1 bg-green-900/30 rounded px-2 py-1 text-center">
+                                                    <span className="block text-lg font-bold text-green-400">{cutoffResult.summary.same}</span>
+                                                    <span className="text-gray-500">正常</span>
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* 受影响节点列表 */}
+                                        {cutoffResult.affectedNodes.length > 0 && (
+                                            <div className="space-y-0.5 max-h-52 overflow-y-auto">
+                                                <p className="text-[10px] text-gray-500 mb-1">受影响节点</p>
+                                                {cutoffResult.affectedNodes.map(node => (
+                                                    <div key={node.id}
+                                                        className={`px-2 py-1.5 rounded text-[10px] border ${
+                                                            node.status === 'supply_lost'
+                                                                ? 'border-red-800/40 bg-red-900/10'
+                                                                : 'border-orange-800/40 bg-orange-900/10'
+                                                        }`}>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="material-symbols-outlined text-[10px]" style={{
+                                                                color: node.status === 'supply_lost' ? '#f87171' : '#fb923c'
+                                                            }}>
+                                                                {node.status === 'supply_lost' ? 'cancel' : 'alt_route'}
+                                                            </span>
+                                                            <span className="flex-1 truncate text-gray-300">{node.name}</span>
+                                                            <span className={node.status === 'supply_lost' ? 'text-red-400' : 'text-orange-400'}>
+                                                                {node.status === 'supply_lost' ? '断供' : '绕行'}
+                                                            </span>
+                                                        </div>
+                                                        {/* 路径预览 */}
+                                                        {node.status === 'rerouted' && node.pathAfter.length > 0 && (
+                                                            <div className="mt-1 text-[9px] text-gray-600 truncate pl-4">
+                                                                ⤷ {pathIdsToNames(node.pathAfter, topoNodes.map(n => ({ id: n.id, name: n.name, type: n.type }))).join(' → ')}
+                                                            </div>
+                                                        )}
+                                                        {node.status === 'supply_lost' && node.pathBefore.length > 0 && (
+                                                            <div className="mt-1 text-[9px] text-gray-600 truncate pl-4">
+                                                                ⚠ 原路径: {pathIdsToNames(node.pathBefore, topoNodes.map(n => ({ id: n.id, name: n.name, type: n.type }))).join(' → ')}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* 提示 */}
+                                {topoNodes.length === 0 && (
+                                    <p className="text-center text-gray-600 text-[10px] py-4">请先点击「导入拓扑」</p>
+                                )}
                             </div>
                         )}
 

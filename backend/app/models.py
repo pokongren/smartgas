@@ -6,6 +6,37 @@ from datetime import datetime
 # 核心业务模型 (保留兼容性)
 # =================================================================
 
+
+class JunctionGroup(SQLModel, table=True):
+    """跨管线联络点（枢纽）
+    
+    记录不同管线系统之间的物理连接关系。
+    同一枢纽内的站场视为可互通，在构建全国联合拓扑图时
+    会在它们之间添加虚拟互联边。
+    
+    示例：靖边枢纽连接了陕京四线首站和西一线起点。
+    """
+    __tablename__ = "junction_groups"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(title="枢纽名称")                # 靖边枢纽
+    description: Optional[str] = Field(default=None, title="描述")
+    station_ids: str = Field(title="关联站场ID列表(JSON)")  # '["SJ4-1022", "WE1-1"]'
+
+class PipelineSystem(SQLModel, table=True):
+    """管线系统元数据（对应前端 PipelinePackage）
+    
+    每条管线系统（如"西气东输一线"）包含若干图层（干线+支线），
+    此表存储系统级别的分组信息，用于 pipeline-packages API。
+    """
+    __tablename__ = "pipeline_systems"
+    id: str = Field(primary_key=True)        # 'we1', 'we2', 'zm' ...
+    name: str = Field(title="管线系统名称")    # '西气东输一线'
+    color: str = Field(title="主题色")         # '#FF5722'
+    sort_order: int = Field(default=0, title="排序序号")
+    # 图层配置 JSON: [{"name": "西一线干线", "type": "trunk", "id_prefix": "WE1", "visible": true}, ...]
+    layers_config: Optional[str] = Field(default=None, title="图层配置(JSON)")
+
+
 class Station(SQLModel, table=True):
     """通用站场表 (通过各 Sheet 汇总) - 数据质量修复版
     

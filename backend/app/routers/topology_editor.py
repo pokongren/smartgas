@@ -99,6 +99,58 @@ class ConnectionSuggestion(BaseModel):
 
 # ============ API 路由 ============
 
+@router.get("/graph")
+def get_topology_graph(session: Session = Depends(get_session)):
+    """获取整合与捏合后的运行时计算图 (供可视化与仿真使用)"""
+    service = TopologyService(session)
+    # 获取计算图对象（内部已聚合 JunctionGroup）
+    graph_obj = service.get_computation_graph(directed=True)
+    
+    # 组装为前端 D3/Canvas 画布所需结构
+    from app.services.topology_computation import TopologyMetrics
+    
+    nodes_data = []
+    # 获取所有在图中的节点ID（有边相连）来判断孤立
+    connected_ids = set()
+    for e in graph_obj._edges.values():
+        connected_ids.add(e.source)
+        connected_ids.add(e.target)
+        
+    for nid, node in graph_obj._nodes.items():
+        nd = node.to_dict()
+        nd["hasConnection"] = nid in connected_ids
+        nd["designPressure"] = nd.get("pressure_mpa")
+        # 对部分特供前端的名称做修改 (如: type, name)
+        nodes_data.append(nd)
+        
+    edges_data = []
+    for e in graph_obj._edges.values():
+        ed = e.to_dict()
+        ed["category"] = ed.get("type", "branch")
+        ed["diameterMm"] = ed.get("diameter_mm")
+        ed["lengthKm"] = ed.get("length_km")
+        edges_data.append(ed)
+        
+    isolated = [n["id"] for n in nodes_data if not n["hasConnection"]]
+    
+    try:
+        critical_nodes = list(service.find_critical_nodes().keys())
+    except Exception:
+        critical_nodes = []
+        
+    return {
+        "nodes": nodes_data,
+        "edges": edges_data,
+        "isolatedNodes": isolated,
+        "criticalNodes": critical_nodes,
+        "stats": {
+            "nodeCount": graph_obj.node_count,
+            "edgeCount": graph_obj.edge_count,
+            "isolatedCount": len(isolated),
+            "componentCount": 1
+        }
+    }
+
 @router.get("/editor-data", response_model=TopologyData)
 def get_editor_data(session: Session = Depends(get_session)):
     """
@@ -525,3 +577,209 @@ def get_topology_stats(session: Session = Depends(get_session)):
         "trunk_pipelines": trunk_count,
         "branch_pipelines": branch_count
     }
+
+
+# ============ 坐标保存 ============
+
+class UpdatePositionRequest(BaseModel):
+    """更新站场坐标"""
+    longitude: float
+    latitude: float
+
+
+class BatchUpdatePositionRequest(BaseModel):
+    """批量更新坐标"""
+    updates: List[Dict[str, Any]]  # [{id, longitude, latitude}, ...]
+
+
+@router.put("/station/{station_id}/position")
+def update_station_position(
+    station_id: str,
+    request: UpdatePositionRequest,
+    session: Session = Depends(get_session)
+):
+    """前端拖拽节点后保存坐标到数据库"""
+    station = session.get(Station, station_id)
+    if not station:
+        raise HTTPException(status_code=404, detail=f"站场不存在: {station_id}")
+    
+    old_lng, old_lat = station.longitude, station.latitude
+    station.longitude = request.longitude
+    station.latitude = request.latitude
+    session.commit()
+    
+    return {
+        "message": f"{station.name} 坐标已更新",
+        "station_id": station_id,
+        "old": {"longitude": old_lng, "latitude": old_lat},
+        "new": {"longitude": request.longitude, "latitude": request.latitude}
+    }
+
+
+@router.put("/stations/batch-position")
+def batch_update_positions(
+    request: BatchUpdatePositionRequest,
+    session: Session = Depends(get_session)
+):
+    """批量保存多个节点的坐标修改"""
+    results = {"updated": [], "errors": []}
+    
+    for item in request.updates:
+        sid = item.get("id")
+        station = session.get(Station, sid)
+        if not station:
+            results["errors"].append({"id": sid, "error": "站场不存在"})
+            continue
+        station.longitude = item["longitude"]
+        station.latitude = item["latitude"]
+        results["updated"].append(sid)
+    
+    session.commit()
+    return results
+
+
+# ============ 合建站（两站合并） ============
+
+class MergeStationsRequest(BaseModel):
+    """合并两个站场为合建站"""
+    keep_station_id: str       # 保留的站场 ID
+    remove_station_id: str     # 被移除的站场 ID
+    new_name: Optional[str] = None  # 合建站新名称，默认 "A/B合建站"
+
+
+@router.post("/merge-stations")
+def merge_stations(
+    request: MergeStationsRequest,
+    session: Session = Depends(get_session)
+):
+    """
+    合并两个站场为合建站
+    
+    逻辑：
+    1. 保留 keep_station，重命名为合建站
+    2. 将 remove_station 的所有管段端点重定向到 keep_station
+    3. 删除 remove_station
+    4. 自动创建 junction_group 记录
+    5. 删除因合并产生的自环管段
+    """
+    import json as json_mod
+    from app.models import JunctionGroup
+    
+    keep = session.get(Station, request.keep_station_id)
+    remove = session.get(Station, request.remove_station_id)
+    
+    if not keep:
+        raise HTTPException(status_code=404, detail=f"保留站场不存在: {request.keep_station_id}")
+    if not remove:
+        raise HTTPException(status_code=404, detail=f"移除站场不存在: {request.remove_station_id}")
+    if request.keep_station_id == request.remove_station_id:
+        raise HTTPException(status_code=400, detail="不能合并同一个站场")
+    
+    # 记录原始信息
+    old_keep_name = keep.name
+    old_remove_name = remove.name
+    
+    # 1. 重命名保留站场
+    merged_name = request.new_name or f"{old_keep_name}/{old_remove_name}合建站"
+    keep.name = merged_name
+    
+    # 2. 重定向所有管段引用
+    all_pipelines = session.exec(select(Pipeline)).all()
+    redirected = 0
+    self_loops_removed = 0
+    
+    for p in all_pipelines:
+        changed = False
+        if p.start_station_id == request.remove_station_id:
+            p.start_station_id = request.keep_station_id
+            changed = True
+        if p.end_station_id == request.remove_station_id:
+            p.end_station_id = request.keep_station_id
+            changed = True
+        
+        if changed:
+            redirected += 1
+            # 检查是否因合并产生自环
+            if p.start_station_id == p.end_station_id:
+                session.delete(p)
+                self_loops_removed += 1
+    
+    # 3. 删除被移除的站场
+    session.delete(remove)
+    
+    # 4. 创建 junction_group 记录
+    try:
+        junction = JunctionGroup(
+            name=merged_name,
+            description=f"合建站：{old_keep_name} + {old_remove_name}",
+            station_ids=json_mod.dumps([request.keep_station_id])
+        )
+        session.add(junction)
+    except Exception:
+        pass  # junction_groups 表可能未创建
+    
+    session.commit()
+    
+    return {
+        "message": f"合并成功: {old_keep_name} + {old_remove_name} → {merged_name}",
+        "kept_station": {
+            "id": request.keep_station_id,
+            "old_name": old_keep_name,
+            "new_name": merged_name,
+        },
+        "removed_station": {
+            "id": request.remove_station_id,
+            "name": old_remove_name,
+        },
+        "pipelines_redirected": redirected,
+        "self_loops_removed": self_loops_removed,
+    }
+
+# ============ 枢纽组(JunctionGroup)捏合与查询 ============
+
+class CreateJunctionGroupRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    station_ids: List[str]
+
+@router.post("/junctions")
+def create_junction_group(
+    request: CreateJunctionGroupRequest,
+    session: Session = Depends(get_session)
+):
+    """
+    在不删除原站场的情况下，将多个站场捏合为一个大枢纽节点
+    """
+    import json
+    from app.models import JunctionGroup
+    
+    if len(request.station_ids) < 2:
+        raise HTTPException(status_code=400, detail="合并枢纽至少需要包含两个底层站场。")
+        
+    junction = JunctionGroup(
+        name=request.name,
+        description=request.description,
+        station_ids=json.dumps(request.station_ids)
+    )
+    session.add(junction)
+    session.commit()
+    session.refresh(junction)
+    
+    return {"message": f"枢纽 '{request.name}' 合并成功！", "id": junction.id}
+
+@router.get("/junctions")
+def get_junction_groups(session: Session = Depends(get_session)):
+    """获取所有枢纽群组"""
+    from app.models import JunctionGroup
+    import json
+    
+    junctions = session.exec(select(JunctionGroup)).all()
+    results = []
+    for j in junctions:
+        results.append({
+            "id": j.id,
+            "name": j.name,
+            "description": j.description,
+            "station_ids": json.loads(j.station_ids) if j.station_ids else []
+        })
+    return {"junctions": results}

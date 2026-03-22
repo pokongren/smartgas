@@ -5,96 +5,218 @@ description: 天然气管网全生命周期管理系统，整合数据提取、�
 
 # 管道全生命周期管理系统 (Pipeline Master System)
 
-这是 SmartGas 系统的**核心处理大脑**，负责将散乱的数据库记录转化为可视化的屏幕资产。它打通了从底层 SQLite 库提取数据，经由清洗与坐标系映射，转化为 React 驱动的可视化呈现模型的完整闭环。
+SmartGas 的核心处理引擎，将管线数据从录入到可视化渲染的完整闭环。
 
-> **设计理念**: 数据(SQLite) → 提取(Python) → 转换(AI/TS) → 渲染(React) → 智能决策(AI/QA) 的完整闭环
+> **数据流**: 原始数据 → Python 脚本写入数据库 → 后端 API 输出 → 前端地图渲染
 
-## 🚀 AI 代理指令 (执行工作流)
+## 架构概览
 
-当 USER 要求你“绘制某条新管线”、“提取并展示”、“接入全生命周期管理”时，请**严格遵循**以下《一站式接入清单》执行，每完成一步请在你的思维链及对外输出中明确标记进度。
-
-### 阶段一: 提取层 (Extraction Layer)
-
-原始数据库中，干线和支线数据混在一起，且在关系表中里程字段往往会在支线起点发生重置。
-
-**要求动作**: 
-使用后端的提取脚本，从 `smartgas.db` 提取出这根管线的标准层级结构。
-
-- **推荐方案**: 使用 `backend/scripts/batch_extract.py`。
-  1. 使用相关搜索工具或查看文件，往 `PIPELINES` 数组中挂载本次需要提取的管线配置。
-  2. 运行脚本：
-     ```bash
-     python backend/scripts/batch_extract.py
-     ```
-  3. 检查输出目录下是否成功生成了对应的 `xxx_structure.json` 文件（它应该是包含了 `trunk` 和 `branches` 分野的拓扑结构）。
-
-### 阶段二: 转换层 (Transformation Layer) / 数据孪生
-
-你需要将上一步生成的 `xxx_structure.json` 洗练转换为前端可用的 TypeScript 数据模块（通常存放于 `src/data/pipelines/` 目录下）。
-
-**要求动作**:
-1. 读取 `xxx_structure.json` 的内容（如果节点很多，可以通过 `jq` 或 Python 辅助分析提取只含有 `compressor` 或 `distribution` 的重要节点）。
-2. 利用网络搜索功能 (或已知的先验坐标) 查找该管线上所有**主要站场**的真实经纬度。这是可视化点亮的基础！
-3. 创建新的 TypeScript 数据文件（例：`src/data/pipelines/xinqi.ts`）。
-   - 文件需要对外暴露出 `allStations` 和 `allPipelines` 两个集合。
-   - 依赖 `src/utils/mapRenderer.ts` 里的工厂方法，生成虚拟阀室（默认间距可视情况调整为 30-40 KM）。
-
-*数据代码沙盘模板*:
-```typescript
-import { generateStations, generatePipelines } from '../utils/mapRenderer';
-
-// 1. 设置核心站场坐标字典
-const COORDS: Record<string, { lng: number; lat: number }> = {
-    '首站名称': { lng: 116.4, lat: 39.9 },
-    // 录入查找到的所有真实坐标...
-};
-
-// 2. 拷贝提取到的骨干节点
-const TRUNK_NODES = [
-    { name: '首站名称', mileage: 0, type: 'compressor' },
-    // ...
-] as const;
-
-// 3. 经过转换工厂
-export const trunkStations = generateStations(TRUNK_NODES, '设定干线名称', 'TRUNK', 40, COORDS);
-export const trunkPipelines = generatePipelines(trunkStations, '设定干线名称', 'TRUNK', '#4caf50'); // 配置对应色系
-
-// 4. 对外挂载暴露
-export const allStations = [...trunkStations]; // 如果存在支路可使用 spread 重组合并
-export const allPipelines = [...trunkPipelines];
+```
+┌─── 数据源 ───┐    ┌─── 后端数据库 ───┐    ┌─── API 层 ──┐    ┌── 前端渲染 ──┐
+│ 网络搜索坐标  │    │ pipeline_systems │    │ GET /api/   │    │ 地图视图     │
+│ structure.json│ →  │ stations         │ →  │  pipeline-  │ →  │ 管线目录     │
+│ 手工数据录入  │    │ pipelines        │    │  packages   │    │ SCADA 面板   │
+└──────────────┘    └────────────────┘    └────────────┘    └─────────────┘
 ```
 
-### 阶段三: 前端渲染视图集成 (Rendering Layer)
+## 数据库核心表
 
-转换好了数据，需要呈现在操作员的大屏上。
+| 表名 | 说明 | 关键字段 |
+|------|------|----------|
+| `pipeline_systems` | 管线系统注册表 | `id`, `name`, `color`, `layers_config`, `sort_order` |
+| `stations` | 站场表（节点） | `id`, `name`, `type`, `longitude`, `latitude` |
+| `pipelines` | 管段表（边） | `id`, `name`, `start_station_id`, `end_station_id`, `diameter`, `length`, `category` |
 
-**要求动作**:
-1. **聚合注册**：如果你在 `src/data/pipelines/` 创建了新的管线文件，不要忘记在 `src/data/pipelines/index.ts` 中注册并合并它，这样全局视图 (`GlobalPipelineView`) 才能一并显示。
-2. **专属看板**：如果指令倾向于做单管线特写图，可以创建如 `src/views/XxxView.tsx` 并将其挂载到 `src/App.tsx` 的路由以及全局切换悬浮器（`ViewSwitcher`）当中。
+**`layers_config` 格式**（JSON 数组）:
+```json
+[
+  { "id_prefix": "NC", "name": "南昌-上海干线", "type": "trunk", "visible": true },
+  { "id_prefix": "NC-B1", "name": "九江支线", "type": "branch", "visible": false }
+]
+```
 
----
+**站场 ID 命名规则**: `{系统前缀}-{序号}`，如 `NC-1`, `NC-2`
 
-## 🏗️ 核心算法套件及集成组件特性参考
-
-为了你更好地配合项目特性扩展代码，了解当前系统拥有的前沿技术能力至关重要：
-
-### 1. 智能分层防重叠与蜂群聚合 (Swarm Analysis)
-由于管道密集区往往会有上百个虚拟阀室或分输站，在前端 `ClusterDetailPanel.tsx` 与相关 utils 中已经提供了基于缩放因子的聚合与发散策略。当你配置新的管道层展现时，只需确保类型传递正确，聚合算法会自动处理拥堵的重叠图标。
-
-### 2. 管网推演与应急断流 (后端集成)
-在 `app/routers/emergency.py` 和内部 `SimulationEngine` 中已包含了诸如灾害阻断波及半径计算、物理时间轴断流降压推演帧反馈等接口。设计 UI 侧边栏的交互时，可以直接调取该层 API 形成动态红线预警画面。
-
-### 3. RAG 自主决策 (AI / QA Copilot)
-当前已集成于 `src/views/QaView.tsx` 页面。所有由你洗出并生成的前端代码、站场管存逻辑，终端调度员均能通过全局浮层的 SmartGas AI 获取支持，所以你的 JSON 注释以及 TS 常量的名字请保证足够的业务直观性。
+**管段 ID 命名规则**: `{系统前缀}-T-{序号}`（干线）或 `{系统前缀}-B{支线号}-T-{序号}`
 
 ---
 
-## ⚠️ 防御性执行准则 (Troubleshooting)
+## 🚀 一站式接入工作流
 
-如果在 Pipeline 运作链条上遇阻，排错清单如下：
+当用户要求"接入新管线"、"绘制某条管线"时，严格按以下 3 个阶段执行。
 
-- **地图坐标漂移或重叠为一团**: 系统工具类依靠线性插值匹配距离差来放置虚拟节点，**若起点终点或转折点缺失真实坐标极大概率引发插值计算错乱**。请认真穷举核心大站的 `COORDS` 坐标。
-- **JSON 支路里程漂移**: 在使用 `batch_extract.py` 处理 `smartgas.db` 的时候要清晰关注：支线记录在里程字段(mileage) 上是基于自身的"相向里程"，并非总骨干里程。
-- **React 组件不渲染新管线**: 确保所有的 React 路由层引入 (`Suspense/lazy`) 及数据入口点 (`index.ts`) 已经包含你新的构建资产。
+### 阶段一: 数据探查 (Data Discovery)
 
-> 你的使命明确且唯一：接受指令 → 探明物理架构 → 洗练空间坐标 → 融入大屏生态，帮助用户达成 **自动发现并点亮数字化输气管网** 的神迹。
+**目标**: 从数据库查询该管线已有的站场和管段数据，确定需要补充的坐标。
+
+> [!IMPORTANT]
+> **必须先从 `smartgas.db` 查询！** 绝大多数管线的站场和管段已经存在于数据库中，只是缺少坐标或未注册为管线系统。
+
+1. **查询数据库中已有数据**:
+   ```sql
+   -- 查看 node_relation_details 表中是否有该管线
+   SELECT DISTINCT trunk_name, branch_name, COUNT(*) 
+   FROM node_relation_details 
+   WHERE trunk_name LIKE '%南昌%上海%' 
+   GROUP BY trunk_name, branch_name;
+
+   -- 查看 stations 表中是否有相关站场
+   SELECT id, name, type, longitude, latitude 
+   FROM stations 
+   WHERE name LIKE '%南昌%' OR name LIKE '%上海%';
+
+   -- 查看 trunk_pipeline_details 和 branch_pipeline_details
+   SELECT * FROM trunk_pipeline_details WHERE trunk_name LIKE '%关键词%';
+   ```
+
+2. **评估数据完整性**:
+   - ✅ 已有站场 → 只需补充坐标和注册管线系统
+   - ⚠️ 部分有 → 需要用 `batch_extract.py` 提取并补充
+   - ❌ 完全没有 → 需要手动创建（搜索坐标 + 编写导入脚本）
+
+3. **收集缺失的站场坐标**:
+   - **压气站/分输站（锚点）**: 根据站场名称中的**城市名**，使用 `search_web` 搜索该城市的默认经纬度作为站场坐标
+     - 例如："南昌压气站" → 搜索 "南昌 经纬度" → 得到 (115.86, 28.68)
+     - 例如："景德镇分输站" → 搜索 "景德镇 经纬度" → 得到 (117.18, 29.27)
+   - **阀室**: 不需要搜索坐标，在**锚点之间均分插值**（等间距分配，不按里程比例）
+
+3. **整理站场列表**:
+   按里程顺序列出所有站场，格式：
+   ```
+   站场名 | 类型(compressor/distribution/valve) | 经度 | 纬度
+   ```
+
+### 阶段二: 数据库写入 (Database Ingestion)
+
+**目标**: 将管线数据写入 3 张核心表。
+
+使用 Python 脚本完成数据写入，脚本模板见 `scripts/examples/add_pipeline.py`。
+
+**写入步骤（必须按顺序）**:
+
+#### Step 1: 注册管线系统
+
+```python
+import sqlite3, json
+
+conn = sqlite3.connect('backend/data/smartgas.db')
+cur = conn.cursor()
+
+# 获取当前最大 sort_order
+cur.execute("SELECT MAX(sort_order) FROM pipeline_systems")
+max_sort = cur.fetchone()[0] or 0
+
+# layers_config: 定义干线和支线图层
+layers_config = json.dumps([
+    {"id_prefix": "NC", "name": "南昌-上海干线", "type": "trunk", "visible": True},
+    {"id_prefix": "NC-B1", "name": "九江支线", "type": "branch", "visible": False},
+], ensure_ascii=False)
+
+cur.execute("""
+    INSERT INTO pipeline_systems (id, name, color, sort_order, layers_config)
+    VALUES (?, ?, ?, ?, ?)
+""", ('nc', '南昌-上海支干线', '#00BCD4', max_sort + 1, layers_config))
+
+conn.commit()
+```
+
+#### Step 2: 写入站场
+
+```python
+# 站场数据（锚点需真实坐标，阀室可后续均分插值）
+stations = [
+    # (id, name, type, longitude, latitude)
+    ('NC-1', '南昌压气站', 'compressor', 115.86, 28.68),
+    ('NC-2', '南昌1#阀室', 'valve', 0, 0),  # 坐标后续插值
+    ('NC-3', '景德镇分输站', 'distribution', 117.18, 29.27),
+    # ... 更多站场
+]
+
+for s in stations:
+    cur.execute("""
+        INSERT OR IGNORE INTO stations (id, name, type, longitude, latitude)
+        VALUES (?, ?, ?, ?, ?)
+    """, s)
+
+conn.commit()
+```
+
+#### Step 3: 写入管段
+
+```python
+# 管段数据（每两个相邻站场之间一条管段）
+segments = [
+    # (id, name, start_station_id, end_station_id, diameter, length, category)
+    ('NC-T-1', '南昌-上海干线-段1', 'NC-1', 'NC-2', 1016, 45.0, '南昌-上海支干线'),
+    ('NC-T-2', '南昌-上海干线-段2', 'NC-2', 'NC-3', 1016, 52.0, '南昌-上海支干线'),
+    # ... 更多管段
+]
+
+for s in segments:
+    cur.execute("""
+        INSERT OR IGNORE INTO pipelines (id, name, start_station_id, end_station_id, 
+                                         diameter, length, category)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, s)
+
+conn.commit()
+```
+
+#### Step 4: 坐标均分插值
+
+对零坐标的阀室执行均分插值：
+
+```python
+# 获取干线站场列表（按管段连接顺序）
+# 找到有坐标的锚点，在锚点之间均分中间节点
+from fix_station_coords_equal import compute_equal_spacing
+# ... 或直接内联插值逻辑
+```
+
+### 阶段三: 验证与渲染 (Verification & Rendering)
+
+**目标**: 确认数据正确，前端自动渲染。
+
+1. **API 验证**:
+   ```bash
+   # 检查管线包是否正确返回
+   curl http://localhost:8000/api/pipeline-packages | python -m json.tool | grep "南昌"
+   ```
+
+2. **前端验证**:
+   - 打开 `http://localhost:3000/#/global`
+   - 在管线目录中找到新管线
+   - 确认勾选后地图上正确渲染
+
+3. **注意**: 前端有缓存，可能需要**硬刷新** (Ctrl+Shift+R) 清除 API 缓存
+
+> [!IMPORTANT]
+> 前端 `src/data/pipelines/index.ts` 中的 `filterLayers()` 函数有**白名单过滤**。
+> 如果新支线需要在管线目录中显示，必须将支线名添加到 `keepList` 数组中：
+> ```typescript
+> const keepList = ['甪直联络线', '广深支干线', '广南支干线', '南昌-上海支干线']  // ← 添加新支线
+> ```
+
+---
+
+## 📁 关键文件索引
+
+| 文件 | 说明 |
+|------|------|
+| `backend/data/smartgas.db` | SQLite 数据库 |
+| `backend/app/routers/pipeline_packages.py` | 管线数据 API（自动从 3 张表组装） |
+| `backend/app/routers/basic.py` | 拓扑图 API + CRUD 接口 |
+| `backend/scripts/batch_extract.py` | 从 `node_relation_details` 表提取拓扑结构 |
+| `backend/scripts/fix_station_coords_equal.py` | 均分插值坐标修复脚本 |
+| `src/data/pipelines/index.ts` | 前端管线加载入口（含图层过滤 + 去重） |
+| `src/views/GlobalPipelineView.tsx` | 全国管网统一视图（地图 + SCADA） |
+
+---
+
+## ⚠️ 注意事项
+
+1. **坐标有效性**: 中国境内坐标范围 70°~140° E, 15°~55° N。零坐标会导致管线汇聚到非洲海域
+2. **ID 唯一性**: 站场 ID 和管段 ID 必须全局唯一，建议使用 `{系统前缀}-{序号}` 格式
+3. **图层过滤**: 前端 `filterLayers()` 默认只保留 trunk 类型 + 白名单支线
+4. **名称匹配**: SCADA 面板呼出按钮依赖 `pkg.name` 精确匹配，添加新管线的 SCADA 需要在 `GlobalPipelineView.tsx` 中添加对应条件
+5. **数据缓存**: 前端有内存缓存，修改数据库后需要刷新页面

@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import '../styles/topology-view.css';
-import { ALL_PIPELINES } from '@/data/pipelines';
+import { loadAllPipelines } from '@/data/pipelines';
+import type { PipelinePackage } from '@/data/pipelines/types';
+import { findIsolatedNodes, computeBetweennessCentrality, countComponents } from '@/utils/topology-validator';
 
 // ============ 类型定义 ============
 
@@ -20,6 +22,7 @@ interface TopoNode {
     vy: number;
     fx: number | null;
     fy: number | null;
+    properties?: Record<string, any> | null;
 }
 
 interface TopoEdge {
@@ -189,7 +192,7 @@ function drawGraph(
     edges: TopoEdge[],
     criticalSet: Set<string>,
     hoveredNodeId: string | null,
-    selectedNodeId: string | null,
+    selectedNodeIds: Set<string>,
     searchMatchIds: Set<string>,
     width: number,
     height: number,
@@ -265,7 +268,7 @@ function drawGraph(
     for (const node of nodes) {
         const isCritical = criticalSet.has(node.id);
         const isHovered = hoveredNodeId === node.id;
-        const isSelected = selectedNodeId === node.id;
+        const isSelected = selectedNodeIds.has(node.id);
         const isSearchMatch = searchMatchIds.has(node.id);
         const baseColor = NODE_COLORS[node.type] || NODE_COLORS.default;
         const radius = isCritical ? CRITICAL_RADIUS : NODE_RADIUS;
@@ -398,7 +401,9 @@ const TopologyView: React.FC = () => {
 
     // 交互
     const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+    const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+    const selectedNodeId = selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null;
+    const [contextMenu, setContextMenu] = useState<{screenX: number, screenY: number} | null>(null);
     const [draggingNode, setDraggingNode] = useState<TopoNode | null>(null);
 
     // 缩放与平移
@@ -409,32 +414,159 @@ const TopologyView: React.FC = () => {
 
     const criticalSetRef = useRef(new Set<string>());
 
-    // ============ 获取数据 ============
+    // ============ 获取数据（从后端 API） ============
     useEffect(() => {
-        fetch('http://localhost:8000/api/topology/graph')
-            .then(r => {
-                if (!r.ok) throw new Error(`API Error: ${r.status}`);
-                return r.json();
-            })
-            .then((json: TopoData) => {
-                console.log('[Topology] Data loaded:', json.nodes?.length, 'nodes,', json.edges?.length, 'edges');
-                console.log('[Topology] Sample node:', json.nodes?.[0]);
-                console.log('[Topology] Node types:', [...new Set(json.nodes?.map(n => n.type) || [])]);
-                setRawData(json);
-                criticalSetRef.current = new Set(json.criticalNodes);
+        const fetchTopologyData = async () => {
+            try {
+                console.log('[Topology] 从后端 API 获取拓扑数据...');
+                const response = await fetch('/api/topology/graph');
+                if (!response.ok) {
+                    throw new Error(`API 请求失败: ${response.status}`);
+                }
+                const data = await response.json();
+
+                const rawNodes: TopoNode[] = (data.nodes || []).map((n: any) => ({
+                    id: n.id,
+                    name: n.name,
+                    type: n.type || 'other',
+                    longitude: n.longitude || 0,
+                    latitude: n.latitude || 0,
+                    designPressure: n.designPressure || null,
+                    capacity: n.capacity || null,
+                    hasConnection: n.hasConnection ?? false,
+                    properties: n.properties || null,
+                    x: 0, y: 0, vx: 0, vy: 0, fx: null, fy: null,
+                }));
+
+                const rawEdges: TopoEdge[] = (data.edges || []).map((e: any) => ({
+                    id: e.id,
+                    name: e.name || '',
+                    source: e.source,
+                    target: e.target,
+                    category: e.category || 'branch',
+                    diameterMm: e.diameterMm || null,
+                    lengthKm: e.lengthKm || 0,
+                }));
+
+                const isolatedNodes: string[] = data.isolatedNodes || [];
+                const criticalNodes: string[] = data.criticalNodes || [];
+
+                console.log(`[Topology] 从 API 获取: ${rawNodes.length} 节点, ${rawEdges.length} 边`);
+
+                setRawData({
+                    nodes: rawNodes,
+                    edges: rawEdges,
+                    isolatedNodes,
+                    criticalNodes,
+                    stats: data.stats || {
+                        nodeCount: rawNodes.length,
+                        edgeCount: rawEdges.length,
+                        isolatedCount: isolatedNodes.length,
+                        componentCount: 1,
+                    },
+                });
+                criticalSetRef.current = new Set(criticalNodes);
                 setLoading(false);
-            })
-            .catch(err => {
-                console.error('Failed to fetch topology data:', err);
+            } catch (err) {
+                console.error('[Topology] API 获取失败，回退到异步加载前端数据:', err);
+                // 回退逻辑：通过 loadAllPipelines 加载前端缓存数据
+                fallbackToFrontendData();
+            }
+        };
+
+        // 回退到前端数据的逻辑（API 失败时使用）
+        const fallbackToFrontendData = async () => {
+            try {
+                const pipelinePackages = await loadAllPipelines()
+                const rawNodes: TopoNode[] = [];
+                const rawEdges: TopoEdge[] = [];
+                const seenNodes = new Set<string>();
+                const seenEdges = new Set<string>();
+
+                pipelinePackages.forEach(pkg => {
+                    pkg.layers.forEach(layer => {
+                        layer.nodes.forEach((n: any) => {
+                            if (!seenNodes.has(n.id)) {
+                                seenNodes.add(n.id);
+                                rawNodes.push({
+                                    id: n.id,
+                                    name: n.name,
+                                    type: n.type || 'other',
+                                    longitude: n.coordinate?.[0] || 0,
+                                    latitude: n.coordinate?.[1] || 0,
+                                    designPressure: n.designPressure || null,
+                                    capacity: null,
+                                    hasConnection: false,
+                                    x: 0, y: 0, vx: 0, vy: 0, fx: null, fy: null
+                                });
+                            }
+                        });
+                        layer.lines.forEach((l: any) => {
+                            const edgeIdStr = [l.startNodeId, l.endNodeId].sort().join('-');
+                            if (!seenEdges.has(edgeIdStr)) {
+                                seenEdges.add(edgeIdStr);
+                                rawEdges.push({
+                                    id: l.id || edgeIdStr,
+                                    name: l.name || layer.name,
+                                    source: l.startNodeId,
+                                    target: l.endNodeId,
+                                    category: layer.type || 'branch',
+                                    diameterMm: l.diameter || null,
+                                    lengthKm: l.length || 0,
+                                });
+                            }
+                        });
+                    });
+                });
+
+                // 标记连接关系
+                const connectedIds = new Set<string>();
+                rawEdges.forEach(e => { connectedIds.add(e.source); connectedIds.add(e.target); });
+                rawNodes.forEach(n => { n.hasConnection = connectedIds.has(n.id); });
+
+                const gNodes = rawNodes.map(n => ({ id: n.id, name: n.name, type: n.type }));
+                const gEdges = rawEdges.map(e => ({ id: e.id, startNodeId: e.source, endNodeId: e.target }));
+                const isolated = findIsolatedNodes(gNodes, gEdges);
+                const centralityMap = computeBetweennessCentrality(gNodes, gEdges);
+                const compCount = countComponents(gNodes, gEdges);
+                const criticalNodes = Array.from(centralityMap.entries())
+                    .sort((a, b) => b[1] - a[1]).slice(0, 5).map(entry => entry[0]);
+
+                setRawData({
+                    nodes: rawNodes,
+                    edges: rawEdges,
+                    isolatedNodes: isolated,
+                    criticalNodes,
+                    stats: {
+                        nodeCount: rawNodes.length,
+                        edgeCount: rawEdges.length,
+                        isolatedCount: isolated.length,
+                        componentCount: compCount
+                    }
+                });
+                criticalSetRef.current = new Set(criticalNodes);
                 setLoading(false);
-            });
+            } catch (err) {
+                console.error('前端数据回退也失败:', err);
+                setLoading(false);
+            }
+        };
+
+        fetchTopologyData();
     }, []);
 
-    // ============ 构建前端硬编码管线与节点的映射 ============
+    // ============ 构建管线与节点的映射（异步加载） ============
     // nodeName -> Set of Package Names
+    const [pipelinePackages, setPipelinePackages] = useState<PipelinePackage[]>([])
+    useEffect(() => {
+        loadAllPipelines()
+            .then(data => setPipelinePackages(data))
+            .catch(() => {}) // 加载失败静默处理，节点过滤会显示全部
+    }, [])
+
     const nodePackagesMap = useMemo(() => {
         const map = new Map<string, Set<string>>();
-        ALL_PIPELINES.forEach(pkg => {
+        pipelinePackages.forEach(pkg => {
             pkg.layers.forEach(layer => {
                 layer.nodes.forEach(n => {
                     if (!map.has(n.name)) map.set(n.name, new Set());
@@ -443,10 +575,9 @@ const TopologyView: React.FC = () => {
             });
         });
         return map;
-    }, []);
+    }, [pipelinePackages]);
 
-    // 管线选择器列表
-    const pipelinePackages = useMemo(() => ALL_PIPELINES, []);
+    // 管线选择器列表（使用异步加载的数据）
 
     // ============ 过滤逻辑 ============
     const { filteredNodes, filteredEdges, visibleStats } = useMemo(() => {
@@ -576,7 +707,7 @@ const TopologyView: React.FC = () => {
         alphaRef.current = 1;
         setZoom(1);
         setPan({ x: 0, y: 0 });
-        setSelectedNodeId(null);
+        setSelectedNodeIds(new Set()); setContextMenu(null);
         setHoveredNodeId(null);
     }, [filteredNodes, filteredEdges, loading, rawData]);
 
@@ -614,12 +745,12 @@ const TopologyView: React.FC = () => {
                 alphaRef.current *= 0.995;
             }
             drawGraph(ctx, nodesRef.current, edgesRef.current, criticalSetRef.current,
-                hoveredNodeId, selectedNodeId, searchMatchIds, w, h, zoom, pan.x, pan.y);
+                hoveredNodeId, selectedNodeIds, searchMatchIds, w, h, zoom, pan.x, pan.y);
             animFrameRef.current = requestAnimationFrame(animate);
         };
         animFrameRef.current = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(animFrameRef.current);
-    }, [loading, hoveredNodeId, selectedNodeId, searchMatchIds, zoom, pan]);
+    }, [loading, hoveredNodeId, selectedNodeIds, searchMatchIds, zoom, pan]);
 
     // ============ 鼠标坐标转换（考虑缩放和平移） ============
     const screenToWorld = useCallback((sx: number, sy: number) => {
@@ -701,12 +832,59 @@ const TopologyView: React.FC = () => {
     }, [draggingNode]);
 
     const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+        setContextMenu(null); // click closes menu
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect) return;
         const { x, y } = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
         const node = findNodeAt(x, y);
-        setSelectedNodeId(node?.id || null);
+        
+        setSelectedNodeIds(prev => {
+            const next = new Set(prev);
+            if (e.shiftKey) {
+                if (node) {
+                    if (next.has(node.id)) next.delete(node.id);
+                    else next.add(node.id);
+                }
+            } else {
+                next.clear();
+                if (node) next.add(node.id);
+            }
+            return next;
+        });
     }, [findNodeAt, screenToWorld]);
+
+    const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
+        if (selectedNodeIds.size > 1) {
+            setContextMenu({ screenX: e.clientX, screenY: e.clientY });
+        }
+    }, [selectedNodeIds]);
+
+    const handleCreateJunction = async () => {
+        if (selectedNodeIds.size < 2) return;
+        try {
+            const nodes = Array.from(selectedNodeIds);
+            const name = prompt("请输入联合大枢纽名称:", `联合大枢纽-` + Date.now().toString().slice(-4));
+            if (!name) return;
+            
+            const res = await fetch('/api/topology/junctions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, station_ids: nodes, description: '前端批量合成' })
+            });
+            if (res.ok) {
+                alert(`超级枢纽【${name}】融合成功！底层有向图已更新。`);
+                setContextMenu(null);
+                setSelectedNodeIds(new Set());
+            } else {
+                const err = await res.text();
+                alert(`合并失败: ${err}`);
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    };
+
 
     // 滚轮缩放
     const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -738,7 +916,7 @@ const TopologyView: React.FC = () => {
         const h = window.innerHeight;
         setZoom(1.5);
         setPan({ x: w / 2 - node.x * 1.5, y: h / 2 - node.y * 1.5 });
-        setSelectedNodeId(firstId);
+        setSelectedNodeIds(new Set([firstId]));
     }, [searchMatchIds]);
 
     // 重置视图
@@ -932,73 +1110,12 @@ const TopologyView: React.FC = () => {
                 <span className="toolbar-zoom">{Math.round(zoom * 100)}%</span>
             </div>
 
-            {/* ====== 西一线 SCADA 浮动参数表（新版） ====== */}
-            <div style={{
-                position: 'absolute',
-                left: '24px',
-                bottom: '80px',
-                width: '480px',
-                height: '295px',
-                display: 'flex',
-                flexDirection: 'column',
-                zIndex: 100,
-                pointerEvents: 'auto',
-                userSelect: 'none',
-                background: 'linear-gradient(135deg, rgba(10,20,30,0.92) 0%, rgba(15,30,20,0.92) 100%)',
-                backdropFilter: 'blur(12px)',
-                borderRadius: '10px',
-                border: '1px solid rgba(16,185,129,0.3)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
-                overflow: 'hidden',
-            }}>
-                {/* 顶部装饰条 */}
-                <div style={{ height: '3px', background: 'linear-gradient(90deg, #10b981, #059669, #10b981)', borderRadius: '10px 10px 0 0' }} />
-                <div style={{ padding: '8px 14px', borderBottom: '1px solid rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: '18px', color: '#10b981' }}>sensors</span>
-                    <span style={{ fontWeight: 'bold', color: '#a7f3d0', fontSize: '13px' }}>西气东输一线</span>
-                    <span style={{ color: '#10b981', fontSize: '10px', background: 'rgba(16,185,129,0.15)', padding: '1px 6px', borderRadius: '9999px', border: '1px solid rgba(16,185,129,0.3)' }}>SCADA 实时</span>
-                </div>
-                <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px', scrollbarWidth: 'thin', scrollbarColor: '#10b98140 transparent' } as React.CSSProperties}>
-                    <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 3px', fontSize: '12px' }}>
-                        <thead>
-                            <tr style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
-                                <th style={{ padding: '2px 6px', textAlign: 'left', fontWeight: 600 }}>站名</th>
-                                <th style={{ padding: '2px 4px', textAlign: 'center', fontWeight: 600 }}>类型</th>
-                                <th style={{ padding: '2px 8px', textAlign: 'right', fontWeight: 600 }}>进站压力</th>
-                                <th style={{ padding: '2px 4px', textAlign: 'center', fontWeight: 600 }}>进温</th>
-                                <th style={{ padding: '2px 8px', textAlign: 'right', fontWeight: 600 }}>出站压力</th>
-                                <th style={{ padding: '2px 4px', textAlign: 'center', fontWeight: 600 }}>出温</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {Object.entries(REAL_SCADA_DATA).map(([name, data]) => {
-                                const isCompressor = /压气站/.test(name);
-                                const typeBadge = isCompressor ? '压' : '分';
-                                const rowBg = isCompressor ? 'rgba(16,185,129,0.07)' : 'rgba(255,255,255,0.03)';
-                                const pColor = (p: number) => p < 6 ? '#f97316' : p > 10 ? '#ef4444' : '#34d399';
-                                return (
-                                    <tr key={name} style={{ background: rowBg }}>
-                                        <td style={{ padding: '5px 6px', borderRadius: '6px 0 0 6px', fontWeight: isCompressor ? 600 : 400, color: '#e2e8f0', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>{name}</td>
-                                        <td style={{ padding: '5px 4px', textAlign: 'center' }}>
-                                            <span style={{ fontSize: '10px', background: isCompressor ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.2)', color: isCompressor ? '#10b981' : '#94a3b8', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>{typeBadge}</span>
-                                        </td>
-                                        <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', color: pColor(data.inP), fontWeight: 600 }}>{data.inP.toFixed(3)}</td>
-                                        <td style={{ padding: '5px 4px', textAlign: 'center', color: '#f97316', fontSize: '11px' }}>{data.inT != null ? `${data.inT}°` : '—'}</td>
-                                        <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', color: pColor(data.outP), fontWeight: 600 }}>{data.outP.toFixed(3)}</td>
-                                        <td style={{ padding: '5px 4px', textAlign: 'center', color: '#fb923c', fontSize: '11px', borderRadius: '0 6px 6px 0' }}>{data.outT != null ? `${data.outT}°` : '—'}</td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
 
             {/* ====== 节点详情侧边栏 ====== */}
             <div className={`topology-detail-panel ${selectedNode ? 'open' : ''}`}>
                 {selectedNode && (
                     <>
-                        <button className="detail-close" onClick={() => setSelectedNodeId(null)}>
+                        <button className="detail-close" onClick={() => setSelectedNodeIds(new Set())}>
                             <span className="material-symbols-outlined">close</span>
                         </button>
                         <div className="detail-header">
@@ -1056,6 +1173,64 @@ const TopologyView: React.FC = () => {
                                 )}
                             </ul>
                         </div>
+                        {/* 新增：枢纽内部分量展示 */}
+                        {selectedNode.properties?.is_super_junction && (
+                            <div className="detail-section">
+                                <h4>调度分量配比 (基于管径权重)</h4>
+                                {(() => {
+                                    const conns = getNodeConnections(selectedNode.id);
+                                    const inflows = conns.filter(c => c.target === selectedNode.id);
+                                    const outflows = conns.filter(c => c.source === selectedNode.id);
+                                    const totalInWeight = inflows.reduce((sum, c) => sum + Math.pow(c.diameterMm || 600, 2), 0) || 1;
+                                    const totalOutWeight = outflows.reduce((sum, c) => sum + Math.pow(c.diameterMm || 600, 2), 0) || 1;
+                                    
+                                    return (
+                                        <div className="dispatch-components">
+                                            {/* 进气流向区域 */}
+                                            <div style={{marginBottom: 10}}>
+                                                <div style={{fontSize: 12, color: '#94a3b8', marginBottom: 4}}>进气配比 (Inflow)</div>
+                                                {inflows.map(c => {
+                                                    const w = Math.pow(c.diameterMm || 600, 2);
+                                                    const pct = ((w / totalInWeight) * 100).toFixed(1);
+                                                    return (
+                                                        <div key={c.id} style={{display: 'flex', alignItems: 'center', marginBottom: 4, fontSize: 11}}>
+                                                            <div style={{width: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 4, color: '#10b981'}} title={c.name}>{c.name}</div>
+                                                            <div style={{flex: 1, height: 6, background: '#334155', borderRadius: 3, overflow: 'hidden', marginRight: 8}}>
+                                                                <div style={{width: `${pct}%`, height: '100%', background: '#10b981'}} />
+                                                            </div>
+                                                            <div style={{width: 35, textAlign: 'right'}}>{pct}%</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                                {inflows.length === 0 && <div style={{fontSize: 11, color: '#64748b'}}>无进气管线</div>}
+                                            </div>
+                                            {/* 出气流向区域 */}
+                                            <div>
+                                                <div style={{fontSize: 12, color: '#94a3b8', marginBottom: 4}}>出气配比 (Outflow)</div>
+                                                {outflows.map(c => {
+                                                    const w = Math.pow(c.diameterMm || 600, 2);
+                                                    const pct = ((w / totalOutWeight) * 100).toFixed(1);
+                                                    return (
+                                                        <div key={c.id} style={{display: 'flex', alignItems: 'center', marginBottom: 4, fontSize: 11}}>
+                                                            <div style={{width: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 4, color: '#3b82f6'}} title={c.name}>{c.name}</div>
+                                                            <div style={{flex: 1, height: 6, background: '#334155', borderRadius: 3, overflow: 'hidden', marginRight: 8}}>
+                                                                <div style={{width: `${pct}%`, height: '100%', background: '#3b82f6'}} />
+                                                            </div>
+                                                            <div style={{width: 35, textAlign: 'right'}}>{pct}%</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                                {outflows.length === 0 && <div style={{fontSize: 11, color: '#64748b'}}>无出气管线</div>}
+                                            </div>
+                                            {/* 内部原节点列表 */}
+                                            <div style={{marginTop: 8, fontSize: 11, color: '#64748b', background: '#0f172a', padding: 6, borderRadius: 4}}>
+                                                <strong>内部合并站场:</strong> {selectedNode.properties.original_stations?.join(', ') || '未知'}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        )}
                     </>
                 )}
             </div>

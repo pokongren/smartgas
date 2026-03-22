@@ -1,0 +1,12 @@
+[tool.pyrefly]
+# 项目搜索路径配置
+search_path = [
+    "backend",
+    "backend/app",
+]
+
+# Python 版本
+python_version = "3.14"
+
+# site-packages 路径
+site_package_path = "C:\\Python314\\Lib\\site-packages"
