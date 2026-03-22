@@ -1,12 +1,20 @@
 import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import AiAssistant from './components/ai-assistant/AiAssistant';
 
 // ✅ 路由级代码分割 - 动态导入视图组件
 const CorpView = lazy(() => import('./views/CorpView'));
 const TechView = lazy(() => import('./views/TechView'));
 const MapDemo = lazy(() => import('./views/MapDemo'));
 const GlobalPipelineView = lazy(() => import('./views/GlobalPipelineView'));
-const QaView = lazy(() => import('./views/QaView'));
+const WorkflowView = lazy(() => import('./views/WorkflowView'));
+const TopologyView = lazy(() => import('./views/TopologyView'));
+const MapTopologyView = lazy(() => import('./views/MapTopologyView'));
+const TopologyDemoView = lazy(() => import('./views/TopologyDemoView'));
+
+// 独立弹窗组件
+import { AiAssistantStandalone } from './components/ai-assistant/AiAssistant';
+import { ScadaStandalone } from './views/GlobalPipelineView';
 
 /**
  * 页面加载状态组件
@@ -31,7 +39,9 @@ const ViewSwitcher: React.FC = () => {
   const isTech = location.pathname === '/tech';
   const isMapDemo = location.pathname === '/map-demo';
   const isGlobal = location.pathname === '/global';
-  const isQa = location.pathname === '/qa';
+  const isWorkflow = location.pathname === '/workflow';
+  const isTopology = location.pathname === '/topology';
+  const isMapTopology = location.pathname === '/map-topology';
 
   // 地图演示页面不显示切换按钮
   if (isMapDemo) return null;
@@ -43,14 +53,36 @@ const ViewSwitcher: React.FC = () => {
       </div>
 
       <button
-        onClick={() => navigate('/qa')}
-        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isQa
+        onClick={() => navigate('/map-topology')}
+        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isMapTopology
+          ? 'bg-teal-600 text-white shadow-teal-500/50'
+          : 'bg-gray-700 text-white hover:bg-teal-500'
+          }`}
+        title="地图拓扑管理"
+      >
+        <span className="material-symbols-outlined text-2xl">conversion_path</span>
+      </button>
+
+      <button
+        onClick={() => navigate('/topology')}
+        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isTopology
           ? 'bg-cyan-600 text-white shadow-cyan-500/50'
           : 'bg-gray-700 text-white hover:bg-cyan-500'
           }`}
-        title="智能管网问答助手"
+        title="Canvas 拓扑图"
       >
-        <span className="material-symbols-outlined text-2xl">smart_toy</span>
+        <span className="material-symbols-outlined text-2xl">hub</span>
+      </button>
+
+      <button
+        onClick={() => navigate('/workflow')}
+        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isWorkflow
+          ? 'bg-violet-600 text-white shadow-violet-500/50'
+          : 'bg-gray-700 text-white hover:bg-violet-500'
+          }`}
+        title="AI 工作流"
+      >
+        <span className="material-symbols-outlined text-2xl">neurology</span>
       </button>
 
       <button
@@ -84,10 +116,27 @@ const ViewSwitcher: React.FC = () => {
  * 应用主组件
  * 配置路由和 Suspense 加载状态
  */
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const location = useLocation();
+  const isPopout = location.pathname.startsWith('/popout');
+
+  // 如果处于独立弹出窗口模式，不渲染主应用的叠加组件 (侧边栏/Switcher 等)
+  if (isPopout) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/popout/assistant" element={<AiAssistantStandalone />} />
+          <Route path="/popout/scada" element={<ScadaStandalone />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  // 常规主应用渲染逻辑
   return (
-    <HashRouter>
+    <>
       <ViewSwitcher />
+      <AiAssistant />
       {/* ✅ Suspense 包裹路由，提供懒加载状态 */}
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -95,9 +144,20 @@ const App: React.FC = () => {
           <Route path="/tech" element={<TechView />} />
           <Route path="/map-demo" element={<MapDemo />} />
           <Route path="/global" element={<GlobalPipelineView />} />
-          <Route path="/qa" element={<QaView />} />
+          <Route path="/workflow" element={<WorkflowView />} />
+          <Route path="/topology" element={<TopologyView />} />
+          <Route path="/map-topology" element={<MapTopologyView />} />
+          <Route path="/topology-demo" element={<TopologyDemoView />} />
         </Routes>
       </Suspense>
+    </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <HashRouter>
+      <AppContent />
     </HashRouter>
   );
 };

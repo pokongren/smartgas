@@ -16,7 +16,7 @@ const TechView: React.FC = () => {
               <span className="material-symbols-outlined !text-[32px]">hub</span>
             </div>
             <div>
-              <h2 className="text-white text-lg font-bold leading-tight tracking-tight uppercase">全国天然气管网</h2>
+              <h2 className="text-white text-lg font-bold leading-tight tracking-tight uppercase">智脉平台-全国天然气管网</h2>
               <p className="text-xs text-slate-400 font-medium tracking-wider">监测系统 V2.4</p>
             </div>
           </div>

@@ -40,10 +40,10 @@ const CLUSTER_CONFIG = {
     EXPAND_CLUSTER_ZOOM: 12,
 
     /** 螺旋偏移半径（像素） */
-    SPIRAL_RADIUS: 30,
+    SPIRAL_RADIUS: 40,
 
     /** 螺旋偏移间距（像素） */
-    SPIRAL_SEPARATION: 25,
+    SPIRAL_SEPARATION: 30,
 
     /** 聚合标记最大显示数量 */
     MAX_CLUSTER_COUNT: 99,
@@ -71,8 +71,8 @@ export const PRESSURE_COLORS = {
  * 压气站图标配置 - 右小左宽梯形
  */
 const COMPRESSOR_ICON_CONFIG = {
-    WIDTH: 32,
-    HEIGHT: 24,
+    WIDTH: 22,
+    HEIGHT: 16,
     COLOR: '#00d4ff',
     DPR: Math.min(window.devicePixelRatio || 1, 2),
 } as const
@@ -346,6 +346,90 @@ export function clearClusterCache(): void {
     cachedNodesKey = ''
 }
 
+// -----------------------------------------------------------------------------
+// 节点拖拽映射管理器
+// NOTE: 维护 nodeId → marker 和 nodeId → polylines 的映射关系
+//       拖拽节点时通过映射表查找关联管线并实时更新路径
+// -----------------------------------------------------------------------------
+
+/** nodeId → AMap.Marker 实例 */
+const nodeMarkerMap = new Map<string, any>()
+
+/** 
+ * 获取所有节点的 Marker 实例映射表
+ * 暴露给外部用于基于操作 DOM 的实时状态更新（绕过 React 渲染周期避免卡顿）
+ */
+export function getNodeMarkerMap(): Map<string, any> {
+    return nodeMarkerMap
+}
+
+/** nodeId → 关联的 polyline 及其角色（start=管线起点 / end=管线终点） */
+const nodePolylinesMap = new Map<string, { polyline: any; role: 'start' | 'end'; line: PipelineLine }[]>()
+
+/**
+ * 将管线注册到节点拖拽映射表
+ * 渲染管线时调用，建立 nodeId → polylines 的关联
+ */
+function registerPolylineMapping(line: PipelineLine, polyline: any): void {
+    // 注册起点
+    if (line.startNodeId) {
+        if (!nodePolylinesMap.has(line.startNodeId)) {
+            nodePolylinesMap.set(line.startNodeId, [])
+        }
+        nodePolylinesMap.get(line.startNodeId)!.push({ polyline, role: 'start', line })
+    }
+    // 注册终点
+    if (line.endNodeId) {
+        if (!nodePolylinesMap.has(line.endNodeId)) {
+            nodePolylinesMap.set(line.endNodeId, [])
+        }
+        nodePolylinesMap.get(line.endNodeId)!.push({ polyline, role: 'end', line })
+    }
+}
+
+/**
+ * 节点拖拽时更新所有关联管线的端点
+ * @param nodeId 被拖拽的节点 ID
+ * @param newLng 新的经度
+ * @param newLat 新的纬度
+ */
+function updateConnectedPolylines(nodeId: string, newLng: number, newLat: number): void {
+    const connections = nodePolylinesMap.get(nodeId)
+    if (!connections) return
+
+    for (let i = 0; i < connections.length; i++) {
+        const { polyline, role } = connections[i]
+        try {
+            const currentPath = polyline.getPath()
+            if (!currentPath || currentPath.length < 2) continue
+
+            // 将 AMap.LngLat 数组转为普通数组
+            const pathArr = currentPath.map((p: any) => [p.lng || p.getLng(), p.lat || p.getLat()])
+
+            if (role === 'start') {
+                // 更新管线起点
+                pathArr[0] = [newLng, newLat]
+            } else {
+                // 更新管线终点
+                pathArr[pathArr.length - 1] = [newLng, newLat]
+            }
+
+            polyline.setPath(pathArr)
+        } catch (e) {
+            // 更新失败时静默忽略
+        }
+    }
+}
+
+/**
+ * 清除拖拽映射表
+ * 在重新渲染或销毁时调用
+ */
+export function clearDragMappings(): void {
+    nodeMarkerMap.clear()
+    nodePolylinesMap.clear()
+}
+
 /**
  * 使用 Canvas 绘制压气站梯形图标 - 右小左宽
  * @returns DataURL 格式的图片
@@ -582,7 +666,24 @@ function createCompressorMarkerContent(rotation: number = 0): HTMLElement {
 }
 
 /**
- * 创建偏移后的节点标记
+ * 创建圆形节点的 HTML 内容
+ * NOTE: 由于 AMap.CircleMarker 不支持 draggable，统一使用 AMap.Marker + HTML 模拟
+ */
+function createCircleNodeContent(color: string, size: number, strokeColor: string, strokeWidth: number): string {
+    return `<div style="
+        width: ${size * 2}px;
+        height: ${size * 2}px;
+        border-radius: 50%;
+        background: ${color};
+        border: ${strokeWidth}px solid ${strokeColor};
+        cursor: move;
+        box-shadow: 0 0 6px rgba(0,0,0,0.4);
+    "></div>`
+}
+
+/**
+ * 创建偏移后的节点标记 — 可拖拽版
+ * 所有节点统一使用 AMap.Marker（支持 draggable），拖拽时关联管线自动跟随
  */
 function createOffsetNodeMarker(
     map: any,
@@ -597,10 +698,12 @@ function createOffsetNodeMarker(
     const isDistribution = node.name.includes('分输站') || node.name.includes('门站')
 
     let marker: any
+    let markerSize: number  // 用于计算 offset 居中
 
     if (isCompressor) {
         const rotation = node.properties?.rotation || 0
         const content = createCompressorMarkerContent(rotation)
+        markerSize = COMPRESSOR_ICON_CONFIG.WIDTH
 
         marker = new AMap.Marker({
             position: [position.longitude, position.latitude],
@@ -609,37 +712,39 @@ function createOffsetNodeMarker(
                 -COMPRESSOR_ICON_CONFIG.WIDTH / 2,
                 -COMPRESSOR_ICON_CONFIG.HEIGHT / 2
             ),
+            draggable: true,
+            cursor: 'move',
             zIndex: 140,
             extData: { node }
         })
     } else if (isDistribution) {
-        marker = new AMap.CircleMarker({
-            center: [position.longitude, position.latitude],
-            radius: 8,
-            fillColor: '#ffd700',
-            fillOpacity: 0.9,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-            zIndex: 130
+        markerSize = 16
+        marker = new AMap.Marker({
+            position: [position.longitude, position.latitude],
+            content: createCircleNodeContent('#ffd700', 8, '#ffffff', 2),
+            offset: new AMap.Pixel(-markerSize / 2, -markerSize / 2),
+            draggable: true,
+            cursor: 'move',
+            zIndex: 130,
+            extData: { node }
         })
     } else {
-        marker = new AMap.CircleMarker({
-            center: [position.longitude, position.latitude],
-            radius: 5,
-            fillColor: '#e0e0e0',
-            fillOpacity: 0.8,
-            strokeColor: '#666',
-            strokeWeight: 1,
-            zIndex: 120
+        markerSize = 10
+        marker = new AMap.Marker({
+            position: [position.longitude, position.latitude],
+            content: createCircleNodeContent('#e0e0e0', 5, '#666', 1),
+            offset: new AMap.Pixel(-markerSize / 2, -markerSize / 2),
+            draggable: true,
+            cursor: 'move',
+            zIndex: 120,
+            extData: { node }
         })
     }
 
-    if (onClick && marker) {
-        marker.on('click', () => {
-            onClick({ node, position })
-        })
-    }
+    // 注册到映射表，方便管线查找对应 marker
+    nodeMarkerMap.set(node.id, marker)
 
+    // 标签（也跟随拖拽移动）
     const text = new AMap.Text({
         text: node.name,
         position: [position.longitude, position.latitude],
@@ -656,6 +761,23 @@ function createOffsetNodeMarker(
         },
         zIndex: 121
     })
+
+    // NOTE: dragging 事件实时触发，拖拽过程中管线跟随移动
+    marker.on('dragging', (e: any) => {
+        const lng = e.lnglat.getLng()
+        const lat = e.lnglat.getLat()
+        // 更新关联管线端点
+        updateConnectedPolylines(node.id, lng, lat)
+        // 标签跟随移动
+        text.setPosition([lng, lat])
+    })
+
+    if (onClick && marker) {
+        marker.on('click', () => {
+            const pos = marker.getPosition()
+            onClick({ node, position: { longitude: pos.getLng(), latitude: pos.getLat() } })
+        })
+    }
 
     return [marker, text]
 }
@@ -721,6 +843,9 @@ export function renderPipelineLines(
                             onLineClick({ line, position: { longitude: e.lnglat.lng, latitude: e.lnglat.lat } })
                         })
                     }
+
+                    // NOTE: 注册到拖拽映射表，使节点拖动时能联动更新此管线
+                    registerPolylineMapping(line, polyline)
 
                     map.add(polyline)
                     polylines.push(polyline)
@@ -902,7 +1027,7 @@ export function renderPipelineNodesWithClustering(
 
                             // 轻量级自适应不重叠算法：角度步进黄金角，距离按索引平方根递增
                             const angle = idx * goldenAngle
-                            const offsetDistance = nodeCount <= 1 ? 0 : 18 + Math.sqrt(idx) * 14
+                            const offsetDistance = nodeCount <= 1 ? 0 : 28 + Math.sqrt(idx) * 20
 
                             // 计算偏移位置
                             const offsetX = Math.cos(angle) * offsetDistance

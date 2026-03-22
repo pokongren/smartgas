@@ -2,15 +2,23 @@
 管网拓扑图算法服务 - 阶段一：物理基座重塑 (优化版)
 
 核心优化：
-1. 图模板缓存 - 避免重复构建
-2. 惰性加载 - 按需构建有向图
-3. 压力等级系数 - 高压管道存气更多
+1. 整合计算引擎 - 基于 TopologyComputationService 实现高性能图算法
+2. 缓存驱动 - 自动管理 NetworkX 图实例与计算结果
+3. 物理权重 - 计算包含管存与延迟属性的有向拓扑
 """
 
 import networkx as nx
 from sqlmodel import Session, select
 from app.models import Station, Pipeline
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
+from app.services.topology_computation import (
+    topology_service, 
+    TopologyGraph, 
+    TopoNode, 
+    TopoEdge,
+    NodeType,
+    EdgeType
+)
 
 
 class TopologyService:
@@ -18,199 +26,166 @@ class TopologyService:
     管网拓扑图算法服务
     
     支持：
-    - 无向图（兼容旧代码）
-    - 有向图（仿真推演，带物理权重）
+    - 无向图（兼容旧代码，用于连通性分析）
+    - 有向图（用于物理仿真与流向推演）
     """
     
     def __init__(self, session: Session):
         self.session = session
-        self._graph: Optional[nx.Graph] = None
-        self._directed_graph: Optional[nx.DiGraph] = None
-        self._graph_template: Optional[nx.DiGraph] = None
     
     @property
     def graph(self) -> nx.Graph:
-        """兼容旧代码：返回无向图"""
-        if self._graph is None:
-            self._graph = self._build_graph()
-        return self._graph
+        """兼容旧代码：返回无向图句柄"""
+        return self.get_computation_graph(directed=False).graph
     
     def get_directed_graph(self) -> nx.DiGraph:
-        """获取带有物理权重的有向图（用于仿真推演）"""
-        if self._directed_graph is None:
-            self._directed_graph = self._build_directed_graph()
-        return self._directed_graph
-    
-    def get_graph_template(self) -> nx.DiGraph:
-        """获取图模板（用于快速复制）"""
-        if self._graph_template is None:
-            self._graph_template = self._build_directed_graph()
-        return self._graph_template
-    
+        """获取带有物理权重的有向图句柄"""
+        return self.get_computation_graph(directed=True).graph
+
+    def get_computation_graph(self, directed: bool = True) -> TopologyGraph:
+        """获取已构建的 TopologyGraph 实例（带缓存管理）"""
+        cache_key = f"db_graph_{'directed' if directed else 'undirected'}"
+        graph = topology_service.get_graph(cache_key)
+        if graph is None:
+            graph = self._build_computation_graph(directed)
+            topology_service._graphs[cache_key] = graph
+        return graph
+
     def refresh(self):
-        """刷新所有缓存的图"""
-        self._graph = None
-        self._directed_graph = None
-        self._graph_template = None
+        """刷新所有缓存的图及计算指标"""
+        topology_service.clear_cache()
+        # 移除以 db_graph_ 开头的内部缓存图
+        keys_to_del = [k for k in topology_service._graphs if k.startswith("db_graph_")]
+        for key in keys_to_del:
+            del topology_service._graphs[key]
     
-    def _build_graph(self) -> nx.Graph:
-        """从数据库构建 NetworkX 无向图（兼容旧代码）"""
-        G = nx.Graph()
+    def _build_computation_graph(self, directed: bool = True) -> TopologyGraph:
+        """从数据库物理模型构建高性能拓扑图"""
+        graph = TopologyGraph(directed=directed)
         
-        # 添加节点 (站场)
+        # 1. 注入节点 (站场)
         stations = self.session.exec(select(Station)).all()
-        for station in stations:
-            G.add_node(
-                station.id,
-                name=station.name,
-                type=station.type,
-                longitude=station.longitude,
-                latitude=station.latitude
-            )
-        
-        # 添加边 (管线) - 使用新字段，兼容旧数据
+        for s in stations:
+            graph.add_node(TopoNode(
+                id=s.id,
+                name=s.name,
+                node_type=NodeType(s.type),
+                longitude=s.longitude,
+                latitude=s.latitude,
+                pressure_mpa=s.design_pressure or 10.0,
+                capacity=s.capacity or 0.0
+            ))
+            
+        # 2. 注入边 (管线)
         pipelines = self.session.exec(select(Pipeline)).all()
-        for pipeline in pipelines:
-            # 数据兼容性处理
-            diameter_mm = pipeline.diameter_mm or (float(pipeline.diameter) if pipeline.diameter else None)
-            length_km = pipeline.length_km or pipeline.length or 0.0
+        for p in pipelines:
+            diameter_mm = p.diameter_mm or (float(p.diameter) if p.diameter else 0.0)
+            length_km = p.length_km or p.length or 0.0
             
-            G.add_edge(
-                pipeline.start_station_id,
-                pipeline.end_station_id,
-                pipeline_id=pipeline.id,
-                name=pipeline.name,
-                weight=length_km,
-                category=pipeline.category,
-                diameter_mm=diameter_mm,
-                length_km=length_km
-            )
-        
-        return G
-    
-    def _build_directed_graph(self) -> nx.DiGraph:
-        """
-        构建带有物理权重的有向图 (DiGraph)
-        
-        特点：
-        1. 方向：start_station -> end_station（气流方向）
-        2. 边属性包含管存和延迟权重
-        3. 支持断流仿真的时间推演
-        """
-        G = nx.DiGraph()
-        
-        # 添加节点 (站场)
-        stations = self.session.exec(select(Station)).all()
-        for station in stations:
-            G.add_node(
-                station.id,
-                name=station.name,
-                type=station.type,
-                longitude=station.longitude,
-                latitude=station.latitude,
-                design_pressure=station.design_pressure
-            )
-        
-        # 添加边 (管线) - 注入物理权重
-        pipelines = self.session.exec(select(Pipeline)).all()
-        for pipeline in pipelines:
-            # 数据兼容性处理
-            diameter_mm = pipeline.diameter_mm or (float(pipeline.diameter) if pipeline.diameter else None)
-            length_km = pipeline.length_km or pipeline.length or 0.0
-            
-            # 计算管存和延迟权重
-            temp_pipeline = Pipeline(
-                diameter_mm=diameter_mm,
+            graph.add_edge(TopoEdge(
+                id=p.id,
+                source=p.start_station_id,
+                target=p.end_station_id,
+                name=p.name,
+                edge_type=EdgeType.TRUNK if p.category == 'trunk' else EdgeType.BRANCH,
                 length_km=length_km,
-                design_pressure_mpa=pipeline.design_pressure_mpa
-            )
-            linepack_volume = temp_pipeline.calculate_linepack_volume()
-            delay_ticks = temp_pipeline.calculate_delay_ticks()
-            
-            # 添加有向边：start -> end
-            G.add_edge(
-                pipeline.start_station_id,
-                pipeline.end_station_id,
-                # 基础属性
-                pipeline_id=pipeline.id,
-                name=pipeline.name,
-                category=pipeline.category,
-                # 物理属性
                 diameter_mm=diameter_mm,
-                length_km=length_km,
-                design_pressure_mpa=pipeline.design_pressure_mpa or 10.0,
-                # 计算属性（管存算子）
-                linepack_volume=linepack_volume,
-                delay_ticks=delay_ticks,
-                # 仿真状态属性（运行时）
-                remaining_ticks=delay_ticks,
-                status='normal',
-                # 权重（用于最短路径计算）
-                weight=length_km
-            )
-        
-        return G
-    
+                design_pressure_mpa=p.design_pressure_mpa or 10.0,
+                # 初始物理值为0，add_edge 会触发自动计算
+                linepack_volume=0.0, 
+                flow_rate=0.0
+            ))
+            
+        return graph
+
     def find_alternative_routes(
         self,
         source: str,
         target: str,
-        blocked_pipelines: List[str] = None
+        blocked_pipelines: Optional[List[str]] = None
     ) -> List[Dict]:
-        """寻找备用路径"""
-        G_temp = self.graph.copy()
+        """寻找两点间的备用路径 (整合高性能路径搜索)"""
+        graph = self.get_computation_graph(directed=False)
         
-        # 移除故障管线
+        # 如果存在阻塞管线，创建临时子图或在搜索时排除
         if blocked_pipelines:
-            edges_to_remove = []
-            for u, v, data in G_temp.edges(data=True):
-                if data.get('pipeline_id') in blocked_pipelines:
-                    edges_to_remove.append((u, v))
-            G_temp.remove_edges_from(edges_to_remove)
-        
-        # 计算最短路径
-        try:
-            path = nx.shortest_path(G_temp, source, target, weight='weight')
-            length = nx.shortest_path_length(G_temp, source, target, weight='weight')
+            # 找到需要保留的节点
+            all_node_ids = set(graph._nodes.keys())
+            # 简化方案：TopologyGraph 目前通过 exclude_nodes 过滤。
+            # 为了过滤“边”，我们目前通过 reconstruct 临时子图。
+            sub = TopologyGraph(directed=False)
+            for nid, node in graph._nodes.items():
+                sub.add_node(node)
+            for eid, edge in graph._edges.items():
+                if eid not in blocked_pipelines:
+                    sub.add_edge(edge)
+            result = sub.find_path(source, target)
+        else:
+            result = graph.find_path(source, target)
             
-            return [{
-                "path": [G_temp.nodes[node]['name'] for node in path],
-                "total_length": round(length, 2),
-                "estimated_time": f"{int(length / 100)}h",
-                "risk_level": "low"
-            }]
-        except nx.NetworkXNoPath:
-            return []
+        if not result: return []
+        
+        # 转换为前端兼容的旧格式数据
+        res_dict = result.to_dict()
+        res_dict["estimated_time"] = f"{int(res_dict['total_length'] / 100)}h"
+        res_dict["risk_level"] = "low"
+        return [res_dict]
     
     def calculate_impact_area(self, failed_pipeline_id: str) -> List[str]:
-        """计算故障管线影响的站场"""
-        pipeline = self.session.exec(
-            select(Pipeline).where(Pipeline.id == failed_pipeline_id)
-        ).first()
+        """计算管线故障导致的受影响站场范围（基于图连通性）"""
+        graph_obj = self.get_computation_graph(directed=False)
+        nx_g = graph_obj.graph
         
-        if not pipeline:
-            return []
+        # 定位需要断开的 A-B 节点对
+        u_v = None
+        for u, v, data in nx_g.edges(data=True):
+            if data.get('id') == failed_pipeline_id:
+                u_v = (u, v)
+                break
         
-        G_temp = self.graph.copy()
-        G_temp.remove_edge(pipeline.start_station_id, pipeline.end_station_id)
+        if not u_v: return []
         
-        components = list(nx.connected_components(G_temp))
-        affected_component = min(components, key=len)
+        # 模拟断开
+        temp_g = nx_g.copy()
+        temp_g.remove_edge(*u_v)
         
+        # 计算连通分量，受影响通常是较小的那个分量（孤岛）
+        components = list(nx.connected_components(temp_g))
+        if len(components) <= 1: return []
+        
+        affected_nodes = min(components, key=len)
         return [
-            self.graph.nodes[node]['name']
-            for node in affected_component
+            graph_obj.get_node(nid).name 
+            for nid in affected_nodes 
+            if graph_obj.get_node(nid)
         ]
     
     def find_critical_nodes(self) -> Dict[str, float]:
-        """识别关键节点 (介数中心性)"""
-        betweenness = nx.betweenness_centrality(self.graph, weight='weight')
+        """智能识别管网枢纽节点 (基于介数中心性)"""
+        graph_obj = self.get_computation_graph(directed=False)
+        centrality = graph_obj.calculate_centrality()
+        
+        # 提取介数中心性前5名并映射名称
+        top_5 = sorted(
+            centrality.betweenness.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:5]
         
         return {
-            self.graph.nodes[node]['name']: round(score, 4)
-            for node, score in sorted(
-                betweenness.items(),
-                key=lambda x: x[1],
-                reverse=True
-            )[:5]
+            graph_obj.get_node(nid).name: round(score, 4)
+            for nid, score in top_5
+            if graph_obj.get_node(nid)
+        }
+    
+    def get_graph_summary(self) -> Dict:
+        """获取全管网拓扑物理概览"""
+        graph_obj = self.get_computation_graph(directed=True)
+        total_linepack = sum(
+            e.linepack_volume for e in graph_obj._edges.values()
+        )
+        return {
+            "node_count": graph_obj.node_count,
+            "edge_count": graph_obj.edge_count,
+            "total_linepack": round(total_linepack, 2)
         }

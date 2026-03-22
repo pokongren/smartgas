@@ -150,7 +150,7 @@ function MapDemo() {
     <div className="map-demo-container">
       {/* 顶部标题栏 */}
       <header className="map-demo-header">
-        <h1 className="map-demo-title">南部管网运行监测系统 (增强版)</h1>
+        <h1 className="map-demo-title">智脉平台-南部管网运行监测系统</h1>
         <button
           className="emergency-button"
           onClick={() => setShowEmergencyPanel(!showEmergencyPanel)}

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from app.database import get_session
 from app.models import Station, Pipeline
-from typing import List
+from typing import List, Dict, Any
 
 router = APIRouter()
 
@@ -123,3 +123,90 @@ def create_pipelines_batch(pipelines: List[Pipeline], session: Session = Depends
     
     session.commit()
     return {"created": len(created), "pipeline_ids": created}
+
+# ============ 拓扑全景接口 ============
+
+@router.get("/topology/graph")
+def get_topology_graph(session: Session = Depends(get_session)) -> Dict[str, Any]:
+    """获取拓扑全景数据，供前端力导向图渲染
+
+    返回所有节点、连线、孤立节点、关键节点和统计信息。
+    前端可据此一次性渲染完整的网络拓扑图。
+    
+    NOTE: 使用原生 SQL 查询管线数据，以兼容数据库 schema 与 ORM 模型不完全一致的情况。
+    """
+    import networkx as nx
+    from sqlalchemy import text
+
+    # 查询站场（Station 模型与表 schema 一致，可直接使用 ORM）
+    stations = session.exec(select(Station)).all()
+
+    # 查询管线（使用原生 SQL 避免 ORM 列映射错误）
+    pipeline_rows = session.exec(
+        text("SELECT id, name, start_station_id, end_station_id, diameter, length, category FROM pipelines")
+    ).all()
+
+    # 构建连接关系集合
+    connected_station_ids: set[str] = set()
+    for row in pipeline_rows:
+        connected_station_ids.add(row[2])  # start_station_id
+        connected_station_ids.add(row[3])  # end_station_id
+
+    # 构建节点列表
+    nodes = []
+    for s in stations:
+        nodes.append({
+            "id": s.id,
+            "name": s.name,
+            "type": s.type,
+            "longitude": s.longitude,
+            "latitude": s.latitude,
+            "designPressure": s.design_pressure,
+            "capacity": s.capacity,
+            "hasConnection": s.id in connected_station_ids,
+        })
+
+    # 构建边列表
+    edges = []
+    for row in pipeline_rows:
+        edges.append({
+            "id": row[0],
+            "name": row[1],
+            "source": row[2],
+            "target": row[3],
+            "category": row[6] or "branch",
+            "diameterMm": float(row[4]) if row[4] else None,
+            "lengthKm": float(row[5]) if row[5] else 0.0,
+        })
+
+    # 孤立节点
+    isolated_ids = [s.id for s in stations if s.id not in connected_station_ids]
+
+    # NOTE: 只用有连接的节点构建图，避免 3506 个孤立节点拖慢计算
+    G = nx.Graph()
+    for row in pipeline_rows:
+        G.add_edge(row[2], row[3])
+
+    critical_ids: list[str] = []
+    if G.number_of_edges() > 0:
+        betweenness = nx.betweenness_centrality(G)
+        sorted_nodes = sorted(betweenness.items(), key=lambda x: x[1], reverse=True)
+        critical_ids = [node_id for node_id, _ in sorted_nodes[:5]]
+
+    # 连通分量数 = 图中的连通分量 + 孤立节点数（每个孤立节点就是一个独立分量）
+    num_components = nx.number_connected_components(G) + len(isolated_ids)
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "isolatedNodes": isolated_ids,
+        "criticalNodes": critical_ids,
+        "stats": {
+            "nodeCount": len(stations),
+            "edgeCount": len(pipeline_rows),
+            "isolatedCount": len(isolated_ids),
+            "componentCount": num_components,
+        },
+    }
+
+

@@ -6,19 +6,22 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent.parent / "data" / "smartgas.db"
 DB_PATH.parent.mkdir(exist_ok=True)
 
-# 数据库连接字符串
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+# 读取环境变量中真实的数据库包（默认回退到 SQLite）
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
 # 是否在日志中回显 SQL 语句
 # 推荐仅在开发环境打开，可通过环境变量覆盖
 SQL_ECHO = os.getenv("SQL_ECHO", "False").lower() in ("true", "1", "t")
 
+connect_args = {}
+if DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+
 # 创建引擎
-# connect_args={"check_same_thread": False} 是解决 SQLite 在多线程中共享连接时的强制配置
 engine = create_engine(
     DATABASE_URL, 
     echo=SQL_ECHO,
-    connect_args={"check_same_thread": False}
+    connect_args=connect_args
 )
 
 def create_db_and_tables():

@@ -14,6 +14,7 @@ PIPELINES = [
     {'trunk_name': '中缅线（国内段）', 'output': 'zm_structure.json'},
     {'trunk_name': '广南支干线',       'output': 'gn_structure.json'},
     {'trunk_name': '广深支干线',       'output': 'gs_structure.json'},
+    {'trunk_name': '西气东输一线',       'output': 'xyx_structure.json'},
 ]
 
 

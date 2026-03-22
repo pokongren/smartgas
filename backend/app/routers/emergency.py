@@ -10,8 +10,9 @@ from app.schemas import (
     TopologySummary
 )
 from app.services.topology import TopologyService
-from app.services.topology_service import PhysicsTopologyService
-from app.services.simulation_service import SimulationEngine
+# NOTE: PhysicsTopologyService 已合并到 TopologyService 中
+PhysicsTopologyService = TopologyService
+from app.services.simulation_service import OptimizedSimulationEngine as SimulationEngine
 from app.services.rag_mock import RAGService
 import logging
 from fastapi import HTTPException

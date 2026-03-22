@@ -2,212 +2,226 @@
   "pipeline_name": "广南支干线",
   "trunk": [
     {
-      "id": 31650,
+      "id": 76700,
       "name": "广州压气站",
       "mileage": 0.0,
       "type": "compressor",
       "branch_name": "广南广东段"
     },
     {
-      "id": 71109,
+      "id": 68295,
+      "name": "横县分输站",
+      "mileage": 0.0,
+      "type": "distribution",
+      "branch_name": "广南广西段"
+    },
+    {
+      "id": 90568,
+      "name": "广西管道南宁分输站",
+      "mileage": 0.0,
+      "type": "distribution",
+      "branch_name": "广西管道与广南支干线南宁联络线"
+    },
+    {
+      "id": 21071,
+      "name": "广南支干线南宁分输站",
+      "mileage": 8.0,
+      "type": "distribution",
+      "branch_name": "广西管道与广南支干线南宁联络线"
+    },
+    {
+      "id": 47700,
       "name": "清远分输站",
       "mileage": 21.1,
       "type": "distribution",
       "branch_name": "广南广东段"
     },
     {
-      "id": 63160,
+      "id": 67069,
       "name": "广南1#阀室",
       "mileage": 41.8381,
       "type": "valve",
       "branch_name": "广南广东段"
     },
     {
-      "id": 96053,
+      "id": 21910,
       "name": "广南2#阀室",
       "mileage": 62.7908,
       "type": "valve",
       "branch_name": "广南广东段"
     },
     {
-      "id": 56195,
+      "id": 72773,
       "name": "佛山分输站",
       "mileage": 79.2,
       "type": "distribution",
       "branch_name": "广南广东段"
     },
     {
-      "id": 16250,
+      "id": 43820,
       "name": "肇庆分输站",
       "mileage": 102.7,
       "type": "distribution",
       "branch_name": "广南广东段"
     },
     {
-      "id": 41929,
+      "id": 93439,
       "name": "广南4#阀室",
       "mileage": 124.8511,
       "type": "valve",
       "branch_name": "广南广东段"
     },
     {
-      "id": 10465,
+      "id": 47272,
       "name": "高要分输站",
       "mileage": 147.6565,
       "type": "distribution",
       "branch_name": "广南广东段"
     },
     {
-      "id": 32715,
+      "id": 42840,
       "name": "广南6#阀室",
       "mileage": 164.5137,
       "type": "valve",
       "branch_name": "广南广东段"
     },
     {
-      "id": 53298,
+      "id": 33559,
       "name": "广南7#阀室",
       "mileage": 185.0642,
       "type": "valve",
       "branch_name": "广南广东段"
     },
     {
-      "id": 80312,
+      "id": 89807,
       "name": "德庆分输站",
       "mileage": 202.6011,
       "type": "distribution",
       "branch_name": "广南广东段"
     },
     {
-      "id": 93032,
+      "id": 18284,
       "name": "广南9#阀室",
       "mileage": 221.5402,
       "type": "valve",
       "branch_name": "广南广东段"
     },
     {
-      "id": 89643,
+      "id": 82917,
       "name": "广南10#阀室",
       "mileage": 236.797,
       "type": "valve",
       "branch_name": "广南广东段"
     },
     {
-      "id": 22068,
+      "id": 60452,
       "name": "广南11#阀室",
       "mileage": 246.2541,
       "type": "valve",
       "branch_name": "广南广东段"
     },
     {
-      "id": 75600,
+      "id": 93126,
       "name": "梧州压气站",
-      "mileage": 566.254,
+      "mileage": 269.9999,
       "type": "compressor",
       "branch_name": "广南广西段"
     },
     {
-      "id": 23033,
+      "id": 18598,
       "name": "广南12#阀室",
-      "mileage": 594.004,
+      "mileage": 297.7499,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 96742,
+      "id": 78676,
       "name": "广南13#阀室",
-      "mileage": 618.5840000000001,
+      "mileage": 322.3299,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 43804,
+      "id": 2675,
       "name": "广南14#阀室",
-      "mileage": 641.48,
+      "mileage": 345.2259,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 5072,
+      "id": 91182,
       "name": "广南15#阀室",
-      "mileage": 665.8199999999999,
+      "mileage": 369.5659,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 62880,
+      "id": 21718,
       "name": "广南16#阀室",
-      "mileage": 694.2049999999999,
+      "mileage": 397.9509,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 55783,
+      "id": 9456,
       "name": "广南17#阀室",
-      "mileage": 721.4839999999999,
+      "mileage": 425.2299,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 71427,
+      "id": 79039,
       "name": "广南18#阀室",
-      "mileage": 744.052,
+      "mileage": 447.7979,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 31945,
+      "id": 48808,
       "name": "广南19#阀室",
-      "mileage": 764.713,
+      "mileage": 468.4589,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 84880,
+      "id": 38077,
       "name": "贵港压气站",
-      "mileage": 781.4839999999999,
+      "mileage": 485.2299,
       "type": "compressor",
       "branch_name": "广南广西段"
     },
     {
-      "id": 85906,
+      "id": 60446,
       "name": "广南20#阀室",
-      "mileage": 812.804,
+      "mileage": 516.5499,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 17604,
+      "id": 21298,
       "name": "广南21#阀室",
-      "mileage": 834.584,
+      "mileage": 538.3299,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 51612,
-      "name": "横县分输站",
-      "mileage": 846.2541,
-      "type": "distribution",
-      "branch_name": "广南广西段"
-    },
-    {
-      "id": 42665,
+      "id": 85052,
       "name": "广南22#阀室",
-      "mileage": 854.007,
+      "mileage": 557.7529,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 81536,
+      "id": 58529,
       "name": "广南23#阀室",
-      "mileage": 877.919,
+      "mileage": 581.6649,
       "type": "valve",
       "branch_name": "广南广西段"
     },
     {
-      "id": 49231,
+      "id": 90515,
       "name": "南宁分输站",
-      "mileage": 895.894,
+      "mileage": 599.6399,
       "type": "distribution",
       "branch_name": "广南广西段"
     }
@@ -215,56 +229,56 @@
   "branches": [
     [
       {
-        "id": 82684,
+        "id": 71661,
         "name": "吴圩分输站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "南宁-凭祥支线（南宁-崇左段）"
       },
       {
-        "id": 35441,
+        "id": 56143,
         "name": "1#阀室",
         "mileage": 20.1,
         "type": "valve",
         "branch_name": "南宁-凭祥支线（南宁-崇左段）"
       },
       {
-        "id": 57404,
+        "id": 21512,
         "name": "苏圩输气站",
         "mileage": 40.49,
         "type": "other",
         "branch_name": "南宁-凭祥支线（南宁-崇左段）"
       },
       {
-        "id": 8087,
+        "id": 43232,
         "name": "2#阀室",
         "mileage": 62.09,
         "type": "valve",
         "branch_name": "南宁-凭祥支线（南宁-崇左段）"
       },
       {
-        "id": 61567,
+        "id": 92418,
         "name": "扶绥输气站",
         "mileage": 62.09,
         "type": "other",
         "branch_name": "南宁-凭祥支线（南宁-崇左段）"
       },
       {
-        "id": 24431,
+        "id": 85833,
         "name": "3#阀室",
         "mileage": 83.89,
         "type": "valve",
         "branch_name": "南宁-凭祥支线（南宁-崇左段）"
       },
       {
-        "id": 98151,
+        "id": 40275,
         "name": "4#阀室",
         "mileage": 105.16,
         "type": "valve",
         "branch_name": "南宁-凭祥支线（南宁-崇左段）"
       },
       {
-        "id": 82519,
+        "id": 60504,
         "name": "崇左输气站",
         "mileage": 114.755,
         "type": "other",
@@ -273,147 +287,147 @@
     ],
     [
       {
-        "id": 75421,
+        "id": 69175,
         "name": "南宁分输站",
         "mileage": 0.0,
         "type": "distribution",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 28373,
+        "id": 57388,
         "name": "南百1#阀室",
         "mileage": 18.816,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 10792,
+        "id": 99369,
         "name": "南百2#阀室",
         "mileage": 36.994,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 94556,
+        "id": 47583,
         "name": "吴圩分输站",
         "mileage": 53.49,
         "type": "distribution",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 5118,
+        "id": 66216,
         "name": "南百3#阀室",
         "mileage": 76.857,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 26898,
+        "id": 92566,
         "name": "南百4#阀室",
         "mileage": 90.977,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 53393,
+        "id": 63424,
         "name": "隆安分输站",
         "mileage": 109.65,
         "type": "distribution",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 14786,
+        "id": 61432,
         "name": "南百6#阀室",
         "mileage": 131.156,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 71527,
+        "id": 73627,
         "name": "南百7#阀室",
         "mileage": 151.576,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 23373,
+        "id": 40347,
         "name": "南百8#阀室",
         "mileage": 163.325,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 77727,
+        "id": 79204,
         "name": "南百9#阀室",
         "mileage": 174.413,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 53357,
+        "id": 5534,
         "name": "南百10#阀室",
         "mileage": 180.24,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 93766,
+        "id": 41982,
         "name": "南百11#阀室",
         "mileage": 198.931,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 30400,
+        "id": 35507,
         "name": "南百12#阀室",
         "mileage": 212.949,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 63990,
+        "id": 71927,
         "name": "南百13#阀室",
         "mileage": 230.262,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 93670,
+        "id": 16903,
         "name": "南百14#阀室",
         "mileage": 244.85,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 28703,
+        "id": 1475,
         "name": "田东分输站",
         "mileage": 244.85,
         "type": "distribution",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 22741,
+        "id": 14666,
         "name": "南百15#阀室",
         "mileage": 263.365,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 43231,
+        "id": 60483,
         "name": "南百16#阀室",
         "mileage": 275.06,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 4856,
+        "id": 42089,
         "name": "南百17#阀室",
         "mileage": 287.014,
         "type": "valve",
         "branch_name": "南宁-百色支线"
       },
       {
-        "id": 34560,
+        "id": 65321,
         "name": "百色末站",
         "mileage": 300.0,
         "type": "distribution",
@@ -422,30 +436,14 @@
     ],
     [
       {
-        "id": 74533,
-        "name": "广西管道南宁分输站",
-        "mileage": 0.0,
-        "type": "distribution",
-        "branch_name": "广西管道与广南支干线南宁联络线"
-      },
-      {
-        "id": 34696,
-        "name": "广南支干线南宁分输站",
-        "mileage": 8.0,
-        "type": "distribution",
-        "branch_name": "广西管道与广南支干线南宁联络线"
-      }
-    ],
-    [
-      {
-        "id": 17955,
+        "id": 85408,
         "name": "广南2#阀室",
         "mileage": 0.0,
         "type": "valve",
         "branch_name": "珊瑚支线"
       },
       {
-        "id": 41461,
+        "id": 84516,
         "name": "珊瑚门站",
         "mileage": 0.17,
         "type": "distribution",
@@ -454,84 +452,84 @@
     ],
     [
       {
-        "id": 72039,
+        "id": 71592,
         "name": "梧州压气站",
         "mileage": 0.0,
         "type": "compressor",
         "branch_name": "苍梧-贺州支线"
       },
       {
-        "id": 86360,
+        "id": 4685,
         "name": "苍梧分输站",
         "mileage": 15.6,
         "type": "distribution",
         "branch_name": "苍梧-贺州支线"
       },
       {
-        "id": 17982,
+        "id": 54620,
         "name": "临港分输站",
         "mileage": 25.478,
         "type": "distribution",
         "branch_name": "苍梧-贺州支线"
       },
       {
-        "id": 45182,
+        "id": 2808,
         "name": "长洲分输站",
         "mileage": 46.0,
         "type": "distribution",
         "branch_name": "苍梧-贺州支线"
       },
       {
-        "id": 52112,
+        "id": 46229,
         "name": "苍贺2#阀室",
         "mileage": 74.291,
         "type": "valve",
         "branch_name": "苍梧-贺州支线"
       },
       {
-        "id": 24599,
+        "id": 29014,
         "name": "苍贺3#阀室",
         "mileage": 100.562,
         "type": "valve",
         "branch_name": "苍梧-贺州支线"
       },
       {
-        "id": 35356,
+        "id": 74733,
         "name": "苍贺4#阀室",
         "mileage": 127.464,
         "type": "valve",
         "branch_name": "苍梧-贺州支线"
       },
       {
-        "id": 35556,
+        "id": 17520,
         "name": "苍贺5#阀室",
         "mileage": 151.3,
         "type": "valve",
         "branch_name": "苍梧-贺州支线"
       },
       {
-        "id": 60572,
+        "id": 45527,
         "name": "苍贺6#阀室",
         "mileage": 168.73,
         "type": "valve",
         "branch_name": "苍梧-贺州支线"
       },
       {
-        "id": 98687,
+        "id": 57970,
         "name": "苍贺7#阀室",
         "mileage": 177.516,
         "type": "valve",
         "branch_name": "苍梧-贺州支线"
       },
       {
-        "id": 17393,
+        "id": 21905,
         "name": "苍贺8#阀室",
         "mileage": 189.404,
         "type": "valve",
         "branch_name": "苍梧-贺州支线"
       },
       {
-        "id": 29690,
+        "id": 39516,
         "name": "贺州末站",
         "mileage": 205.15,
         "type": "distribution",
@@ -540,56 +538,56 @@
     ],
     [
       {
-        "id": 26915,
+        "id": 85925,
         "name": "贵港压气站",
         "mileage": 0.0,
         "type": "compressor",
         "branch_name": "贵港-玉林支线"
       },
       {
-        "id": 21754,
+        "id": 6756,
         "name": "贵玉1#阀室",
         "mileage": 10.2334,
         "type": "valve",
         "branch_name": "贵港-玉林支线"
       },
       {
-        "id": 12623,
+        "id": 47918,
         "name": "贵玉2#阀室",
         "mileage": 17.8464,
         "type": "valve",
         "branch_name": "贵港-玉林支线"
       },
       {
-        "id": 1417,
+        "id": 15371,
         "name": "贵玉3#阀室",
         "mileage": 28.5064,
         "type": "valve",
         "branch_name": "贵港-玉林支线"
       },
       {
-        "id": 22958,
+        "id": 30836,
         "name": "贵玉4#阀室",
         "mileage": 38.5714,
         "type": "valve",
         "branch_name": "贵港-玉林支线"
       },
       {
-        "id": 4583,
+        "id": 83327,
         "name": "贵玉5#阀室",
         "mileage": 62.5964,
         "type": "valve",
         "branch_name": "贵港-玉林支线"
       },
       {
-        "id": 67868,
+        "id": 54404,
         "name": "贵玉6#阀室",
         "mileage": 80.9844,
         "type": "valve",
         "branch_name": "贵港-玉林支线"
       },
       {
-        "id": 67407,
+        "id": 2802,
         "name": "玉林末站",
         "mileage": 99.2964,
         "type": "distribution",
@@ -600,7 +598,6 @@
   "branch_names": [
     "南宁-凭祥支线（南宁-崇左段）",
     "南宁-百色支线",
-    "广西管道与广南支干线南宁联络线",
     "珊瑚支线",
     "苍梧-贺州支线",
     "贵港-玉林支线"

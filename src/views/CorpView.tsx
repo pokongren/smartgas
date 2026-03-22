@@ -13,7 +13,7 @@ const CorpView: React.FC = () => {
             <span className="material-symbols-outlined text-2xl">propane</span>
           </div>
           <h2 className="text-[#111418] dark:text-white text-xl font-bold leading-tight tracking-[-0.015em] font-display">
-            智慧管网 <span className="text-xs opacity-50 font-normal ml-2">政企版</span>
+            智脉平台-智慧管网 <span className="text-xs opacity-50 font-normal ml-2">政企版</span>
           </h2>
         </div>
 
