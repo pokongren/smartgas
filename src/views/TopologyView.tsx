@@ -1089,7 +1089,47 @@ const TopologyView: React.FC = () => {
                 onMouseLeave={handleMouseUp}
                 onClick={handleClick}
                 onWheel={handleWheel}
+                onContextMenu={handleContextMenu}
             />
+
+            {/* ====== 右键菜单 ====== */}
+            {contextMenu && (
+                <div
+                    className="context-menu"
+                    style={{
+                        position: 'fixed',
+                        left: contextMenu.screenX,
+                        top: contextMenu.screenY,
+                        background: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: '6px',
+                        padding: '4px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                        zIndex: 1000,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        minWidth: '120px'
+                    }}
+                >
+                    <button 
+                        onClick={handleCreateJunction}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#e2e8f0',
+                            padding: '8px 12px',
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            borderRadius: '4px'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#334155'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                    >
+                        合并为大枢纽
+                    </button>
+                </div>
+            )}
 
             {/* ====== 底部工具栏 ====== */}
             <div className="topology-toolbar">
