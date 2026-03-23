@@ -11,9 +11,6 @@ build/
 .env
 .env.local
 
-# 数据库文件（可选：如果想备份数据库，移除这行）
-*.db
-
 # IDE
 .vscode/
 .idea/
