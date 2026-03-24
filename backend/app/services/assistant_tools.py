@@ -5,7 +5,9 @@ AI 助手工具注册表
 """
 import json
 import logging
+import math
 from typing import Any
+from datetime import datetime, timedelta
 
 from sqlmodel import Session, select, func
 
@@ -89,6 +91,30 @@ TOOL_DEFINITIONS = [
         "description": "专门用于检索《天然气管网操作规程》、《现场处置应急预案》等官方文档，以回答如何处理故障、参数对标、操作步骤等特定业务知识问题。",
         "parameters": {
             "query": {"description": "用户检索问题的关键字或完整句子", "required": True},
+        },
+    },
+    {
+        "name": "predict_trend",
+        "description": "对指定站场的历史压力/温度数据做线性回归，预测增速和何时触及设计上限。返回斜率、当前值、预计超标剩余时间。",
+        "parameters": {
+            "station_id": {"description": "站场名称（如 靖边压气站）", "required": True},
+            "metric": {"description": "分析指标：pressure 或 temperature，默认 pressure", "required": False},
+            "hours": {"description": "回溯小时数，默认 6", "required": False},
+        },
+    },
+    {
+        "name": "analyze_correlation",
+        "description": "分析指定站场进站压力与出站流量之间的皮尔逊相关系数，用于诊断憋压、冰堵等异常。返回相关系数和异常诊断结论。",
+        "parameters": {
+            "station_id": {"description": "站场名称（如 靖边压气站）", "required": True},
+            "hours": {"description": "回溯小时数，默认 6", "required": False},
+        },
+    },
+    {
+        "name": "simulate_cutoff",
+        "description": "模拟某个站场突然停机后的截断推演：用 BFS 图算法找出所有受影响的下游站点，并根据管存容量估算下游可支撑的剩余时间。",
+        "parameters": {
+            "station_id": {"description": "故障站场名称或 ID", "required": True},
         },
     },
 ]
@@ -424,6 +450,263 @@ def _handle_find_critical_nodes(args: dict, session: Session) -> str:
     return "\n".join(lines)
 
 
+def _handle_predict_trend(args: dict, session: Session) -> str:
+    """时序预测：线性回归估算超标剩余时间"""
+    station_id = args.get("station_id", "")
+    metric = args.get("metric", "pressure")
+    hours = int(args.get("hours", 6))
+
+    if not station_id:
+        return "请提供站场名称"
+
+    # 从 scada_history 表查询历史数据
+    from app.scada_models import ScadaHistory
+    records = session.exec(
+        select(ScadaHistory)
+        .where(
+            ScadaHistory.station_name == station_id,
+            ScadaHistory.metric_type == metric,
+        )
+        .order_by(ScadaHistory.recorded_at)
+    ).all()
+
+    if len(records) < 3:
+        return f"{station_id} 的 {metric} 历史数据点不足（仅 {len(records)} 条），无法进行趋势预测"
+
+    # 将时间转换为小时偏移量，做线性回归 y = a*x + b
+    t0 = records[0].recorded_at
+    xs = [(r.recorded_at - t0).total_seconds() / 3600.0 for r in records]
+    ys = [r.value for r in records]
+    n = len(xs)
+
+    sum_x = sum(xs)
+    sum_y = sum(ys)
+    sum_xy = sum(x * y for x, y in zip(xs, ys))
+    sum_x2 = sum(x * x for x in xs)
+
+    denom = n * sum_x2 - sum_x * sum_x
+    if abs(denom) < 1e-10:
+        return f"{station_id} 数据方差为0，无法回归"
+
+    slope = (n * sum_xy - sum_x * sum_y) / denom  # MPa/h 或 °C/h
+    intercept = (sum_y - slope * sum_x) / n
+
+    current_val = ys[-1]
+    current_time_h = xs[-1]
+
+    # 查站场设计压力上限
+    station = session.exec(
+        select(Station).where(Station.name == station_id)
+    ).first()
+    design_limit = station.design_pressure if station and station.design_pressure else 12.0
+
+    lines = [f"📊 {station_id} {metric} 趋势预测（基于近 {len(records)} 个数据点）："]
+    lines.append(f"  当前值: {current_val:.3f} {'MPa' if metric == 'pressure' else '°C'}")
+    direction = "上升" if slope > 0 else "下降"
+    lines.append(f"  变化速率: {abs(slope):.4f}/h（{direction}趋势）")
+
+    if metric == "pressure" and slope > 0.001:
+        remaining_h = (design_limit - current_val) / slope
+        if remaining_h > 0:
+            hours_part = int(remaining_h)
+            mins_part = int((remaining_h - hours_part) * 60)
+            lines.append(f"  ⚠️ 预计 {hours_part}小时{mins_part}分钟 后触及设计上限 {design_limit} MPa")
+        else:
+            lines.append(f"  ❗ 当前值已超过设计上限 {design_limit} MPa！")
+    elif metric == "pressure" and slope < -0.001:
+        # 预测降至最低安全值（假设 3 MPa）
+        min_safe = 3.0
+        remaining_h = (current_val - min_safe) / abs(slope)
+        if remaining_h > 0:
+            hours_part = int(remaining_h)
+            mins_part = int((remaining_h - hours_part) * 60)
+            lines.append(f"  ⚠️ 预计 {hours_part}小时{mins_part}分钟 后降至最低安全线 {min_safe} MPa")
+    else:
+        lines.append("  趋势平稳，暂无超标风险")
+
+    return "\n".join(lines)
+
+
+def _handle_analyze_correlation(args: dict, session: Session) -> str:
+    """归因分析：计算压力与温度的皮尔逊相关系数，诊断异常"""
+    station_id = args.get("station_id", "")
+    hours = int(args.get("hours", 6))
+
+    if not station_id:
+        return "请提供站场名称"
+
+    from app.scada_models import ScadaHistory
+
+    # 查询压力和温度数据
+    pressure_records = session.exec(
+        select(ScadaHistory)
+        .where(
+            ScadaHistory.station_name == station_id,
+            ScadaHistory.metric_type == "pressure",
+        )
+        .order_by(ScadaHistory.recorded_at)
+    ).all()
+
+    temp_records = session.exec(
+        select(ScadaHistory)
+        .where(
+            ScadaHistory.station_name == station_id,
+            ScadaHistory.metric_type == "temperature",
+        )
+        .order_by(ScadaHistory.recorded_at)
+    ).all()
+
+    if len(pressure_records) < 3 or len(temp_records) < 3:
+        return f"{station_id} 的压力或温度历史数据不足，无法进行相关性分析"
+
+    # 按时间对齐（取交集时间戳）
+    p_map = {r.recorded_at.isoformat(): r.value for r in pressure_records}
+    t_map = {r.recorded_at.isoformat(): r.value for r in temp_records}
+    common_times = sorted(set(p_map.keys()) & set(t_map.keys()))
+
+    if len(common_times) < 3:
+        # 如果时间点没有精确对齐，按顺序截取相同长度
+        min_len = min(len(pressure_records), len(temp_records))
+        p_vals = [r.value for r in pressure_records[:min_len]]
+        t_vals = [r.value for r in temp_records[:min_len]]
+    else:
+        p_vals = [p_map[t] for t in common_times]
+        t_vals = [t_map[t] for t in common_times]
+
+    n = len(p_vals)
+
+    # 计算皮尔逊相关系数
+    mean_p = sum(p_vals) / n
+    mean_t = sum(t_vals) / n
+    cov = sum((p - mean_p) * (t - mean_t) for p, t in zip(p_vals, t_vals)) / n
+    std_p = math.sqrt(sum((p - mean_p) ** 2 for p in p_vals) / n)
+    std_t = math.sqrt(sum((t - mean_t) ** 2 for t in t_vals) / n)
+
+    if std_p < 1e-10 or std_t < 1e-10:
+        return f"{station_id} 数据无波动，无法计算相关性"
+
+    r = cov / (std_p * std_t)
+
+    # 分析压力变化趋势
+    p_change = p_vals[-1] - p_vals[0]
+    t_change = t_vals[-1] - t_vals[0]
+
+    lines = [f"🔍 {station_id} 压力-温度相关性分析（{n} 个对齐数据点）："]
+    lines.append(f"  压力范围: {min(p_vals):.3f} ~ {max(p_vals):.3f} MPa（变化: {p_change:+.3f}）")
+    lines.append(f"  温度范围: {min(t_vals):.1f} ~ {max(t_vals):.1f} °C（变化: {t_change:+.1f}）")
+    lines.append(f"  皮尔逊相关系数 r = {r:.4f}")
+
+    # 诊断结论
+    if r > 0.7:
+        lines.append("  【诊断】压力与温度高度正相关，属正常热力学耦合")
+    elif r < -0.7:
+        lines.append("  【诊断】压力与温度强负相关，可能存在异常工况（如压缩机效率衰减）")
+    elif abs(r) < 0.3:
+        lines.append("  【诊断】压力与温度几乎无关，可能受外部因素（如下游调节阀操作）主导")
+
+    # 特殊模式检测：压力升但温度降 → 典型憋压
+    if p_change > 0.3 and t_change < -1.0:
+        lines.append("  ⚠️ 【异常模式】压力上升但温度下降，疑似下游憋压或冰堵")
+    elif p_change < -0.3 and t_change > 1.0:
+        lines.append("  ⚠️ 【异常模式】压力下降但温度上升，疑似管线泄漏导致节流效应")
+
+    return "\n".join(lines)
+
+
+def _handle_simulate_cutoff(args: dict, session: Session) -> str:
+    """截断推演：BFS 找受影响下游 + 管存时长估算"""
+    station_id = args.get("station_id", "")
+    if not station_id:
+        return "请提供故障站场名称或 ID"
+
+    topo = TopologyService(session)
+
+    # 先按名称找到对应的图节点
+    target_node = None
+    for node_id, data in topo.graph.nodes(data=True):
+        if data.get("name") == station_id or node_id == station_id:
+            target_node = node_id
+            break
+
+    if target_node is None:
+        return f"在拓扑图中未找到站场: {station_id}"
+
+    # BFS 遍历：从故障节点出发，找所有可达的下游节点
+    import networkx as nx
+    # 获取所有从该节点可达的节点（不含自身）
+    try:
+        descendants = nx.descendants(topo.graph.to_undirected(), target_node)
+    except Exception:
+        # 如果图是无向的，直接用连通分量
+        descendants = set()
+        visited = set()
+        queue = [target_node]
+        while queue:
+            current = queue.pop(0)
+            if current in visited:
+                continue
+            visited.add(current)
+            for neighbor in topo.graph.neighbors(current):
+                if neighbor not in visited:
+                    queue.append(neighbor)
+                    descendants.add(neighbor)
+
+    if not descendants:
+        return f"{station_id} 是末端站点，停机不会波及其他站场"
+
+    # 整理受影响站点信息
+    affected_stations = []
+    total_linepack = 0.0
+    for node_id in descendants:
+        node_data = topo.graph.nodes.get(node_id, {})
+        name = node_data.get("name", node_id)
+        node_type = node_data.get("type", "unknown")
+        affected_stations.append({"name": name, "type": node_type})
+
+    # 估算管存（简化模型：按管线长度和管径估算体积）
+    affected_edges = []
+    for u, v, data in topo.graph.edges(data=True):
+        if u in descendants or v in descendants or u == target_node or v == target_node:
+            length = data.get("length_km", 10)
+            diameter = data.get("diameter_mm", 1000)
+            # 管存体积 = π * (d/2)^2 * L（简化，单位：万方）
+            volume = math.pi * (diameter / 2000) ** 2 * length * 1000 / 10000
+            total_linepack += volume
+            affected_edges.append(data.get("name", f"{u}-{v}"))
+
+    # 估算支撑时长（假设平均日消耗为管存的 5 倍 → 每小时消耗 = 管存/4.8）
+    hourly_consumption = total_linepack / 4.8 if total_linepack > 0 else 0
+    support_hours = total_linepack / hourly_consumption if hourly_consumption > 0 else 0
+
+    # 分类统计
+    type_map = {"source": "气源站", "compressor": "压气站", "distribution": "分输站", "valve": "阀室"}
+    type_counts: dict[str, int] = {}
+    for s in affected_stations:
+        t = type_map.get(s["type"], s["type"])
+        type_counts[t] = type_counts.get(t, 0) + 1
+
+    lines = [f"🚨 截断推演结果 —— 假设 {station_id} 突发停机："]
+    lines.append(f"\n📌 波及范围：下游共 {len(affected_stations)} 个站场受影响")
+    for t, c in type_counts.items():
+        lines.append(f"  - {t}: {c} 个")
+
+    lines.append(f"\n📌 受影响站场清单：")
+    for s in affected_stations[:15]:
+        lines.append(f"  - {s['name']}（{type_map.get(s['type'], s['type'])}）")
+    if len(affected_stations) > 15:
+        lines.append(f"  ...还有 {len(affected_stations) - 15} 个未列出")
+
+    lines.append(f"\n📌 管存估算：")
+    lines.append(f"  - 受影响管段管存总量: {total_linepack:.1f} 万方")
+    hours_part = int(support_hours)
+    mins_part = int((support_hours - hours_part) * 60)
+    lines.append(f"  - 预计可支撑下游: {hours_part}小时{mins_part}分钟")
+
+    lines.append(f"\n【抢险建议】必须在 {hours_part}小时{mins_part}分钟 内完成倒换干线操作")
+
+    return "\n".join(lines)
+
+
 # 工具名 → 处理函数的映射
 TOOL_HANDLERS = {
     "query_stations": _handle_query_stations,
@@ -436,4 +719,7 @@ TOOL_HANDLERS = {
     "find_critical_nodes": _handle_find_critical_nodes,
     "simulate_failure": _handle_simulate_failure,
     "search_knowledge_base": _handle_search_knowledge_base,
+    "predict_trend": _handle_predict_trend,
+    "analyze_correlation": _handle_analyze_correlation,
+    "simulate_cutoff": _handle_simulate_cutoff,
 }

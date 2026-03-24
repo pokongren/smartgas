@@ -222,7 +222,7 @@ def import_excel(session: Session = Depends(get_session)):
     """
     import openpyxl
 
-    excel_path = r'C:\Users\Administrator\Downloads\甪直站20262311-0312.xlsx'
+    excel_path = r'C:\Users\jushixio\Downloads\甪直站20262311-0312.xlsx'
     wb = openpyxl.load_workbook(excel_path)
     ws = wb.active
 
@@ -369,4 +369,64 @@ def get_history(station_name: str, pipeline_id: str = "we1", metric_type: str = 
             {"time": r.recorded_at.isoformat(), "value": r.value}
             for r in records
         ],
+    }
+
+
+@router.get("/history-by-id")
+def get_history_by_id(
+    station_id: str,
+    hours: int = 6,
+    session: Session = Depends(get_session),
+):
+    """
+    通用历史时序查询（供 AI 工具和前端 ECharts 使用）。
+    按 station_name 和时间范围查询，返回所有指标的合并数据。
+    
+    参数：
+    - station_id: 站场名称或 ID
+    - hours: 回溯小时数，默认 6
+    """
+    from datetime import timedelta
+
+    # 计算时间范围
+    now = datetime.now()
+    since = now - timedelta(hours=hours)
+
+    # 先按名称查，兼容 station_id 传名称的场景
+    records = session.exec(
+        select(ScadaHistory)
+        .where(
+            ScadaHistory.station_name == station_id,
+            ScadaHistory.recorded_at >= since,
+        )
+        .order_by(ScadaHistory.recorded_at)
+    ).all()
+
+    if not records:
+        # 没有时间范围限制的情况下也查一次（可能历史数据不在最近窗口内）
+        records = session.exec(
+            select(ScadaHistory)
+            .where(ScadaHistory.station_name == station_id)
+            .order_by(ScadaHistory.recorded_at)
+        ).all()
+
+    if not records:
+        return {"station": station_id, "hours": hours, "count": 0, "series": {}}
+
+    # 按 metric_type 分组组织数据
+    series: dict[str, list] = {}
+    for r in records:
+        key = f"{r.pipeline_id}_{r.metric_type}"
+        if key not in series:
+            series[key] = []
+        series[key].append({
+            "time": r.recorded_at.isoformat(),
+            "value": r.value,
+        })
+
+    return {
+        "station": station_id,
+        "hours": hours,
+        "count": len(records),
+        "series": series,
     }

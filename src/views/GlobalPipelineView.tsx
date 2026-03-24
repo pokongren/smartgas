@@ -2,6 +2,7 @@ import React, { useMemo, useState, useCallback, lazy, Suspense, useEffect } from
 import MapView from '@/components/map-view/MapView'
 import { loadAllPipelines, PipelinePackage, PipelineLayer } from '@/data/pipelines'
 import type { PipelineData, PipelineLine, PipelineNode } from '@/types'
+import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
 
 import { getNodeMarkerMap } from '@/utils/mapRenderer'
 import { useNewWindow, usePopoutSync } from '@/hooks/useNewWindow'
@@ -485,6 +486,15 @@ const GlobalPipelineView: React.FC = () => {
     const toggleExtraScada = (id: string) => setExtraScadaVisible(prev => ({ ...prev, [id]: !prev[id] }))
     // 压力趋势图面板
     const [showTrendChart, setShowTrendChart] = useState(false)
+    // SCADA 历史曲线面板状态
+    const [historyStation, setHistoryStation] = useState<string | null>(null)
+    const [historyChartPos, setHistoryChartPos] = useState({ x: Math.round((typeof window !== 'undefined' ? window.innerWidth : 1280) / 2) - 300, y: 120 })
+    const [isDraggingHistory, setIsDraggingHistory] = useState(false)
+    const historyOffsetRef = React.useRef({ x: 0, y: 0 })
+    const handleHistoryMouseDown = (e: React.MouseEvent) => {
+        setIsDraggingHistory(true)
+        historyOffsetRef.current = { x: e.clientX - historyChartPos.x, y: e.clientY - historyChartPos.y }
+    }
 
     // 西二线 SCADA 面板拖拽状态
     const [we2ScadaPos, setWe2ScadaPos] = useState({
@@ -584,6 +594,7 @@ const GlobalPipelineView: React.FC = () => {
         if (isDraggingCred)    setCredPos({    x: e.clientX - credOffsetRef.current.x,    y: e.clientY - credOffsetRef.current.y    })
         if (isDraggingPt)      setPtPos({      x: e.clientX - ptOffsetRef.current.x,      y: e.clientY - ptOffsetRef.current.y      })
         if (isDraggingTrend)   setTrendPos({   x: e.clientX - trendOffsetRef.current.x,   y: e.clientY - trendOffsetRef.current.y   })
+        if (isDraggingHistory) setHistoryChartPos({ x: e.clientX - historyOffsetRef.current.x, y: e.clientY - historyOffsetRef.current.y })
     }
 
     const handleGlobalMouseUp = () => {
@@ -593,6 +604,7 @@ const GlobalPipelineView: React.FC = () => {
         if (isDraggingCred)     setIsDraggingCred(false)
         if (isDraggingPt)       setIsDraggingPt(false)
         if (isDraggingTrend)    setIsDraggingTrend(false)
+        if (isDraggingHistory)  setIsDraggingHistory(false)
     }
 
     // 展开状态
@@ -995,7 +1007,7 @@ const GlobalPipelineView: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                    <ScadaTableContent data={REAL_SCADA_DATA} isPoppedOut={false} closePopOut={closeScadaPopOut} popOut={popOutScada} accentColor="#10b981" />
+                    <ScadaTableContent data={REAL_SCADA_DATA} isPoppedOut={false} closePopOut={closeScadaPopOut} popOut={popOutScada} accentColor="#10b981" onStationClick={setHistoryStation} />
                 </div>
             )}
 
@@ -1033,7 +1045,7 @@ const GlobalPipelineView: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                    <ScadaTableContent data={WE2_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#3b82f6" />
+                    <ScadaTableContent data={WE2_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#3b82f6" onStationClick={setHistoryStation} />
                 </div>
             )}
 
@@ -1063,7 +1075,7 @@ const GlobalPipelineView: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                    <ScadaTableContent data={WE1_WEST_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#f59e0b" />
+                    <ScadaTableContent data={WE1_WEST_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#f59e0b" onStationClick={setHistoryStation} />
                 </div>
             )}
 
@@ -1093,7 +1105,7 @@ const GlobalPipelineView: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                    <ScadaTableContent data={CRED_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#ec4899" />
+                    <ScadaTableContent data={CRED_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#ec4899" onStationClick={setHistoryStation} />
                 </div>
             )}
 
@@ -1123,7 +1135,7 @@ const GlobalPipelineView: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                    <ScadaTableContent data={PT_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#a855f7" />
+                    <ScadaTableContent data={PT_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#a855f7" onStationClick={setHistoryStation} />
                 </div>
             )}
 
@@ -1210,6 +1222,21 @@ const GlobalPipelineView: React.FC = () => {
                     ))}
                 </div>
             </div>
+
+            {/* SCADA 历史曲线浮动面板 */}
+            {historyStation && (
+                <div
+                    className="absolute z-30"
+                    style={{ left: historyChartPos.x, top: historyChartPos.y }}
+                >
+                    <ScadaHistoryChart
+                        stationName={historyStation}
+                        onClose={() => setHistoryStation(null)}
+                        onMouseDown={handleHistoryMouseDown}
+                        isDragging={isDraggingHistory}
+                    />
+                </div>
+            )}
         </div>
     )
 }
@@ -1221,7 +1248,8 @@ const ScadaTableContent: React.FC<{
     closePopOut: () => void
     popOut: (w: number, h: number) => void
     accentColor?: string
-}> = ({ data, isPoppedOut, closePopOut, accentColor = '#10b981' }) => {
+    onStationClick?: (stationName: string) => void
+}> = ({ data, isPoppedOut, closePopOut, accentColor = '#10b981', onStationClick }) => {
     // 根据 accentColor 生成进入亮色（将色调变亮一点作为进入压力列）
     // 映射表：升色额色 → 进入色 (accentColor 相对是“出射2”，进入用更亮变体)
     const inPressureColor = accentColor === '#10b981' ? '#34d399'
@@ -1293,8 +1321,13 @@ const ScadaTableContent: React.FC<{
                                 onMouseEnter={e => (e.currentTarget.style.background = `rgba(${rgb},0.14)`)}
                                 onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
                             >
-                                <td style={{ padding: '5px 6px', borderRadius: '6px 0 0 6px', fontWeight: nameBold ? 600 : 400, color: '#e2e8f0', maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>
+                                <td
+                                    style={{ padding: '5px 6px', borderRadius: '6px 0 0 6px', fontWeight: nameBold ? 600 : 400, color: '#e2e8f0', maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: onStationClick ? 'pointer' : 'default' }}
+                                    title={`${name}${onStationClick ? ' — 点击查看历史曲线' : ''}`}
+                                    onClick={() => onStationClick?.(name)}
+                                >
                                     {name}
+                                    {onStationClick && <span style={{ fontSize: '9px', color: '#3b82f6', marginLeft: '3px', opacity: 0.7 }}>📈</span>}
                                 </td>
                                 <td style={{ padding: '5px 4px', textAlign: 'center' }}>
                                     <span style={{ fontSize: '10px', background: typeBg, color: typeColor, padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>{typeLabel}</span>

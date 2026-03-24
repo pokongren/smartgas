@@ -783,3 +783,18 @@ def get_junction_groups(session: Session = Depends(get_session)):
             "station_ids": json.loads(j.station_ids) if j.station_ids else []
         })
     return {"junctions": results}
+
+
+@router.delete("/junctions/{junction_id}")
+def delete_junction_group(junction_id: int, session: Session = Depends(get_session)):
+    """拆分枢纽：删除 JunctionGroup 记录，还原物理站点的独立显示"""
+    from app.models import JunctionGroup
+
+    group = session.get(JunctionGroup, junction_id)
+    if not group:
+        raise HTTPException(status_code=404, detail=f"枢纽 {junction_id} 不存在")
+    
+    name = group.name
+    session.delete(group)
+    session.commit()
+    return {"ok": True, "message": f"枢纽 '{name}' 已拆分还原"}

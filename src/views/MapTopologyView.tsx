@@ -80,12 +80,18 @@ const TYPE_MAP: Record<string, PointType> = {
 }
 
 // ================== 创建纯拓扑圆点标记 ==================
-function createTopoMarkerContent(type: PointType, isHighlight = false): string {
+function createTopoMarkerContent(type: PointType, name: string = '', isHighlight = false): string {
     const color = TOPO_COLORS[type]
     const size = TOPO_SIZES[type]
     const border = isHighlight ? '2px solid #fff' : '1px solid rgba(255,255,255,0.5)'
     const shadow = isHighlight ? '0 0 8px rgba(255,255,255,0.5)' : 'none'
-    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${shadow};"></div>`
+    
+    return `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+            <div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;"></div>
+            ${name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10;">${name}</div>` : ''}
+        </div>
+    `
 }
 
 // ================== 主组件 ==================
@@ -190,12 +196,13 @@ const MapTopologyView: React.FC = () => {
     const doAddNode = (lnglat: any, type: PointType) => {
         const AMap = (window as any).AMap
         const id = `tn-${Date.now()}`
+        const nodeName = `${TOPO_LABELS[type]}-${nodesRef.current.length + 1}`
         const pos: [number, number] = [lnglat.getLng(), lnglat.getLat()]
         const size = TOPO_SIZES[type]
 
         const marker = new AMap.Marker({
             position: new AMap.LngLat(pos[0], pos[1]),
-            content: createTopoMarkerContent(type),
+            content: createTopoMarkerContent(type, nodeName),
             offset: new AMap.Pixel(-size / 2, -size / 2),
             draggable: true,
             cursor: 'move',
@@ -212,7 +219,7 @@ const MapTopologyView: React.FC = () => {
         })
         marker.on('click', () => doNodeClick(id))
 
-        const node: TopoNode = { id, type, name: `${TOPO_LABELS[type]}-${nodesRef.current.length + 1}`, position: pos, marker }
+        const node: TopoNode = { id, type, name: nodeName, position: pos, marker }
         setTopoNodes(prev => [...prev, node])
         setUndoStack(prev => [...prev, { type: 'add-node', nodeId: id }])
         setStatusMsg(`已添加: ${node.name}`)
@@ -394,7 +401,7 @@ const MapTopologyView: React.FC = () => {
 
             const marker = new AMap.Marker({
                 position: new AMap.LngLat(pos[0], pos[1]),
-                content: createTopoMarkerContent(type),
+                content: createTopoMarkerContent(type, sn.name),
                 offset: new AMap.Pixel(-size / 2, -size / 2),
                 draggable: true,
                 cursor: 'move',
@@ -461,7 +468,10 @@ const MapTopologyView: React.FC = () => {
             const orig = cutNode.marker.getContent()
             highlightedMarkersRef.current.set(cutoffNodeId, orig)
             cutNode.marker.setContent(
-                `<div style="width:18px;height:18px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 10px #ef4444;"></div>`
+                `<div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+                    <div style="width:18px;height:18px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 10px #ef4444; pointer-events: auto;"></div>
+                    <div style="position: absolute; top: 22px; white-space: nowrap; font-size: 11px; color: #ef4444; font-weight: bold; text-shadow: 0 0 2px #fff, 0 0 2px #fff; z-index: 10;">${cutNode.name}</div>
+                </div>`
             )
         }
 
@@ -476,7 +486,10 @@ const MapTopologyView: React.FC = () => {
             const color = aNode.status === 'supply_lost' ? '#991b1b' : '#f97316'
             const size = aNode.status === 'supply_lost' ? 12 : 10
             nd.marker.setContent(
-                `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:1.5px solid #fff;"></div>`
+                `<div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+                    <div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:1.5px solid #fff; pointer-events: auto;"></div>
+                    <div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: ${color}; font-weight: bold; text-shadow: 0 0 2px #fff, 0 0 2px #fff; z-index: 10;">${nd.name}</div>
+                </div>`
             )
         }
 
