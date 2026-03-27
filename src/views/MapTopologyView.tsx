@@ -7,7 +7,8 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import MapView from '@/components/map-view/MapView'
-import { loadAllPipelines } from '@/data/pipelines'
+import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
+import { invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
 import type { PipelinePackage } from '@/data/pipelines/types'
 import type { PipelineNode, PipelineLine } from '@/types'
 import {
@@ -18,9 +19,7 @@ import {
 import type { ValidationReport } from '@/utils/topology-validator'
 import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
 import type { CutoffResult } from '@/utils/cutoff-simulator'
-import { stationAPI, pipelineAPI, emergencyAPI, topologyAPI, SimulationResult } from '../services/api'
-import { message, Modal, Table, Tag, Input, Button, Card, Space, Divider, Drawer, Tooltip } from 'antd'
-import { SearchOutlined, SafetyCertificateOutlined, AlertOutlined, PlayCircleOutlined, SettingOutlined } from '@ant-design/icons'
+import type { SimulationResult } from '../services/api'
 
 // ================== 类型 ==================
 type PointType = 'station' | 'valve' | 'distribution' | 'compressor'
@@ -32,6 +31,9 @@ interface TopoNode {
     type: PointType
     name: string
     position: [number, number]
+    sourceNodeIds?: string[]
+    junctionId?: number
+    isJunction?: boolean
     marker?: any
 }
 
@@ -40,7 +42,42 @@ interface TopoEdge {
     startNodeId: string
     endNodeId: string
     name?: string
+    sourceEdgeIds?: string[]
     poly?: any
+}
+
+interface BaseTopoNode {
+    id: string
+    type: PointType
+    name: string
+    position: [number, number]
+}
+
+interface BaseTopoEdge {
+    id: string
+    startNodeId: string
+    endNodeId: string
+    name?: string
+}
+
+interface JunctionGroup {
+    id: number
+    name: string
+    description?: string | null
+    station_ids: string[]
+}
+
+interface PositionPreviewResult {
+    updated_station_ids: string[]
+    updated_valve_ids: string[]
+    affected_layers: string[]
+    impacted_segments: Array<{
+        start_id: string
+        end_id: string
+        valve_ids: string[]
+    }>
+    errors: Array<{ id?: string | null; error: string }>
+    preview_only?: boolean
 }
 
 // ================== 拓扑样式（极简圆点 + 颜色区分） ==================
@@ -80,15 +117,18 @@ const TYPE_MAP: Record<string, PointType> = {
 }
 
 // ================== 创建纯拓扑圆点标记 ==================
-function createTopoMarkerContent(type: PointType, name: string = '', isHighlight = false): string {
+function createTopoMarkerContent(type: PointType, name: string = '', isHighlight = false, isJunction = false): string {
     const color = TOPO_COLORS[type]
-    const size = TOPO_SIZES[type]
+    const size = isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[type]
     const border = isHighlight ? '2px solid #fff' : '1px solid rgba(255,255,255,0.5)'
     const shadow = isHighlight ? '0 0 8px rgba(255,255,255,0.5)' : 'none'
+    const shapeStyle = isJunction
+        ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 3px;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
+        : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
     
     return `
         <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
-            <div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;"></div>
+            <div style="${shapeStyle}"></div>
             ${name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10;">${name}</div>` : ''}
         </div>
     `
@@ -98,6 +138,7 @@ function createTopoMarkerContent(type: PointType, name: string = '', isHighlight
 const MapTopologyView: React.FC = () => {
     const [mapInstance, setMapInstance] = useState<any>(null)
     const handleMapLoad = useCallback((map: any) => setMapInstance(map), [])
+    const importedOnceRef = useRef(false)
 
     // 管线数据异步加载
     const [pipelines, setPipelines] = useState<PipelinePackage[]>([])
@@ -108,8 +149,11 @@ const MapTopologyView: React.FC = () => {
     }, [])
 
     // 编辑器状态
+    const [baseTopoNodes, setBaseTopoNodes] = useState<BaseTopoNode[]>([])
+    const [baseTopoEdges, setBaseTopoEdges] = useState<BaseTopoEdge[]>([])
     const [topoNodes, setTopoNodes] = useState<TopoNode[]>([])
     const [topoEdges, setTopoEdges] = useState<TopoEdge[]>([])
+    const [junctionGroups, setJunctionGroups] = useState<JunctionGroup[]>([])
     const [editMode, setEditMode] = useState<EditMode>('view')
     const [pointType, setPointType] = useState<PointType>('station')
     const [connectFrom, setConnectFrom] = useState<string | null>(null)
@@ -125,11 +169,18 @@ const MapTopologyView: React.FC = () => {
     const [simResults, setSimResults] = useState<SimulationResult[]>([])
     const [currentSimStep, setCurrentSimStep] = useState(0)
     const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
+    const [historyChartTarget, setHistoryChartTarget] = useState<null | {
+        stationName?: string
+        junctionId?: string
+        displayName?: string
+    }>(null)
 
     // 撤销栈
     type UndoAction = 
         | { type: 'add-node'; nodeId: string }
         | { type: 'add-edge'; edgeId: string }
+        | { type: 'create-junction'; junctionId: number; name: string; stationIds: string[] }
+        | { type: 'delete-junction'; group: JunctionGroup }
     const [undoStack, setUndoStack] = useState<UndoAction[]>([])
 
     // 截断仿真状态
@@ -140,9 +191,12 @@ const MapTopologyView: React.FC = () => {
     // 保存机制：跟踪拖拽修改的坐标
     const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
     const [isSaving, setIsSaving] = useState(false)
+    const [cascadeValves, setCascadeValves] = useState(true)
+    const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
+    const [isPreviewing, setIsPreviewing] = useState(false)
 
     // 合建站：合并模式状态
-    const [mergeFirst, setMergeFirst] = useState<string | null>(null)
+    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
     // 已高亮的 marker 原始 content，用于恢复
     const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
 
@@ -170,6 +224,186 @@ const MapTopologyView: React.FC = () => {
         return { nodes, lines }
     }, [pipelines])
 
+    const clearRenderedTopology = useCallback(() => {
+        nodesRef.current.forEach(node => node.marker?.setMap(null))
+        edgesRef.current.forEach(edge => edge.poly?.setMap(null))
+        highlightedMarkersRef.current.clear()
+    }, [])
+
+    useEffect(() => {
+        setPositionPreview(null)
+    }, [cascadeValves, dirtyPositions])
+
+    const resetUnsavedPositions = useCallback(() => {
+        if (dirtyPositions.size === 0) return
+        void loadAllPipelines()
+            .then(data => {
+                setPipelines(data)
+                const coordMap = new Map<string, [number, number]>()
+                for (const pkg of data) {
+                    for (const layer of pkg.layers) {
+                        for (const node of layer.nodes) {
+                            coordMap.set(node.id, [node.coordinate.longitude, node.coordinate.latitude])
+                        }
+                    }
+                }
+                setBaseTopoNodes(prev => prev.map(node => {
+                    const next = coordMap.get(node.id)
+                    return next ? { ...node, position: next } : node
+                }))
+                setDirtyPositions(new Map())
+                setPositionPreview(null)
+                setStatusMsg('已撤销未保存的点位修改')
+            })
+            .catch(error => {
+                console.error(error)
+                setStatusMsg('撤销未保存修改失败')
+            })
+    }, [dirtyPositions.size])
+
+    const loadJunctionGroups = useCallback(async () => {
+        try {
+            const res = await fetch('/api/topology/junctions')
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            const data = await res.json()
+            setJunctionGroups(Array.isArray(data.junctions) ? data.junctions : [])
+            return Array.isArray(data.junctions) ? data.junctions as JunctionGroup[] : []
+        } catch (error) {
+            console.error('[MapTopologyView] 枢纽组加载失败:', error)
+            setStatusMsg('加载枢纽组失败')
+            return []
+        }
+    }, [])
+
+    const buildCollapsedGraph = useCallback((
+        nodes: BaseTopoNode[],
+        edges: BaseTopoEdge[],
+        groups: JunctionGroup[]
+    ) => {
+        const stationToDisplayId = new Map<string, string>()
+        const displayNodes: TopoNode[] = []
+
+        groups.forEach(group => {
+            const memberNodes = nodes.filter(node => group.station_ids.includes(node.id))
+            if (memberNodes.length === 0) return
+
+            const centerLng = memberNodes.reduce((sum, node) => sum + node.position[0], 0) / memberNodes.length
+            const centerLat = memberNodes.reduce((sum, node) => sum + node.position[1], 0) / memberNodes.length
+            const junctionNodeId = `junction-${group.id}`
+
+            group.station_ids.forEach(stationId => stationToDisplayId.set(stationId, junctionNodeId))
+            displayNodes.push({
+                id: junctionNodeId,
+                name: group.name,
+                type: 'station',
+                position: [centerLng, centerLat],
+                sourceNodeIds: [...group.station_ids],
+                junctionId: group.id,
+                isJunction: true,
+            })
+        })
+
+        nodes.forEach(node => {
+            if (stationToDisplayId.has(node.id)) return
+            displayNodes.push({
+                ...node,
+                sourceNodeIds: [node.id],
+                isJunction: false,
+            })
+        })
+
+        const collapsedEdgeMap = new Map<string, TopoEdge>()
+        edges.forEach(edge => {
+            const startNodeId = stationToDisplayId.get(edge.startNodeId) ?? edge.startNodeId
+            const endNodeId = stationToDisplayId.get(edge.endNodeId) ?? edge.endNodeId
+            if (startNodeId === endNodeId) return
+
+            const sorted = [startNodeId, endNodeId].sort()
+            const key = `${sorted[0]}__${sorted[1]}`
+            const existing = collapsedEdgeMap.get(key)
+            if (existing) {
+                existing.sourceEdgeIds = [...(existing.sourceEdgeIds ?? []), edge.id]
+                return
+            }
+
+            collapsedEdgeMap.set(key, {
+                id: `merged-${key}`,
+                startNodeId,
+                endNodeId,
+                name: edge.name,
+                sourceEdgeIds: [edge.id],
+            })
+        })
+
+        return {
+            nodes: displayNodes,
+            edges: [...collapsedEdgeMap.values()],
+        }
+    }, [])
+
+    const renderCollapsedGraph = useCallback((graphNodes: TopoNode[], graphEdges: TopoEdge[]) => {
+        if (!mapInstance) return
+        const AMap = (window as any).AMap
+        if (!AMap) return
+
+        clearRenderedTopology()
+
+        const renderedNodes: TopoNode[] = graphNodes.map(node => {
+            const size = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
+            const marker = new AMap.Marker({
+                position: new AMap.LngLat(node.position[0], node.position[1]),
+                content: createTopoMarkerContent(node.type, node.name, false, !!node.isJunction),
+                offset: new AMap.Pixel(-size / 2, -size / 2),
+                draggable: !node.isJunction,
+                cursor: node.isJunction ? 'pointer' : 'move',
+                zIndex: node.isJunction ? 260 : 200,
+            })
+            marker.setMap(mapInstance)
+
+            const nodeId = node.id
+            if (!node.isJunction) {
+                marker.on('dragend', (event: any) => {
+                    const nextPosition: [number, number] = [event.lnglat.getLng(), event.lnglat.getLat()]
+                    setBaseTopoNodes(prev => prev.map(item => item.id === nodeId ? { ...item, position: nextPosition } : item))
+                    setDirtyPositions(prev => new Map(prev).set(nodeId, nextPosition))
+                })
+            }
+            marker.on('click', (event: any) => doNodeClick(nodeId, event))
+
+            return { ...node, marker }
+        })
+
+        const renderedNodeMap = new Map(renderedNodes.map(node => [node.id, node]))
+        const renderedEdges: TopoEdge[] = graphEdges.map(edge => {
+            const startNode = renderedNodeMap.get(edge.startNodeId)
+            const endNode = renderedNodeMap.get(edge.endNodeId)
+            if (!startNode || !endNode) return edge
+
+            const poly = new AMap.Polyline({
+                path: [startNode.position, endNode.position],
+                strokeColor: LINE_COLOR,
+                strokeWeight: LINE_WEIGHT,
+                strokeStyle: 'solid',
+                zIndex: 100,
+            })
+            poly.setMap(mapInstance)
+            return { ...edge, poly }
+        })
+
+        setTopoNodes(renderedNodes)
+        setTopoEdges(renderedEdges)
+    }, [clearRenderedTopology, mapInstance])
+
+    useEffect(() => {
+        void loadJunctionGroups()
+    }, [loadJunctionGroups])
+
+    useEffect(() => {
+        if (!mapInstance || baseTopoNodes.length === 0) return
+        const collapsed = buildCollapsedGraph(baseTopoNodes, baseTopoEdges, junctionGroups)
+        renderCollapsedGraph(collapsed.nodes, collapsed.edges)
+    }, [baseTopoNodes, baseTopoEdges, buildCollapsedGraph, junctionGroups, mapInstance, renderCollapsedGraph])
+
     // ================== 地图点击 ==================
     useEffect(() => {
         if (!mapInstance) return
@@ -189,54 +423,51 @@ const MapTopologyView: React.FC = () => {
         mapInstance.setDefaultCursor(editMode === 'view' ? 'grab' : 'crosshair')
         if (editMode === 'draw-point') setStatusMsg(`绘制：点击地图添加「${TOPO_LABELS[pointType]}」`)
         else if (editMode === 'connect') { setStatusMsg('连线：点击起点节点'); setConnectFrom(null) }
+        else if (editMode === 'merge') { setStatusMsg('捏合：点击节点进行多选，再点击「创建枢纽」'); setConnectFrom(null) }
         else setStatusMsg('浏览模式')
     }, [editMode, pointType, mapInstance])
 
     // ================== 节点操作 ==================
     const doAddNode = (lnglat: any, type: PointType) => {
-        const AMap = (window as any).AMap
         const id = `tn-${Date.now()}`
-        const nodeName = `${TOPO_LABELS[type]}-${nodesRef.current.length + 1}`
+        const nodeName = `${TOPO_LABELS[type]}-${baseTopoNodes.length + 1}`
         const pos: [number, number] = [lnglat.getLng(), lnglat.getLat()]
-        const size = TOPO_SIZES[type]
-
-        const marker = new AMap.Marker({
-            position: new AMap.LngLat(pos[0], pos[1]),
-            content: createTopoMarkerContent(type, nodeName),
-            offset: new AMap.Pixel(-size / 2, -size / 2),
-            draggable: true,
-            cursor: 'move',
-            zIndex: 200,
-        })
-        marker.setMap(mapInstance)
-
-        marker.on('dragend', (e: any) => {
-            const np: [number, number] = [e.lnglat.getLng(), e.lnglat.getLat()]
-            setTopoNodes(prev => prev.map(n => n.id === id ? { ...n, position: np } : n))
-            syncEdges(id, np)
-            // 记录脏坐标
-            setDirtyPositions(prev => new Map(prev).set(id, np))
-        })
-        marker.on('click', () => doNodeClick(id))
-
-        const node: TopoNode = { id, type, name: nodeName, position: pos, marker }
-        setTopoNodes(prev => [...prev, node])
+        const node: BaseTopoNode = { id, type, name: nodeName, position: pos }
+        setBaseTopoNodes(prev => [...prev, node])
         setUndoStack(prev => [...prev, { type: 'add-node', nodeId: id }])
         setStatusMsg(`已添加: ${node.name}`)
     }
 
     /** 拖拽后同步关联管线 */
-    const syncEdges = (nodeId: string, newPos: [number, number]) => {
-        for (const edge of edgesRef.current) {
-            if (edge.startNodeId === nodeId || edge.endNodeId === nodeId) {
-                const isStart = edge.startNodeId === nodeId
-                const other = nodesRef.current.find(n => n.id === (isStart ? edge.endNodeId : edge.startNodeId))
-                if (other && edge.poly) edge.poly.setPath(isStart ? [newPos, other.position] : [other.position, newPos])
-            }
-        }
+    const syncEdges = (_nodeId: string, _newPos: [number, number]) => {}
+
+    const extractShiftPressed = (event: any) => {
+        return Boolean(
+            event?.originEvent?.shiftKey ??
+            event?.originEvent?.domEvent?.shiftKey ??
+            event?.domEvent?.shiftKey
+        )
     }
 
-    const doNodeClick = (nodeId: string) => {
+    const toggleMergeSelection = useCallback((nodeId: string) => {
+        const clickedNode = nodesRef.current.find(node => node.id === nodeId)
+        const targetIds = clickedNode?.isJunction && clickedNode.sourceNodeIds?.length
+            ? clickedNode.sourceNodeIds
+            : [nodeId]
+
+        setSelectedMergeNodeIds(prev => {
+            const shouldRemove = targetIds.every(id => prev.includes(id))
+            const next = shouldRemove
+                ? prev.filter(id => !targetIds.includes(id))
+                : [...prev, ...targetIds.filter(id => !prev.includes(id))]
+            setStatusMsg(`已选择 ${next.length} 个待捏合节点`)
+            return next
+        })
+    }, [])
+
+    const doNodeClick = (nodeId: string, event?: any) => {
+        const shiftPressed = extractShiftPressed(event)
+
         if (modeRef.current === 'connect') {
             const from = cfRef.current
             if (!from) {
@@ -251,89 +482,190 @@ const MapTopologyView: React.FC = () => {
             }
             return
         }
+        if (modeRef.current === 'merge' || shiftPressed) {
+            toggleMergeSelection(nodeId)
+            return
+        }
+
+        const clickedNode = nodesRef.current.find(n => n.id === nodeId) || null
+        setSelectedNode(clickedNode)
+
         // 截断模式：点击节点设为截断点
-        if (modeRef.current === 'view') {
-            const nd = nodesRef.current.find(n => n.id === nodeId)
+        if (modeRef.current === 'view' && activeTab === 'cutoff') {
+            const nd = clickedNode
             if (!nd) return
             setCutoffNodeId(nodeId)
             setCutoffResult(null)
-            setActiveTab('cutoff')
             setStatusMsg(`截断点已选：${nd.name}`)
+            return
+        }
+
+        if (clickedNode?.isJunction) {
+            setStatusMsg(`已选中枢纽：${clickedNode.name}`)
+        } else if (clickedNode) {
+            setStatusMsg(`已选中节点：${clickedNode.name}`)
         }
     }
 
     const doAddEdge = (startId: string, endId: string) => {
-        const s = nodesRef.current.find(n => n.id === startId)
-        const e = nodesRef.current.find(n => n.id === endId)
+        const s = baseTopoNodes.find(n => n.id === startId)
+        const e = baseTopoNodes.find(n => n.id === endId)
         if (!s || !e) return
-        const AMap = (window as any).AMap
         const id = `te-${Date.now()}`
-        const poly = new AMap.Polyline({
-            path: [s.position, e.position],
-            strokeColor: LINE_COLOR,
-            strokeWeight: LINE_WEIGHT,
-            strokeStyle: 'solid',
-            lineJoin: 'round',
-            lineCap: 'round',
-            zIndex: 100,
-        })
-        poly.setMap(mapInstance)
-        setTopoEdges(prev => [...prev, { id, startNodeId: startId, endNodeId: endId, name: '新建管线', poly }])
+        setBaseTopoEdges(prev => [...prev, { id, startNodeId: startId, endNodeId: endId, name: '新建管线' }])
         setUndoStack(prev => [...prev, { type: 'add-edge', edgeId: id }])
     }
 
     // ================== 导入：将 ALL_PIPELINES 数据转为纯拓扑点+线（阀室链路合并） ==================
 
     // ================== 撤销操作 ==================
-    const doUndo = useCallback(() => {
+    const restoreSelectionHighlights = useCallback(() => {
+        nodesRef.current.forEach(node => {
+            if (!node.marker) return
+            const isHighlighted = selectedMergeNodeIds.includes(node.id)
+            node.marker.setContent(createTopoMarkerContent(node.type, node.name, isHighlighted, !!node.isJunction))
+        })
+    }, [selectedMergeNodeIds])
+
+    useEffect(() => {
+        restoreSelectionHighlights()
+    }, [restoreSelectionHighlights, topoNodes])
+
+    const handleCreateJunction = useCallback(async () => {
+        if (selectedMergeNodeIds.length < 2) {
+            setStatusMsg('至少选择两个节点才能捏合')
+            return
+        }
+
+        const selectedNodes = baseTopoNodes.filter(node => selectedMergeNodeIds.includes(node.id))
+        const defaultName = selectedNodes.map(node => node.name).slice(0, 2).join('-') || `联合枢纽-${Date.now().toString().slice(-4)}`
+        const junctionName = window.prompt('请输入枢纽名称', `${defaultName}枢纽`)
+        if (!junctionName?.trim()) return
+
+        try {
+            const res = await fetch('/api/topology/junctions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: junctionName.trim(),
+                    station_ids: selectedMergeNodeIds,
+                    description: 'MapTopologyView 创建',
+                }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+
+            const data = await res.json()
+            invalidatePipelineCache()
+            await loadJunctionGroups()
+            setUndoStack(prev => [...prev, {
+                type: 'create-junction',
+                junctionId: data.id,
+                name: junctionName.trim(),
+                stationIds: [...selectedMergeNodeIds],
+            }])
+            setSelectedMergeNodeIds([])
+            setEditMode('view')
+            setStatusMsg(`已捏合 ${selectedMergeNodeIds.length} 个节点为「${junctionName.trim()}」`)
+        } catch (error) {
+            console.error(error)
+            setStatusMsg('创建枢纽失败')
+        }
+    }, [baseTopoNodes, loadJunctionGroups, selectedMergeNodeIds])
+
+    const handleDeleteJunction = useCallback((group: JunctionGroup) => {
+        if (!window.confirm(`确认拆分枢纽「${group.name}」，并恢复 ${group.station_ids.length} 个底层站点吗？`)) {
+            return
+        }
+        ; (async () => {
+            try {
+                const res = await fetch(`/api/topology/junctions/${group.id}`, { method: 'DELETE' })
+                if (!res.ok) throw new Error(await res.text())
+                invalidatePipelineCache()
+                await loadJunctionGroups()
+                setUndoStack(prev => [...prev, { type: 'delete-junction', group }])
+                setSelectedNode(null)
+                setSelectedMergeNodeIds([])
+                setStatusMsg(`枢纽「${group.name}」已拆分`)
+            } catch (error) {
+                console.error(error)
+                setStatusMsg('拆分枢纽失败')
+            }
+        })()
+    }, [loadJunctionGroups])
+
+    const doUndo = useCallback(async () => {
         const stack = [...undoStack]
         const action = stack.pop()
         if (!action) { setStatusMsg('无可撤销的操作'); return }
         setUndoStack(stack)
 
         if (action.type === 'add-edge') {
-            // 撤销添加边：移除 polyline 并删除 state
-            const edge = edgesRef.current.find(e => e.id === action.edgeId)
-            if (edge?.poly) edge.poly.setMap(null)
-            setTopoEdges(prev => prev.filter(e => e.id !== action.edgeId))
+            setBaseTopoEdges(prev => prev.filter(e => e.id !== action.edgeId))
             setStatusMsg('已撤销: 删除连线')
         } else if (action.type === 'add-node') {
-            // 撤销添加节点：先删关联边，再删 marker
-            const relEdges = edgesRef.current.filter(e => e.startNodeId === action.nodeId || e.endNodeId === action.nodeId)
-            relEdges.forEach(e => e.poly?.setMap(null))
-            setTopoEdges(prev => prev.filter(e => e.startNodeId !== action.nodeId && e.endNodeId !== action.nodeId))
-            
-            const node = nodesRef.current.find(n => n.id === action.nodeId)
-            if (node?.marker) node.marker.setMap(null)
-            setTopoNodes(prev => prev.filter(n => n.id !== action.nodeId))
+            const node = baseTopoNodes.find(n => n.id === action.nodeId)
+            setBaseTopoEdges(prev => prev.filter(e => e.startNodeId !== action.nodeId && e.endNodeId !== action.nodeId))
+            setBaseTopoNodes(prev => prev.filter(n => n.id !== action.nodeId))
+            setSelectedMergeNodeIds(prev => prev.filter(id => id !== action.nodeId))
             setStatusMsg(`已撤销: 删除 ${node?.name || '节点'}`)
+        } else if (action.type === 'create-junction') {
+            try {
+                const res = await fetch(`/api/topology/junctions/${action.junctionId}`, { method: 'DELETE' })
+                if (!res.ok) throw new Error(await res.text())
+                invalidatePipelineCache()
+                await loadJunctionGroups()
+                setSelectedNode(null)
+                setStatusMsg(`已撤销: 拆分枢纽「${action.name}」`)
+            } catch (error) {
+                console.error(error)
+                setStatusMsg('撤销枢纽创建失败')
+            }
+        } else if (action.type === 'delete-junction') {
+            try {
+                const res = await fetch('/api/topology/junctions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: action.group.name,
+                        station_ids: action.group.station_ids,
+                        description: action.group.description,
+                    }),
+                })
+                if (!res.ok) throw new Error(await res.text())
+                invalidatePipelineCache()
+                await loadJunctionGroups()
+                setStatusMsg(`已撤销: 恢复枢纽「${action.group.name}」`)
+            } catch (error) {
+                console.error(error)
+                setStatusMsg('撤销枢纽拆分失败')
+            }
         }
-    }, [undoStack])
+    }, [baseTopoNodes, loadJunctionGroups, undoStack])
 
     // Ctrl+Z 快捷键
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
                 e.preventDefault()
-                doUndo()
+                void doUndo()
             }
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [doUndo])
-    const importTopology = useCallback(() => {
+    const importTopology = useCallback((silent = false) => {
         if (!mapInstance) return
-        const AMap = (window as any).AMap
         const { nodes: srcN, lines: srcL } = rawPipelineData
-        if (srcN.length === 0) { setStatusMsg('无可导入的管线数据'); return }
-
-        // 避免重复导入
-        if (topoNodes.length > 0) {
-            nodesRef.current.forEach(n => n.marker?.setMap(null))
-            edgesRef.current.forEach(e => e.poly?.setMap(null))
-            setTopoNodes([])
-            setTopoEdges([])
+        if (srcN.length === 0) {
+            if (!silent) setStatusMsg('无可导入的管线数据')
+            return
         }
+
+        clearRenderedTopology()
+        setTopoNodes([])
+        setTopoEdges([])
+        setSelectedNode(null)
+        setSelectedMergeNodeIds([])
 
         // ------- 阀室链路合并算法 -------
         // 1. 归类：哪些是阀室、哪些是站场
@@ -390,61 +722,49 @@ const MapTopologyView: React.FC = () => {
             }
         }
 
-        // 4. 创建非阀室节点的 Marker
-        const imported: TopoNode[] = []
+        // 4. 构造非阀室基础节点
+        const imported: BaseTopoNode[] = []
         for (const sn of srcN) {
             if (valveIds.has(sn.id)) continue
 
             const pos: [number, number] = [sn.coordinate.longitude, sn.coordinate.latitude]
             const type = nodeTypeMap.get(sn.id) || 'station'
-            const size = TOPO_SIZES[type]
-
-            const marker = new AMap.Marker({
-                position: new AMap.LngLat(pos[0], pos[1]),
-                content: createTopoMarkerContent(type, sn.name),
-                offset: new AMap.Pixel(-size / 2, -size / 2),
-                draggable: true,
-                cursor: 'move',
-                zIndex: 200,
-            })
-            marker.setMap(mapInstance)
-
-            const nodeId = sn.id
-            marker.on('dragend', (e: any) => {
-                const np: [number, number] = [e.lnglat.getLng(), e.lnglat.getLat()]
-                setTopoNodes(prev => prev.map(n => n.id === nodeId ? { ...n, position: np } : n))
-                syncEdges(nodeId, np)
-            })
-            marker.on('click', () => doNodeClick(nodeId))
-
-            imported.push({ id: sn.id, type, name: sn.name, position: pos, marker })
+            imported.push({ id: sn.id, type, name: sn.name, position: pos })
         }
 
-        // 5. 创建合并后的连线
-        const importedEdges: TopoEdge[] = []
-        const importedMap = new Map(imported.map(n => [n.id, n]))
+        // 5. 构造基础连线
+        const importedEdges: BaseTopoEdge[] = []
+        const importedMap = new Map(imported.map(node => [node.id, node]))
 
         for (const [startId, endId] of edgePairs) {
             const sNode = importedMap.get(startId)
             const eNode = importedMap.get(endId)
             if (!sNode || !eNode) continue
-
-            const poly = new AMap.Polyline({
-                path: [sNode.position, eNode.position],
-                strokeColor: LINE_COLOR,
-                strokeWeight: LINE_WEIGHT,
-                strokeStyle: 'solid',
-                zIndex: 100,
-            })
-            poly.setMap(mapInstance)
             const edgeId = `ce-${startId.slice(-4)}-${endId.slice(-4)}`
-            importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} → ${eNode.name}`, poly })
+            importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} → ${eNode.name}` })
         }
 
-        setTopoNodes(imported)
-        setTopoEdges(importedEdges)
-        setStatusMsg(`已导入 ${imported.length} 节点, ${importedEdges.length} 条连线（阀室链路已合并）`)
-    }, [mapInstance, rawPipelineData, topoNodes.length])
+        setBaseTopoNodes(imported)
+        setBaseTopoEdges(importedEdges)
+        setDirtyPositions(new Map())
+        setPositionPreview(null)
+
+        if (!silent) {
+            setStatusMsg(`已导入 ${imported.length} 节点, ${importedEdges.length} 条连线（阀室链路已合并）`)
+        }
+    }, [clearRenderedTopology, mapInstance, rawPipelineData])
+
+    useEffect(() => {
+        if (!mapInstance || rawPipelineData.nodes.length === 0 || importedOnceRef.current) return
+        importedOnceRef.current = true
+        importTopology(true)
+    }, [importTopology, mapInstance, rawPipelineData.nodes.length])
+
+    useEffect(() => {
+        if (!selectedNode) return
+        const nextSelected = topoNodes.find(node => node.id === selectedNode.id) || null
+        setSelectedNode(nextSelected)
+    }, [selectedNode?.id, topoNodes])
 
     // ================== 截断仿真 ==================
     const runCutoffSimulation = useCallback(() => {
@@ -563,14 +883,90 @@ const MapTopologyView: React.FC = () => {
     }
 
     const clearAll = () => {
-        nodesRef.current.forEach(n => n.marker?.setMap(null))
-        edgesRef.current.forEach(e => e.poly?.setMap(null))
+        clearRenderedTopology()
+        setBaseTopoNodes([])
+        setBaseTopoEdges([])
         setTopoNodes([])
         setTopoEdges([])
+        setDirtyPositions(new Map())
+        setPositionPreview(null)
         setReport(null)
         setCentralityData([])
+        setSelectedNode(null)
+        setSelectedMergeNodeIds([])
+        setCutoffNodeId(null)
+        setCutoffResult(null)
         setStatusMsg('已清空')
     }
+
+    const handleSavePositions = useCallback(async () => {
+        if (dirtyPositions.size === 0 || isSaving) return
+        setIsSaving(true)
+        try {
+            const updates = [...dirtyPositions.entries()].map(([id, position]) => ({
+                id,
+                longitude: position[0],
+                latitude: position[1],
+            }))
+            const res = await fetch('/api/topology/positions/commit', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    updates,
+                    cascade_valves: cascadeValves,
+                    cascade_scope: 'segment',
+                }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+
+            const data = await res.json()
+            invalidatePipelineCache()
+            const packages = await loadAllPipelines()
+            setPipelines(packages)
+            setDirtyPositions(new Map())
+            setPositionPreview(null)
+            setStatusMsg(
+                `已保存 ${data.updated_station_ids?.length ?? 0} 个主点，联动 ${data.updated_valve_ids?.length ?? 0} 个阀室`
+            )
+        } catch (error) {
+            console.error(error)
+            setStatusMsg('保存点位失败')
+        } finally {
+            setIsSaving(false)
+        }
+    }, [cascadeValves, dirtyPositions, isSaving])
+
+    const handlePreviewPositions = useCallback(async () => {
+        if (dirtyPositions.size === 0 || isPreviewing || isSaving) return
+        setIsPreviewing(true)
+        try {
+            const updates = [...dirtyPositions.entries()].map(([id, position]) => ({
+                id,
+                longitude: position[0],
+                latitude: position[1],
+            }))
+            const res = await fetch('/api/topology/positions/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    updates,
+                    cascade_valves: cascadeValves,
+                    cascade_scope: 'segment',
+                }),
+            })
+            if (!res.ok) throw new Error(await res.text())
+            const data = await res.json()
+            setPositionPreview(data)
+            setStatusMsg(
+                `预览完成：将影响 ${data.updated_station_ids?.length ?? 0} 个主点、${data.updated_valve_ids?.length ?? 0} 个阀室`
+            )
+        } catch (error) {
+            console.error(error)
+            setStatusMsg('预览影响失败')
+        } finally {
+            setIsPreviewing(false)
+        }
+    }, [cascadeValves, dirtyPositions, isPreviewing, isSaving])
 
     // ================== 实时统计 ==================
     const stats = useMemo(() => ({
@@ -644,11 +1040,12 @@ const MapTopologyView: React.FC = () => {
                             <div className="space-y-3">
                                 <div>
                                     <p className="text-[10px] text-gray-500 mb-1.5 uppercase tracking-wider">操作模式</p>
-                                    <div className="grid grid-cols-3 gap-1.5">
+                                    <div className="grid grid-cols-4 gap-1.5">
                                         {([
                                             { m: 'view' as EditMode, label: '浏览', icon: 'pan_tool' },
                                             { m: 'draw-point' as EditMode, label: '添点', icon: 'add_location' },
                                             { m: 'connect' as EditMode, label: '连线', icon: 'timeline' },
+                                            { m: 'merge' as EditMode, label: '捏合', icon: 'hub' },
                                         ]).map(item => (
                                             <button key={item.m} onClick={() => setEditMode(item.m)}
                                                 className={`py-2 rounded-lg text-[11px] transition-all flex flex-col items-center gap-0.5
@@ -675,6 +1072,128 @@ const MapTopologyView: React.FC = () => {
                                     </div>
                                 )}
 
+                                {(editMode === 'merge' || selectedMergeNodeIds.length > 0) && (
+                                    <div className="border border-purple-500/20 bg-purple-950/20 rounded-lg p-2.5 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-[10px] text-purple-300 uppercase tracking-wider">待捏合节点</p>
+                                            <span className="text-[10px] text-purple-400">{selectedMergeNodeIds.length} 个</span>
+                                        </div>
+                                        <div className="max-h-28 overflow-y-auto space-y-1">
+                                            {selectedMergeNodeIds.length === 0 && (
+                                                <p className="text-[10px] text-gray-500">进入捏合模式后点击节点，或在浏览模式按住 Shift 进行多选。</p>
+                                            )}
+                                            {selectedMergeNodeIds.map(nodeId => {
+                                                const node = baseTopoNodes.find(item => item.id === nodeId)
+                                                    ?? topoNodes.find(item => item.id === nodeId)
+                                                if (!node) return null
+                                                return (
+                                                    <div key={nodeId} className="flex items-center gap-2 text-[11px] bg-white/5 rounded px-2 py-1">
+                                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TOPO_COLORS[node.type] }} />
+                                                        <span className="text-gray-200 flex-1 truncate">{node.name}</span>
+                                                        <button
+                                                            onClick={() => toggleMergeSelection(nodeId)}
+                                                            className="text-gray-500 hover:text-red-400 transition-colors"
+                                                        >
+                                                            <span className="material-symbols-outlined text-sm">close</span>
+                                                        </button>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                        <div className="flex gap-1.5">
+                                            <button
+                                                onClick={() => setSelectedMergeNodeIds([])}
+                                                disabled={selectedMergeNodeIds.length === 0}
+                                                className="flex-1 bg-gray-800/60 hover:bg-gray-700 text-gray-300 py-2 rounded-lg text-xs transition-colors disabled:opacity-40"
+                                            >
+                                                清空选择
+                                            </button>
+                                            <button
+                                                onClick={() => void handleCreateJunction()}
+                                                disabled={selectedMergeNodeIds.length < 2}
+                                                className="flex-1 bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">hub</span>创建枢纽
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="border border-cyan-500/20 bg-cyan-950/20 rounded-lg p-2.5 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[10px] text-cyan-300 uppercase tracking-wider">点位保存</p>
+                                        <span className="text-[10px] text-cyan-400">{dirtyPositions.size} 个待保存</span>
+                                    </div>
+                                    <label className="flex items-center justify-between gap-3 text-xs text-gray-300">
+                                        <span>保存时联动阀室</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCascadeValves(prev => !prev)}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${cascadeValves ? 'bg-cyan-600' : 'bg-gray-700'}`}
+                                        >
+                                            <span
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${cascadeValves ? 'translate-x-6' : 'translate-x-1'}`}
+                                            />
+                                        </button>
+                                    </label>
+                                    <p className="text-[10px] text-gray-500 leading-4">
+                                        保存后会把当前拖动过的主点写入数据库，并按区段自动重算受影响阀室的位置。
+                                    </p>
+                                    {positionPreview && (
+                                        <div className="rounded-lg border border-cyan-500/20 bg-black/20 p-2 space-y-1.5">
+                                            <div className="grid grid-cols-3 gap-1 text-[10px]">
+                                                <span className="rounded bg-white/5 px-2 py-1 text-center text-gray-300">
+                                                    主点 {positionPreview.updated_station_ids.length}
+                                                </span>
+                                                <span className="rounded bg-white/5 px-2 py-1 text-center text-gray-300">
+                                                    阀室 {positionPreview.updated_valve_ids.length}
+                                                </span>
+                                                <span className="rounded bg-white/5 px-2 py-1 text-center text-gray-300">
+                                                    区段 {positionPreview.impacted_segments.length}
+                                                </span>
+                                            </div>
+                                            {positionPreview.impacted_segments.length > 0 && (
+                                                <div className="max-h-24 overflow-y-auto space-y-1">
+                                                    {positionPreview.impacted_segments.slice(0, 4).map(segment => (
+                                                        <div key={`${segment.start_id}-${segment.end_id}`} className="text-[10px] text-gray-400 bg-white/5 rounded px-2 py-1">
+                                                            {segment.start_id} → {segment.end_id} · 阀室 {segment.valve_ids.length}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {positionPreview.errors.length > 0 && (
+                                                <p className="text-[10px] text-red-400">
+                                                    预览包含 {positionPreview.errors.length} 条异常，请先检查待保存点位。
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                    <div className="flex gap-1.5">
+                                        <button
+                                            onClick={() => void handlePreviewPositions()}
+                                            disabled={dirtyPositions.size === 0 || isSaving || isPreviewing}
+                                            className="flex-1 bg-sky-900/60 hover:bg-sky-800 text-sky-300 py-2 rounded-lg text-xs transition-colors disabled:opacity-40"
+                                        >
+                                            {isPreviewing ? '预览中...' : '预览影响'}
+                                        </button>
+                                        <button
+                                            onClick={() => void resetUnsavedPositions()}
+                                            disabled={dirtyPositions.size === 0 || isSaving}
+                                            className="flex-1 bg-gray-800/60 hover:bg-gray-700 text-gray-300 py-2 rounded-lg text-xs transition-colors disabled:opacity-40"
+                                        >
+                                            撤销未保存
+                                        </button>
+                                        <button
+                                            onClick={() => void handleSavePositions()}
+                                            disabled={dirtyPositions.size === 0 || isSaving}
+                                            className="flex-1 bg-cyan-700/80 hover:bg-cyan-600 text-white py-2 rounded-lg text-xs transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">save</span>
+                                            {isSaving ? '保存中...' : '保存坐标'}
+                                        </button>
+                                    </div>
+                                </div>
+
                                 {/* 图例 */}
                                 <div className="border-t border-gray-800/50 pt-2">
                                     <p className="text-[10px] text-gray-500 mb-1.5 uppercase tracking-wider">图例</p>
@@ -693,7 +1212,7 @@ const MapTopologyView: React.FC = () => {
                                 </div>
 
                                 <div className="flex gap-1.5 pt-1">
-                                    <button onClick={doUndo} disabled={undoStack.length === 0} className="flex-1 bg-blue-900/40 hover:bg-blue-800 text-blue-400 py-2 rounded-lg text-xs border border-blue-800/40 transition-colors disabled:opacity-40 flex items-center justify-center gap-1">
+                                    <button onClick={() => void doUndo()} disabled={undoStack.length === 0} className="flex-1 bg-blue-900/40 hover:bg-blue-800 text-blue-400 py-2 rounded-lg text-xs border border-blue-800/40 transition-colors disabled:opacity-40 flex items-center justify-center gap-1">
                                         <span className="material-symbols-outlined text-sm">undo</span>撤销{undoStack.length > 0 ? `(${undoStack.length})` : ''}
                                     </button>
                                     <button onClick={exportJSON} disabled={topoNodes.length === 0} className="flex-1 bg-green-900/40 hover:bg-green-800 text-green-400 py-2 rounded-lg text-xs border border-green-800/40 transition-colors disabled:opacity-40">导出</button>
@@ -935,6 +1454,100 @@ const MapTopologyView: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {selectedNode && (
+                <div className="absolute top-[84px] right-4 bottom-4 z-20 w-[360px]">
+                    <div className="h-full bg-[#0c1218]/95 backdrop-blur-md rounded-xl border border-cyan-500/20 shadow-2xl overflow-hidden flex flex-col">
+                        <div className="px-4 py-3 border-b border-cyan-500/20 flex items-center justify-between bg-[#0f1722]">
+                            <div>
+                                <h3 className="text-sm font-semibold text-white">{selectedNode.name}</h3>
+                                <p className="text-[11px] text-gray-400 mt-0.5">节点详情</p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedNode(null)}
+                                className="text-gray-400 hover:text-white transition-colors"
+                            >
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
+                            <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: TOPO_COLORS[selectedNode.type] }} />
+                                    <span className="text-white font-medium">{selectedNode.name}</span>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-2">类型：{selectedNode.isJunction ? '枢纽' : TOPO_LABELS[selectedNode.type]}</p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    坐标：{selectedNode.position[0].toFixed(4)}, {selectedNode.position[1].toFixed(4)}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    关联连线：{topoEdges.filter(edge => edge.startNodeId === selectedNode.id || edge.endNodeId === selectedNode.id).length}
+                                </p>
+                            </div>
+
+                            {selectedNode.isJunction ? (
+                                <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 space-y-3">
+                                    <div>
+                                        <p className="text-xs text-purple-300 uppercase tracking-wider">底层站点</p>
+                                        <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                                            {selectedNode.sourceNodeIds?.map(stationId => {
+                                                const rawNode = baseTopoNodes.find(node => node.id === stationId)
+                                                return (
+                                                    <div key={stationId} className="text-xs text-gray-300 bg-white/5 rounded px-2 py-1">
+                                                        {rawNode?.name || stationId}
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            const group = junctionGroups.find(item => item.id === selectedNode.junctionId)
+                                            if (group) handleDeleteJunction(group)
+                                        }}
+                                        className="w-full bg-red-700/80 hover:bg-red-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">device_hub</span>解除捏合
+                                    </button>
+                                    <button
+                                        onClick={() => setHistoryChartTarget({
+                                            junctionId: selectedNode.junctionId ? `JUNCTION-${selectedNode.junctionId}` : selectedNode.id,
+                                            displayName: selectedNode.name,
+                                        })}
+                                        className="w-full bg-blue-700/80 hover:bg-blue-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">show_chart</span>查看枢纽历史
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="rounded-lg border border-gray-700/40 bg-white/5 p-3">
+                                    <button
+                                        onClick={() => {
+                                            setEditMode('merge')
+                                            toggleMergeSelection(selectedNode.id)
+                                        }}
+                                        className="w-full bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">hub</span>加入待捏合列表
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {historyChartTarget && (
+                <div className="absolute inset-0 z-30 bg-black/30 backdrop-blur-[1px] flex items-center justify-center">
+                    <ScadaHistoryChart
+                        stationName={historyChartTarget.stationName}
+                        junctionId={historyChartTarget.junctionId}
+                        displayName={historyChartTarget.displayName}
+                        onClose={() => setHistoryChartTarget(null)}
+                    />
+                </div>
+            )}
         </div>
     )
 }

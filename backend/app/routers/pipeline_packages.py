@@ -16,7 +16,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import PipelineSystem, Station, Pipeline, JunctionGroup
+from app.models import PipelineSystem, Station, Pipeline
+from app.services.junction_groups import load_normalized_junction_groups
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ def _map_node_type_to_frontend(raw_type: str) -> str:
         "distribution": "metering",
         "valve": "valve",
         "source": "junction",
+        "junction": "junction",
     }
     return mapping.get(raw_type, "junction")
 
@@ -75,16 +77,48 @@ def get_pipeline_packages(
         node_degree[p.start_station_id] += 1
         node_degree[p.end_station_id] += 1
     
-    # 收集 junction_groups 中的枢纽站场
-    junction_station_ids: set = set()
+    # 收集 junction_groups 中的枢纽站场，并构造“超级节点”
+    junction_station_ids: set[str] = set()
     junction_names: Dict[str, str] = {}  # station_id → 枢纽名
+    station_to_junction_id: Dict[str, str] = {}
+    junction_nodes: Dict[str, Dict[str, Any]] = {}
     try:
-        all_junctions = session.exec(select(JunctionGroup)).all()
+        all_junctions = load_normalized_junction_groups(session)
         for jg in all_junctions:
-            ids = json.loads(jg.station_ids)
+            ids = jg["station_ids"]
+            member_stations = [station_map[sid] for sid in ids if sid in station_map]
+            if not member_stations:
+                continue
+            junction_id = f"JUNCTION-{jg['id']}"
+            center_lng = sum(st.longitude for st in member_stations) / len(member_stations)
+            center_lat = sum(st.latitude for st in member_stations) / len(member_stations)
+            junction_nodes[junction_id] = {
+                "id": junction_id,
+                "name": jg["name"],
+                "type": "junction",
+                "coordinate": {
+                    "longitude": center_lng,
+                    "latitude": center_lat,
+                },
+                "pressureLevel": "high",
+                "status": "normal",
+                "isHub": True,
+                "properties": {
+                    "rawType": "junction",
+                    "sourceStationIds": ids,
+                    "junctionId": jg["id"],
+                    "sourceGroupIds": jg.get("raw_group_ids", []),
+                },
+                "hubInfo": {
+                    "degree": len(ids),
+                    "isJunction": True,
+                    "junctionName": jg["name"],
+                },
+            }
             for sid in ids:
                 junction_station_ids.add(sid)
-                junction_names[sid] = jg.name
+                junction_names[sid] = jg["name"]
+                station_to_junction_id[sid] = junction_id
     except Exception:
         pass  # junction_groups 表可能未创建
     
@@ -140,6 +174,30 @@ def get_pipeline_packages(
                 "junctionName": junction_names.get(s.id, ""),
             }
         return node
+
+    def _build_display_node(display_id: str, layer_name: str) -> Optional[Dict[str, Any]]:
+        """构建最终给前端的显示节点：普通站点或枢纽超级节点"""
+        if display_id in junction_nodes:
+            base = junction_nodes[display_id]
+            node = {
+                **base,
+                "properties": {
+                    **base.get("properties", {}),
+                    "pipeline": layer_name,
+                },
+            }
+            return node
+
+        station = station_map.get(display_id)
+        if not station:
+            return None
+        return _build_node(station, layer_name)
+
+    def _build_line_path_from_node_dict(start_node: Dict[str, Any], end_node: Dict[str, Any]) -> list:
+        return [
+            start_node["coordinate"],
+            end_node["coordinate"],
+        ]
     
     for system in systems:
         layers_config = json.loads(system.layers_config) if system.layers_config else []
@@ -150,29 +208,42 @@ def get_pipeline_packages(
             layer_stations = stations_by_prefix.get(id_prefix, [])
             layer_pipelines = pipelines_by_prefix.get(id_prefix, [])
             
-            # 构建节点列表（按前缀归属的站场）
-            node_ids_in_layer = set()
+            # 构建显示节点列表（带枢纽收缩）
+            display_node_ids: set[str] = set()
+            for station in layer_stations:
+                display_node_ids.add(station_to_junction_id.get(station.id, station.id))
+            for pipeline in layer_pipelines:
+                display_node_ids.add(station_to_junction_id.get(pipeline.start_station_id, pipeline.start_station_id))
+                display_node_ids.add(station_to_junction_id.get(pipeline.end_station_id, pipeline.end_station_id))
+
             nodes = []
-            for s in layer_stations:
-                nodes.append(_build_node(s, layer_cfg["name"]))
-                node_ids_in_layer.add(s.id)
+            node_map_in_layer: Dict[str, Dict[str, Any]] = {}
+            for display_id in display_node_ids:
+                node = _build_display_node(display_id, layer_cfg["name"])
+                if node is None:
+                    continue
+                nodes.append(node)
+                node_map_in_layer[display_id] = node
             
             # 构建管段列表
             lines = []
             for p in layer_pipelines:
-                start_s = station_map.get(p.start_station_id)
-                end_s = station_map.get(p.end_station_id)
-                
-                # 构建路径
-                path = []
-                if start_s and end_s:
-                    path = _build_line_path(start_s, end_s)
-                
+                start_display_id = station_to_junction_id.get(p.start_station_id, p.start_station_id)
+                end_display_id = station_to_junction_id.get(p.end_station_id, p.end_station_id)
+
+                # 内部边被枢纽吸收，不再显示
+                if start_display_id == end_display_id:
+                    continue
+
+                start_node = node_map_in_layer.get(start_display_id)
+                end_node = node_map_in_layer.get(end_display_id)
+                path = _build_line_path_from_node_dict(start_node, end_node) if start_node and end_node else []
+
                 lines.append({
                     "id": p.id,
                     "name": p.name,
-                    "startNodeId": p.start_station_id,
-                    "endNodeId": p.end_station_id,
+                    "startNodeId": start_display_id,
+                    "endNodeId": end_display_id,
                     "path": path,
                     "diameter": p.diameter or (int(p.diameter_mm) if p.diameter_mm else 1016),
                     "material": "Steel",
@@ -184,15 +255,6 @@ def get_pipeline_packages(
                         "color": system.color,
                     },
                 })
-            
-            # 补充支线管段引用的共享站场（SJ4 等管线中支线与干线共用节点）
-            for p in layer_pipelines:
-                for ref_id in [p.start_station_id, p.end_station_id]:
-                    if ref_id not in node_ids_in_layer:
-                        ref_s = station_map.get(ref_id)
-                        if ref_s:
-                            nodes.append(_build_node(ref_s, layer_cfg["name"]))
-                            node_ids_in_layer.add(ref_id)
             
             package_layers.append({
                 "name": layer_cfg["name"],

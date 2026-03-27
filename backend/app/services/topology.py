@@ -8,9 +8,9 @@
 """
 
 import networkx as nx
-import json
 from sqlmodel import Session, select
 from app.models import Station, Pipeline, JunctionGroup
+from app.services.junction_groups import load_normalized_junction_groups
 from typing import List, Dict, Optional, Any
 from app.services.topology_computation import (
     topology_service, 
@@ -65,24 +65,22 @@ class TopologyService:
         graph = TopologyGraph(directed=directed)
         
         # 0. 预加载 JunctionGroup 进行节点收缩映射
-        junctions = self.session.exec(select(JunctionGroup)).all()
+        junctions = load_normalized_junction_groups(self.session)
         station_to_junction = {}  # station_id -> super_node_id
         junction_nodes = {}       # super_node_id -> info
         
         for j in junctions:
-            try:
-                sids = json.loads(j.station_ids)
-                if not sids: continue
-                super_node_id = f"JUNC_{j.id}"
-                junction_nodes[super_node_id] = {
-                    "id": super_node_id,
-                    "name": j.name,
-                    "sids": sids
-                }
-                for sid in sids:
-                    station_to_junction[sid] = super_node_id
-            except Exception:
-                pass
+            sids = j["station_ids"]
+            if not sids:
+                continue
+            super_node_id = f"JUNC_{j['id']}"
+            junction_nodes[super_node_id] = {
+                "id": super_node_id,
+                "name": j["name"],
+                "sids": sids
+            }
+            for sid in sids:
+                station_to_junction[sid] = super_node_id
                 
         # 1. 注入节点 (站场)
         stations = self.session.exec(select(Station)).all()

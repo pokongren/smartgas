@@ -15,6 +15,8 @@ from pydantic import BaseModel
 
 from app.database import get_session
 from app.models import Station, Pipeline
+from app.services.junction_groups import expand_station_ids_for_request, load_normalized_junction_groups
+from app.services.position_commit import PositionCommitService
 from app.services.topology import TopologyService
 
 router = APIRouter(prefix="/api/topology", tags=["拓扑编辑器"])
@@ -592,6 +594,18 @@ class BatchUpdatePositionRequest(BaseModel):
     updates: List[Dict[str, Any]]  # [{id, longitude, latitude}, ...]
 
 
+class PositionCommitItem(BaseModel):
+    id: str
+    longitude: float
+    latitude: float
+
+
+class PositionCommitRequest(BaseModel):
+    updates: List[PositionCommitItem]
+    cascade_valves: bool = True
+    cascade_scope: str = 'segment'
+
+
 @router.put("/station/{station_id}/position")
 def update_station_position(
     station_id: str,
@@ -607,6 +621,7 @@ def update_station_position(
     station.longitude = request.longitude
     station.latitude = request.latitude
     session.commit()
+    TopologyService(session).refresh()
     
     return {
         "message": f"{station.name} 坐标已更新",
@@ -635,7 +650,48 @@ def batch_update_positions(
         results["updated"].append(sid)
     
     session.commit()
+    TopologyService(session).refresh()
     return results
+
+
+@router.put("/positions/commit")
+def commit_positions(
+    request: PositionCommitRequest,
+    session: Session = Depends(get_session)
+):
+    """提交地图拓扑页的点位编辑，并按区段联动阀室坐标"""
+    service = PositionCommitService(session)
+    result = service.commit(
+        updates=[item.model_dump() for item in request.updates],
+        cascade_valves=request.cascade_valves,
+        cascade_scope=request.cascade_scope,
+    )
+    TopologyService(session).refresh()
+
+    return {
+        "message": "点位保存成功",
+        **result,
+    }
+
+
+@router.post("/positions/preview")
+def preview_positions(
+    request: PositionCommitRequest,
+    session: Session = Depends(get_session)
+):
+    """预览点位提交会影响哪些区段和阀室，不真正写库"""
+    service = PositionCommitService(session)
+    result = service.commit(
+        updates=[item.model_dump() for item in request.updates],
+        cascade_valves=request.cascade_valves,
+        cascade_scope=request.cascade_scope,
+        preview_only=True,
+    )
+
+    return {
+        "message": "点位影响预览",
+        **result,
+    }
 
 
 # ============ 合建站（两站合并） ============
@@ -753,36 +809,27 @@ def create_junction_group(
     import json
     from app.models import JunctionGroup
     
-    if len(request.station_ids) < 2:
+    normalized_station_ids = expand_station_ids_for_request(session, request.station_ids)
+
+    if len(normalized_station_ids) < 2:
         raise HTTPException(status_code=400, detail="合并枢纽至少需要包含两个底层站场。")
         
     junction = JunctionGroup(
         name=request.name,
         description=request.description,
-        station_ids=json.dumps(request.station_ids)
+        station_ids=json.dumps(normalized_station_ids)
     )
     session.add(junction)
     session.commit()
     session.refresh(junction)
+    TopologyService(session).refresh()
     
     return {"message": f"枢纽 '{request.name}' 合并成功！", "id": junction.id}
 
 @router.get("/junctions")
 def get_junction_groups(session: Session = Depends(get_session)):
     """获取所有枢纽群组"""
-    from app.models import JunctionGroup
-    import json
-    
-    junctions = session.exec(select(JunctionGroup)).all()
-    results = []
-    for j in junctions:
-        results.append({
-            "id": j.id,
-            "name": j.name,
-            "description": j.description,
-            "station_ids": json.loads(j.station_ids) if j.station_ids else []
-        })
-    return {"junctions": results}
+    return {"junctions": load_normalized_junction_groups(session)}
 
 
 @router.delete("/junctions/{junction_id}")
@@ -797,4 +844,5 @@ def delete_junction_group(junction_id: int, session: Session = Depends(get_sessi
     name = group.name
     session.delete(group)
     session.commit()
+    TopologyService(session).refresh()
     return {"ok": True, "message": f"枢纽 '{name}' 已拆分还原"}

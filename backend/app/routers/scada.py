@@ -10,10 +10,12 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select
 
-from app.database import get_session, engine
+from app.database import get_scada_history_session, get_session
+from app.models import Station
+from app.services.junction_groups import load_normalized_junction_groups
 from app.scada_models import ScadaStation, ScadaHistory
 
 logger = logging.getLogger(__name__)
@@ -215,7 +217,10 @@ _playback_index: dict[str, int] = {}
 
 
 @router.post("/import-excel")
-def import_excel(session: Session = Depends(get_session)):
+def import_excel(
+    session: Session = Depends(get_session),
+    history_session: Session = Depends(get_scada_history_session),
+):
     """
     导入甪直站 Excel 数据到 scada_history 表。
     解析 PI tag 列，提取西一线/西二线/中俄线的压力和温度时序数据。
@@ -227,10 +232,10 @@ def import_excel(session: Session = Depends(get_session)):
     ws = wb.active
 
     # 先清除旧数据
-    old = session.exec(select(ScadaHistory).where(ScadaHistory.station_name == "甪直分输站")).all()
+    old = history_session.exec(select(ScadaHistory).where(ScadaHistory.station_name == "甪直分输站")).all()
     for row in old:
-        session.delete(row)
-    session.commit()
+        history_session.delete(row)
+    history_session.commit()
 
     # 列映射：(date_col, time_col, value_col, pipeline_id, tag_name, metric_type)
     col_map = [
@@ -269,10 +274,10 @@ def import_excel(session: Session = Depends(get_session)):
                 recorded_at=recorded,
                 value=float(value),
             )
-            session.add(record)
+            history_session.add(record)
             count += 1
 
-    session.commit()
+    history_session.commit()
 
     # 重置回放指针
     _playback_index["甪直分输站"] = 0
@@ -281,13 +286,17 @@ def import_excel(session: Session = Depends(get_session)):
 
 
 @router.post("/playback/{station_name}")
-def playback_next(station_name: str, session: Session = Depends(get_session)):
+def playback_next(
+    station_name: str,
+    session: Session = Depends(get_session),
+    history_session: Session = Depends(get_scada_history_session),
+):
     """
     回放一步：从历史记录中取下一个时间点的数据，
     更新 scada_stations 表的实时值，模拟数据变化。
     """
     # 获取该站所有历史时间点（去重+排序）
-    all_records = session.exec(
+    all_records = history_session.exec(
         select(ScadaHistory)
         .where(ScadaHistory.station_name == station_name)
         .order_by(ScadaHistory.recorded_at.desc())  # 从最新到最旧（Excel顺序）
@@ -348,7 +357,7 @@ def playback_next(station_name: str, session: Session = Depends(get_session)):
 
 @router.get("/history/{station_name}")
 def get_history(station_name: str, pipeline_id: str = "we1", metric_type: str = "pressure",
-                session: Session = Depends(get_session)):
+                session: Session = Depends(get_scada_history_session)):
     """获取指定站场的历史时序数据（前端画趋势曲线用）"""
     records = session.exec(
         select(ScadaHistory)
@@ -374,59 +383,122 @@ def get_history(station_name: str, pipeline_id: str = "we1", metric_type: str = 
 
 @router.get("/history-by-id")
 def get_history_by_id(
-    station_id: str,
+    station_id: Optional[str] = Query(None, description="站场名称或站场ID"),
+    junction_id: Optional[str] = Query(None, description="枢纽ID，支持 17 或 JUNCTION-17"),
     hours: int = 6,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_scada_history_session),
+    main_session: Session = Depends(get_session),
 ):
     """
     通用历史时序查询（供 AI 工具和前端 ECharts 使用）。
     按 station_name 和时间范围查询，返回所有指标的合并数据。
     
     参数：
-    - station_id: 站场名称或 ID
+    - station_id: 单站查询，支持站场名称或站场 ID
+    - junction_id: 枢纽查询，返回枢纽内各物理站多条曲线
     - hours: 回溯小时数，默认 6
     """
     from datetime import timedelta
+
+    if not station_id and not junction_id:
+        return {
+            "station": None,
+            "hours": hours,
+            "count": 0,
+            "series": {},
+            "seriesMeta": {},
+            "targetType": "unknown",
+        }
 
     # 计算时间范围
     now = datetime.now()
     since = now - timedelta(hours=hours)
 
-    # 先按名称查，兼容 station_id 传名称的场景
-    records = session.exec(
-        select(ScadaHistory)
-        .where(
-            ScadaHistory.station_name == station_id,
-            ScadaHistory.recorded_at >= since,
-        )
-        .order_by(ScadaHistory.recorded_at)
-    ).all()
+    def _normalize_junction_id(raw_id: str) -> Optional[int]:
+        raw = str(raw_id).strip()
+        if not raw:
+            return None
+        if raw.upper().startswith("JUNCTION-"):
+            raw = raw.split("-", 1)[1]
+        try:
+            return int(raw)
+        except Exception:
+            return None
 
-    if not records:
-        # 没有时间范围限制的情况下也查一次（可能历史数据不在最近窗口内）
+    target_station_names: List[str] = []
+    target_label = station_id or junction_id or ""
+    target_type = "station"
+
+    if junction_id:
+        normalized_junction_id = _normalize_junction_id(junction_id)
+        groups = load_normalized_junction_groups(main_session)
+        group = next((item for item in groups if item["id"] == normalized_junction_id), None)
+        if group:
+            target_type = "junction"
+            target_label = group["name"]
+            station_ids = group["station_ids"]
+            station_rows = main_session.exec(select(Station).where(Station.id.in_(station_ids))).all() if station_ids else []
+            station_name_map = {row.id: row.name for row in station_rows}
+            target_station_names = [station_name_map[sid] for sid in station_ids if sid in station_name_map]
+
+    if not target_station_names and station_id:
+        station_row = main_session.get(Station, station_id)
+        if station_row:
+            target_station_names = [station_row.name]
+            target_label = station_row.name
+        else:
+            target_station_names = [station_id]
+
+    records = []
+    if target_station_names:
         records = session.exec(
             select(ScadaHistory)
-            .where(ScadaHistory.station_name == station_id)
+            .where(
+                ScadaHistory.station_name.in_(target_station_names),
+                ScadaHistory.recorded_at >= since,
+            )
             .order_by(ScadaHistory.recorded_at)
         ).all()
 
-    if not records:
-        return {"station": station_id, "hours": hours, "count": 0, "series": {}}
+        if not records:
+            records = session.exec(
+                select(ScadaHistory)
+                .where(ScadaHistory.station_name.in_(target_station_names))
+                .order_by(ScadaHistory.recorded_at)
+            ).all()
 
-    # 按 metric_type 分组组织数据
+    if not records:
+        return {
+            "station": target_label,
+            "hours": hours,
+            "count": 0,
+            "series": {},
+            "seriesMeta": {},
+            "targetType": target_type,
+        }
+
     series: dict[str, list] = {}
+    series_meta: dict[str, dict] = {}
     for r in records:
-        key = f"{r.pipeline_id}_{r.metric_type}"
+        key = f"{r.station_name}__{r.pipeline_id}_{r.metric_type}"
         if key not in series:
             series[key] = []
+            series_meta[key] = {
+                "label": f"{r.station_name} · {r.pipeline_id.upper()} · {r.metric_type}",
+                "stationName": r.station_name,
+                "pipelineId": r.pipeline_id,
+                "metricType": r.metric_type,
+            }
         series[key].append({
             "time": r.recorded_at.isoformat(),
             "value": r.value,
         })
 
     return {
-        "station": station_id,
+        "station": target_label,
         "hours": hours,
         "count": len(records),
         "series": series,
+        "seriesMeta": series_meta,
+        "targetType": target_type,
     }

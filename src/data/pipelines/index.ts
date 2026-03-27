@@ -83,6 +83,13 @@ let _loadingPromise: Promise<PipelinePackage[]> | null = null
  */
 export const ALL_PIPELINES: PipelinePackage[] = []
 
+/** 主动失效缓存：用于拓扑捏合后强制重新拉取后端数据 */
+export function invalidatePipelineCache(): void {
+    _cachedPackages = null
+    _loadingPromise = null
+    ALL_PIPELINES.length = 0
+}
+
 /**
  * 异步加载所有管线数据（带缓存）
  *
