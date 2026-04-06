@@ -12,12 +12,18 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models import PipelineSystem, Station, Pipeline
 from app.services.junction_groups import load_runtime_junction_groups
+from app.services.we1_pilot_service import (
+    list_we1_pilots,
+    get_we1_pilot_or_raise,
+    get_we1_pilot_seed_or_raise,
+    build_pilot_package,
+)
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
@@ -311,3 +317,49 @@ def get_pipeline_packages(
         })
     
     return result
+
+
+@router.get("/pipeline-packages/pilots/we1")
+def get_we1_pilot_scopes() -> Dict[str, Any]:
+    """返回 WE1 试点样板范围定义，供前后端和补数脚本统一使用。"""
+    return {
+        "system_id": "we1",
+        "pilots": list_we1_pilots(),
+    }
+
+
+@router.get("/pipeline-packages/pilots/we1/{pilot_id}")
+def get_we1_pilot_package(
+    pilot_id: str,
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """
+    返回 WE1 指定试点样板的数据快照。
+
+    当前阶段先提供：
+    - 过滤后的样板拓扑包
+    - 场景模板
+    - 补数要求
+    """
+    try:
+        pilot = get_we1_pilot_or_raise(pilot_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"未找到 WE1 试点样板: {pilot_id}")
+
+    packages = get_pipeline_packages(system_id="we1", session=session)
+    if not packages:
+        raise HTTPException(status_code=404, detail="未找到 WE1 管线数据包")
+
+    system_package = packages[0]
+    return build_pilot_package(system_package, pilot)
+
+
+@router.get("/pipeline-packages/pilots/we1/{pilot_id}/seed")
+def get_we1_pilot_seed(pilot_id: str) -> Dict[str, Any]:
+    """返回 WE1 指定试点样板的机器可读 seed，供补数脚本和后续求解层共用。"""
+    try:
+        return get_we1_pilot_seed_or_raise(pilot_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"未找到 WE1 试点样板: {pilot_id}")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"未找到 WE1 试点 seed: {exc}")

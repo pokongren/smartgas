@@ -1,0 +1,185 @@
+{
+  "pilot_id": "zhengzhou_xuedian_changlv",
+  "system_id": "we1",
+  "name": "WE1 辅样板：郑州压气站 -> 薛店分输站 -> 长铝支线",
+  "description": "郑州压气站 -> 薛店分输站 -> WE1-B1 长铝支线",
+  "parameter_basis": {
+    "version": "trial-default-v1",
+    "updated_at": "2026-04-06",
+    "pressure_unit": "MPa",
+    "flow_unit": "10^4 Nm3/d",
+    "notes": [
+      "当前是试点默认值口径，用来先打通主干分流和支线承接，不代表真实生产参数。",
+      "郑州、薛店、长铝三点先用一套可解释的默认需求和压力约束，后续再接真实需求。"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "WE1-127",
+      "name": "郑州压气站",
+      "type": "compressor",
+      "role": "source",
+      "supply_max": 120.0,
+      "target_pressure_mpa": 9.8,
+      "min_pressure_mpa": 8.7,
+      "max_pressure_mpa": 10.1,
+      "capacity": 120.0,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.05,
+      "notes": "辅样板上游供气入口，先承担主干和支线共用供给起点。"
+    },
+    {
+      "id": "WE1-129",
+      "name": "薛店分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 32.0,
+      "target_pressure_mpa": 8.2,
+      "min_pressure_mpa": 7.2,
+      "max_pressure_mpa": 9.0,
+      "distribution_demand": 32.0,
+      "notes": "主干分输负荷点，先按试点基线需求承接主干分流。"
+    },
+    {
+      "id": "WE1-B1-1",
+      "name": "郑州压气站",
+      "type": "compressor",
+      "role": "transit",
+      "supply_max": 0.0,
+      "target_pressure_mpa": 9.7,
+      "min_pressure_mpa": 8.6,
+      "max_pressure_mpa": 10.0,
+      "capacity": 45.0,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.0,
+      "linked_node_id": "WE1-127",
+      "notes": "和主干郑州压气站是同位点，第一轮先按同压耦合处理，不单独再提压。"
+    },
+    {
+      "id": "WE1-B1-2",
+      "name": "长铝末站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 18.0,
+      "target_pressure_mpa": 7.8,
+      "min_pressure_mpa": 7.0,
+      "max_pressure_mpa": 8.8,
+      "distribution_demand": 18.0,
+      "notes": "支线末端负荷点，先按试点基线需求承接长铝方向负荷。"
+    }
+  ],
+  "edges": [
+    {
+      "id_range": [
+        "WE1-T-127",
+        "WE1-T-130"
+      ],
+      "pipeline_kind": "trunk",
+      "diameter_mm_default": 1016.0,
+      "design_pressure_mpa_default": 10.0,
+      "roughness_mm_default": 0.03,
+      "direction_mode_default": "fixed",
+      "status_default": "open",
+      "start_pressure_mpa": 9.8,
+      "end_pressure_mpa": 8.4,
+      "max_flow": 120.0,
+      "notes": "郑州到薛店附近主干段，先按默认主干口径补齐，支持分流基线试算。"
+    },
+    {
+      "id_range": [
+        "WE1-B1-T-1",
+        "WE1-B1-T-1"
+      ],
+      "pipeline_kind": "branch",
+      "diameter_mm_default": 1016.0,
+      "design_pressure_mpa_default": 10.0,
+      "roughness_mm_default": 0.03,
+      "direction_mode_default": "fixed",
+      "status_default": "open",
+      "start_pressure_mpa": 9.7,
+      "end_pressure_mpa": 7.9,
+      "max_flow": 40.0,
+      "notes": "长铝支线当前只有单段，先按单段承压和流量上限处理，后面再细化压降。"
+    }
+  ],
+  "valves": [
+    {
+      "id_range": [
+        "WE1-128",
+        "WE1-128"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-130",
+        "WE1-131"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "steady_branch_base",
+      "name": "常规分输",
+      "compressor_overrides": [],
+      "edge_overrides": [],
+      "node_overrides": [],
+      "notes": "先验证郑州主干到薛店和长铝两路分流。"
+    },
+    {
+      "id": "xuedian_load_up",
+      "name": "薛店负荷上调",
+      "compressor_overrides": [],
+      "edge_overrides": [],
+      "node_overrides": [
+        {
+          "node_id": "WE1-129",
+          "demand_nominal": 40.0,
+          "distribution_demand": 40.0
+        }
+      ],
+      "notes": "验证薛店需求拉升后主干和支线分配变化。"
+    },
+    {
+      "id": "changlv_load_up",
+      "name": "长铝支线负荷上调",
+      "compressor_overrides": [],
+      "edge_overrides": [],
+      "node_overrides": [
+        {
+          "node_id": "WE1-B1-2",
+          "demand_nominal": 26.0,
+          "distribution_demand": 26.0
+        }
+      ],
+      "notes": "验证长铝末端拉升后的支线供气变化。"
+    },
+    {
+      "id": "branch_limited",
+      "name": "支线限流",
+      "compressor_overrides": [],
+      "edge_overrides": [
+        {
+          "edge_id": "WE1-B1-T-1",
+          "status": "limited",
+          "max_flow": 22.0
+        }
+      ],
+      "node_overrides": [],
+      "notes": "验证长铝支线限流后主干侧和薛店侧的响应。"
+    }
+  ],
+  "cross_layer_hints": [
+    {
+      "anchor_node_id": "WE1-127",
+      "paired_node_id": "WE1-B1-1",
+      "relation": "same_site_pressure_coupling",
+      "notes": "郑州主干和长铝支线起点是同位点，第一轮先保留共享压力提示，不做复杂联算。"
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+{
+  "pilot_id": "mainline_zhongwei_jingbian",
+  "system_id": "we1",
+  "name": "WE1 主样板：中卫压气站前后主干段",
+  "description": "古浪压气站 -> 中卫压气站 -> 西一盐池压气站 -> 西一靖边压气站",
+  "parameter_basis": {
+    "version": "trial-default-v1",
+    "updated_at": "2026-04-06",
+    "pressure_unit": "MPa",
+    "flow_unit": "10^4 Nm3/d",
+    "notes": [
+      "当前是试点默认值口径，用来先打通主干稳态求解，不代表真实生产参数。",
+      "流量和能力值先按试点级别收口，后续拿到站场和SCADA数据后再回填。"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "WE1-67",
+      "name": "古浪压气站",
+      "type": "compressor",
+      "role": "source",
+      "supply_max": 180.0,
+      "target_pressure_mpa": 9.9,
+      "min_pressure_mpa": 8.8,
+      "max_pressure_mpa": 10.2,
+      "capacity": 180.0,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.08,
+      "notes": "主样板上游供给起点，先按试点默认值承担整段主干供给。"
+    },
+    {
+      "id": "WE1-76",
+      "name": "中卫压气站",
+      "type": "compressor",
+      "role": "transit",
+      "supply_max": 0.0,
+      "target_pressure_mpa": 9.7,
+      "min_pressure_mpa": 8.5,
+      "max_pressure_mpa": 10.1,
+      "capacity": 165.0,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.06,
+      "notes": "主样板核心站，默认承担主干中段提压和故障传播观察点。"
+    },
+    {
+      "id": "WE1-86",
+      "name": "西一盐池压气站",
+      "type": "compressor",
+      "role": "transit",
+      "supply_max": 0.0,
+      "target_pressure_mpa": 9.5,
+      "min_pressure_mpa": 8.3,
+      "max_pressure_mpa": 9.9,
+      "capacity": 155.0,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.05,
+      "notes": "中下游主干增压点，先按连续稳态输气口径补默认值。"
+    },
+    {
+      "id": "WE1-92",
+      "name": "西一靖边压气站",
+      "type": "compressor",
+      "role": "transit",
+      "supply_max": 0.0,
+      "target_pressure_mpa": 9.3,
+      "min_pressure_mpa": 8.0,
+      "max_pressure_mpa": 9.7,
+      "capacity": 145.0,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.03,
+      "notes": "主样板下游承接点，先保留主干连续承压口径。"
+    }
+  ],
+  "edges": [
+    {
+      "id_range": [
+        "WE1-T-66",
+        "WE1-T-91"
+      ],
+      "diameter_mm_default": 1016.0,
+      "design_pressure_mpa_default": 10.0,
+      "roughness_mm_default": 0.03,
+      "direction_mode_default": "fixed",
+      "status_default": "open",
+      "start_pressure_mpa": 9.9,
+      "end_pressure_mpa": 9.1,
+      "max_flow": 150.0,
+      "notes": "主样板第一轮先按统一主干口径补齐，先能稳定算压力梯度，再逐段细化。"
+    }
+  ],
+  "valves": [
+    {
+      "id_range": [
+        "WE1-68",
+        "WE1-75"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-77",
+        "WE1-85"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-87",
+        "WE1-91"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "steady_base",
+      "name": "常规稳态输气",
+      "compressor_overrides": [],
+      "edge_overrides": [],
+      "node_overrides": [],
+      "notes": "先验证主干方向和压力梯度。"
+    },
+    {
+      "id": "zhongwei_compressor_offline",
+      "name": "中卫压气站停运",
+      "compressor_overrides": [
+        {
+          "node_id": "WE1-76",
+          "compressor_enabled": false
+        }
+      ],
+      "edge_overrides": [],
+      "node_overrides": [],
+      "notes": "验证中卫停运后的下游压力变化。"
+    },
+    {
+      "id": "zhongwei_trunk_break",
+      "name": "中卫附近主干中断",
+      "compressor_overrides": [],
+      "edge_overrides": [
+        {
+          "edge_id": "WE1-T-75",
+          "status": "closed"
+        }
+      ],
+      "node_overrides": [],
+      "notes": "验证中卫前后主干中断后的影响传播。"
+    },
+    {
+      "id": "yanchi_jingbian_limited",
+      "name": "盐池到靖边段限流",
+      "compressor_overrides": [],
+      "edge_overrides": [
+        {
+          "edge_id": "WE1-T-90",
+          "status": "limited",
+          "max_flow": 105.0
+        }
+      ],
+      "node_overrides": [],
+      "notes": "验证盐池到靖边段限流对下游承接能力的影响。"
+    }
+  ],
+  "cross_system_hints": [
+    {
+      "anchor_node_id": "WE1-76",
+      "related_systems": [
+        "we2",
+        "zg"
+      ],
+      "notes": "中卫附近存在跨系统候选点，主样板第一轮先只保留标记，不直接联算。"
+    }
+  ]
+}

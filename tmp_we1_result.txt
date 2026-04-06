@@ -1,0 +1,110 @@
+=== stations 字段 ===
+['id', 'name', 'type', 'longitude', 'latitude', 'design_pressure', 'operating_pressure_in', 'operating_pressure_out', 'operating_temp_in', 'operating_temp_out', 'capacity', 'properties']
+=== pipelines 字段 ===
+['id', 'name', 'start_station_id', 'end_station_id', 'diameter_mm', 'length_km', 'design_pressure_mpa', 'start_pressure_mpa', 'end_pressure_mpa', 'diameter', 'length', 'category', 'properties']
+
+=== stations 样本(前2条) ===
+{
+  "id": "WE1-1",
+  "name": "轮南压气站",
+  "type": "compressor",
+  "longitude": 84.25,
+  "latitude": 41.78,
+  "design_pressure": 10.0,
+  "operating_pressure_in": null,
+  "operating_pressure_out": null,
+  "operating_temp_in": null,
+  "operating_temp_out": null,
+  "capacity": null,
+  "properties": null
+}
+{
+  "id": "WE1-2",
+  "name": "西一1#阀室",
+  "type": "valve",
+  "longitude": 84.57,
+  "latitude": 41.771667,
+  "design_pressure": 10.0,
+  "operating_pressure_in": null,
+  "operating_pressure_out": null,
+  "operating_temp_in": null,
+  "operating_temp_out": null,
+  "capacity": null,
+  "properties": null
+}
+
+=== pipelines 样本(前2条) ===
+{
+  "id": "WE1-T-1",
+  "name": "西气东输一线",
+  "start_station_id": "WE1-1",
+  "end_station_id": "WE1-2",
+  "diameter_mm": null,
+  "length_km": 32.5005,
+  "design_pressure_mpa": 10.0,
+  "start_pressure_mpa": null,
+  "end_pressure_mpa": null,
+  "diameter": null,
+  "length": 32.5005,
+  "category": "trunk",
+  "properties": null
+}
+{
+  "id": "WE1-T-2",
+  "name": "西气东输一线",
+  "start_station_id": "WE1-2",
+  "end_station_id": "WE1-3",
+  "diameter_mm": null,
+  "length_km": 30.0289,
+  "design_pressure_mpa": 10.0,
+  "start_pressure_mpa": null,
+  "end_pressure_mpa": null,
+  "diameter": null,
+  "length": 30.0289,
+  "category": "trunk",
+  "properties": null
+}
+
+=== 名称含'西一'的站场 ===
+共 20 条
+{"id": "WE1-2", "name": "西一1#阀室", "type": "valve", "longitude": 84.57, "latitude": 41.771667, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-3", "name": "西一2#阀室", "type": "valve", "longitude": 84.89, "latitude": 41.763333, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-4", "name": "西一3#阀室", "type": "valve", "longitude": 85.21, "latitude": 41.755, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-5", "name": "西一4#阀室", "type": "valve", "longitude": 85.53, "latitude": 41.746667, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-6", "name": "西一5#阀室", "type": "valve", "longitude": 85.85, "latitude": 41.738333, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-8", "name": "西一6#阀室", "type": "valve", "longitude": 86.536, "latitude": 41.844, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-9", "name": "西一7#阀室", "type": "valve", "longitude": 86.902, "latitude": 41.958, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-10", "name": "西一8#阀室", "type": "valve", "longitude": 87.268, "latitude": 42.072, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-11", "name": "西一9#阀室", "type": "valve", "longitude": 87.634, "latitude": 42.186, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-13", "name": "西一10#阀室", "type": "valve", "longitude": 88.315714, "latitude": 42.38, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-14", "name": "西一11#阀室", "type": "valve", "longitude": 88.631429, "latitude": 42.46, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-15", "name": "西一11A#阀室", "type": "valve", "longitude": 88.947143, "latitude": 42.54, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-16", "name": "西一12#阀室", "type": "valve", "longitude": 89.262857, "latitude": 42.62, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-17", "name": "西一13#阀室", "type": "valve", "longitude": 89.578571, "latitude": 42.7, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-18", "name": "西一14#阀室", "type": "valve", "longitude": 89.894286, "latitude": 42.78, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-20", "name": "西一15#阀室", "type": "valve", "longitude": 90.761667, "latitude": 42.853333, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-21", "name": "西一16#阀室", "type": "valve", "longitude": 91.313333, "latitude": 42.846667, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-22", "name": "西一17#阀室", "type": "valve", "longitude": 91.865, "latitude": 42.84, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-23", "name": "西一18#阀室", "type": "valve", "longitude": 92.416667, "latitude": 42.833333, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+{"id": "WE1-24", "name": "西一19#阀室", "type": "valve", "longitude": 92.968333, "latitude": 42.826667, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": null}
+
+=== properties 含'西一'的站场 ===
+共 0 条
+
+=== properties 含 we1/WE1 的站场 ===
+共 15 条
+{"id": "WE1-174", "name": "西一133阀室", "type": "valve", "longitude": 120.55011321766374, "latitude": 31.38307870572381, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"WE1-176\", \"segmentEndId\": \"WE1-173\", \"ratio\": 0.666667436053369, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "WE1-175", "name": "西一134阀室", "type": "valve", "longitude": 120.60022678233626, "latitude": 31.36615729427619, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"WE1-176\", \"segmentEndId\": \"WE1-173\", \"ratio\": 0.33333256394663097, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "WE1-177", "name": "西一136#阀室", "type": "valve", "longitude": 120.72356024919699, "latitude": 31.322823910109385, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"WE1-176\", \"segmentEndId\": \"WE1-179\", \"ratio\": 0.3333344678002056, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "WE1-178", "name": "西一137#阀室", "type": "valve", "longitude": 120.796779750803, "latitude": 31.29641208989062, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"WE1-176\", \"segmentEndId\": \"WE1-179\", \"ratio\": 0.6666655321997461, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "WE2-480", "name": "西二72#阀室", "type": "valve", "longitude": 105.331333, "latitude": 37.281656, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"WE2-483\", \"segmentEndId\": \"WE1-76\", \"ratio\": 0.7499999999999974, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "WE2-481", "name": "西二73#阀室", "type": "valve", "longitude": 105.472666, "latitude": 37.053312, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"WE2-483\", \"segmentEndId\": \"WE1-76\", \"ratio\": 0.5, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "WE2-482", "name": "西二74#阀室", "type": "valve", "longitude": 105.61399899999999, "latitude": 36.824968, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"WE2-483\", \"segmentEndId\": \"WE1-76\", \"ratio\": 0.2500000000000025, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "ZG-10346", "name": "中贵1#阀室", "type": "valve", "longitude": 105.28552121855013, "latitude": 37.33568413726876, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"ZG-95820\", \"segmentEndId\": \"WE1-76\", \"ratio\": 0.8888887639147377, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "ZG-87768", "name": "中贵2#阀室", "type": "valve", "longitude": 105.38104203591199, "latitude": 37.16136900666264, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"ZG-95820\", \"segmentEndId\": \"WE1-76\", \"ratio\": 0.7777779944957086, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "ZG-57304", "name": "中贵3#阀室", "type": "valve", "longitude": 105.47656325446212, "latitude": 36.9870531439314, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"ZG-95820\", \"segmentEndId\": \"WE1-76\", \"ratio\": 0.6666667584104431, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "ZG-91861", "name": "中贵4#阀室", "type": "valve", "longitude": 105.57208447301227, "latitude": 36.81273728120016, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"ZG-95820\", \"segmentEndId\": \"WE1-76\", \"ratio\": 0.5555555223251809, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "ZG-95319", "name": "中贵5#阀室", "type": "valve", "longitude": 105.66760552698773, "latitude": 36.63842171879985, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"ZG-95820\", \"segmentEndId\": \"WE1-76\", \"ratio\": 0.44444447767482237, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "ZG-36435", "name": "中贵6#阀室", "type": "valve", "longitude": 105.76312674553787, "latitude": 36.4641058560686, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"ZG-95820\", \"segmentEndId\": \"WE1-76\", \"ratio\": 0.33333324158955685, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "ZG-60576", "name": "中贵7#阀室", "type": "valve", "longitude": 105.85864796408801, "latitude": 36.289789993337365, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"ZG-95820\", \"segmentEndId\": \"WE1-76\", \"ratio\": 0.22222200550429466, \"lastSource\": \"segment-reproject\"}}"}
+{"id": "ZG-80119", "name": "中贵8#阀室", "type": "valve", "longitude": 105.95416878144985, "latitude": 36.11547486273124, "design_pressure": 10.0, "operating_pressure_in": null, "operating_pressure_out": null, "operating_temp_in": null, "operating_temp_out": null, "capacity": null, "properties": "{\"positionMeta\": {\"mode\": \"auto\", \"locked\": false, \"segmentStartId\": \"ZG-95820\", \"segmentEndId\": \"WE1-76\", \"ratio\": 0.11111123608526553, \"lastSource\": \"segment-reproject\"}}"}
