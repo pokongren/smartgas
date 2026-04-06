@@ -1,7 +1,12 @@
-# 依赖目录
+﻿# 依赖目录
 node_modules/
 __pycache__/
 *.pyc
+
+# Python 虚拟环境
+.venv/
+venv/
+env/
 
 # 构建产物
 dist/
@@ -21,3 +26,29 @@ build/
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# 文档目录（避免 Antigravity 加载过多上下文）
+docs/
+Fsmartgas-griddocs/
+
+# 根目录大型报告文档
+CALCULATION_VERIFICATION_REPORT.md
+CONNECTED_NODES_LIST.md
+DATA_QUALITY_SUMMARY.md
+MATHEMATICAL_FORMULAS.md
+PHASE1_OPTIMIZATION_REPORT.md
+PHASE1_REPORT.md
+PHASE2_DEEP_ANALYSIS_REPORT.md
+PROJECT_DOCUMENTATION.md
+STATION_DATA_ENRICHMENT_REPORT.md
+architecture.md
+
+# Agent 配置
+.agent/skills/
+.agents/
+.claude/
+
+# 其他大型 MD 文件
+智脉平台*
+项目介绍.md
+6_三库合一与大模型架构说明.md

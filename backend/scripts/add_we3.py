@@ -1,22 +1,20 @@
 """
-西气东输三线 (WE3) - 局部数据写入脚本
+西气东输三线（局部）(WE3) 写入脚本。
 
-只画出用户要求的 永清 → 琉璃河 → 高丽营 段（北京南部环线）。
-西三线全长约 7378km (西段+东段)，管径 1219mm。
-本脚本仅写入北京周边段，约 120km。
-
-管线走向: 永清(河北) → 琉璃河(房山) → 良乡 → 长阳 → 高丽营(顺义)
+当前库里只维护北京周边这一小段：
+永清(河北) → 琉璃河(房山) → 良乡 → 西沙屯 → 高丽营(顺义)
+不是全国完整西三线。
 """
 import sqlite3
 import json
-import os
 import sys
+from pathlib import Path
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-DB_PATH = os.path.join(os.getcwd(), 'backend', 'data', 'smartgas.db')
+DB_PATH = str(Path(__file__).resolve().parents[1] / 'data' / 'smartgas.db')
 SYSTEM_ID = 'we3'
-SYSTEM_NAME = '西气东输三线'
+SYSTEM_NAME = '西气东输三线（局部）'
 SYSTEM_COLOR = '#26A69A'  # 青绿色
 ID_PREFIX = 'WE3'
 
@@ -25,6 +23,7 @@ ID_PREFIX = 'WE3'
 # ============================================================
 TRUNK_STATIONS = [
     # (序号, 名称, 类型, 经度, 纬度)
+    # NOTE: 长阳分输站已确认不存在，已移除
     (1,  '西三永清压气站',     'compressor',    116.50, 39.32),
     (2,  '西三1#阀室',         'valve',         0, 0),
     (3,  '西三2#阀室',         'valve',         0, 0),
@@ -37,19 +36,17 @@ TRUNK_STATIONS = [
     (10, '良乡分输站',         'distribution',  116.13, 39.73),
     (11, '西三7#阀室',         'valve',         0, 0),
     (12, '西三8#阀室',         'valve',         0, 0),
-    (13, '长阳分输站',         'distribution',  116.18, 39.85),
+    (13, '西沙屯分输站',       'distribution',  116.162141, 40.181403),
     (14, '西三9#阀室',         'valve',         0, 0),
     (15, '西三10#阀室',        'valve',         0, 0),
-    (16, '西沙屯分输站',       'distribution',  116.23, 40.02),
-    (17, '西三11#阀室',        'valve',         0, 0),
-    (18, '西三12#阀室',        'valve',         0, 0),
-    (19, '高丽营压气站',       'compressor',    116.53, 40.18),
+    (16, '高丽营压气站',       'compressor',    116.53, 40.18),
 ]
 
 
 def main():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
+    print(f"DB_PATH = {DB_PATH}")
 
     # 清理旧数据
     cur.execute("DELETE FROM pipeline_systems WHERE id = ?", (SYSTEM_ID,))
@@ -61,7 +58,7 @@ def main():
     max_sort = cur.fetchone()[0] or 0
 
     layers_config = json.dumps([
-        {"id_prefix": ID_PREFIX, "name": f"{SYSTEM_NAME}（局部）", "type": "trunk", "visible": True},
+        {"id_prefix": ID_PREFIX, "name": SYSTEM_NAME, "type": "trunk", "visible": True},
     ], ensure_ascii=False)
 
     cur.execute("""
@@ -89,7 +86,7 @@ def main():
             INSERT INTO pipelines (id, name, start_station_id, end_station_id,
                                    diameter_mm, length_km, diameter, length, category)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (seg_id, seg_name, start_id, end_id, 1219, 0, 1219, 0, SYSTEM_NAME))
+        """, (seg_id, seg_name, start_id, end_id, 1219, 0, 1219, 0, "trunk"))
     print(f"✅ 写入管段: {len(TRUNK_STATIONS) - 1} 条")
     conn.commit()
 
@@ -126,6 +123,22 @@ def main():
     cur.execute("SELECT COUNT(*) FROM stations WHERE id LIKE ? AND (longitude = 0 OR latitude = 0)", (f"{ID_PREFIX}%",))
     zero = cur.fetchone()[0]
     print(f"\n=== 验证: 零坐标={zero} ===")
+
+    cur.execute("SELECT COUNT(*) FROM pipeline_systems WHERE id = ?", (SYSTEM_ID,))
+    sys_count = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM stations WHERE id LIKE ?", (f"{ID_PREFIX}%",))
+    station_count = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM pipelines WHERE id LIKE ?", (f"{ID_PREFIX}%",))
+    pipeline_count = cur.fetchone()[0]
+    cur.execute(
+        "SELECT COUNT(*) FROM pipelines WHERE id LIKE ? AND category NOT IN ('trunk','branch')",
+        (f"{ID_PREFIX}%",),
+    )
+    non_standard_category = cur.fetchone()[0]
+    print(f"  pipeline_systems[{SYSTEM_ID}] count: {sys_count}")
+    print(f"  stations[{ID_PREFIX}%] count: {station_count}")
+    print(f"  pipelines[{ID_PREFIX}%] count: {pipeline_count}")
+    print(f"  非标准 category 管段: {non_standard_category}")
 
     for seq, name, *_ in TRUNK_STATIONS:
         sid = f"{ID_PREFIX}-{seq}"

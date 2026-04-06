@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { TopoViewer } from '@/components/topology'
+import { resolveBackendPath } from '@/services/apiBase'
 import type { PipelineNode, PipelineLine } from '@/types'
 
 // 示例数据 - 简单的测试管网
@@ -29,6 +30,8 @@ const DEMO_LINES: PipelineLine[] = [
 
 export const TopologyDemoView: React.FC = () => {
     const [ready, setReady] = useState(false)
+    const docsUrl = resolveBackendPath('/docs')
+    const graphsUrl = resolveBackendPath('/topology/graphs')
 
     useEffect(() => {
         // 模拟加载延迟
@@ -88,7 +91,7 @@ export const TopologyDemoView: React.FC = () => {
                     <h3 className="text-white font-medium mb-3">API 测试</h3>
                     <div className="flex flex-wrap gap-3">
                         <a
-                            href="http://localhost:8000/docs"
+                            href={docsUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="bg-blue-600 hover:bg-blue-500 text-white text-sm px-4 py-2 rounded transition-colors"
@@ -96,7 +99,7 @@ export const TopologyDemoView: React.FC = () => {
                             打开 API 文档
                         </a>
                         <a
-                            href="http://localhost:8000/api/topology/graphs"
+                            href={graphsUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="bg-slate-600 hover:bg-slate-500 text-white text-sm px-4 py-2 rounded transition-colors"

@@ -10,7 +10,7 @@
 import networkx as nx
 from sqlmodel import Session, select
 from app.models import Station, Pipeline, JunctionGroup
-from app.services.junction_groups import load_normalized_junction_groups
+from app.services.junction_groups import load_runtime_junction_groups
 from typing import List, Dict, Optional, Any
 from app.services.topology_computation import (
     topology_service, 
@@ -65,7 +65,7 @@ class TopologyService:
         graph = TopologyGraph(directed=directed)
         
         # 0. 预加载 JunctionGroup 进行节点收缩映射
-        junctions = load_normalized_junction_groups(self.session)
+        junctions = load_runtime_junction_groups(self.session)
         station_to_junction = {}  # station_id -> super_node_id
         junction_nodes = {}       # super_node_id -> info
         
@@ -77,7 +77,10 @@ class TopologyService:
             junction_nodes[super_node_id] = {
                 "id": super_node_id,
                 "name": j["name"],
-                "sids": sids
+                "sids": sids,
+                "junction_kind": j.get("junction_kind", "junction"),
+                "system_ids": j.get("system_ids", []),
+                "member_count": j.get("member_count", len(sids)),
             }
             for sid in sids:
                 station_to_junction[sid] = super_node_id
@@ -101,7 +104,13 @@ class TopologyService:
                         latitude=s.latitude,
                         pressure_mpa=s.design_pressure or 10.0,
                         capacity=s.capacity or 0.0,
-                        properties={"is_super_junction": True, "original_stations": j_info["sids"]}
+                        properties={
+                            "is_super_junction": True,
+                            "original_stations": j_info["sids"],
+                            "junction_kind": j_info["junction_kind"],
+                            "system_ids": j_info["system_ids"],
+                            "member_count": j_info["member_count"],
+                        }
                     ))
                     added_super_nodes.add(super_node_id)
             else:

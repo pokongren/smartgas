@@ -1,6 +1,8 @@
 import type { PipelineNode, PipelineLine, PipelineDevice } from '@/types'
 import { NodeType, PipelineStatus, PressureLevel, DeviceType } from '@/types'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
+import { getJunctionKind, getLinePipelineKind, getNodeRawType, isCompressorNode, isDistributionNode, isMajorJunctionNode, isValveNode } from '@/utils/pipelineDomain'
+import { getNodeImportance, getNodeLODStrategy, NODE_LOD_THRESHOLDS, NodeImportance, shouldShowNodeAtZoom } from '@/utils/hierarchyRenderer'
 
 /**
  * 地图渲染工具函数 - 性能优化版
@@ -33,6 +35,10 @@ const CLUSTER_CONFIG = {
 
     /** 聚合标记最大显示数量 */
     MAX_CLUSTER_COUNT: 99,
+    SMALL_GROUP_EXPAND_MAX: 4,
+    SMALL_GROUP_EXPAND_ZOOM: NODE_LOD_THRESHOLDS.highZoom,
+    FANOUT_RADIUS: 54,
+    FANOUT_ARC_DEGREES: 110,
 
     /** 聚合标记颜色 */
     CLUSTER_COLORS: {
@@ -307,9 +313,12 @@ function groupNodesByCoordinate(nodes: PipelineNode[]): Map<string, ClusterGroup
                 coordinate: node.coordinate,
                 nodes: [],
                 typeStats: {
+                    source: 0,
                     compressor: 0,
                     distribution: 0,
                     valve: 0,
+                    junction: 0,
+                    majorJunction: 0,
                     other: 0
                 },
                 hasImportantStation: false
@@ -320,17 +329,26 @@ function groupNodesByCoordinate(nodes: PipelineNode[]): Map<string, ClusterGroup
         group.nodes.push(node)
 
         // 更新类型统计
-        const name = node.name
-        if (name.includes('压气站')) {
+        const rawType = getNodeRawType(node)
+        const importance = getNodeImportance(node)
+        if (rawType === 'source') {
+            group.typeStats.source++
+        } else if (rawType === 'compressor') {
             group.typeStats.compressor++
-            group.hasImportantStation = true
-        } else if (name.includes('分输站') || name.includes('门站')) {
+        } else if (rawType === 'distribution') {
             group.typeStats.distribution++
-            group.hasImportantStation = true
-        } else if (name.includes('阀室') || name.includes('阀门')) {
+        } else if (rawType === 'valve') {
             group.typeStats.valve++
+        } else if (rawType === 'junction') {
+            group.typeStats.junction++
+            if (isMajorJunctionNode(node)) {
+                group.typeStats.majorJunction++
+            }
         } else {
             group.typeStats.other++
+        }
+        if (importance <= NodeImportance.HIGH) {
+            group.hasImportantStation = true
         }
     }
 
@@ -584,6 +602,9 @@ function createClusterMarkerContent(group: ClusterGroup): string {
     }
 
     const indicators = []
+    if (typeStats.source > 0) {
+        indicators.push(`<span class="cluster-indicator compressor" title="气源/首末站">源</span>`)
+    }
     if (typeStats.compressor > 0) {
         indicators.push(`<span class="cluster-indicator compressor" title="压气站">压</span>`)
     }
@@ -592,6 +613,11 @@ function createClusterMarkerContent(group: ClusterGroup): string {
     }
     if (typeStats.valve > 0) {
         indicators.push(`<span class="cluster-indicator valve" title="阀室">阀</span>`)
+    }
+    if (typeStats.majorJunction > 0) {
+        indicators.push(`<span class="cluster-indicator compressor" title="大枢纽">大</span>`)
+    } else if (typeStats.junction > 0) {
+        indicators.push(`<span class="cluster-indicator distribution" title="枢纽/交汇点">枢</span>`)
     }
 
     return `
@@ -649,6 +675,68 @@ function createClusterMarker(
     return marker
 }
 
+function shouldPreferCompactFanout(group: ClusterGroup, zoom: number): boolean {
+    return (
+        group.nodes.length > 1
+        && group.nodes.length <= CLUSTER_CONFIG.SMALL_GROUP_EXPAND_MAX
+        && group.hasImportantStation
+        && zoom >= CLUSTER_CONFIG.SMALL_GROUP_EXPAND_ZOOM
+    )
+}
+
+function calculateCompactFanoutPositions(
+    map: any,
+    group: ClusterGroup
+): Array<{ node: PipelineNode; position: { longitude: number; latitude: number } }> {
+    const prioritizedNodes = [...group.nodes].sort((left, right) => {
+        const importanceDiff = getNodeImportance(left) - getNodeImportance(right)
+        if (importanceDiff !== 0) return importanceDiff
+        return left.name.localeCompare(right.name, 'zh-CN')
+    })
+
+    const count = prioritizedNodes.length
+    if (count === 0) return []
+
+    const arcDegrees = count === 2 ? 76 : CLUSTER_CONFIG.FANOUT_ARC_DEGREES
+    const startDegrees = -90 - (arcDegrees / 2)
+    const stepDegrees = count === 1 ? 0 : arcDegrees / (count - 1)
+
+    return prioritizedNodes.map((node, index) => {
+        const angle = (startDegrees + (stepDegrees * index)) * (Math.PI / 180)
+        const radius = CLUSTER_CONFIG.FANOUT_RADIUS + (index % 2 === 1 ? 8 : 0)
+        const offsetX = Math.cos(angle) * radius
+        const offsetY = Math.sin(angle) * radius
+
+        return {
+            node,
+            position: pixelOffsetToLngLat(map, group.coordinate, offsetX, offsetY),
+        }
+    })
+}
+
+function createLeaderLine(
+    origin: { longitude: number; latitude: number },
+    target: { longitude: number; latitude: number }
+): any | null {
+    const AMap = (window as any).AMap
+    if (!AMap) return null
+
+    return new AMap.Polyline({
+        path: [
+            [origin.longitude, origin.latitude],
+            [target.longitude, target.latitude],
+        ],
+        strokeColor: 'rgba(191, 219, 254, 0.75)',
+        strokeWeight: 2,
+        strokeOpacity: 0.95,
+        strokeStyle: 'dashed',
+        strokeDasharray: [6, 4],
+        lineJoin: 'round',
+        lineCap: 'round',
+        zIndex: 101,
+    })
+}
+
 /**
  * 创建压气站标记内容（Canvas/SVG 高清晰度版）
  */
@@ -697,12 +785,14 @@ function createOffsetNodeMarker(
     const AMap = (window as any).AMap
     if (!AMap) return []
 
-    const isCompressor = node.name.includes('压气站')
-    const isDistribution = node.name.includes('分输站') || node.name.includes('门站')
+    const rawType = getNodeRawType(node)
+    const isCompressor = isCompressorNode(node)
+    const isDistribution = isDistributionNode(node)
     // 枢纽判断：API 返回的 isHub 标记
     const nodeAny = node as any
     const isHub = nodeAny.isHub === true
-    const isJunction = nodeAny.hubInfo?.isJunction === true
+    const isJunction = nodeAny.hubInfo?.isJunction === true || rawType === 'junction'
+    const isMajorJunction = isMajorJunctionNode(node)
 
     let marker: any
     let markerSize: number  // 用于计算 offset 居中
@@ -770,8 +860,8 @@ function createOffsetNodeMarker(
         })
     } else if (isHub) {
         // 枢纽节点：菱形图标
-        const hubSize = isJunction ? 18 : 14
-        const hubColor = isJunction ? '#00e5ff' : '#ffd700'
+        const hubSize = isMajorJunction ? 22 : isJunction ? 18 : 14
+        const hubColor = isMajorJunction ? '#ffb703' : isJunction ? '#00e5ff' : '#ffd700'
         const junctionClass = isJunction ? ' hub-marker-junction' : ''
         markerSize = hubSize + 4
         marker = new AMap.Marker({
@@ -876,7 +966,7 @@ export function renderPipelineLines(
                     const category = line.properties?.category as string || '其他'
                     const color = line.properties?.color || getPipelineCategoryColor(category)
                     const strokeStyle = line.status === PipelineStatus.MAINTENANCE ? 'dashed' : 'solid'
-                    const isBranch = category.includes('支线')
+                    const isBranch = getLinePipelineKind(line) === 'branch'
                     const baseWidth = isBranch ? 2 : (line.pressureLevel === PressureLevel.HIGH ? 6 : 4)
                     const path = line.path.map(p => [p.longitude, p.latitude])
 
@@ -984,7 +1074,7 @@ function createFlowDot(color: string): string {
 }
 
 function isValveRoom(node: PipelineNode): boolean {
-    if (node.type === NodeType.VALVE) return true
+    if (node.type === NodeType.VALVE || isValveNode(node)) return true
     const nodeName = node.name || ''
     return nodeName.includes('阀室') || nodeName.includes('阀门') || nodeName.includes('#')
 }
@@ -999,8 +1089,6 @@ function isValveRoom(node: PipelineNode): boolean {
 export function renderPipelineNodesWithClustering(
     map: any,
     nodes: PipelineNode[],
-    sourceNodes: string[] = [],
-    compressorStations: string[] = [],
     onNodeClick?: (event: { node: PipelineNode; position: any }) => void,
     onClusterClick?: (event: ClusterClickEvent) => void,
     signal?: AbortSignal
@@ -1014,11 +1102,10 @@ export function renderPipelineNodesWithClustering(
 
         const overlays: any[] = []
         const currentZoom = map.getZoom()
+        const lodStrategy = getNodeLODStrategy(currentZoom)
 
         // 阀室全局过滤：在分组前就移除阀室节点，防止它们出现在任何渲染分支中
-        const filteredNodes = currentZoom < CLUSTER_CONFIG.VALVE_MIN_ZOOM
-            ? nodes.filter(n => !isValveRoom(n))
-            : nodes
+        const filteredNodes = nodes.filter(node => shouldShowNodeAtZoom(node, currentZoom, lodStrategy))
 
         // 1. 按坐标分组（带缓存）
         const clusterGroups = groupNodesByCoordinate(filteredNodes)
@@ -1044,7 +1131,7 @@ export function renderPipelineNodesWithClustering(
                         const node = group.nodes[0]
 
                         // 阀室隐藏机制：低缩放级别下阀室节点跳过创建
-                        if (isValveRoom(node) && currentZoom < CLUSTER_CONFIG.VALVE_MIN_ZOOM) {
+                        if (!shouldShowNodeAtZoom(node, currentZoom, lodStrategy)) {
                             continue
                         }
 
@@ -1054,49 +1141,46 @@ export function renderPipelineNodesWithClustering(
                             overlays.push(...markers)
                         }
                     }
-                    else if (currentZoom >= CLUSTER_CONFIG.EXPAND_CLUSTER_ZOOM) {
+                    else if (lodStrategy.clusterDisplayMode === 'expanded' || shouldPreferCompactFanout(group, currentZoom)) {
                         // 高缩放级别：使用轻量化极简黄金螺旋展开（极简高效，自适应任意多的密度）
                         const nodeCount = group.nodes.length
+                        const useCompactFanout = shouldPreferCompactFanout(group, currentZoom)
+                        const fanoutPositions = useCompactFanout ? calculateCompactFanoutPositions(map, group) : []
                         const scale = Math.pow(2, currentZoom) * 256 / 360
 
                         // 黄金角（约 137.5 度），用于生成向日葵式均匀螺旋布局
                         const goldenAngle = Math.PI * (3 - Math.sqrt(5))
 
                         for (let idx = 0; idx < nodeCount; idx++) {
-                            const node = group.nodes[idx]
+                            const node = useCompactFanout ? fanoutPositions[idx].node : group.nodes[idx]
 
                             // 阀室隐藏机制：低缩放级别下阀室节点跳过创建
-                            if (isValveRoom(node) && currentZoom < CLUSTER_CONFIG.VALVE_MIN_ZOOM) {
+                            if (!shouldShowNodeAtZoom(node, currentZoom, lodStrategy)) {
                                 continue
                             }
 
                             // 轻量级自适应不重叠算法：角度步进黄金角，距离按索引平方根递增
-                            const angle = idx * goldenAngle
-                            const offsetDistance = nodeCount <= 1 ? 0 : 28 + Math.sqrt(idx) * 20
+                            const newPosition = useCompactFanout
+                                ? fanoutPositions[idx].position
+                                : (() => {
+                                    const angle = idx * goldenAngle
+                                    const offsetDistance = nodeCount <= 1 ? 0 : 28 + Math.sqrt(idx) * 20
+                                    const offsetX = Math.cos(angle) * offsetDistance
+                                    const offsetY = Math.sin(angle) * offsetDistance
 
-                            // 计算偏移位置
-                            const offsetX = Math.cos(angle) * offsetDistance
-                            const offsetY = Math.sin(angle) * offsetDistance
-
-                            const newPosition = {
-                                longitude: node.coordinate.longitude + offsetX / scale,
-                                latitude: node.coordinate.latitude - offsetY / scale
-                            }
+                                    return {
+                                        longitude: node.coordinate.longitude + offsetX / scale,
+                                        latitude: node.coordinate.latitude - offsetY / scale
+                                    }
+                                })()
 
                             const markers = createOffsetNodeMarker(map, node, newPosition, onNodeClick)
                             if (markers && markers.length > 0) {
-                                // 简化的连接线
-                                const line = new AMap.Polyline({
-                                    path: [
-                                        [node.coordinate.longitude, node.coordinate.latitude],
-                                        [newPosition.longitude, newPosition.latitude]
-                                    ],
-                                    strokeColor: 'rgba(255,255,255,0.3)',
-                                    strokeWeight: 1,
-                                    zIndex: 100
-                                })
-                                map.add(line)
-                                overlays.push(line)
+                                const line = createLeaderLine(node.coordinate, newPosition)
+                                if (line) {
+                                    map.add(line)
+                                    overlays.push(line)
+                                }
 
                                 map.add(markers)
                                 overlays.push(...markers)

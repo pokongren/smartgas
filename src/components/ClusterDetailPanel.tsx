@@ -1,6 +1,7 @@
 import React from 'react'
 import type { ClusterGroup } from '@/types/cluster'
 import type { PipelineNode } from '@/types/pipeline'
+import { getJunctionKind, getNodeRawType } from '@/utils/pipelineDomain'
 
 interface ClusterDetailPanelProps {
     cluster: ClusterGroup | null
@@ -13,25 +14,36 @@ export const ClusterDetailPanel: React.FC<ClusterDetailPanelProps> = ({
     cluster,
     visible,
     onClose,
-    onNodeSelect
+    onNodeSelect,
 }) => {
     if (!visible || !cluster) return null
 
     const { nodes, coordinate } = cluster
 
-    // 分类节点
-    const compressorNodes = nodes.filter(n => n.name.includes('压气站'))
-    const distributionNodes = nodes.filter(n =>
-        n.name.includes('分输站') || n.name.includes('门站')
-    )
-    const valveNodes = nodes.filter(n =>
-        n.type === 'valve' || n.name.includes('阀室') || n.name.includes('阀门') || n.name.includes('#')
-    )
+    const sourceNodes = nodes.filter(node => getNodeRawType(node) === 'source')
+    const compressorNodes = nodes.filter(node => getNodeRawType(node) === 'compressor')
+    const distributionNodes = nodes.filter(node => getNodeRawType(node) === 'distribution')
+    const valveNodes = nodes.filter(node => getNodeRawType(node) === 'valve')
+    const junctionNodes = nodes.filter(node => getNodeRawType(node) === 'junction')
+    const otherNodes = nodes.filter(node => {
+        const rawType = getNodeRawType(node)
+        return rawType !== 'source'
+            && rawType !== 'compressor'
+            && rawType !== 'distribution'
+            && rawType !== 'valve'
+            && rawType !== 'junction'
+    })
+
+    const handleSelect = (node: PipelineNode) => {
+        onNodeSelect?.(node)
+        onClose()
+    }
+
+    const hasAnyNode = nodes.length > 0
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-gray-900 rounded-lg shadow-2xl border border-blue-500/30 w-[400px] max-h-[70vh] overflow-hidden flex flex-col">
-                {/* 头部 */}
+            <div className="bg-gray-900 rounded-lg shadow-2xl border border-blue-500/30 w-[420px] max-h-[70vh] overflow-hidden flex flex-col">
                 <div className="flex justify-between items-center p-4 border-b border-gray-700 bg-gray-800 shrink-0">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
                         <span className="material-symbols-outlined text-blue-400">hub</span>
@@ -45,82 +57,89 @@ export const ClusterDetailPanel: React.FC<ClusterDetailPanelProps> = ({
                     </button>
                 </div>
 
-                {/* 节点列表 */}
                 <div className="overflow-y-auto flex-1 p-4 space-y-3">
-                    {/* 压气站 */}
+                    <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <div className="text-xs text-gray-400">聚合中心坐标</div>
+                                <div className="text-sm text-gray-100 font-medium">
+                                    {formatCoordinate(coordinate.longitude)}, {formatCoordinate(coordinate.latitude)}
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-xs text-gray-400">交汇/枢纽节点</div>
+                                <div className="text-sm text-cyan-300 font-medium">{junctionNodes.length} 个</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {sourceNodes.length > 0 && (
+                        <NodeGroup
+                            title={`气源/首末站 (${sourceNodes.length})`}
+                            icon="flare"
+                            className="border-rose-500/30 bg-rose-900/20 text-rose-400"
+                            nodes={sourceNodes}
+                            onNodeSelect={handleSelect}
+                        />
+                    )}
+
                     {compressorNodes.length > 0 && (
-                        <div className="border border-cyan-500/30 bg-cyan-900/20 rounded-lg p-3">
-                            <h4 className="text-sm font-semibold mb-2 text-cyan-400 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px]">compress</span>
-                                压气站 ({compressorNodes.length})
-                            </h4>
-                            <div className="space-y-2">
-                                {compressorNodes.map(node => (
-                                    <NodeItem
-                                        key={node.id}
-                                        node={node}
-                                        onClick={() => {
-                                            onNodeSelect?.(node)
-                                            onClose()
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
+                        <NodeGroup
+                            title={`压气站 (${compressorNodes.length})`}
+                            icon="compress"
+                            className="border-cyan-500/30 bg-cyan-900/20 text-cyan-400"
+                            nodes={compressorNodes}
+                            onNodeSelect={handleSelect}
+                        />
                     )}
 
-                    {/* 分输站 */}
                     {distributionNodes.length > 0 && (
-                        <div className="border border-yellow-500/30 bg-yellow-900/20 rounded-lg p-3">
-                            <h4 className="text-sm font-semibold mb-2 text-yellow-400 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px]">hub</span>
-                                分输站 ({distributionNodes.length})
-                            </h4>
-                            <div className="space-y-2">
-                                {distributionNodes.map(node => (
-                                    <NodeItem
-                                        key={node.id}
-                                        node={node}
-                                        onClick={() => {
-                                            onNodeSelect?.(node)
-                                            onClose()
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
+                        <NodeGroup
+                            title={`分输站 (${distributionNodes.length})`}
+                            icon="hub"
+                            className="border-yellow-500/30 bg-yellow-900/20 text-yellow-400"
+                            nodes={distributionNodes}
+                            onNodeSelect={handleSelect}
+                        />
                     )}
 
-                    {/* 阀室 */}
                     {valveNodes.length > 0 && (
-                        <div className="border border-gray-500/30 bg-gray-800/50 rounded-lg p-3">
-                            <h4 className="text-sm font-semibold mb-2 text-gray-400 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px]">valve</span>
-                                阀室 ({valveNodes.length})
-                            </h4>
-                            <div className="space-y-2">
-                                {valveNodes.map(node => (
-                                    <NodeItem
-                                        key={node.id}
-                                        node={node}
-                                        onClick={() => {
-                                            onNodeSelect?.(node)
-                                            onClose()
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        </div>
+                        <NodeGroup
+                            title={`阀室 (${valveNodes.length})`}
+                            icon="valve"
+                            className="border-gray-500/30 bg-gray-800/50 text-gray-400"
+                            nodes={valveNodes}
+                            onNodeSelect={handleSelect}
+                        />
                     )}
 
-                    {compressorNodes.length === 0 && distributionNodes.length === 0 && valveNodes.length === 0 && (
+                    {junctionNodes.length > 0 && (
+                        <NodeGroup
+                            title={`交汇/枢纽 (${junctionNodes.length})`}
+                            icon="account_tree"
+                            className="border-cyan-500/30 bg-cyan-950/40 text-cyan-300"
+                            nodes={junctionNodes}
+                            onNodeSelect={handleSelect}
+                        />
+                    )}
+
+                    {otherNodes.length > 0 && (
+                        <NodeGroup
+                            title={`其他节点 (${otherNodes.length})`}
+                            icon="account_tree"
+                            className="border-slate-500/30 bg-slate-900/40 text-slate-300"
+                            nodes={otherNodes}
+                            onNodeSelect={handleSelect}
+                        />
+                    )}
+
+                    {!hasAnyNode && (
                         <div className="text-center text-gray-500 py-8">
                             无节点数据
                         </div>
                     )}
                 </div>
 
-                {/* 底部 */}
                 <div className="p-4 border-t border-gray-700 bg-gray-800 shrink-0 flex justify-end">
                     <button
                         onClick={onClose}
@@ -134,7 +153,32 @@ export const ClusterDetailPanel: React.FC<ClusterDetailPanelProps> = ({
     )
 }
 
-// 节点项组件
+interface NodeGroupProps {
+    title: string
+    icon: string
+    className: string
+    nodes: PipelineNode[]
+    onNodeSelect: (node: PipelineNode) => void
+}
+
+const NodeGroup: React.FC<NodeGroupProps> = ({ title, icon, className, nodes, onNodeSelect }) => (
+    <div className={`border rounded-lg p-3 ${className}`}>
+        <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px]">{icon}</span>
+            {title}
+        </h4>
+        <div className="space-y-2">
+            {nodes.map(node => (
+                <NodeItem
+                    key={node.id}
+                    node={node}
+                    onClick={() => onNodeSelect(node)}
+                />
+            ))}
+        </div>
+    </div>
+)
+
 interface NodeItemProps {
     node: PipelineNode
     onClick: () => void
@@ -147,9 +191,11 @@ const NodeItem: React.FC<NodeItemProps> = ({ node, onClick }) => (
     >
         <div className="flex flex-col">
             <span className="text-sm text-gray-200 font-medium">{node.name}</span>
-            <span className="text-[10px] text-gray-500 mt-1">
-                {node.pressureLevel || '未知压力'}
-            </span>
+            <div className="text-[10px] text-gray-500 mt-1 space-y-1">
+                <div>{getNodeMetaLabel(node)}</div>
+                {node.properties?.layerName && <div>图层：{String(node.properties.layerName)}</div>}
+                <div>坐标：{formatNodeCoordinate(node)}</div>
+            </div>
         </div>
         <span className={`text-xs px-2 py-1 rounded-full ${node.status === 'normal'
             ? 'bg-green-500/10 text-green-400 border border-green-500/20'
@@ -159,5 +205,31 @@ const NodeItem: React.FC<NodeItemProps> = ({ node, onClick }) => (
         </span>
     </div>
 )
+
+function getNodeMetaLabel(node: PipelineNode): string {
+    switch (getNodeRawType(node)) {
+        case 'source':
+            return '气源/首末站'
+        case 'compressor':
+            return '压气站'
+        case 'distribution':
+            return '分输站'
+        case 'valve':
+            return '阀室'
+        case 'junction':
+            if (getJunctionKind(node) === 'major_junction') return '大枢纽节点'
+            return node.isHub || node.hubInfo?.isJunction ? '枢纽节点' : '交汇节点'
+        default:
+            return node.pressureLevel || '未知类型'
+    }
+}
+
+function formatCoordinate(value: number): string {
+    return value.toFixed(4)
+}
+
+function formatNodeCoordinate(node: PipelineNode): string {
+    return `${formatCoordinate(node.coordinate.longitude)}, ${formatCoordinate(node.coordinate.latitude)}`
+}
 
 export default ClusterDetailPanel

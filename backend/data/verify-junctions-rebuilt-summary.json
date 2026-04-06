@@ -1,0 +1,13 @@
+{
+  "db": "F:\\smartgas-grid\\backend\\data\\smartgas.db",
+  "table": "junction_groups_rebuilt",
+  "stats": {
+    "group_count": 12,
+    "junction_count": 10,
+    "major_junction_count": 2,
+    "unknown_kind_count": 0,
+    "issue_count": 0
+  },
+  "issue_count": 0,
+  "issues": []
+}

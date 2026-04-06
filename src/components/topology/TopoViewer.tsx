@@ -8,6 +8,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react'
 import { useTopology, type PathResult, type TopologyAnalysis, type NodeType } from '@/hooks/useTopology'
 import type { PipelineNode, PipelineLine } from '@/types'
+import { getNodeRawType } from '@/utils/pipelineDomain'
 
 // =============================================================================
 // 类型定义
@@ -136,9 +137,15 @@ export const TopoViewer: React.FC<TopoViewerProps> = ({
         return pipelineNodes.map(n => ({
             id: n.id,
             name: n.name,
-            type: n.name.includes('压气站') ? 'compressor' :
-                  n.name.includes('分输站') ? 'distribution' :
-                  n.name.includes('阀室') ? 'valve' : 'junction'
+            type: getNodeRawType(n) === 'source'
+                ? 'source'
+                : getNodeRawType(n) === 'compressor'
+                    ? 'compressor'
+                    : getNodeRawType(n) === 'distribution'
+                        ? 'distribution'
+                        : getNodeRawType(n) === 'valve'
+                            ? 'valve'
+                            : 'junction'
         }))
     }, [pipelineNodes])
     
@@ -276,10 +283,12 @@ export const TopoViewer: React.FC<TopoViewerProps> = ({
                     const isSource = node.id === selectedSource
                     const isTarget = node.id === selectedTarget
                     
+                    const rawType = getNodeRawType(node)
                     let fill = '#64748b'
-                    if (node.name.includes('压气站')) fill = '#06b6d4'
-                    else if (node.name.includes('分输站')) fill = '#f59e0b'
-                    else if (node.name.includes('阀室')) fill = '#6b7280'
+                    if (rawType === 'source') fill = '#2563eb'
+                    else if (rawType === 'compressor') fill = '#06b6d4'
+                    else if (rawType === 'distribution') fill = '#f59e0b'
+                    else if (rawType === 'valve') fill = '#6b7280'
                     
                     if (isSource) fill = '#22c55e'
                     if (isTarget) fill = '#ef4444'
@@ -297,7 +306,7 @@ export const TopoViewer: React.FC<TopoViewerProps> = ({
                                 className="cursor-pointer hover:opacity-80 transition-opacity"
                                 onClick={() => onNodeClick?.(node.id, node.name)}
                             />
-                            {(isHighlighted || node.name.includes('压气站') || node.name.includes('分输站')) && (
+                            {(isHighlighted || rawType === 'compressor' || rawType === 'distribution') && (
                                 <text
                                     x={scaleX(node.coordinate.longitude)}
                                     y={scaleY(node.coordinate.latitude) - 12}

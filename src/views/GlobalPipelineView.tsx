@@ -1,208 +1,231 @@
 import React, { useMemo, useState, useCallback, lazy, Suspense, useEffect } from 'react'
 import MapView from '@/components/map-view/MapView'
-import { loadAllPipelines, PipelinePackage, PipelineLayer } from '@/data/pipelines'
+import {
+    buildInitialLayerVisibility,
+    buildPipelineDataFromPackages,
+    getPipelineLayerId,
+    loadAllPipelines,
+    PipelinePackage,
+    PipelineLayer
+} from '@/data/pipelines'
 import type { PipelineData, PipelineLine, PipelineNode } from '@/types'
 import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
+import LuzhiHistoryPanel from '@/components/scada/LuzhiHistoryPanel'
+import {
+    CRED_SCADA_DATA,
+    EXTRA_SCADA_PANELS,
+    PT_SCADA_DATA,
+    REAL_SCADA_DATA,
+    SCADA_DATA_MAP,
+    WE1_FULL_STATIONS,
+    WE1_WEST_SCADA_DATA,
+    WE2_SCADA_DATA,
+} from '@/views/global-pipeline/scadaConfig'
+import { EmptyScadaState, ScadaFloatingPanel } from '@/views/global-pipeline/ScadaFloatingPanel'
+import type { ScadaRecord } from '@/views/global-pipeline/scadaConfig'
+import { useNavigate } from 'react-router-dom'
 
 import { getNodeMarkerMap } from '@/utils/mapRenderer'
 import { useNewWindow, usePopoutSync } from '@/hooks/useNewWindow'
+import { getNodeRawType } from '@/utils/pipelineDomain'
+import { getJunctionKind } from '@/utils/pipelineDomain'
 
-// SCADA 站场数据类型
-interface ScadaRecord {
+const noop = () => {}
+
+type TrendChartStation = {
+    name: string
     inP: number
     outP: number
-    inT?: number
-    outT?: number
-    /** 站场类型: compressor=压气站, distribution=分输站, valve=阀室 */
-    type?: 'compressor' | 'distribution' | 'valve'
+    type: string
+    mileage: number
 }
 
-// 从监控系统截图中提取的西一线真实 SCADA 运行基准数据
-const REAL_SCADA_DATA: Record<string, ScadaRecord> = {
-    '中卫压气站': { inP: 6.391, outP: 7.856, inT: 7.7, outT: 30.8, type: 'compressor' },
-    '盐池压气站': { inP: 7.133, outP: 7.092, inT: 10.3, outT: 10.2, type: 'compressor' },
-    '靖边压气站': { inP: 6.681, outP: 8.947, inT: 5.7, outT: 34.9, type: 'compressor' },
-    '子长分输站': { inP: 8.098, outP: 8.098, inT: 19.9, outT: 19.9, type: 'distribution' },
-    '延川压气站': { inP: 7.880, outP: 9.175, inT: 21.4, outT: 31.9, type: 'compressor' },
-    '沁水压气站': { inP: 6.889, outP: 8.762, inT: 18.0, outT: 39.4, type: 'compressor' },
-    '阳城清管站': { inP: 7.936, outP: 7.912, inT: 16.4, outT: 16.4, type: 'distribution' },
-    '博爱分输站': { inP: 7.118, outP: 7.126, outT: 26.2, type: 'distribution' },
-    '郑州压气站': { inP: 6.166, outP: 7.830, inT: 20.1, outT: 41.9, type: 'compressor' },
-    '薛店分输站': { inP: 7.273, outP: 7.273, outT: 34.8, type: 'distribution' },
-    '淮阳压气站': { inP: 5.726, outP: 7.766, inT: 18.4, outT: 45.0, type: 'compressor' },
-    '利辛分输站': { inP: 6.354, outP: 6.232, inT: 21.6, outT: 16.9, type: 'distribution' },
-    '定远压气站': { inP: 4.818, outP: 6.245, inT: 12.8, outT: 35.0, type: 'compressor' },
-    '龙池分输站': { inP: 6.005, outP: 6.002, outT: 19.3, type: 'distribution' },
-    '龙源分输站': { inP: 5.971, outP: 5.590, outT: 20.4, type: 'distribution' },
-    '镇江分输站': { inP: 5.573, outP: 5.575, outT: 14.9, type: 'distribution' },
-    '常州分输站': { inP: 5.255, outP: 5.248, outT: 13.4, type: 'distribution' },
-    '芙蓉分输站': { inP: 5.167, outP: 5.162, inT: 15.9, outT: 5.2, type: 'distribution' },
-    '徐霞客分输站': { inP: 0.000, outP: 0.001, inT: 19.0, outT: 18.4, type: 'distribution' },
-    '无锡分输站': { inP: 4.244, outP: 5.101, outT: 12.2, type: 'distribution' },
-    '东桥分输站': { inP: 5.092, outP: 5.087, outT: 12.7, type: 'distribution' },
-    '苏州分输站': { inP: 5.078, outP: 5.089, outT: 15.5, type: 'distribution' },
-    '甪直分输站': { inP: 5.094, outP: 5.106, outT: 7.9, type: 'distribution' },
-    '昆山分输站': { inP: 5.073, outP: 5.065, outT: 12.4, type: 'distribution' },
-    '上海白鹤末站': { inP: 5.050, outP: 5.050, outT: 13.7, type: 'distribution' },
+type TrendChartConfig = {
+    pipelineId: string
+    title: string
+    color: string
+    stations: TrendChartStation[]
+    mileageMode: 'estimated' | 'sequence'
 }
 
-// 从监控系统截图中提取的西二线真实 SCADA 运行基准数据
-// 数据来源：西二线导航图监控截图 (新疆段 + 甘肃段)
-const WE2_SCADA_DATA: Record<string, ScadaRecord> = {
-    // === 新疆段 ===
-    '霍尔果斯压气站':   { inP: 7.566, outP: 9.615, inT: 15.7, outT: 34.5, type: 'compressor' },
-    '精河压气站':       { inP: 8.856, outP: 8.835, inT: 14.7, type: 'compressor' },
-    '乌苏压气站':       { inP: 7.981, outP: 7.977, inT: 13.8, type: 'compressor' },
-    '玛纳斯压气站':     { inP: 7.202, outP: 10.123, inT: 6.7, outT: 34.0, type: 'compressor' },
-    '昌吉分输站':       { inP: 9.492, outP: 9.526, inT: 6.7, type: 'distribution' },
-    '乌鲁木齐压气站':   { inP: 8.529, outP: 8.441, inT: 14.7, outT: 14.7, type: 'compressor' },
-    '吐鲁番分输联络站': { inP: 7.826, outP: 7.832, inT: 29.5, outT: 28.7, type: 'distribution' },
-    '连木沁压气站':     { inP: 7.086, outP: 9.323, inT: 9.7, outT: 24.0, type: 'compressor' },
-    '了墩压气站':       { inP: 7.940, outP: 10.163, inT: 18.9, outT: 39.7, type: 'compressor' },
-    '哈密分输站':       { inP: 9.364, outP: 9.145, inT: 31.4, outT: 30.9, type: 'distribution' },
-    '烟墩压气站':       { inP: 9.011, outP: 8.977, inT: 26.8, outT: 25.5, type: 'compressor' },
-    // === 甘肃段 ===
-    '红柳压气站':       { inP: 7.462, outP: 10.155, inT: 13.3, outT: 38.6, type: 'compressor' },
-    '瓜州压气站':       { inP: 9.162, outP: 9.120, inT: 24.5, outT: 24.4, type: 'compressor' },
-    '嘉峪关压气站':     { inP: 7.753, outP: 9.670, inT: 12.8, outT: 31.9, type: 'compressor' },
-    '张掖压气站':       { inP: 8.599, outP: 8.555, inT: 17.1, outT: 16.6, type: 'compressor' },
-    '永昌压气站':       { inP: 6.765, outP: 8.201, inT: 6.9, outT: 23.9, type: 'compressor' },
-    '武威分输站':       { inP: 7.655, outP: 4.006, inT: 18.2, outT: 5.0, type: 'distribution' },
-    '古浪压气站':       { inP: 6.731, outP: 8.693, inT: 10.6, outT: 31.9, type: 'compressor' },
-    '中卫压气站(二线)': { inP: 8.177, outP: 8.178, inT: 24.7, type: 'compressor' },
-    // === 宁夏/陕西段 ===
-    '彭阳压气站':       { inP: 6.765, outP: 8.201, inT: 6.9, outT: 23.9, type: 'compressor' },
-    '灵台压气站':       { inP: 6.153, outP: 8.388, inT: 12.3, outT: 38.0, type: 'compressor' },
-    '高陵压气站':       { inP: 7.511, outP: 7.539, inT: 26.7, type: 'compressor' },
-    '潼关压气站':       { inP: 6.663, outP: 9.167, inT: 22.6, outT: 47.7, type: 'compressor' },
-    '洛宁压气站':       { inP: 6.663, outP: 9.167, inT: 22.6, outT: 47.7, type: 'compressor' },
-    '鲁山压气站':       { inP: 6.614, outP: 9.230, inT: 21.0, type: 'compressor' },
-    '枣阳压气站':       { inP: 6.663, outP: 9.167, inT: 22.6, outT: 47.7, type: 'compressor' },
-    '黄石压气站':       { inP: 6.663, outP: 9.167, inT: 22.6, outT: 47.7, type: 'compressor' },
-    '南昌压气站':       { inP: 6.663, outP: 9.167, inT: 22.6, outT: 47.7, type: 'compressor' },
-    '吉安压气站':       { inP: 6.663, outP: 9.167, inT: 22.6, outT: 47.7, type: 'compressor' },
-    '广州压气站':       { inP: 6.663, outP: 9.167, inT: 22.6, outT: 47.7, type: 'compressor' },
+function normalizeStationMatchKey(name: string): string {
+    return name
+        .replace(/[（(][^()（）]*[)）]/g, '')
+        .replace(/\s+/g, '')
+        .replace(/分输压气站|分输联络站|分输清管站|压气站|分输站|清管站|末站/g, '')
 }
 
-// 西气东输一线西段（新疆段）SCADA 运行数据
-// 数据来源：西一线西段工艺综合图（2026-03-09）
-const WE1_WEST_SCADA_DATA: Record<string, ScadaRecord> = {
-    '轮南压气站':     { inP: 7.566, outP: 8.415, inT: 23.9, outT: 52.8, type: 'compressor' },
-    '孔雀河压气站':   { inP: 8.831, outP: 8.832, inT: 25.6, outT: 49.4, type: 'compressor' },
-    '四道班压气站':   { inP: 7.768, outP: 7.735, inT: 30.0, outT: 29.6, type: 'compressor' },
-    '哈密压气站':     { inP: 5.878, outP: 8.868, inT: 12.6, outT: 47.0, type: 'compressor' },
-    '雅满苏压气站':   { inP: 8.517, outP: 8.509, inT: 23.0, outT: 23.0, type: 'compressor' },
-    '红柳压气站':     { inP: 7.382, outP: 7.388, inT: 9.8,  outT: 10.6, type: 'compressor' },
-    '玉石压气站':     { inP: 5.935, outP: 8.814, inT: 6.1,  outT: 37.4, type: 'compressor' },
-    '温泉压气站':     { inP: 8.298, outP: 8.245, inT: 10.0, outT: 9.7,  type: 'compressor' },
-    '古浪分输压气站': { inP: 6.875, outP: 6.594, inT: 6.9,  outT: 6.6,  type: 'compressor' },
+function hexToRgba(hex: string, alpha: number): string {
+    const normalized = hex.replace('#', '')
+    if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+        return `rgba(59,130,246,${alpha})`
+    }
+
+    const r = Number.parseInt(normalized.slice(0, 2), 16)
+    const g = Number.parseInt(normalized.slice(2, 4), 16)
+    const b = Number.parseInt(normalized.slice(4, 6), 16)
+    return `rgba(${r},${g},${b},${alpha})`
 }
 
-// 中俄东线天然气管道 SCADA 运行数据
-// 数据来源：中俄东线北段+南段工艺综合图（2026-03-07）
-const CRED_SCADA_DATA: Record<string, ScadaRecord> = {
-    // === 北段（黑河 → 长岭）===
-    '黑河首站':       { inP: 9.708, outP: 11.174, inT: 2.9,  outT: 14.4, type: 'compressor' },
-    '五大连池压气站': { inP: 9.230, outP: 10.584, inT: 4.4,  outT: 15.1, type: 'compressor' },
-    '明水压气站':     { inP: 8.629, outP: 10.546, inT: 5.6,  outT: 21.4, type: 'compressor' },
-    '大庆分输站':     { inP: 9.148, outP: 9.000,  inT: 13.0,             type: 'distribution' },
-    '肇源压气站':     { inP: 8.756, outP: 8.761,  inT: 7.7,              type: 'compressor' },
-    // === 中段（长岭 → 宝坻）===
-    '双辽分输站':     { inP: 8.585, outP: 10.549, inT: 10.7, outT: 27.1, type: 'distribution' },
-    '长岭分输站':     { inP: 9.048, outP: 9.086,  inT: 18.5, outT: 16.6, type: 'distribution' },
-    '锦州压气站':     { inP: 8.629, outP: 10.546, inT: 5.6,  outT: 21.4, type: 'compressor' },
-    '永清压气站':     { inP: 8.447, outP: 8.451,  inT: 6.5,  outT: 6.9,  type: 'compressor' },
-    // === 南段（安平 → 甪直）===
-    '安平压气站':     { inP: 7.291, outP: 8.839,                outT: 34.6, type: 'compressor' },
-    '德州分输站':     { inP: 7.291, outP: 7.291,                           type: 'distribution' },
-    '济南西分输站':   { inP: 6.505, outP: 6.509,                           type: 'distribution' },
-    '泰安压气站':     { inP: 6.116, outP: 8.400,  inT: 12.0, outT: 36.8, type: 'compressor' },
-    '临沂分输清管站': { inP: 7.888, outP: 7.862,  inT: 15.9, outT: 15.7, type: 'distribution' },
-    '连云港分输压气站':{ inP: 7.291, outP: 8.064,             outT: 22.4, type: 'compressor' },
-    '阜宁联络站':     { inP: 8.034, outP: 8.045,                           type: 'distribution' },
-    '盐城分输清管站': { inP: 7.980, outP: 7.992,                           type: 'distribution' },
-    '泰兴联络站':     { inP: 7.250, outP: 7.218,  inT: 15.3,              type: 'distribution' },
-    '南通联络站':     { inP: 7.210, outP: 7.248,  inT: 16.5, outT: 6.4,  type: 'distribution' },
-    '常熟分输站':     { inP: 7.128, outP: 7.103,  inT: 16.4, outT: 18.3, type: 'distribution' },
-    '甪直末站':       { inP: 7.061, outP: 5.097,  inT: 17.0, outT: 7.8,  type: 'distribution' },
+function buildGraphDistanceIndex(layer: PipelineLayer | undefined) {
+    const exactNameToNodeId = new Map<string, string>()
+    const normalizedNameToNodeId = new Map<string, string>()
+    const adjacency = new Map<string, Array<{ to: string; lengthKm: number }>>()
+
+    if (!layer) {
+        return { exactNameToNodeId, normalizedNameToNodeId, adjacency }
+    }
+
+    layer.nodes.forEach((node) => {
+        exactNameToNodeId.set(node.name, node.id)
+
+        const normalizedKey = normalizeStationMatchKey(node.name)
+        if (normalizedKey && !normalizedNameToNodeId.has(normalizedKey)) {
+            normalizedNameToNodeId.set(normalizedKey, node.id)
+        }
+    })
+
+    layer.lines.forEach((line) => {
+        const startId = String(line.startNodeId)
+        const endId = String(line.endNodeId)
+        const lengthKm = typeof line.length === 'number' && Number.isFinite(line.length) && line.length > 0
+            ? line.length / 1000
+            : 0
+
+        if (!adjacency.has(startId)) adjacency.set(startId, [])
+        if (!adjacency.has(endId)) adjacency.set(endId, [])
+
+        adjacency.get(startId)?.push({ to: endId, lengthKm })
+        adjacency.get(endId)?.push({ to: startId, lengthKm })
+    })
+
+    return { exactNameToNodeId, normalizedNameToNodeId, adjacency }
 }
 
-// 平泰支干线 SCADA 运行数据
-// 数据来源：东部台综合图1-平泰线区域（2026-03-07）
-const PT_SCADA_DATA: Record<string, ScadaRecord> = {
-    '鲁山压气站':   { inP: 5.832, outP: 5.831, inT: 18.3,              type: 'compressor' },
-    '禹州分输站':   { inP: 5.742, outP: 5.742,                          type: 'distribution' },
-    '薛店分输站':   { inP: 5.767, outP: 5.782,                          type: 'distribution' },
-    '中牟分输站':   { inP: 5.759, outP: 5.770,                          type: 'distribution' },
-    '开封分输站':   { inP: 5.730, outP: 5.724,                          type: 'distribution' },
-    '杞县分输站':   { inP: 5.689, outP: 5.688, inT: 14.5,              type: 'distribution' },
-    '兰考分输站':   { inP: 5.660, outP: 5.660,                          type: 'distribution' },
-    '菏泽分输站':   { inP: 5.646, outP: 5.619, inT: 15.7, outT: 15.6, type: 'distribution' },
-    '巨野分输站':   { inP: 5.615, outP: 5.616, inT: 14.6,              type: 'distribution' },
-    '济宁分输站':   { inP: 5.597, outP: 5.616, inT: 14.6,              type: 'distribution' },
-    '上山末站':     { inP: 5.542, outP: 4.203, inT: 16.5, outT: 10.5, type: 'distribution' },
-    '泰安压气站':   { inP: 4.203, outP: 5.883, inT: 22.6, outT: 16.6, type: 'compressor' },
+function resolveNodeIdByStationName(
+    stationName: string,
+    exactNameToNodeId: Map<string, string>,
+    normalizedNameToNodeId: Map<string, string>,
+): string | undefined {
+    const exactMatch = exactNameToNodeId.get(stationName)
+    if (exactMatch) return exactMatch
+
+    return normalizedNameToNodeId.get(normalizeStationMatchKey(stationName))
 }
 
-// 中贵线 SCADA 运行数据（待导入实际数据）
-const ZG_SCADA_DATA: Record<string, ScadaRecord> = {}
+function findShortestDistanceKm(
+    adjacency: Map<string, Array<{ to: string; lengthKm: number }>>,
+    startId: string,
+    endId: string,
+): number | null {
+    if (startId === endId) return 0
+    if (!adjacency.has(startId) || !adjacency.has(endId)) return null
 
-// 中缅线 SCADA 运行数据（待导入实际数据）
-const ZM_SCADA_DATA: Record<string, ScadaRecord> = {}
+    const distances = new Map<string, number>([[startId, 0]])
+    const visited = new Set<string>()
+    const queue: Array<{ id: string; distance: number }> = [{ id: startId, distance: 0 }]
 
-// 广南支干线 SCADA 运行数据（待导入实际数据）
-const GN_SCADA_DATA: Record<string, ScadaRecord> = {}
+    while (queue.length > 0) {
+        queue.sort((a, b) => a.distance - b.distance)
+        const current = queue.shift()
+        if (!current) break
+        if (visited.has(current.id)) continue
+        visited.add(current.id)
 
-// 广深支干线 SCADA 运行数据（待导入实际数据）
-const GS_SCADA_DATA: Record<string, ScadaRecord> = {}
+        if (current.id === endId) {
+            return current.distance
+        }
 
-// 陕京四线 SCADA 运行数据（待导入实际数据）
-const SJ4_SCADA_DATA: Record<string, ScadaRecord> = {}
+        const neighbors = adjacency.get(current.id) || []
+        neighbors.forEach((neighbor) => {
+            if (visited.has(neighbor.to)) return
 
-// 陕京三线 SCADA 运行数据（待导入实际数据）
-const SJ3_SCADA_DATA: Record<string, ScadaRecord> = {}
+            const nextDistance = current.distance + Math.max(neighbor.lengthKm, 0.1)
+            const knownDistance = distances.get(neighbor.to)
+            if (knownDistance == null || nextDistance < knownDistance) {
+                distances.set(neighbor.to, nextDistance)
+                queue.push({ id: neighbor.to, distance: nextDistance })
+            }
+        })
+    }
 
-// 陕京二线 SCADA 运行数据（待导入实际数据）
-const SJ2_SCADA_DATA: Record<string, ScadaRecord> = {}
-
-
-// 南昌-上海支干线 SCADA 运行数据（待导入实际数据）
-const NCSH_SCADA_DATA: Record<string, ScadaRecord> = {}
-
-// 嘉兴-甦直联络线 SCADA 运行数据（待导入实际数据）
-const JXLZ_SCADA_DATA: Record<string, ScadaRecord> = {}
-
-// SCADA 面板统一配置
-interface ScadaPanelConfig {
-    id: string
-    label: string
-    data: Record<string, ScadaRecord>
-    color: string        // 主色
-    bgFrom: string       // 渐变起始色
-    bgTo: string         // 渐变结束色
-    titleColor: string   // 标题文字颜色
+    return null
 }
 
-const EXTRA_SCADA_PANELS: ScadaPanelConfig[] = [
-    { id: 'zg',   label: '中贵线',           data: ZG_SCADA_DATA,   color: '#f59e0b', bgFrom: 'rgba(25,15,5,0.93)',  bgTo: 'rgba(35,20,5,0.93)',  titleColor: '#fde68a' },
-    { id: 'zm',   label: '中缅线',           data: ZM_SCADA_DATA,   color: '#ef4444', bgFrom: 'rgba(25,5,5,0.93)',   bgTo: 'rgba(35,5,8,0.93)',   titleColor: '#fecaca' },
-    { id: 'gn',   label: '广南支干线',       data: GN_SCADA_DATA,   color: '#14b8a6', bgFrom: 'rgba(5,20,18,0.93)',  bgTo: 'rgba(5,28,25,0.93)',  titleColor: '#99f6e4' },
-    { id: 'gs',   label: '广深支干线',       data: GS_SCADA_DATA,   color: '#f97316', bgFrom: 'rgba(25,12,5,0.93)',  bgTo: 'rgba(30,15,5,0.93)',  titleColor: '#fed7aa' },
-    { id: 'sj4',  label: '陕京四线',         data: SJ4_SCADA_DATA,  color: '#6366f1', bgFrom: 'rgba(10,5,25,0.93)',  bgTo: 'rgba(15,8,35,0.93)',  titleColor: '#c7d2fe' },
-    { id: 'sj3',  label: '陕京三线',         data: SJ3_SCADA_DATA,  color: '#818cf8', bgFrom: 'rgba(12,5,28,0.93)',  bgTo: 'rgba(18,8,38,0.93)',  titleColor: '#c7d2fe' },
-    { id: 'ncsh', label: '南昌-上海支干线', data: NCSH_SCADA_DATA, color: '#06b6d4', bgFrom: 'rgba(5,15,22,0.93)',  bgTo: 'rgba(5,20,30,0.93)',  titleColor: '#a5f3fc' },
-    { id: 'jxlz', label: '嘉兴-甦直联络线', data: JXLZ_SCADA_DATA, color: '#84cc16', bgFrom: 'rgba(10,18,5,0.93)',  bgTo: 'rgba(15,22,5,0.93)',  titleColor: '#d9f99d' },
-    { id: 'sj2',  label: '陕京二线',         data: SJ2_SCADA_DATA,  color: '#a1887f', bgFrom: 'rgba(18,12,8,0.93)',  bgTo: 'rgba(25,16,10,0.93)', titleColor: '#d7ccc8' },
+function getTrendSource(pipelineId: string): { title: string; color: string; entries: Array<[string, ScadaRecord]> } | null {
+    if (pipelineId === 'we1') {
+        return {
+            title: '西气东输一线',
+            color: '#10b981',
+            entries: WE1_FULL_STATIONS.map((station) => [
+                station.name,
+                {
+                    inP: station.inP,
+                    outP: station.outP,
+                    type: station.type as ScadaRecord['type'],
+                },
+            ]),
+        }
+    }
 
-]
-// 懒加载 AI 工作流组件
-// 西气东输一线完整站场排列（从西到东，合并西段+东段）
-const WE1_FULL_STATIONS: { name: string; inP: number; outP: number; type: string }[] = [
-    // 西段（新疆→甘肃）
-    ...Object.entries(WE1_WEST_SCADA_DATA).map(([name, d]) => ({ name, inP: d.inP, outP: d.outP, type: d.type || 'compressor' })),
-    // 东段（中卫→上海）
-    ...Object.entries(REAL_SCADA_DATA).map(([name, d]) => ({ name, inP: d.inP, outP: d.outP, type: d.type || 'distribution' })),
-]
+    const scadaEntry = SCADA_DATA_MAP[pipelineId]
+    if (!scadaEntry) return null
+
+    return {
+        title: scadaEntry.label,
+        color: scadaEntry.color,
+        entries: Object.entries(scadaEntry.data),
+    }
+}
+
+function buildTrendChartConfig(pkg: PipelinePackage | undefined, pipelineId: string): TrendChartConfig | null {
+    const source = getTrendSource(pipelineId)
+    if (!source) return null
+
+    const trunkLayer = pkg?.layers.find((layer) => layer.type === 'trunk') ?? pkg?.layers[0]
+    const { exactNameToNodeId, normalizedNameToNodeId, adjacency } = buildGraphDistanceIndex(trunkLayer)
+
+    let cumulativeMileage = 0
+    let previousNodeId: string | undefined
+    let usedEstimatedMileage = false
+
+    const stations = source.entries
+        .filter(([, record]) => Number.isFinite(record.inP) && Number.isFinite(record.outP))
+        .map(([name, record], index) => {
+            const currentNodeId = resolveNodeIdByStationName(name, exactNameToNodeId, normalizedNameToNodeId)
+            if (index > 0) {
+                const distanceKm = previousNodeId && currentNodeId
+                    ? findShortestDistanceKm(adjacency, previousNodeId, currentNodeId)
+                    : null
+
+                if (distanceKm != null) {
+                    cumulativeMileage += distanceKm
+                    usedEstimatedMileage = true
+                } else {
+                    cumulativeMileage += 1
+                }
+            }
+
+            previousNodeId = currentNodeId
+
+            return {
+                name,
+                inP: record.inP,
+                outP: record.outP,
+                type: record.type || 'distribution',
+                mileage: Number(cumulativeMileage.toFixed(1)),
+            }
+        })
+        .filter((station) => station.inP > 0.1 || station.outP > 0.1)
+
+    return {
+        pipelineId,
+        title: source.title,
+        color: source.color,
+        stations,
+        mileageMode: usedEstimatedMileage ? 'estimated' : 'sequence',
+    }
+}
 
 /**
  * 西气东输一线 · 水力坡降线（SVG）
@@ -213,61 +236,71 @@ const WE1_FULL_STATIONS: { name: string; inP: number; outP: number; type: string
  *   - 用一条连续线串起来：上一站 outP → 下一站 inP → (如果是压气站) outP → ...
  *   - 形成经典的 SCADA 水力坡降锯齿形
  */
-const PressureTrendChart: React.FC<{
+const LegacyPressureTrendChart: React.FC<{
+    title: string
+    accentColor: string
+    stations: TrendChartStation[]
+    mileageMode: 'estimated' | 'sequence'
     onClose: () => void
     onMouseDown?: (e: React.MouseEvent) => void
     isDragging?: boolean
-}> = ({ onClose, onMouseDown, isDragging }) => {
+}> = ({ title, accentColor, stations, mileageMode, onClose, onMouseDown, isDragging }) => {
     const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+    const hasStations = stations.length > 0
 
-    const stations = WE1_FULL_STATIONS.filter(s => s.inP > 0.1)
-
-    // SVG 绘图参数
     const W = 860, H = 320
     const padL = 50, padR = 25, padT = 25, padB = 70
     const chartW = W - padL - padR
     const chartH = H - padT - padB
 
-    // 压力范围（只需要覆盖实际出现的值）
-    const allP = stations.flatMap(s => s.type === 'compressor' ? [s.inP, s.outP] : [s.inP])
-    const minP = Math.floor(Math.min(...allP) * 2) / 2  // 对齐到0.5
+    const allP = hasStations
+        ? stations.flatMap((station) => station.type === 'compressor' ? [station.inP, station.outP] : [station.inP])
+        : [0, 1]
+    const minP = Math.floor(Math.min(...allP) * 2) / 2
     const maxP = Math.ceil(Math.max(...allP) * 2) / 2 + 0.5
-    const rangeP = maxP - minP
+    const rangeP = maxP - minP || 1
+    const maxMileage = hasStations ? Math.max(...stations.map((station) => station.mileage), 1) : 1
+    const xAxisLabel = mileageMode === 'estimated' ? '估算里程 km' : '站序'
 
-    // 坐标转换
-    const xScale = (i: number) => padL + (i / (stations.length - 1)) * chartW
+    const borderColor = hexToRgba(accentColor, 0.2)
+    const headerBorderColor = hexToRgba(accentColor, 0.1)
+    const areaTopColor = hexToRgba(accentColor, 0.15)
+    const areaMidColor = hexToRgba(accentColor, 0.05)
+    const areaBottomColor = hexToRgba(accentColor, 0.01)
+
+    const xScale = (station: TrendChartStation, index: number) => {
+        if (mileageMode === 'estimated' && maxMileage > 0) {
+            return padL + (station.mileage / maxMileage) * chartW
+        }
+        return padL + ((stations.length <= 1 ? 0 : index / (stations.length - 1)) * chartW)
+    }
     const yScale = (p: number) => padT + chartH - ((p - minP) / rangeP) * chartH
 
-    // 构建水力坡降线路径（单线）
-    // 逻辑：从左往右，
-    //   压气站 → 画到 inP，再竖线到 outP（增压）
-    //   非压气站 → 只画到 inP
-    // 连线：上一个点的"出口值"连到下一个点的 inP
     const buildHydraulicPath = () => {
         let path = ''
-        stations.forEach((s, i) => {
-            const x = xScale(i)
-            const yIn = yScale(s.inP)
-            const isCompressor = s.type === 'compressor'
+        stations.forEach((station, index) => {
+            const x = xScale(station, index)
+            const yIn = yScale(station.inP)
+            const isCompressor = station.type === 'compressor'
 
-            if (i === 0) {
+            if (index === 0) {
                 path += `M ${x} ${yIn}`
-                if (isCompressor) path += ` L ${x} ${yScale(s.outP)}`
-            } else {
-                // 从上一个点连线到当前站的 inP
-                path += ` L ${x} ${yIn}`
-                // 压气站增压：竖线跳到 outP
-                if (isCompressor) path += ` L ${x} ${yScale(s.outP)}`
+                if (isCompressor) path += ` L ${x} ${yScale(station.outP)}`
+                return
             }
+
+            path += ` L ${x} ${yIn}`
+            if (isCompressor) path += ` L ${x} ${yScale(station.outP)}`
         })
         return path
     }
 
-    // 面积填充路径（坡降线下方填充）
-    const hydraulicPath = buildHydraulicPath()
-    const areaPath = hydraulicPath + ` L ${xScale(stations.length - 1)} ${padT + chartH} L ${padL} ${padT + chartH} Z`
+    const hydraulicPath = hasStations ? buildHydraulicPath() : ''
+    const lastStation = hasStations ? stations[stations.length - 1] : null
+    const areaPath = hasStations && lastStation
+        ? `${hydraulicPath} L ${xScale(lastStation, stations.length - 1)} ${padT + chartH} L ${padL} ${padT + chartH} Z`
+        : ''
 
-    // 网格线（每1 MPa一条）
     const gridLines: number[] = []
     for (let p = Math.ceil(minP); p <= Math.floor(maxP); p++) {
         gridLines.push(p)
@@ -277,31 +310,30 @@ const PressureTrendChart: React.FC<{
         <div
             className={`absolute z-20 flex flex-col select-none overflow-hidden ${isDragging ? 'cursor-grabbing' : ''}`}
             style={{
-                width: '920px', height: '420px',
+                width: '920px',
+                height: '420px',
                 background: 'linear-gradient(180deg, rgba(5,10,18,0.97) 0%, rgba(8,15,12,0.97) 100%)',
-                backdropFilter: 'blur(16px)', borderRadius: '12px',
-                border: '1px solid rgba(16,185,129,0.2)',
+                backdropFilter: 'blur(16px)',
+                borderRadius: '12px',
+                border: `1px solid ${borderColor}`,
                 boxShadow: '0 16px 64px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.05)',
             }}
         >
-            {/* 顶部渐变装饰条 */}
-            <div style={{ height: '3px', background: 'linear-gradient(90deg, #10b981, #34d399, #059669, #10b981)', borderRadius: '12px 12px 0 0' }} />
-            {/* 头部 */}
+            <div style={{ height: '3px', background: `linear-gradient(90deg, ${accentColor}, ${hexToRgba(accentColor, 0.75)}, ${accentColor})`, borderRadius: '12px 12px 0 0' }} />
             <div
                 className="px-5 py-2.5 flex justify-between items-center shrink-0 cursor-grab active:cursor-grabbing"
-                style={{ borderBottom: '1px solid rgba(16,185,129,0.1)' }}
+                style={{ borderBottom: `1px solid ${headerBorderColor}` }}
                 onMouseDown={onMouseDown}
             >
-                <h3 className="m-0 text-sm font-bold flex items-center gap-2" style={{ color: '#a7f3d0' }}>
-                    <span className="material-symbols-outlined text-lg" style={{ color: '#10b981' }}>show_chart</span>
-                    <span>西气东输一线 · 水力坡降线</span>
-                    <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 'normal' }}>单位: MPa</span>
+                <h3 className="m-0 text-sm font-bold flex items-center gap-2" style={{ color: '#e2e8f0' }}>
+                    <span className="material-symbols-outlined text-lg" style={{ color: accentColor }}>show_chart</span>
+                    <span>{title} · 里程进出站压力图</span>
+                    <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 'normal' }}>{xAxisLabel}</span>
                 </h3>
-                <div className="flex items-center gap-3" onMouseDown={e => e.stopPropagation()}>
-                    {/* 图例 */}
+                <div className="flex items-center gap-3" onMouseDown={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-4 mr-2" style={{ fontSize: '11px' }}>
                         <span className="flex items-center gap-1.5">
-                            <span style={{ display: 'inline-block', width: 8, height: 8, background: '#10b981', borderRadius: '50%' }} />
+                            <span style={{ display: 'inline-block', width: 8, height: 8, background: accentColor, borderRadius: '50%' }} />
                             <span style={{ color: '#94a3b8' }}>压气站 (进/出)</span>
                         </span>
                         <span className="flex items-center gap-1.5">
@@ -315,141 +347,410 @@ const PressureTrendChart: React.FC<{
                 </div>
             </div>
 
-            {/* SVG 图表区 */}
             <div className="flex-1 px-4 py-2 overflow-hidden">
-                <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%' }}>
-                    <defs>
-                        <linearGradient id="hydraulicGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
-                            <stop offset="60%" stopColor="#10b981" stopOpacity="0.05" />
-                            <stop offset="100%" stopColor="#10b981" stopOpacity="0.01" />
-                        </linearGradient>
-                    </defs>
+                {!hasStations ? (
+                    <div className="h-full flex items-center justify-center text-gray-500">
+                        <div className="text-center">
+                            <span className="material-symbols-outlined text-5xl block mb-3" style={{ color: `${accentColor}66` }}>show_chart</span>
+                            <p className="text-lg">暂无压力图数据</p>
+                            <p className="text-sm text-gray-600 mt-2">当前管线还没有可用的进出站压力数据</p>
+                        </div>
+                    </div>
+                ) : (
+                    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%' }}>
+                        <defs>
+                            <linearGradient id="hydraulicGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={areaTopColor} />
+                                <stop offset="60%" stopColor={areaMidColor} />
+                                <stop offset="100%" stopColor={areaBottomColor} />
+                            </linearGradient>
+                        </defs>
 
-                    {/* 网格线 */}
-                    {gridLines.map(p => (
-                        <g key={p}>
-                            <line x1={padL} y1={yScale(p)} x2={padL + chartW} y2={yScale(p)} stroke="rgba(100,116,139,0.12)" strokeWidth={1} />
-                            <text x={padL - 8} y={yScale(p) + 4} textAnchor="end" fill="#475569" fontSize="10" fontFamily="monospace">{p}</text>
-                        </g>
-                    ))}
-
-                    {/* 面积填充 */}
-                    <path d={areaPath} fill="url(#hydraulicGrad)" />
-
-                    {/* 主线：水力坡降线 */}
-                    <path d={hydraulicPath} fill="none" stroke="#10b981" strokeWidth={2} strokeLinejoin="round" />
-
-                    {/* 站点标记 */}
-                    {stations.map((s, i) => {
-                        const x = xScale(i)
-                        const yIn = yScale(s.inP)
-                        const isCompressor = s.type === 'compressor'
-                        const yOut = isCompressor ? yScale(s.outP) : yIn
-                        const isHovered = hoveredIdx === i
-                        // 所有站都显示名字，但非 hover 时用旋转小字
-                        const showLabel = isCompressor || isHovered || i === 0 || i === stations.length - 1
-
-                        return (
-                            <g key={i}
-                                onMouseEnter={() => setHoveredIdx(i)}
-                                onMouseLeave={() => setHoveredIdx(null)}
-                                style={{ cursor: 'pointer' }}
-                            >
-                                {/* 悬停探测区域 */}
-                                <rect x={x - 10} y={padT} width={20} height={chartH} fill="transparent" />
-
-                                {/* 悬停竖线 */}
-                                {isHovered && <line x1={x} y1={padT} x2={x} y2={padT + chartH} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />}
-
-                                {/* 压气站：进站点+竖线+出站点 */}
-                                {isCompressor ? (
-                                    <>
-                                        {/* 增压竖线 */}
-                                        <line x1={x} y1={yIn} x2={x} y2={yOut}
-                                            stroke={isHovered ? '#34d399' : '#10b981'}
-                                            strokeWidth={isHovered ? 2.5 : 1.5}
-                                            opacity={isHovered ? 1 : 0.6}
-                                        />
-                                        {/* 进站点（底部，较暗）*/}
-                                        <circle cx={x} cy={yIn} r={isHovered ? 4.5 : 3}
-                                            fill="#10b981" stroke={isHovered ? '#a7f3d0' : '#064e3b'} strokeWidth={1.5} />
-                                        {/* 出站点（顶部，较亮）*/}
-                                        <circle cx={x} cy={yOut} r={isHovered ? 5 : 3.5}
-                                            fill="#34d399" stroke={isHovered ? '#ecfdf5' : '#065f46'} strokeWidth={1.5} />
-                                        {/* 进站压力数值（点旁边显示） */}
-                                        {isHovered && (
-                                            <>
-                                                <text x={x + 8} y={yIn + 3} fill="#f59e0b" fontSize="9" fontFamily="monospace">
-                                                    {s.inP.toFixed(2)}
-                                                </text>
-                                                <text x={x + 8} y={yOut + 3} fill="#34d399" fontSize="9" fontFamily="monospace">
-                                                    {s.outP.toFixed(2)}
-                                                </text>
-                                            </>
-                                        )}
-                                    </>
-                                ) : (
-                                    /* 非压气站：只显示进站点 */
-                                    <circle cx={x} cy={yIn} r={isHovered ? 4 : 2}
-                                        fill="#f59e0b" stroke={isHovered ? '#fde68a' : 'none'} strokeWidth={1.5}
-                                        opacity={isHovered ? 1 : 0.7}
-                                    />
-                                )}
-
-                                {/* 站名标注 */}
-                                {showLabel && (
-                                    <text
-                                        x={x} y={padT + chartH + 14}
-                                        textAnchor="end" fill={isHovered ? '#e2e8f0' : '#4b5563'}
-                                        fontSize={isHovered ? '10' : '8'}
-                                        fontWeight={isHovered ? 600 : 400}
-                                        transform={`rotate(-50, ${x}, ${padT + chartH + 14})`}
-                                    >
-                                        {s.name.replace(/压气站|分输压气站|分输站|清管站|分输联络站|分输清管站|末站/, '')}
-                                    </text>
-                                )}
-
-                                {/* 悬停 Tooltip */}
-                                {isHovered && (
-                                    <g>
-                                        {/* 背景框 */}
-                                        <rect x={Math.min(x - 70, W - padR - 145)} y={Math.max(padT, Math.min(yIn, yOut) - 52)}
-                                            width={140} height={isCompressor ? 48 : 34} rx={6}
-                                            fill="rgba(15,23,42,0.95)" stroke="rgba(16,185,129,0.25)" strokeWidth={1} />
-                                        {/* 站名 */}
-                                        <text x={Math.min(x, W - padR - 75)} y={Math.max(padT + 14, Math.min(yIn, yOut) - 34)}
-                                            textAnchor="middle" fill="#e2e8f0" fontSize="11" fontWeight={600}>
-                                            {s.name}
-                                        </text>
-                                        {isCompressor ? (
-                                            <>
-                                                <text x={Math.min(x - 60, W - padR - 135)} y={Math.max(padT + 29, Math.min(yIn, yOut) - 18)}
-                                                    fill="#f59e0b" fontSize="10" fontFamily="monospace">
-                                                    进 {s.inP.toFixed(3)}
-                                                </text>
-                                                <text x={Math.min(x + 5, W - padR - 70)} y={Math.max(padT + 29, Math.min(yIn, yOut) - 18)}
-                                                    fill="#34d399" fontSize="10" fontFamily="monospace">
-                                                    出 {s.outP.toFixed(3)}
-                                                </text>
-                                                <text x={Math.min(x, W - padR - 75)} y={Math.max(padT + 42, Math.min(yIn, yOut) - 6)}
-                                                    textAnchor="middle" fill="#94a3b8" fontSize="9">
-                                                    增压 +{(s.outP - s.inP).toFixed(3)} MPa
-                                                </text>
-                                            </>
-                                        ) : (
-                                            <text x={Math.min(x, W - padR - 75)} y={Math.max(padT + 29, Math.min(yIn, yOut) - 20)}
-                                                textAnchor="middle" fill="#f59e0b" fontSize="10" fontFamily="monospace">
-                                                进站 {s.inP.toFixed(3)} MPa
-                                            </text>
-                                        )}
-                                    </g>
-                                )}
+                        {gridLines.map((pressure) => (
+                            <g key={pressure}>
+                                <line x1={padL} y1={yScale(pressure)} x2={padL + chartW} y2={yScale(pressure)} stroke="rgba(100,116,139,0.12)" strokeWidth={1} />
+                                <text x={padL - 8} y={yScale(pressure) + 4} textAnchor="end" fill="#475569" fontSize="10" fontFamily="monospace">{pressure}</text>
                             </g>
-                        )
-                    })}
-                </svg>
+                        ))}
+
+                        <path d={areaPath} fill="url(#hydraulicGrad)" />
+                        <path d={hydraulicPath} fill="none" stroke={accentColor} strokeWidth={2} strokeLinejoin="round" />
+
+                        {stations.map((station, index) => {
+                            const x = xScale(station, index)
+                            const yIn = yScale(station.inP)
+                            const isCompressor = station.type === 'compressor'
+                            const yOut = isCompressor ? yScale(station.outP) : yIn
+                            const isHovered = hoveredIdx === index
+                            const showLabel = isCompressor || isHovered || index === 0 || index === stations.length - 1
+
+                            return (
+                                <g
+                                    key={`${station.name}-${index}`}
+                                    onMouseEnter={() => setHoveredIdx(index)}
+                                    onMouseLeave={() => setHoveredIdx(null)}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    <rect x={x - 10} y={padT} width={20} height={chartH} fill="transparent" />
+                                    {isHovered && <line x1={x} y1={padT} x2={x} y2={padT + chartH} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />}
+
+                                    {isCompressor ? (
+                                        <>
+                                            <line
+                                                x1={x}
+                                                y1={yIn}
+                                                x2={x}
+                                                y2={yOut}
+                                                stroke={isHovered ? '#e2e8f0' : accentColor}
+                                                strokeWidth={isHovered ? 2.5 : 1.5}
+                                                opacity={isHovered ? 1 : 0.6}
+                                            />
+                                            <circle cx={x} cy={yIn} r={isHovered ? 4.5 : 3} fill={accentColor} stroke={isHovered ? '#e2e8f0' : hexToRgba(accentColor, 0.35)} strokeWidth={1.5} />
+                                            <circle cx={x} cy={yOut} r={isHovered ? 5 : 3.5} fill="#f8fafc" stroke={isHovered ? '#ffffff' : hexToRgba(accentColor, 0.45)} strokeWidth={1.5} />
+                                            {isHovered && (
+                                                <>
+                                                    <text x={x + 8} y={yIn + 3} fill="#f59e0b" fontSize="9" fontFamily="monospace">
+                                                        {station.inP.toFixed(2)}
+                                                    </text>
+                                                    <text x={x + 8} y={yOut + 3} fill={accentColor} fontSize="9" fontFamily="monospace">
+                                                        {station.outP.toFixed(2)}
+                                                    </text>
+                                                </>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <circle
+                                            cx={x}
+                                            cy={yIn}
+                                            r={isHovered ? 4 : 2}
+                                            fill="#f59e0b"
+                                            stroke={isHovered ? '#fde68a' : 'none'}
+                                            strokeWidth={1.5}
+                                            opacity={isHovered ? 1 : 0.7}
+                                        />
+                                    )}
+
+                                    {showLabel && (
+                                        <text
+                                            x={x}
+                                            y={padT + chartH + 14}
+                                            textAnchor="end"
+                                            fill={isHovered ? '#e2e8f0' : '#4b5563'}
+                                            fontSize={isHovered ? '10' : '8'}
+                                            fontWeight={isHovered ? 600 : 400}
+                                            transform={`rotate(-50, ${x}, ${padT + chartH + 14})`}
+                                        >
+                                            {station.name.replace(/压气站|分输压气站|分输站|清管站|分输联络站|分输清管站|末站/, '')}
+                                        </text>
+                                    )}
+
+                                    {isHovered && (
+                                        <g>
+                                            <rect
+                                                x={Math.min(x - 76, W - padR - 153)}
+                                                y={Math.max(padT, Math.min(yIn, yOut) - 56)}
+                                                width={152}
+                                                height={isCompressor ? 64 : 50}
+                                                rx={6}
+                                                fill="rgba(15,23,42,0.95)"
+                                                stroke={hexToRgba(accentColor, 0.25)}
+                                                strokeWidth={1}
+                                            />
+                                            <text
+                                                x={Math.min(x, W - padR - 77)}
+                                                y={Math.max(padT + 14, Math.min(yIn, yOut) - 38)}
+                                                textAnchor="middle"
+                                                fill="#e2e8f0"
+                                                fontSize="11"
+                                                fontWeight={600}
+                                            >
+                                                {station.name}
+                                            </text>
+                                            <text
+                                                x={Math.min(x, W - padR - 77)}
+                                                y={Math.max(padT + 27, Math.min(yIn, yOut) - 24)}
+                                                textAnchor="middle"
+                                                fill="#94a3b8"
+                                                fontSize="9"
+                                                fontFamily="monospace"
+                                            >
+                                                {mileageMode === 'estimated' ? `${station.mileage.toFixed(1)} km` : `站序 ${index + 1}`}
+                                            </text>
+                                            {isCompressor ? (
+                                                <>
+                                                    <text
+                                                        x={Math.min(x - 64, W - padR - 141)}
+                                                        y={Math.max(padT + 42, Math.min(yIn, yOut) - 7)}
+                                                        fill="#f59e0b"
+                                                        fontSize="10"
+                                                        fontFamily="monospace"
+                                                    >
+                                                        进 {station.inP.toFixed(3)}
+                                                    </text>
+                                                    <text
+                                                        x={Math.min(x + 8, W - padR - 69)}
+                                                        y={Math.max(padT + 42, Math.min(yIn, yOut) - 7)}
+                                                        fill={accentColor}
+                                                        fontSize="10"
+                                                        fontFamily="monospace"
+                                                    >
+                                                        出 {station.outP.toFixed(3)}
+                                                    </text>
+                                                    <text
+                                                        x={Math.min(x, W - padR - 77)}
+                                                        y={Math.max(padT + 56, Math.min(yIn, yOut) + 7)}
+                                                        textAnchor="middle"
+                                                        fill="#94a3b8"
+                                                        fontSize="9"
+                                                    >
+                                                        增压 +{(station.outP - station.inP).toFixed(3)} MPa
+                                                    </text>
+                                                </>
+                                            ) : (
+                                                <text
+                                                    x={Math.min(x, W - padR - 77)}
+                                                    y={Math.max(padT + 42, Math.min(yIn, yOut) - 7)}
+                                                    textAnchor="middle"
+                                                    fill="#f59e0b"
+                                                    fontSize="10"
+                                                    fontFamily="monospace"
+                                                >
+                                                    进站 {station.inP.toFixed(3)} MPa
+                                                </text>
+                                            )}
+                                        </g>
+                                    )}
+                                </g>
+                            )
+                        })}
+                    </svg>
+                )}
             </div>
+        </div>
+    )
+}
+
+const PressureTrendChart: React.FC<{
+    config: TrendChartConfig
+    onClose: () => void
+    onMouseDown?: (e: React.MouseEvent) => void
+    isDragging?: boolean
+    standalone?: boolean
+}> = ({ config, onClose, onMouseDown, isDragging, standalone = false }) => {
+    const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
+
+    const stations = config.stations
+    const accentColor = config.color
+    const hasData = stations.length > 0
+    const jumpThreshold = 0.001
+
+    const W = 860
+    const H = 320
+    const padL = 50
+    const padR = 25
+    const padT = 25
+    const padB = 70
+    const chartW = W - padL - padR
+    const chartH = H - padT - padB
+
+    const allP = hasData
+        ? stations.flatMap((s) => [s.inP, s.outP])
+        : [0, 1]
+    const minP = Math.floor(Math.min(...allP) * 2) / 2
+    const maxP = Math.ceil(Math.max(...allP) * 2) / 2 + 0.5
+    const rangeP = Math.max(maxP - minP, 1)
+    const maxMileage = hasData ? Math.max(stations[stations.length - 1]?.mileage ?? 0, 1) : 1
+
+    const xScale = (mileage: number) => padL + (mileage / maxMileage) * chartW
+    const yScale = (p: number) => padT + chartH - ((p - minP) / rangeP) * chartH
+
+    const buildHydraulicPath = () => {
+        let path = ''
+        stations.forEach((s, i) => {
+            const x = xScale(s.mileage)
+            const yIn = yScale(s.inP)
+            const yOut = yScale(s.outP)
+            const hasJump = Math.abs(s.outP - s.inP) > jumpThreshold
+
+            if (i === 0) {
+                path += `M ${x} ${yIn}`
+                if (hasJump) path += ` L ${x} ${yOut}`
+                return
+            }
+
+            path += ` L ${x} ${yIn}`
+            if (hasJump) path += ` L ${x} ${yOut}`
+        })
+        return path
+    }
+
+    const hydraulicPath = hasData ? buildHydraulicPath() : ''
+    const areaPath = hasData
+        ? `${hydraulicPath} L ${xScale(maxMileage)} ${padT + chartH} L ${padL} ${padT + chartH} Z`
+        : ''
+
+    const gridLines: number[] = []
+    for (let p = Math.ceil(minP); p <= Math.floor(maxP); p++) {
+        gridLines.push(p)
+    }
+
+    const mileageTicks = Array.from({ length: 6 }, (_, idx) => Number(((maxMileage / 5) * idx).toFixed(1)))
+
+    return (
+        <div
+            className={`${standalone ? 'h-full w-full' : `absolute z-20 ${isDragging ? 'cursor-grabbing' : ''}`} flex flex-col select-none overflow-hidden`}
+            style={{
+                width: standalone ? '100%' : '920px',
+                height: standalone ? '100%' : '420px',
+                background: 'linear-gradient(180deg, rgba(5,10,18,0.97) 0%, rgba(8,15,12,0.97) 100%)',
+                backdropFilter: 'blur(16px)',
+                borderRadius: standalone ? '0' : '12px',
+                border: `1px solid ${hexToRgba(accentColor, 0.2)}`,
+                boxShadow: standalone ? 'none' : '0 16px 64px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.05)',
+            }}
+        >
+            <div style={{ height: '3px', background: `linear-gradient(90deg, ${accentColor}, ${hexToRgba(accentColor, 0.65)}, ${accentColor})`, borderRadius: standalone ? '0' : '12px 12px 0 0' }} />
+            <div
+                className={`px-5 py-2.5 flex justify-between items-center shrink-0 ${standalone ? '' : 'cursor-grab active:cursor-grabbing'}`}
+                style={{ borderBottom: `1px solid ${hexToRgba(accentColor, 0.12)}` }}
+                onMouseDown={onMouseDown}
+            >
+                <h3 className="m-0 text-sm font-bold flex items-center gap-2" style={{ color: '#e2e8f0' }}>
+                    <span className="material-symbols-outlined text-lg" style={{ color: accentColor }}>show_chart</span>
+                    <span>{config.title} · 里程进出站压力图</span>
+                    <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 'normal' }}>单位: MPa / km</span>
+                    {config.mileageMode === 'estimated' && (
+                        <span style={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'normal' }}>主干线累计长度推算</span>
+                    )}
+                </h3>
+                <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10" title="关闭">
+                    <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+            </div>
+
+            {!hasData ? (
+                <div className="flex-1 flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                        <span className="material-symbols-outlined text-5xl block mb-3" style={{ color: `${accentColor}66` }}>show_chart</span>
+                        <p className="text-lg">暂无里程进出站压力图数据</p>
+                        <p className="text-sm text-gray-600 mt-2">
+                            {(SCADA_DATA_MAP[config.pipelineId]?.data && Object.keys(SCADA_DATA_MAP[config.pipelineId].data).length > 0)
+                                ? '当前主干线站序没有和 SCADA 站名匹配上'
+                                : '当前管线还没有导入可用的 SCADA 压力数据'}
+                        </p>
+                    </div>
+                </div>
+            ) : (
+                <div className="flex-1 px-4 py-2 overflow-hidden">
+                    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%' }}>
+                        <defs>
+                            <linearGradient id={`hydraulicGrad-${config.pipelineId}`} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={accentColor} stopOpacity="0.15" />
+                                <stop offset="60%" stopColor={accentColor} stopOpacity="0.05" />
+                                <stop offset="100%" stopColor={accentColor} stopOpacity="0.01" />
+                            </linearGradient>
+                        </defs>
+
+                        {gridLines.map(p => (
+                            <g key={`${config.pipelineId}-grid-${p}`}>
+                                <line x1={padL} y1={yScale(p)} x2={padL + chartW} y2={yScale(p)} stroke="rgba(100,116,139,0.12)" strokeWidth={1} />
+                                <text x={padL - 8} y={yScale(p) + 4} textAnchor="end" fill="#475569" fontSize="10" fontFamily="monospace">{p}</text>
+                            </g>
+                        ))}
+
+                        <path d={areaPath} fill={`url(#hydraulicGrad-${config.pipelineId})`} />
+                        <path d={hydraulicPath} fill="none" stroke={accentColor} strokeWidth={2} strokeLinejoin="round" />
+
+                        {stations.map((s, i) => {
+                            const x = xScale(s.mileage)
+                            const yIn = yScale(s.inP)
+                            const yOut = yScale(s.outP)
+                            const hasJump = Math.abs(s.outP - s.inP) > jumpThreshold
+                            const isHovered = hoveredIdx === i
+                            const showLabel = isHovered || i === 0 || i === stations.length - 1
+
+                            return (
+                                <g
+                                    key={`${config.pipelineId}-${s.name}-${s.mileage}`}
+                                    onMouseEnter={() => setHoveredIdx(i)}
+                                    onMouseLeave={() => setHoveredIdx(null)}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    <rect x={x - 10} y={padT} width={20} height={chartH} fill="transparent" />
+                                    {isHovered && <line x1={x} y1={padT} x2={x} y2={padT + chartH} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />}
+
+                                    {isHovered && (
+                                        <>
+                                            {hasJump && (
+                                                <line x1={x} y1={yIn} x2={x} y2={yOut} stroke="#ffffff" strokeWidth={2} opacity={0.9} />
+                                            )}
+                                            <circle cx={x} cy={yIn} r={4.5} fill="#f59e0b" stroke="#fde68a" strokeWidth={1.5} />
+                                            <circle cx={x} cy={yOut} r={4.5} fill={accentColor} stroke="#ffffff" strokeWidth={1.5} />
+                                        </>
+                                    )}
+
+                                    {showLabel && (
+                                        <text
+                                            x={x}
+                                            y={padT + chartH + 14}
+                                            textAnchor="end"
+                                            fill={isHovered ? '#e2e8f0' : '#4b5563'}
+                                            fontSize={isHovered ? '10' : '8'}
+                                            fontWeight={isHovered ? 600 : 400}
+                                            transform={`rotate(-50, ${x}, ${padT + chartH + 14})`}
+                                        >
+                                            {s.name.replace(/压气站|分输压气站|分输站|清管站|分输联络站|分输清管站|末站/g, '')}
+                                        </text>
+                                    )}
+
+                                    {isHovered && (
+                                        <g>
+                                            <rect
+                                                x={Math.min(x - 84, W - padR - 168)}
+                                                y={Math.max(padT, Math.min(yIn, yOut) - 68)}
+                                                width={168}
+                                                height={60}
+                                                rx={6}
+                                                fill="rgba(15,23,42,0.95)"
+                                                stroke={hexToRgba(accentColor, 0.35)}
+                                                strokeWidth={1}
+                                            />
+                                            <text x={Math.min(x, W - padR - 84)} y={Math.max(padT + 14, Math.min(yIn, yOut) - 50)} textAnchor="middle" fill="#e2e8f0" fontSize="11" fontWeight={600}>
+                                                {s.name}
+                                            </text>
+                                            <text x={Math.min(x, W - padR - 84)} y={Math.max(padT + 28, Math.min(yIn, yOut) - 36)} textAnchor="middle" fill="#94a3b8" fontSize="9">
+                                                里程 {s.mileage.toFixed(1)} km
+                                            </text>
+                                            <text x={Math.min(x - 42, W - padR - 126)} y={Math.max(padT + 44, Math.min(yIn, yOut) - 20)} textAnchor="middle" fill="#f59e0b" fontSize="10" fontFamily="monospace">
+                                                进 {s.inP.toFixed(3)}
+                                            </text>
+                                            <text x={Math.min(x + 42, W - padR - 42)} y={Math.max(padT + 44, Math.min(yIn, yOut) - 20)} textAnchor="middle" fill={accentColor} fontSize="10" fontFamily="monospace">
+                                                出 {s.outP.toFixed(3)}
+                                            </text>
+                                        </g>
+                                    )}
+                                </g>
+                            )
+                        })}
+
+                        <line x1={padL} y1={padT + chartH} x2={padL + chartW} y2={padT + chartH} stroke="rgba(100,116,139,0.2)" strokeWidth={1} />
+                        {mileageTicks.map((tick) => {
+                            const x = xScale(tick)
+                            return (
+                                <g key={`${config.pipelineId}-tick-${tick}`}>
+                                    <line x1={x} y1={padT + chartH} x2={x} y2={padT + chartH + 4} stroke="rgba(100,116,139,0.35)" strokeWidth={1} />
+                                    <text x={x} y={padT + chartH + 18} textAnchor="middle" fill="#64748b" fontSize="9" fontFamily="monospace">
+                                        {tick.toFixed(0)}
+                                    </text>
+                                </g>
+                            )
+                        })}
+                        <text x={padL + chartW} y={padT + chartH + 32} textAnchor="end" fill="#475569" fontSize="10">
+                            里程 / km
+                        </text>
+                    </svg>
+                </div>
+            )}
         </div>
     )
 }
@@ -464,6 +765,7 @@ const PressureTrendChart: React.FC<{
  * 3. 减少不必要的重新渲染
  */
 const GlobalPipelineView: React.FC = () => {
+    const navigate = useNavigate()
     // 管线数据异步加载
     const [pipelines, setPipelines] = useState<PipelinePackage[]>([])
     const [pipelinesLoaded, setPipelinesLoaded] = useState(false)
@@ -474,6 +776,7 @@ const GlobalPipelineView: React.FC = () => {
     }, [])
 
     const [mapInstance, setMapInstance] = useState<any>(null)
+    const [selectedMapNode, setSelectedMapNode] = useState<PipelineNode | null>(null)
 
     const [showScada, setShowScada] = useState(false)
     const [showWe2Scada, setShowWe2Scada] = useState(false)
@@ -484,10 +787,14 @@ const GlobalPipelineView: React.FC = () => {
     // 新增 7 条管线的 SCADA 面板显示状态（默认隐藏）
     const [extraScadaVisible, setExtraScadaVisible] = useState<Record<string, boolean>>({})
     const toggleExtraScada = (id: string) => setExtraScadaVisible(prev => ({ ...prev, [id]: !prev[id] }))
-    // 压力趋势图面板
-    const [showTrendChart, setShowTrendChart] = useState(false)
-    // SCADA 历史曲线面板状态
-    const [historyStation, setHistoryStation] = useState<string | null>(null)
+    // 通用压力趋势图面板
+    const [activeTrendPipelineId, setActiveTrendPipelineId] = useState<string | null>(null)
+    // SCADA 历史曲线面板状态，支持指定指标类型和基准值
+    const [historyTarget, setHistoryTarget] = useState<{
+        stationName: string
+        metricType: 'pressure' | 'temperature'
+        baseValue: number
+    } | null>(null)
     const [historyChartPos, setHistoryChartPos] = useState({ x: Math.round((typeof window !== 'undefined' ? window.innerWidth : 1280) / 2) - 300, y: 120 })
     const [isDraggingHistory, setIsDraggingHistory] = useState(false)
     const historyOffsetRef = React.useRef({ x: 0, y: 0 })
@@ -495,6 +802,10 @@ const GlobalPipelineView: React.FC = () => {
         setIsDraggingHistory(true)
         historyOffsetRef.current = { x: e.clientX - historyChartPos.x, y: e.clientY - historyChartPos.y }
     }
+    // 统一的指标点击处理函数
+    const handleMetricClick = useCallback((stationName: string, metricType: 'pressure' | 'temperature', baseValue: number) => {
+        setHistoryTarget({ stationName, metricType, baseValue })
+    }, [])
 
     // 西二线 SCADA 面板拖拽状态
     const [we2ScadaPos, setWe2ScadaPos] = useState({
@@ -514,7 +825,7 @@ const GlobalPipelineView: React.FC = () => {
 
     // 通用拖拽面板处理
     // 将每个新面板的拖拽状态打包起来
-    // 获取屏幕尺寸计算安全先
+    // 获取屏幕尺寸计算安全位置
     const W = typeof window !== 'undefined' ? window.innerWidth : 1280
     const H = typeof window !== 'undefined' ? window.innerHeight : 800
 
@@ -559,6 +870,12 @@ const GlobalPipelineView: React.FC = () => {
         setMapInstance(map)
     }, [])
 
+    const activeTrendChart = useMemo(() => {
+        if (!activeTrendPipelineId) return null
+        const targetPackage = pipelines.find((pkg) => pkg.id === activeTrendPipelineId)
+        return buildTrendChartConfig(targetPackage, activeTrendPipelineId)
+    }, [activeTrendPipelineId, pipelines])
+
     // SCADA 面板拖拽状态
     const { isPoppedOut: isScadaPoppedOut, popOut: popOutScada, closePopOut: closeScadaPopOut } = useNewWindow('scada-sync', '/popout/scada');
     const [scadaPos, setScadaPos] = useState({
@@ -595,6 +912,7 @@ const GlobalPipelineView: React.FC = () => {
         if (isDraggingPt)      setPtPos({      x: e.clientX - ptOffsetRef.current.x,      y: e.clientY - ptOffsetRef.current.y      })
         if (isDraggingTrend)   setTrendPos({   x: e.clientX - trendOffsetRef.current.x,   y: e.clientY - trendOffsetRef.current.y   })
         if (isDraggingHistory) setHistoryChartPos({ x: e.clientX - historyOffsetRef.current.x, y: e.clientY - historyOffsetRef.current.y })
+        if (isDraggingLuzhi)   setLuzhiPos({   x: e.clientX - luzhiOffsetRef.current.x,   y: e.clientY - luzhiOffsetRef.current.y   })
     }
 
     const handleGlobalMouseUp = () => {
@@ -605,6 +923,170 @@ const GlobalPipelineView: React.FC = () => {
         if (isDraggingPt)       setIsDraggingPt(false)
         if (isDraggingTrend)    setIsDraggingTrend(false)
         if (isDraggingHistory)  setIsDraggingHistory(false)
+        if (isDraggingLuzhi)    setIsDraggingLuzhi(false)
+    }
+
+    const hasScadaStandalone = useCallback((pipelineId: string) => {
+        return Boolean(SCADA_DATA_MAP[pipelineId])
+    }, [])
+
+    const findExtraScadaPanel = useCallback((pkg: PipelinePackage) => {
+        return EXTRA_SCADA_PANELS.find(p =>
+            pkg.name.includes(p.label)
+            || (p.id === 'zg' && pkg.name === '中贵线')
+            || (p.id === 'zm' && pkg.name === '中缅线')
+            || (p.id === 'gn' && pkg.name === '广南支干线')
+            || (p.id === 'gs' && pkg.name === '广深支干线')
+            || (p.id === 'sj4' && pkg.name === '陕京四线')
+            || (p.id === 'sj3' && pkg.name === '陕京三线')
+            || (p.id === 'ncsh' && pkg.name.includes('南昌'))
+            || (p.id === 'jxlz' && pkg.name.includes('嘉兴'))
+            || (p.id === 'sj2' && pkg.name === '陕京二线')
+            || (p.id === 'we3' && pkg.name.includes('三线'))
+        )
+    }, [])
+
+    const openScadaStandalone = useCallback((pipelineId: string) => {
+        if (!hasScadaStandalone(pipelineId)) return
+
+        if (pipelineId === 'we1') {
+            popOutScada(400, 500)
+            setShowScada(false)
+            return
+        }
+
+        const w = 520
+        const h = 500
+        const left = window.screenX + (window.outerWidth - w) / 2
+        const top = window.screenY + (window.outerHeight - h) / 2
+        window.open(
+            `/#/popout/scada?id=${pipelineId}`,
+            `scada-${pipelineId}`,
+            `width=${w},height=${h},left=${left},top=${top}`
+        )
+    }, [hasScadaStandalone, popOutScada])
+
+    const toggleTrendChart = useCallback((pipelineId: string) => {
+        setActiveTrendPipelineId((prev) => prev === pipelineId ? null : pipelineId)
+    }, [])
+
+    const directoryActionButtonClass = 'transition-all duration-150 flex items-center justify-center size-7 rounded-md border border-transparent bg-white/[0.03] hover:bg-white/10 hover:border-white/10'
+    const directoryActionPlaceholderClass = 'size-7 rounded-md opacity-0 pointer-events-none'
+
+    const renderPipelineActions = (pkg: PipelinePackage) => {
+        const extraPanel = findExtraScadaPanel(pkg)
+        let visibilityButton: React.ReactNode = <span className={directoryActionPlaceholderClass} aria-hidden="true" />
+        let popoutButton: React.ReactNode = <span className={directoryActionPlaceholderClass} aria-hidden="true" />
+        let trendButton: React.ReactNode = <span className={directoryActionPlaceholderClass} aria-hidden="true" />
+        const trendSource = getTrendSource(pkg.id)
+        const isTrendActive = activeTrendPipelineId === pkg.id
+
+        if (pkg.name === '西气东输一线' && !isScadaPoppedOut) {
+            visibilityButton = (
+                <button
+                    onClick={(e) => { e.stopPropagation(); setShowScada(!showScada); setShowWe1WestScada(!showWe1WestScada); }}
+                    className={`${directoryActionButtonClass} ${showScada ? 'text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border-emerald-400/20' : 'text-gray-500 hover:text-gray-300'}`}
+                    title={showScada ? '隐藏西一线面板' : '显示西一线面板'}
+                >
+                    <span className="material-symbols-outlined text-sm">{showScada ? 'visibility' : 'visibility_off'}</span>
+                </button>
+            )
+            popoutButton = (
+                <button
+                    onClick={(e) => { e.stopPropagation(); popOutScada(400, 500); setShowScada(false); }}
+                    className={`${directoryActionButtonClass} text-gray-400 hover:text-white`}
+                    title="弹出独立窗口"
+                >
+                    <span className="material-symbols-outlined text-sm">open_in_new</span>
+                </button>
+            )
+        } else {
+            if (pkg.name === '西气东输二线') {
+                visibilityButton = (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setShowWe2Scada(!showWe2Scada); }}
+                        className={`${directoryActionButtonClass} ${showWe2Scada ? 'text-blue-400 hover:text-blue-300 bg-blue-500/10 border-blue-400/20' : 'text-gray-500 hover:text-gray-300'}`}
+                        title={showWe2Scada ? '隐藏西二线参数表' : '显示西二线参数表'}
+                    >
+                        <span className="material-symbols-outlined text-sm">{showWe2Scada ? 'visibility' : 'visibility_off'}</span>
+                    </button>
+                )
+            } else if (pkg.name === '中俄东线') {
+                visibilityButton = (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setShowCredScada(!showCredScada); }}
+                        className={`${directoryActionButtonClass} ${showCredScada ? 'text-pink-400 hover:text-pink-300 bg-pink-500/10 border-pink-400/20' : 'text-gray-500 hover:text-gray-300'}`}
+                        title={showCredScada ? '隐藏中俄东线参数表' : '显示中俄东线参数表'}
+                    >
+                        <span className="material-symbols-outlined text-sm">{showCredScada ? 'visibility' : 'visibility_off'}</span>
+                    </button>
+                )
+            } else if (pkg.name === '平泰支干线') {
+                visibilityButton = (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setShowPtScada(!showPtScada); }}
+                        className={`${directoryActionButtonClass} ${showPtScada ? 'text-purple-400 hover:text-purple-300 bg-purple-500/10 border-purple-400/20' : 'text-gray-500 hover:text-gray-300'}`}
+                        title={showPtScada ? '隐藏平泰参数表' : '显示平泰参数表'}
+                    >
+                        <span className="material-symbols-outlined text-sm">{showPtScada ? 'visibility' : 'visibility_off'}</span>
+                    </button>
+                )
+            } else if (extraPanel) {
+                visibilityButton = (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); toggleExtraScada(extraPanel.id); }}
+                        className={`${directoryActionButtonClass} ${extraScadaVisible[extraPanel.id] ? 'bg-white/10 border-white/10 hover:opacity-80' : 'text-gray-500 hover:text-gray-300'}`}
+                        style={extraScadaVisible[extraPanel.id] ? { color: extraPanel.color } : undefined}
+                        title={`${extraScadaVisible[extraPanel.id] ? '隐藏' : '显示'}${extraPanel.label}参数表`}
+                    >
+                        <span className="material-symbols-outlined text-sm">{extraScadaVisible[extraPanel.id] ? 'visibility' : 'visibility_off'}</span>
+                    </button>
+                )
+            }
+
+            if (hasScadaStandalone(pkg.id)) {
+                popoutButton = (
+                    <button
+                        onClick={(e) => { e.stopPropagation(); openScadaStandalone(pkg.id); }}
+                        className={`${directoryActionButtonClass} text-gray-400 hover:text-white`}
+                        title="弹出独立窗口"
+                    >
+                        <span className="material-symbols-outlined text-sm">open_in_new</span>
+                    </button>
+                )
+            }
+        }
+
+        if (trendSource) {
+            trendButton = (
+                <button
+                    onClick={(e) => { e.stopPropagation(); toggleTrendChart(pkg.id) }}
+                    className={`${directoryActionButtonClass} ${isTrendActive ? 'bg-white/10 border-white/10 hover:opacity-90' : 'text-gray-500 hover:text-gray-300'}`}
+                    style={isTrendActive ? { color: trendSource.color } : undefined}
+                    title={`弹出${trendSource.title}里程进出站压力图`}
+                >
+                    <span className="material-symbols-outlined text-sm">show_chart</span>
+                </button>
+            )
+        }
+
+        return (
+            <div className="ml-3 shrink-0 grid w-[106px] grid-cols-3 justify-items-center gap-1 rounded-lg border border-white/5 bg-black/20 px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                {visibilityButton}
+                {popoutButton}
+                {trendButton}
+            </div>
+        )
+    }
+
+    // 甪直历史面板状态
+    const [showLuzhiHistory, setShowLuzhiHistory] = useState(false)
+    const [luzhiPos, setLuzhiPos] = useState({ x: Math.round(W / 2) - 390, y: Math.round(H / 2) - 240 })
+    const [isDraggingLuzhi, setIsDraggingLuzhi] = useState(false)
+    const luzhiOffsetRef = React.useRef({ x: 0, y: 0 })
+    const handleLuzhiMouseDown = (e: React.MouseEvent) => {
+        setIsDraggingLuzhi(true)
+        luzhiOffsetRef.current = { x: e.clientX - luzhiPos.x, y: e.clientY - luzhiPos.y }
     }
 
     // 展开状态
@@ -614,15 +1096,7 @@ const GlobalPipelineView: React.FC = () => {
     const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({})
     useEffect(() => {
         if (!pipelinesLoaded || pipelines.length === 0) return
-        const initial: Record<string, boolean> = {}
-        for (let i = 0; i < pipelines.length; i++) {
-            const pkg = pipelines[i]
-            for (let j = 0; j < pkg.layers.length; j++) {
-                const layer = pkg.layers[j]
-                initial[layer.name] = layer.visible ?? true
-            }
-        }
-        setVisibleLayers(initial)
+        setVisibleLayers(buildInitialLayerVisibility(pipelines))
     }, [pipelinesLoaded, pipelines])
 
     // 切换分组展开
@@ -631,18 +1105,18 @@ const GlobalPipelineView: React.FC = () => {
     }
 
     // 切换单个图层可见性
-    const toggleLayer = (layerName: string) => {
-        setVisibleLayers(prev => ({ ...prev, [layerName]: !prev[layerName] }))
+    const toggleLayer = (layerId: string) => {
+        setVisibleLayers(prev => ({ ...prev, [layerId]: !prev[layerId] }))
     }
 
     // 切换整个管线包可见性
     const togglePackageVisibility = (pkg: PipelinePackage) => {
-        const layerNames = pkg.layers.map(l => l.name)
-        const allVisible = layerNames.every(name => visibleLayers[name])
+        const layerIds = pkg.layers.map((layer, index) => getPipelineLayerId(pkg, layer, index))
+        const allVisible = layerIds.every(id => visibleLayers[id])
 
         const newState = { ...visibleLayers }
-        for (let i = 0; i < layerNames.length; i++) {
-            newState[layerNames[i]] = !allVisible
+        for (let i = 0; i < layerIds.length; i++) {
+            newState[layerIds[i]] = !allVisible
         }
         setVisibleLayers(newState)
     }
@@ -653,7 +1127,7 @@ const GlobalPipelineView: React.FC = () => {
         for (let i = 0; i < pipelines.length; i++) {
             const pkg = pipelines[i]
             for (let j = 0; j < pkg.layers.length; j++) {
-                newState[pkg.layers[j].name] = visible
+                newState[getPipelineLayerId(pkg, pkg.layers[j], j)] = visible
             }
         }
         setVisibleLayers(newState)
@@ -661,30 +1135,17 @@ const GlobalPipelineView: React.FC = () => {
 
     // 计算当前显示的管道数据 - 性能优化版
     const pipelineData = useMemo<PipelineData>(() => {
-        const allNodes: PipelineNode[] = []
-        const allLines: PipelineLine[] = []
-
-        // 使用 for 循环替代 forEach + 展开运算符，减少内存分配
-        for (let i = 0; i < pipelines.length; i++) {
-            const pkg = pipelines[i]
-            for (let j = 0; j < pkg.layers.length; j++) {
-                const layer = pkg.layers[j]
-                if (visibleLayers[layer.name]) {
-                    // 手动 push 而不是使用展开运算符
-                    const nodes = layer.nodes
-                    const lines = layer.lines
-                    for (let k = 0; k < nodes.length; k++) {
-                        allNodes.push(nodes[k])
-                    }
-                    for (let k = 0; k < lines.length; k++) {
-                        allLines.push(lines[k])
-                    }
-                }
-            }
-        }
-
-        return { nodes: allNodes, lines: allLines, devices: [] }
+        return buildPipelineDataFromPackages(pipelines, visibleLayers)
     }, [visibleLayers, pipelines])
+
+    useEffect(() => {
+        if (!selectedMapNode) return
+
+        const stillVisible = pipelineData.nodes.some(node => node.id === selectedMapNode.id)
+        if (!stillVisible) {
+            setSelectedMapNode(null)
+        }
+    }, [pipelineData.nodes, selectedMapNode])
 
     // 统计信息
     const stats = useMemo(() => ({
@@ -692,6 +1153,44 @@ const GlobalPipelineView: React.FC = () => {
         pipelines: pipelineData.lines.length,
         groups: pipelines.length
     }), [pipelineData, pipelines])
+
+    const selectedMapNodeMeta = useMemo(() => {
+        if (!selectedMapNode) return null
+
+        const rawType = getNodeRawType(selectedMapNode)
+        const rawTypeLabelMap: Record<string, string> = {
+            source: '气源/首末站',
+            compressor: '压气站',
+            distribution: '分输站',
+            valve: '阀室',
+            junction: '交汇点',
+            storage: '储气设施',
+            shared: '共享站点',
+            other: '其他节点',
+        }
+
+        const junctionKind = getJunctionKind(selectedMapNode)
+        const rawTypeLabel = rawType === 'junction'
+            ? junctionKind === 'major_junction'
+                ? '大枢纽'
+                : '枢纽/交汇点'
+            : rawTypeLabelMap[rawType] || '其他节点'
+
+        return {
+            rawTypeLabel,
+            layerName: typeof selectedMapNode.properties?.layerName === 'string'
+                ? selectedMapNode.properties.layerName
+                : '未标记图层',
+            systemId: typeof selectedMapNode.properties?.systemId === 'string'
+                ? selectedMapNode.properties.systemId
+                : '未标记系统',
+            junctionKindLabel: junctionKind === 'major_junction' ? '大枢纽' : junctionKind === 'junction' ? '普通枢纽' : null,
+        }
+    }, [selectedMapNode])
+
+    const handleMapNodeClick = useCallback((event: { data: PipelineNode }) => {
+        setSelectedMapNode(event.data)
+    }, [])
 
     // ==========================================
     // 将 SCADA 数据直接渲染在对应管网节点上 (无动画/单纯显示)
@@ -755,6 +1254,99 @@ const GlobalPipelineView: React.FC = () => {
         return () => clearInterval(timer)
     }, [mapInstance])
 
+    const fixedScadaPanels = [
+        {
+            id: 'we1',
+            visible: showScada && !isScadaPoppedOut,
+            label: '西气东输一线',
+            accentColor: '#10b981',
+            titleColor: '#a7f3d0',
+            style: { left: `${scadaPos.x}px`, top: `${scadaPos.y}px` },
+            topBarGradient: 'linear-gradient(90deg, #10b981, #059669, #10b981)',
+            borderColor: 'rgba(16,185,129,0.3)',
+            headerBorderColor: 'rgba(16,185,129,0.15)',
+            background: 'linear-gradient(135deg, rgba(10,20,30,0.92) 0%, rgba(15,30,20,0.92) 100%)',
+            isDragging: isDraggingScada,
+            onMouseDown: handleScadaMouseDown,
+            onClose: () => setShowScada(false),
+            data: REAL_SCADA_DATA,
+            closePopOut: closeScadaPopOut,
+            popOut: popOutScada,
+        },
+        {
+            id: 'we2',
+            visible: showWe2Scada,
+            label: '西气东输二线',
+            accentColor: '#3b82f6',
+            titleColor: '#bfdbfe',
+            style: { left: `${we2ScadaPos.x}px`, top: `${we2ScadaPos.y}px` },
+            topBarGradient: 'linear-gradient(90deg, #3b82f6, #2563eb, #3b82f6)',
+            borderColor: 'rgba(59,130,246,0.3)',
+            headerBorderColor: 'rgba(59,130,246,0.15)',
+            background: 'linear-gradient(135deg, rgba(10,15,30,0.92) 0%, rgba(10,20,35,0.92) 100%)',
+            isDragging: isDraggingWe2Scada,
+            onMouseDown: handleWe2ScadaMouseDown,
+            onClose: () => setShowWe2Scada(false),
+            data: WE2_SCADA_DATA,
+            closePopOut: noop,
+            popOut: noop,
+        },
+        {
+            id: 'we1-west',
+            visible: showWe1WestScada,
+            label: '西气东输一线（西段）',
+            accentColor: '#f59e0b',
+            titleColor: '#fde68a',
+            style: { left: `${we1WestPos.x}px`, top: `${we1WestPos.y}px` },
+            topBarGradient: 'linear-gradient(90deg,#f59e0b,#d97706,#f59e0b)',
+            borderColor: 'rgba(245,158,11,0.3)',
+            headerBorderColor: 'rgba(245,158,11,0.15)',
+            background: 'linear-gradient(135deg, rgba(20,15,5,0.93) 0%, rgba(30,20,5,0.93) 100%)',
+            isDragging: isDraggingWe1West,
+            onMouseDown: handleWe1WestMouseDown,
+            onClose: () => setShowWe1WestScada(false),
+            data: WE1_WEST_SCADA_DATA,
+            closePopOut: noop,
+            popOut: noop,
+        },
+        {
+            id: 'cred',
+            visible: showCredScada,
+            label: '中俄东线',
+            accentColor: '#ec4899',
+            titleColor: '#fbcfe8',
+            style: { left: `${credPos.x}px`, top: `${credPos.y}px` },
+            topBarGradient: 'linear-gradient(90deg,#ec4899,#be185d,#ec4899)',
+            borderColor: 'rgba(236,72,153,0.3)',
+            headerBorderColor: 'rgba(236,72,153,0.15)',
+            background: 'linear-gradient(135deg, rgba(25,5,15,0.93) 0%, rgba(35,5,20,0.93) 100%)',
+            isDragging: isDraggingCred,
+            onMouseDown: handleCredMouseDown,
+            onClose: () => setShowCredScada(false),
+            data: CRED_SCADA_DATA,
+            closePopOut: noop,
+            popOut: noop,
+        },
+        {
+            id: 'pt',
+            visible: showPtScada,
+            label: '平泰支干线',
+            accentColor: '#a855f7',
+            titleColor: '#e9d5ff',
+            style: { left: `${ptPos.x}px`, top: `${ptPos.y}px` },
+            topBarGradient: 'linear-gradient(90deg,#a855f7,#7c3aed,#a855f7)',
+            borderColor: 'rgba(168,85,247,0.3)',
+            headerBorderColor: 'rgba(168,85,247,0.15)',
+            background: 'linear-gradient(135deg, rgba(15,5,25,0.93) 0%, rgba(20,5,35,0.93) 100%)',
+            isDragging: isDraggingPt,
+            onMouseDown: handlePtMouseDown,
+            onClose: () => setShowPtScada(false),
+            data: PT_SCADA_DATA,
+            closePopOut: noop,
+            popOut: noop,
+        },
+    ]
+
     return (
         <div
             className="h-screen w-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 overflow-hidden relative"
@@ -774,8 +1366,23 @@ const GlobalPipelineView: React.FC = () => {
                             站场: {stats.stations} | 管道段: {stats.pipelines} | 管线组: {stats.groups}
                         </p>
                     </div>
-                    {/* 右侧工具栏（保留空位或后续拓展） */}
-                    <div className="flex items-center gap-4">
+                    {/* 右侧工具栏 */}
+                    <div className="flex items-center gap-3">
+                        {/* 甪直站历史数据入口 */}
+                        <button
+                            onClick={() => setShowLuzhiHistory(v => !v)}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all"
+                            style={{
+                                background: showLuzhiHistory ? 'rgba(59,130,246,0.25)' : 'rgba(15,23,42,0.6)',
+                                border: `1px solid ${showLuzhiHistory ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.2)'}`,
+                                color: showLuzhiHistory ? '#93c5fd' : '#64748b',
+                            }}
+                            title="甪直分输站历史回溯（试点）"
+                        >
+                            <span className="material-symbols-outlined text-base">history</span>
+                            <span>甪直历史</span>
+                            <span style={{ fontSize: '9px', color: '#10b981', background: 'rgba(16,185,129,0.15)', padding: '0 4px', borderRadius: '4px', border: '1px solid rgba(16,185,129,0.3)' }}>试点</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -784,6 +1391,7 @@ const GlobalPipelineView: React.FC = () => {
             <MapView
                 pipelineData={pipelineData}
                 onLoad={handleMapLoad}
+                onNodeClick={handleMapNodeClick}
             />
 
             {/* 图层控制面板 - 树形结构 */}
@@ -815,9 +1423,9 @@ const GlobalPipelineView: React.FC = () => {
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
                     {pipelines.map(pkg => {
-                        const layerNames = pkg.layers.map(l => l.name)
-                        const isAllVisible = layerNames.every(n => visibleLayers[n])
-                        const isPartialVisible = !isAllVisible && layerNames.some(n => visibleLayers[n])
+                        const layerIds = pkg.layers.map((layer, index) => getPipelineLayerId(pkg, layer, index))
+                        const isAllVisible = layerIds.every(id => visibleLayers[id])
+                        const isPartialVisible = !isAllVisible && layerIds.some(id => visibleLayers[id])
                         const hasBranches = pkg.layers.length > 1
 
                         return (
@@ -855,79 +1463,15 @@ const GlobalPipelineView: React.FC = () => {
                                     </div>
 
                                     {/* 文本标签及额外的弹出按钮 */}
-                                    <div className="flex-1 flex items-center justify-between">
-                                        <span className="text-white font-medium text-sm flex items-center gap-2.5">
+                                    <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
+                                        <span className="min-w-0 text-white font-medium text-sm flex items-center gap-2.5">
                                             <span
-                                                className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]"
+                                                className="shrink-0 w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]"
                                                 style={{ backgroundColor: pkg.color }}
                                             ></span>
-                                            {pkg.name}
+                                            <span className="truncate">{pkg.name}</span>
                                         </span>
-                                        {/* SCADA 面板呼出按钮 */}
-                                        {pkg.name === '西气东输二线' && (
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); setShowWe2Scada(!showWe2Scada); }}
-                                                    className={`transition-colors flex items-center justify-center w-6 h-6 rounded hover:bg-white/10 ${showWe2Scada ? 'text-blue-400 hover:text-blue-300' : 'text-gray-500 hover:text-gray-300'}`}
-                                                    title={showWe2Scada ? "隐藏西二线参数表" : "显示西二线参数表"}
-                                                >
-                                                    <span className="material-symbols-outlined text-sm">{showWe2Scada ? 'visibility' : 'visibility_off'}</span>
-                                                </button>
-                                            </div>
-                                        )}
-                                        {pkg.name === '西气东输一线' && !isScadaPoppedOut && (
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); setShowScada(!showScada); setShowWe1WestScada(!showWe1WestScada); setShowTrendChart(!showTrendChart); }}
-                                                    className={`transition-colors flex items-center justify-center w-6 h-6 rounded hover:bg-white/10 ${showScada ? 'text-emerald-400 hover:text-emerald-300' : 'text-gray-500 hover:text-gray-300'}`}
-                                                    title={showScada ? "隐藏西一线面板" : "显示西一线面板"}
-                                                >
-                                                    <span className="material-symbols-outlined text-sm">{showScada ? 'visibility' : 'visibility_off'}</span>
-                                                </button>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); popOutScada(400, 500); setShowScada(false); }}
-                                                    className="text-gray-400 hover:text-white transition-colors flex items-center justify-center w-6 h-6 rounded hover:bg-white/10"
-                                                    title="弹出独立窗口"
-                                                >
-                                                    <span className="material-symbols-outlined text-sm">open_in_new</span>
-                                                </button>
-                                            </div>
-                                        )}
-                                        {pkg.name === '中俄东线' && (
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); setShowCredScada(!showCredScada); }}
-                                                    className={`transition-colors flex items-center justify-center w-6 h-6 rounded hover:bg-white/10 ${showCredScada ? 'text-pink-400 hover:text-pink-300' : 'text-gray-500 hover:text-gray-300'}`}
-                                                    title={showCredScada ? "隐藏中俄东线参数表" : "显示中俄东线参数表"}
-                                                >
-                                                    <span className="material-symbols-outlined text-sm">{showCredScada ? 'visibility' : 'visibility_off'}</span>
-                                                </button>
-                                            </div>
-                                        )}
-                                        {pkg.name === '平泰支干线' && (
-                                            <div className="flex items-center gap-1">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); setShowPtScada(!showPtScada); }}
-                                                    className={`transition-colors flex items-center justify-center w-6 h-6 rounded hover:bg-white/10 ${showPtScada ? 'text-purple-400 hover:text-purple-300' : 'text-gray-500 hover:text-gray-300'}`}
-                                                    title={showPtScada ? "隐藏平泰参数表" : "显示平泰参数表"}
-                                                >
-                                                    <span className="material-symbols-outlined text-sm">{showPtScada ? 'visibility' : 'visibility_off'}</span>
-                                                </button>
-                                            </div>
-                                        )}
-                                        {/* 新增 7 条管线的 SCADA 按钮（统一通过 EXTRA_SCADA_PANELS 配置驱动） */}
-                                        {EXTRA_SCADA_PANELS.filter(p => pkg.name.includes(p.label) || (p.id === 'zg' && pkg.name === '中贵线') || (p.id === 'zm' && pkg.name === '中缅线') || (p.id === 'gn' && pkg.name === '广南支干线') || (p.id === 'gs' && pkg.name === '广深支干线') || (p.id === 'sj4' && pkg.name === '陕京四线') || (p.id === 'sj3' && pkg.name === '陕京三线') || (p.id === 'ncsh' && pkg.name.includes('南昌')) || (p.id === 'jxlz' && pkg.name.includes('嘉兴')) || (p.id === 'sj2' && pkg.name === '陕京二线') || (p.id === 'we3' && pkg.name.includes('三线'))).map(panel => (
-                                            <div key={panel.id} className="flex items-center gap-1">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); toggleExtraScada(panel.id); }}
-                                                    className={`transition-colors flex items-center justify-center w-6 h-6 rounded hover:bg-white/10 ${extraScadaVisible[panel.id] ? 'hover:opacity-80' : 'text-gray-500 hover:text-gray-300'}`}
-                                                    style={extraScadaVisible[panel.id] ? { color: panel.color } : undefined}
-                                                    title={`${extraScadaVisible[panel.id] ? '隐藏' : '显示'}${panel.label}参数表`}
-                                                >
-                                                    <span className="material-symbols-outlined text-sm">{extraScadaVisible[panel.id] ? 'visibility' : 'visibility_off'}</span>
-                                                </button>
-                                            </div>
-                                        ))}
+                                        {renderPipelineActions(pkg)}
                                     </div>
                                 </div>
 
@@ -936,16 +1480,18 @@ const GlobalPipelineView: React.FC = () => {
                                     <div className="ml-[22px] mt-1 mb-2 space-y-1 pl-4 border-l border-gray-700/60 relative">
                                         {/* 顶部辅助渐变线 */}
                                         <div className="absolute top-0 bottom-0 left-[-1px] w-px bg-gradient-to-b from-gray-700/60 to-transparent"></div>
-                                        {pkg.layers.map(layer => (
+                                        {pkg.layers.map((layer, layerIndex) => {
+                                            const layerId = getPipelineLayerId(pkg, layer, layerIndex)
+                                            return (
                                             <div
-                                                key={layer.name}
+                                                key={layerId}
                                                 className="flex items-center gap-2 p-1.5 hover:bg-white/5 rounded cursor-pointer select-none group/item"
-                                                onClick={() => toggleLayer(layer.name)}
+                                                onClick={() => toggleLayer(layerId)}
                                             >
                                                 {/* 自定义复选框 - 子图层 */}
                                                 <div className="relative flex items-center justify-center w-[16px] h-[16px]">
-                                                    <div className={`absolute inset-0 rounded-[3px] border ${visibleLayers[layer.name] ? 'border-[#137fec] bg-[#137fec]' : 'border-gray-500 bg-[#1c2430] group-hover/item:border-gray-400'} transition-colors`}></div>
-                                                    {visibleLayers[layer.name] && (
+                                                    <div className={`absolute inset-0 rounded-[3px] border ${visibleLayers[layerId] ? 'border-[#137fec] bg-[#137fec]' : 'border-gray-500 bg-[#1c2430] group-hover/item:border-gray-400'} transition-colors`}></div>
+                                                    {visibleLayers[layerId] && (
                                                         <svg className="absolute w-[10px] h-[10px] text-white pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                                             <polyline points="20 6 9 17 4 12"></polyline>
                                                         </svg>
@@ -955,11 +1501,12 @@ const GlobalPipelineView: React.FC = () => {
                                                     className={`w-1.5 h-1.5 rounded-full ${layer.type === 'trunk' ? 'opacity-100 shadow-[0_0_4px_rgba(0,0,0,0.5)]' : 'opacity-60'} transition-opacity`}
                                                     style={{ backgroundColor: pkg.color }}
                                                 ></span>
-                                                <span className={`text-sm transition-colors ${visibleLayers[layer.name] ? 'text-gray-200 font-medium' : 'text-gray-400'}`}>
+                                                <span className={`text-sm transition-colors ${visibleLayers[layerId] ? 'text-gray-200 font-medium' : 'text-gray-400'}`}>
                                                     {layer.type === 'trunk' ? '干线' : layer.name.replace('支线', '')}
                                                 </span>
                                             </div>
-                                        ))}
+                                            )
+                                        })}
                                     </div>
                                 )}
                             </div>
@@ -968,243 +1515,109 @@ const GlobalPipelineView: React.FC = () => {
                 </div>
             </div>
 
-
+            {/* ====== 甪直分输站 · 历史回溯面板（试点） ====== */}
+            {showLuzhiHistory && (
+                <div
+                    className="absolute z-20"
+                    style={{ left: `${luzhiPos.x}px`, top: `${luzhiPos.y}px` }}
+                >
+                    <LuzhiHistoryPanel
+                        onClose={() => setShowLuzhiHistory(false)}
+                        onMouseDown={handleLuzhiMouseDown}
+                        isDragging={isDraggingLuzhi}
+                    />
+                </div>
+            )}
 
             {/* ====== 西一线 SCADA 浮动参数表 (支持弹窗新窗口) ====== */}
             {isScadaPoppedOut && (
+
                 <div className="hidden">{/* 主页面隐藏该面板，在 Popup 窗口中渲染 */}</div>
             )}
-            {showScada && !isScadaPoppedOut && (
-                <div
-                    className={`absolute z-10 flex flex-col select-none overflow-hidden ${isDraggingScada ? 'cursor-grabbing' : ''}`}
-                    style={{
-                        left: `${scadaPos.x}px`,
-                        top: `${scadaPos.y}px`,
-                        width: '480px',
-                        height: '310px',
-                        background: 'linear-gradient(135deg, rgba(10,20,30,0.92) 0%, rgba(15,30,20,0.92) 100%)',
-                        backdropFilter: 'blur(12px)',
-                        borderRadius: '10px',
-                        border: '1px solid rgba(16,185,129,0.3)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 0 1px rgba(16,185,129,0.05)',
-                    }}
+            {fixedScadaPanels.filter(panel => panel.visible).map(panel => (
+                <ScadaFloatingPanel
+                    key={panel.id}
+                    label={panel.label}
+                    accentColor={panel.accentColor}
+                    titleColor={panel.titleColor}
+                    style={panel.style}
+                    topBarGradient={panel.topBarGradient}
+                    borderColor={panel.borderColor}
+                    headerBorderColor={panel.headerBorderColor}
+                    background={panel.background}
+                    isDragging={panel.isDragging}
+                    onMouseDown={panel.onMouseDown}
+                    onClose={panel.onClose}
                 >
-                    {/* 头部装饰条 */}
-                    <div style={{ height: '3px', background: 'linear-gradient(90deg, #10b981, #059669, #10b981)', borderRadius: '10px 10px 0 0', opacity: 0.9 }} />
-                    <div
-                        className={`px-4 py-2.5 flex justify-between items-center shrink-0 cursor-grab active:cursor-grabbing`}
-                        style={{ borderBottom: '1px solid rgba(16,185,129,0.15)' }}
-                        onMouseDown={handleScadaMouseDown}
-                    >
-                        <h3 className="m-0 text-sm font-bold flex items-center gap-2" style={{ color: '#a7f3d0' }}>
-                            <span className="material-symbols-outlined text-lg" style={{ color: '#10b981' }}>sensors</span>
-                            <span>西气东输一线</span>
-                            <span style={{ color: '#10b981', fontSize: '10px', fontWeight: 'normal', background: 'rgba(16,185,129,0.15)', padding: '1px 6px', borderRadius: '9999px', border: '1px solid rgba(16,185,129,0.3)' }}>SCADA 实时</span>
-                        </h3>
-                        <div className="flex gap-1" onMouseDown={e => e.stopPropagation()}>
-                            <button onClick={() => setShowScada(false)} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10" title="关闭">
-                                <span className="material-symbols-outlined text-sm">close</span>
-                            </button>
-                        </div>
-                    </div>
-                    <ScadaTableContent data={REAL_SCADA_DATA} isPoppedOut={false} closePopOut={closeScadaPopOut} popOut={popOutScada} accentColor="#10b981" onStationClick={setHistoryStation} />
-                </div>
-            )}
-
-            {/* ====== 西二线 SCADA 浮动参数表 ====== */}
-            {showWe2Scada && (
-                <div
-                    className={`absolute z-10 flex flex-col select-none overflow-hidden ${isDraggingWe2Scada ? 'cursor-grabbing' : ''}`}
-                    style={{
-                        left: `${we2ScadaPos.x}px`,
-                        top: `${we2ScadaPos.y}px`,
-                        width: '480px',
-                        height: '310px',
-                        background: 'linear-gradient(135deg, rgba(10,15,30,0.92) 0%, rgba(10,20,35,0.92) 100%)',
-                        backdropFilter: 'blur(12px)',
-                        borderRadius: '10px',
-                        border: '1px solid rgba(59,130,246,0.3)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05), 0 0 0 1px rgba(59,130,246,0.05)',
-                    }}
-                >
-                    {/* 头部装饰条 */}
-                    <div style={{ height: '3px', background: 'linear-gradient(90deg, #3b82f6, #2563eb, #3b82f6)', borderRadius: '10px 10px 0 0', opacity: 0.9 }} />
-                    <div
-                        className={`px-4 py-2.5 flex justify-between items-center shrink-0 cursor-grab active:cursor-grabbing`}
-                        style={{ borderBottom: '1px solid rgba(59,130,246,0.15)' }}
-                        onMouseDown={handleWe2ScadaMouseDown}
-                    >
-                        <h3 className="m-0 text-sm font-bold flex items-center gap-2" style={{ color: '#bfdbfe' }}>
-                            <span className="material-symbols-outlined text-lg" style={{ color: '#3b82f6' }}>sensors</span>
-                            <span>西气东输二线</span>
-                            <span style={{ color: '#3b82f6', fontSize: '10px', fontWeight: 'normal', background: 'rgba(59,130,246,0.15)', padding: '1px 6px', borderRadius: '9999px', border: '1px solid rgba(59,130,246,0.3)' }}>SCADA 实时</span>
-                        </h3>
-                        <div className="flex gap-1" onMouseDown={e => e.stopPropagation()}>
-                            <button onClick={() => setShowWe2Scada(false)} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10" title="关闭">
-                                <span className="material-symbols-outlined text-sm">close</span>
-                            </button>
-                        </div>
-                    </div>
-                    <ScadaTableContent data={WE2_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#3b82f6" onStationClick={setHistoryStation} />
-                </div>
-            )}
-
-            {/* ====== 西一线西段 SCADA 浮动参数表（主色：黄橙/amber） ====== */}
-            {showWe1WestScada && (
-                <div
-                    className={`absolute z-10 flex flex-col select-none overflow-hidden ${isDraggingWe1West ? 'cursor-grabbing' : ''}`}
-                    style={{
-                        left: `${we1WestPos.x}px`, top: `${we1WestPos.y}px`,
-                        width: '480px', height: '310px',
-                        background: 'linear-gradient(135deg, rgba(20,15,5,0.93) 0%, rgba(30,20,5,0.93) 100%)',
-                        backdropFilter: 'blur(12px)', borderRadius: '10px',
-                        border: '1px solid rgba(245,158,11,0.3)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
-                    }}
-                >
-                    <div style={{ height: '3px', background: 'linear-gradient(90deg,#f59e0b,#d97706,#f59e0b)', borderRadius: '10px 10px 0 0' }} />
-                    <div className="px-4 py-2.5 flex justify-between items-center shrink-0 cursor-grab active:cursor-grabbing" style={{ borderBottom: '1px solid rgba(245,158,11,0.15)' }} onMouseDown={handleWe1WestMouseDown}>
-                        <h3 className="m-0 text-sm font-bold flex items-center gap-2" style={{ color: '#fde68a' }}>
-                            <span className="material-symbols-outlined text-lg" style={{ color: '#f59e0b' }}>sensors</span>
-                            <span>西气东输一线（西段）</span>
-                            <span style={{ color: '#f59e0b', fontSize: '10px', fontWeight: 'normal', background: 'rgba(245,158,11,0.15)', padding: '1px 6px', borderRadius: '9999px', border: '1px solid rgba(245,158,11,0.3)' }}>SCADA 实时</span>
-                        </h3>
-                        <div className="flex gap-1" onMouseDown={e => e.stopPropagation()}>
-                            <button onClick={() => setShowWe1WestScada(false)} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10" title="关闭">
-                                <span className="material-symbols-outlined text-sm">close</span>
-                            </button>
-                        </div>
-                    </div>
-                    <ScadaTableContent data={WE1_WEST_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#f59e0b" onStationClick={setHistoryStation} />
-                </div>
-            )}
-
-            {/* ====== 中俄东线 SCADA 浮动参数表（主色：玫红） ====== */}
-            {showCredScada && (
-                <div
-                    className={`absolute z-10 flex flex-col select-none overflow-hidden ${isDraggingCred ? 'cursor-grabbing' : ''}`}
-                    style={{
-                        left: `${credPos.x}px`, top: `${credPos.y}px`,
-                        width: '480px', height: '310px',
-                        background: 'linear-gradient(135deg, rgba(25,5,15,0.93) 0%, rgba(35,5,20,0.93) 100%)',
-                        backdropFilter: 'blur(12px)', borderRadius: '10px',
-                        border: '1px solid rgba(236,72,153,0.3)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
-                    }}
-                >
-                    <div style={{ height: '3px', background: 'linear-gradient(90deg,#ec4899,#be185d,#ec4899)', borderRadius: '10px 10px 0 0' }} />
-                    <div className="px-4 py-2.5 flex justify-between items-center shrink-0 cursor-grab active:cursor-grabbing" style={{ borderBottom: '1px solid rgba(236,72,153,0.15)' }} onMouseDown={handleCredMouseDown}>
-                        <h3 className="m-0 text-sm font-bold flex items-center gap-2" style={{ color: '#fbcfe8' }}>
-                            <span className="material-symbols-outlined text-lg" style={{ color: '#ec4899' }}>sensors</span>
-                            <span>中俄东线</span>
-                            <span style={{ color: '#ec4899', fontSize: '10px', fontWeight: 'normal', background: 'rgba(236,72,153,0.15)', padding: '1px 6px', borderRadius: '9999px', border: '1px solid rgba(236,72,153,0.3)' }}>SCADA 实时</span>
-                        </h3>
-                        <div className="flex gap-1" onMouseDown={e => e.stopPropagation()}>
-                            <button onClick={() => setShowCredScada(false)} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10" title="关闭">
-                                <span className="material-symbols-outlined text-sm">close</span>
-                            </button>
-                        </div>
-                    </div>
-                    <ScadaTableContent data={CRED_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#ec4899" onStationClick={setHistoryStation} />
-                </div>
-            )}
-
-            {/* ====== 平泰支干线 SCADA 浮动参数表（主色：紫色） ====== */}
-            {showPtScada && (
-                <div
-                    className={`absolute z-10 flex flex-col select-none overflow-hidden ${isDraggingPt ? 'cursor-grabbing' : ''}`}
-                    style={{
-                        left: `${ptPos.x}px`, top: `${ptPos.y}px`,
-                        width: '480px', height: '310px',
-                        background: 'linear-gradient(135deg, rgba(15,5,25,0.93) 0%, rgba(20,5,35,0.93) 100%)',
-                        backdropFilter: 'blur(12px)', borderRadius: '10px',
-                        border: '1px solid rgba(168,85,247,0.3)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
-                    }}
-                >
-                    <div style={{ height: '3px', background: 'linear-gradient(90deg,#a855f7,#7c3aed,#a855f7)', borderRadius: '10px 10px 0 0' }} />
-                    <div className="px-4 py-2.5 flex justify-between items-center shrink-0 cursor-grab active:cursor-grabbing" style={{ borderBottom: '1px solid rgba(168,85,247,0.15)' }} onMouseDown={handlePtMouseDown}>
-                        <h3 className="m-0 text-sm font-bold flex items-center gap-2" style={{ color: '#e9d5ff' }}>
-                            <span className="material-symbols-outlined text-lg" style={{ color: '#a855f7' }}>sensors</span>
-                            <span>平泰支干线</span>
-                            <span style={{ color: '#a855f7', fontSize: '10px', fontWeight: 'normal', background: 'rgba(168,85,247,0.15)', padding: '1px 6px', borderRadius: '9999px', border: '1px solid rgba(168,85,247,0.3)' }}>SCADA 实时</span>
-                        </h3>
-                        <div className="flex gap-1" onMouseDown={e => e.stopPropagation()}>
-                            <button onClick={() => setShowPtScada(false)} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10" title="关闭">
-                                <span className="material-symbols-outlined text-sm">close</span>
-                            </button>
-                        </div>
-                    </div>
-                    <ScadaTableContent data={PT_SCADA_DATA} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor="#a855f7" onStationClick={setHistoryStation} />
-                </div>
-            )}
+                    <ScadaTableContent
+                        data={panel.data}
+                        isPoppedOut={false}
+                        closePopOut={panel.closePopOut}
+                        popOut={panel.popOut}
+                        accentColor={panel.accentColor}
+                        onMetricClick={handleMetricClick}
+                    />
+                </ScadaFloatingPanel>
+            ))}
 
             {/* ====== 所有管线 SCADA 浮动面板（统一循环渲染 + 弹出独立窗口） ====== */}
             {EXTRA_SCADA_PANELS.map((panel, idx) => (
                 extraScadaVisible[panel.id] && (
-                    <div
+                    <ScadaFloatingPanel
                         key={panel.id}
-                        className="absolute z-10 flex flex-col select-none overflow-hidden"
+                        label={panel.label}
+                        accentColor={panel.color}
+                        titleColor={panel.titleColor}
                         style={{
                             right: `${20 + (idx % 3) * 500}px`,
                             bottom: `${20 + Math.floor(idx / 3) * 340}px`,
-                            width: '480px', height: '310px',
-                            background: `linear-gradient(135deg, ${panel.bgFrom} 0%, ${panel.bgTo} 100%)`,
-                            backdropFilter: 'blur(12px)', borderRadius: '10px',
-                            border: `1px solid ${panel.color}33`,
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
                         }}
+                        topBarGradient={`linear-gradient(90deg,${panel.color},${panel.color}88,${panel.color})`}
+                        borderColor={`${panel.color}33`}
+                        headerBorderColor={`${panel.color}22`}
+                        background={`linear-gradient(135deg, ${panel.bgFrom} 0%, ${panel.bgTo} 100%)`}
+                        onClose={() => toggleExtraScada(panel.id)}
+                        actions={
+                            <button
+                                onClick={() => {
+                                    const w = 520
+                                    const h = 500
+                                    const left = window.screenX + (window.outerWidth - w) / 2
+                                    const top = window.screenY + (window.outerHeight - h) / 2
+                                    window.open(
+                                        `/#/popout/scada?id=${panel.id}`,
+                                        `scada-${panel.id}`,
+                                        `width=${w},height=${h},left=${left},top=${top}`
+                                    )
+                                }}
+                                className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10"
+                                title="弹出独立窗口"
+                            >
+                                <span className="material-symbols-outlined text-sm">open_in_new</span>
+                            </button>
+                        }
                     >
-                        <div style={{ height: '3px', background: `linear-gradient(90deg,${panel.color},${panel.color}88,${panel.color})`, borderRadius: '10px 10px 0 0' }} />
-                        <div className="px-4 py-2.5 flex justify-between items-center shrink-0" style={{ borderBottom: `1px solid ${panel.color}22` }}>
-                            <h3 className="m-0 text-sm font-bold flex items-center gap-2" style={{ color: panel.titleColor }}>
-                                <span className="material-symbols-outlined text-lg" style={{ color: panel.color }}>sensors</span>
-                                <span>{panel.label}</span>
-                                <span style={{ color: panel.color, fontSize: '10px', fontWeight: 'normal', background: `${panel.color}22`, padding: '1px 6px', borderRadius: '9999px', border: `1px solid ${panel.color}44` }}>SCADA 实时</span>
-                            </h3>
-                            <div className="flex gap-1">
-                                {/* 弹出独立窗口按钮 */}
-                                <button
-                                    onClick={() => {
-                                        const w = 520, h = 500
-                                        const left = window.screenX + (window.outerWidth - w) / 2
-                                        const top = window.screenY + (window.outerHeight - h) / 2
-                                        window.open(
-                                            `/#/popout/scada?id=${panel.id}`,
-                                            `scada-${panel.id}`,
-                                            `width=${w},height=${h},left=${left},top=${top}`
-                                        )
-                                    }}
-                                    className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10"
-                                    title="弹出独立窗口"
-                                >
-                                    <span className="material-symbols-outlined text-sm">open_in_new</span>
-                                </button>
-                                <button onClick={() => toggleExtraScada(panel.id)} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10" title="关闭">
-                                    <span className="material-symbols-outlined text-sm">close</span>
-                                </button>
-                            </div>
-                        </div>
                         {Object.keys(panel.data).length > 0 ? (
-                            <ScadaTableContent data={panel.data} isPoppedOut={false} closePopOut={() => {}} popOut={() => {}} accentColor={panel.color} />
+                            <ScadaTableContent
+                                data={panel.data}
+                                isPoppedOut={false}
+                                closePopOut={noop}
+                                popOut={noop}
+                                accentColor={panel.color}
+                            />
                         ) : (
-                            <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
-                                <div className="text-center">
-                                    <span className="material-symbols-outlined text-3xl block mb-2" style={{ color: `${panel.color}66` }}>database</span>
-                                    <p>暂无 SCADA 数据</p>
-                                    <p className="text-xs text-gray-600 mt-1">待导入实际运行参数</p>
-                                </div>
-                            </div>
+                            <EmptyScadaState color={panel.color} label={panel.label} />
                         )}
-                    </div>
+                    </ScadaFloatingPanel>
                 )
             ))}
 
-            {/* ====== 西气东输一线 沿线压力趋势图 ====== */}
-            {showTrendChart && (
+            {/* ====== 通用里程进出站压力图 ====== */}
+            {activeTrendChart && (
                 <div style={{ left: `${trendPos.x}px`, top: `${trendPos.y}px`, position: 'absolute', zIndex: 20 }}>
                     <PressureTrendChart
-                        onClose={() => setShowTrendChart(false)}
+                        config={activeTrendChart}
+                        onClose={() => setActiveTrendPipelineId(null)}
                         onMouseDown={handleTrendMouseDown}
                         isDragging={isDraggingTrend}
                     />
@@ -1223,23 +1636,82 @@ const GlobalPipelineView: React.FC = () => {
                 </div>
             </div>
 
-            {/* SCADA 历史曲线浮动面板 */}
-            {historyStation && (
+            {/* SCADA 历史曲线浮动面板 — 点击压力/温度值弹出 */}
+            {historyTarget && (
                 <div
                     className="absolute z-30"
                     style={{ left: historyChartPos.x, top: historyChartPos.y }}
                 >
                     <ScadaHistoryChart
-                        stationName={historyStation}
-                        onClose={() => setHistoryStation(null)}
+                        stationName={historyTarget.stationName}
+                        displayName={historyTarget.stationName}
+                        metricType={historyTarget.metricType}
+                        baseValue={historyTarget.baseValue}
+                        onClose={() => setHistoryTarget(null)}
                         onMouseDown={handleHistoryMouseDown}
                         isDragging={isDraggingHistory}
                     />
                 </div>
             )}
+
+            {selectedMapNode && selectedMapNodeMeta && (
+                <div className="absolute top-24 right-6 z-20 w-[340px] bg-[#0c1218]/95 backdrop-blur-md rounded-xl border border-cyan-500/20 shadow-2xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-cyan-500/20 bg-[#0f1722] flex items-center justify-between">
+                        <div>
+                            <h3 className="text-sm font-semibold text-white">{selectedMapNode.name}</h3>
+                            <p className="text-[11px] text-gray-400 mt-0.5">地图节点详情</p>
+                        </div>
+                        <button
+                            onClick={() => setSelectedMapNode(null)}
+                            className="text-gray-400 hover:text-white transition-colors"
+                        >
+                            <span className="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+
+                    <div className="p-4 space-y-3 text-sm">
+                        <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-2">
+                            <p className="text-xs text-gray-400">类型：<span className="text-gray-200">{selectedMapNodeMeta.rawTypeLabel}</span></p>
+                            {selectedMapNodeMeta.junctionKindLabel && (
+                                <p className="text-xs text-gray-400">枢纽等级：<span className="text-gray-200">{selectedMapNodeMeta.junctionKindLabel}</span></p>
+                            )}
+                            <p className="text-xs text-gray-400">图层：<span className="text-gray-200">{selectedMapNodeMeta.layerName}</span></p>
+                            <p className="text-xs text-gray-400">系统：<span className="text-gray-200">{selectedMapNodeMeta.systemId}</span></p>
+                            <p className="text-xs text-gray-400">
+                                坐标：<span className="text-gray-200">{selectedMapNode.coordinate.longitude.toFixed(4)}, {selectedMapNode.coordinate.latitude.toFixed(4)}</span>
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => {
+                                    if (mapInstance) {
+                                        mapInstance.setZoomAndCenter(13, [selectedMapNode.coordinate.longitude, selectedMapNode.coordinate.latitude])
+                                    }
+                                }}
+                                className="bg-gray-800 hover:bg-gray-700 text-gray-200 py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                            >
+                                <span className="material-symbols-outlined text-sm">my_location</span>地图定位
+                            </button>
+                            <button
+                                onClick={() => {
+                                    navigate(`/map-topology?focusNode=${encodeURIComponent(selectedMapNode.id)}`)
+                                    setSelectedMapNode(null)
+                                }}
+                                className="bg-cyan-700/80 hover:bg-cyan-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                            >
+                                <span className="material-symbols-outlined text-sm">conversion_path</span>地图拓扑
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
+
+// 可点击单元格样式
+const clickableCellStyle: React.CSSProperties = { cursor: 'pointer', borderRadius: '4px', transition: 'background 0.15s, box-shadow 0.15s' }
 
 // 抽取 SCADA 内容渲染部分，供复用
 const ScadaTableContent: React.FC<{
@@ -1249,32 +1721,42 @@ const ScadaTableContent: React.FC<{
     popOut: (w: number, h: number) => void
     accentColor?: string
     onStationClick?: (stationName: string) => void
-}> = ({ data, isPoppedOut, closePopOut, accentColor = '#10b981', onStationClick }) => {
-    // 根据 accentColor 生成进入亮色（将色调变亮一点作为进入压力列）
-    // 映射表：升色额色 → 进入色 (accentColor 相对是“出射2”，进入用更亮变体)
+    onMetricClick?: (stationName: string, metricType: 'pressure' | 'temperature', baseValue: number) => void
+}> = ({ data, isPoppedOut, closePopOut, accentColor = '#10b981', onStationClick, onMetricClick }) => {
     const inPressureColor = accentColor === '#10b981' ? '#34d399'
         : accentColor === '#3b82f6' ? '#60a5fa'
         : accentColor === '#f59e0b' ? '#fcd34d'
         : accentColor === '#ec4899' ? '#f9a8d4'
         : accentColor === '#a855f7' ? '#d8b4fe'
-        : '#a3e635'  // fallback
+        : '#a3e635'
 
-    // 压力异常判断阈值（MPa）
     const isLowPressure = (p: number) => p < 5.0
     const isHighPressure = (p: number) => p > 10.5
     const getPressureColor = (p: number, baseColor: string) => {
-        if (isLowPressure(p)) return '#f97316' // 橙色警告
-        if (isHighPressure(p)) return '#ef4444' // 红色高压
+        if (isLowPressure(p)) return '#f97316'
+        if (isHighPressure(p)) return '#ef4444'
         return baseColor
     }
 
-    // 将 accentColor (hex) 转换为 rgba 背景色
     const rowBgAccent = accentColor.replace('#', '')
     function hexToRgb(hex: string) {
         const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16)
         return `${r},${g},${b}`
     }
     const rgb = hexToRgb(rowBgAccent)
+
+    // 可点击单元格悬停效果
+    const handleCellHover = (e: React.MouseEvent<HTMLTableCellElement>, entering: boolean) => {
+        if (!onMetricClick) return
+        const el = e.currentTarget
+        if (entering) {
+            el.style.background = 'rgba(255,255,255,0.08)'
+            el.style.boxShadow = 'inset 0 0 0 1px rgba(255,255,255,0.15)'
+        } else {
+            el.style.background = ''
+            el.style.boxShadow = ''
+        }
+    }
 
     return (
         <div className={`flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar ${isPoppedOut ? 'h-full w-full p-4 text-white' : 'p-2'}`}
@@ -1291,7 +1773,12 @@ const ScadaTableContent: React.FC<{
                     </button>
                 </div>
             )}
-            {/* 优化后的列表式表格 */}
+            {onMetricClick && (
+                <div style={{ fontSize: '10px', color: '#475569', padding: '2px 6px', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>touch_app</span>
+                    <span>点击压力/温度值查看历史回溯曲线</span>
+                </div>
+            )}
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 3px', fontSize: '12px' }}>
                 <thead>
                     <tr style={{ color: '#64748b', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -1306,42 +1793,44 @@ const ScadaTableContent: React.FC<{
                 <tbody>
                     {(Object.entries(data) as [string, ScadaRecord][]).map(([name, d]) => {
                         const isCompressor = d.type === 'compressor'
-                        const rowBg = isCompressor
-                            ? `rgba(${rgb},0.08)`
-                            : 'rgba(255,255,255,0.02)'
+                        const rowBg = isCompressor ? `rgba(${rgb},0.08)` : 'rgba(255,255,255,0.02)'
                         const nameBold = isCompressor
                         const typeLabel = d.type === 'compressor' ? '压' : d.type === 'distribution' ? '分' : '阀'
                         const typeBg = d.type === 'compressor' ? `rgba(${rgb},0.22)` : 'rgba(100,116,139,0.2)'
                         const typeColor = d.type === 'compressor' ? accentColor : '#94a3b8'
 
                         return (
-                            <tr
-                                key={name}
-                                style={{ background: rowBg, borderRadius: '6px', transition: 'background 0.15s' }}
+                            <tr key={name} style={{ background: rowBg, borderRadius: '6px', transition: 'background 0.15s' }}
                                 onMouseEnter={e => (e.currentTarget.style.background = `rgba(${rgb},0.14)`)}
-                                onMouseLeave={e => (e.currentTarget.style.background = rowBg)}
-                            >
-                                <td
-                                    style={{ padding: '5px 6px', borderRadius: '6px 0 0 6px', fontWeight: nameBold ? 600 : 400, color: '#e2e8f0', maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: onStationClick ? 'pointer' : 'default' }}
-                                    title={`${name}${onStationClick ? ' — 点击查看历史曲线' : ''}`}
-                                    onClick={() => onStationClick?.(name)}
-                                >
+                                onMouseLeave={e => (e.currentTarget.style.background = rowBg)}>
+                                <td style={{ padding: '5px 6px', borderRadius: '6px 0 0 6px', fontWeight: nameBold ? 600 : 400, color: '#e2e8f0', maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>
                                     {name}
-                                    {onStationClick && <span style={{ fontSize: '9px', color: '#3b82f6', marginLeft: '3px', opacity: 0.7 }}>📈</span>}
                                 </td>
                                 <td style={{ padding: '5px 4px', textAlign: 'center' }}>
                                     <span style={{ fontSize: '10px', background: typeBg, color: typeColor, padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>{typeLabel}</span>
                                 </td>
-                                <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', color: getPressureColor(d.inP, inPressureColor), fontWeight: 600 }}>
+                                <td style={{ ...clickableCellStyle, padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', color: getPressureColor(d.inP, inPressureColor), fontWeight: 600 }}
+                                    title={onMetricClick ? `${name} 进站压力 ${d.inP.toFixed(3)} MPa，点击查看曲线` : undefined}
+                                    onClick={() => onMetricClick?.(name, 'pressure', d.inP)}
+                                    onMouseEnter={e => handleCellHover(e, true)} onMouseLeave={e => handleCellHover(e, false)}>
                                     {d.inP.toFixed(3)}
                                 </td>
-                                <td style={{ padding: '5px 4px', textAlign: 'center', color: '#f97316', fontSize: '11px' }}>
+                                <td style={{ ...clickableCellStyle, padding: '5px 4px', textAlign: 'center', color: '#f97316', fontSize: '11px' }}
+                                    title={onMetricClick && d.inT != null ? `${name} 进站温度 ${d.inT}°C，点击查看曲线` : undefined}
+                                    onClick={() => d.inT != null && onMetricClick?.(name, 'temperature', d.inT)}
+                                    onMouseEnter={e => d.inT != null && handleCellHover(e, true)} onMouseLeave={e => handleCellHover(e, false)}>
                                     {d.inT != null ? `${d.inT}°` : '—'}
                                 </td>
-                                <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', color: getPressureColor(d.outP, accentColor), fontWeight: 600 }}>
+                                <td style={{ ...clickableCellStyle, padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', color: getPressureColor(d.outP, accentColor), fontWeight: 600 }}
+                                    title={onMetricClick ? `${name} 出站压力 ${d.outP.toFixed(3)} MPa，点击查看曲线` : undefined}
+                                    onClick={() => onMetricClick?.(name, 'pressure', d.outP)}
+                                    onMouseEnter={e => handleCellHover(e, true)} onMouseLeave={e => handleCellHover(e, false)}>
                                     {d.outP.toFixed(3)}
                                 </td>
-                                <td style={{ padding: '5px 4px', textAlign: 'center', color: '#fb923c', fontSize: '11px', borderRadius: '0 6px 6px 0' }}>
+                                <td style={{ ...clickableCellStyle, padding: '5px 4px', textAlign: 'center', color: '#fb923c', fontSize: '11px', borderRadius: '0 6px 6px 0' }}
+                                    title={onMetricClick && d.outT != null ? `${name} 出站温度 ${d.outT}°C，点击查看曲线` : undefined}
+                                    onClick={() => d.outT != null && onMetricClick?.(name, 'temperature', d.outT)}
+                                    onMouseEnter={e => d.outT != null && handleCellHover(e, true)} onMouseLeave={e => handleCellHover(e, false)}>
                                     {d.outT != null ? `${d.outT}°` : '—'}
                                 </td>
                             </tr>
@@ -1351,16 +1840,6 @@ const ScadaTableContent: React.FC<{
             </table>
         </div>
     )
-}
-
-// 所有 SCADA 数据的查找表（供独立弹窗路由动态加载）
-const SCADA_DATA_MAP: Record<string, { label: string; data: Record<string, ScadaRecord>; color: string }> = {
-    'we1': { label: '西气东输一线', data: REAL_SCADA_DATA, color: '#10b981' },
-    'we1-west': { label: '西气东输一线（西段）', data: WE1_WEST_SCADA_DATA, color: '#f59e0b' },
-    'we2': { label: '西气东输二线', data: WE2_SCADA_DATA, color: '#3b82f6' },
-    'cred': { label: '中俄东线', data: CRED_SCADA_DATA, color: '#ec4899' },
-    'pt': { label: '平泰支干线', data: PT_SCADA_DATA, color: '#a855f7' },
-    ...Object.fromEntries(EXTRA_SCADA_PANELS.map(p => [p.id, { label: p.label, data: p.data, color: p.color }])),
 }
 
 // 供独立路由使用的通用 SCADA 弹窗组件

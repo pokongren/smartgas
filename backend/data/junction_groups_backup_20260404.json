@@ -1,0 +1,104 @@
+{
+  "generated_at": "2026-04-04T11:08:46.916610Z",
+  "source_table": "junction_groups",
+  "backup_table": "junction_groups_backup_20260404",
+  "row_count": 16,
+  "rows": [
+    {
+      "id": 1,
+      "name": "哈密枢纽",
+      "description": "连接 WE1 ↔ WE2",
+      "station_ids": "[\"WE1-25\", \"WE2-434\"]"
+    },
+    {
+      "id": 2,
+      "name": "九江枢纽",
+      "description": "连接 NCSH ↔ WE2",
+      "station_ids": "[\"NCSH-B1-103\", \"WE2-565\"]"
+    },
+    {
+      "id": 3,
+      "name": "南昌枢纽",
+      "description": "连接 NCSH ↔ WE2",
+      "station_ids": "[\"NCSH-1\", \"WE2-571\"]"
+    },
+    {
+      "id": 4,
+      "name": "嘉兴枢纽",
+      "description": "连接 JXLZ ↔ NCSH",
+      "station_ids": "[\"JXLZ-1\", \"NCSH-21\"]"
+    },
+    {
+      "id": 6,
+      "name": "中卫枢纽",
+      "description": "三线汇聚：WE1 ↔ WE2 ↔ ZG",
+      "station_ids": "[\"WE1-76\"]"
+    },
+    {
+      "id": 7,
+      "name": "广州枢纽",
+      "description": "珠三角枢纽：WE2 ↔ GN ↔ GS",
+      "station_ids": "[\"WE2-600\"]"
+    },
+    {
+      "id": 8,
+      "name": "贵阳枢纽",
+      "description": "西南枢纽：ZG ↔ ZM",
+      "station_ids": "[\"ZG-1581\", \"ZG-84707\"]"
+    },
+    {
+      "id": 9,
+      "name": "薛店枢纽",
+      "description": "WE1 ↔ PT",
+      "station_ids": "[\"WE1-129\"]"
+    },
+    {
+      "id": 10,
+      "name": "古浪枢纽",
+      "description": "WE1 ↔ WE2",
+      "station_ids": "[\"WE1-66\", \"WE1-67\"]"
+    },
+    {
+      "id": 11,
+      "name": "红柳枢纽",
+      "description": "WE1 ↔ WE2",
+      "station_ids": "[\"WE1-35\"]"
+    },
+    {
+      "id": 12,
+      "name": "鲁山枢纽",
+      "description": "WE2 ↔ PT",
+      "station_ids": "[\"WE2-531\"]"
+    },
+    {
+      "id": 13,
+      "name": "泰安枢纽",
+      "description": "CRED ↔ PT",
+      "station_ids": "[\"CRED-2178\"]"
+    },
+    {
+      "id": 14,
+      "name": "南宁枢纽",
+      "description": "ZM ↔ GN",
+      "station_ids": "[\"GN-21071\", \"GN-90568\", \"ZM-B11-67943\"]"
+    },
+    {
+      "id": 15,
+      "name": "贵港枢纽",
+      "description": "ZM ↔ GN",
+      "station_ids": "[\"ZM-53742\"]"
+    },
+    {
+      "id": 16,
+      "name": "甪直联络站枢纽",
+      "description": "MapTopologyView 创建",
+      "station_ids": "[\"CRED-2243\", \"WE1-179\"]"
+    },
+    {
+      "id": 17,
+      "name": "甪直联络站枢纽-甪直联络站枢纽",
+      "description": "MapTopologyView 创建",
+      "station_ids": "[\"JUNCTION-16\", \"JXLZ-11\"]"
+    }
+  ]
+}

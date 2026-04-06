@@ -1,42 +1,47 @@
 """
-AI API 客户端封装，支持 OpenAI 兼容格式的 API
-适配 SmartGas 后端环境变量读取方式
+AI API client wrapper for OpenAI-compatible endpoints.
 """
-import os
+
+from __future__ import annotations
+
+import asyncio
 import json
 import logging
+import os
+from pathlib import Path
+from typing import Any
 
 import httpx
 from dotenv import load_dotenv
-from pathlib import Path
 
-# 确保环境变量被加载，显式指向 backend/.env
 env_path = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 logger = logging.getLogger(__name__)
 
-# NOTE: 从环境变量读取 AI 配置，与 SmartGas 的方式保持一致
 AI_API_KEY = os.getenv("AI_API_KEY", "")
 AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 AI_DEFAULT_MODEL = os.getenv("AI_DEFAULT_MODEL", "gpt-3.5-turbo")
 
 
-class AiClient:
-    """
-    AI API 客户端
-    兼容 OpenAI 格式的 API（如 OpenAI、DeepSeek、Minimax 等）
-    """
+class AiServiceError(Exception):
+    def __init__(self, message: str, *, status_code: int | None = None, retryable: bool = False):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+        self.retryable = retryable
 
+
+class AiClient:
     def __init__(self):
         self.api_key = AI_API_KEY
         self.base_url = AI_BASE_URL
         self.default_model = AI_DEFAULT_MODEL
         self._client: httpx.AsyncClient | None = None
+        self.max_retries = 1
 
     @property
     def client(self) -> httpx.AsyncClient:
-        # NOTE: 使用惰性初始化，确保客户端在 FastAPI 的 asyncio 事件循环中被正确创建
         if self._client is None:
             self._client = httpx.AsyncClient(timeout=120.0)
         return self._client
@@ -48,100 +53,182 @@ class AiClient:
 
     async def chat_completion(
         self,
-        prompt: str,
+        prompt: str = "",
+        messages: list[dict[str, Any]] | None = None,
         model: str = "",
         temperature: float = 0.7,
         max_tokens: int = 2000,
     ) -> str:
-        """
-        调用 AI API 获取完整回复
-        """
         use_model = model if model else self.default_model
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
+        headers = self._build_headers()
+        chat_messages = messages if messages is not None else [{"role": "user", "content": prompt}]
 
         payload = {
             "model": use_model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": chat_messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
 
-        logger.info(f"调用 AI API: model={use_model}, prompt长度={len(prompt)}")
-
-        response = await self.client.post(
-            f"{self.base_url}/chat/completions",
-            headers=headers,
-            json=payload,
-        )
-        response.raise_for_status()
-        data = response.json()
+        logger.info("Calling AI API: model=%s, messages=%s", use_model, len(chat_messages))
+        data = await self._post_json("/chat/completions", headers=headers, payload=payload)
 
         result = data["choices"][0]["message"]["content"]
-        logger.info(f"AI API 响应成功: 回复长度={len(result)}")
+        logger.info("AI completion succeeded: length=%s", len(result))
         return result
 
     async def chat_stream(
         self,
-        prompt: str,
+        prompt: str = "",
+        messages: list[dict[str, Any]] | None = None,
         model: str = "",
         temperature: float = 0.7,
         max_tokens: int = 2000,
     ):
-        """
-        流式调用 AI API
-        """
         if not self.api_key or self.api_key == "your_api_key_here":
-            logger.warning("未配置有效的 AI_API_KEY，直接返回模拟回复。")
-            yield "【系统提示】由于当前系统未配置有效的大模型 API Key，AI 助手目前处于脱机状态。相关知识库与逻辑推演查询已记录日志。\n如果你是开发者，请在 `.env.local` 文件中配置 `AI_API_KEY` 以激活完整功能。"
+            logger.warning("AI_API_KEY is missing, returning fallback message")
+            yield (
+                "当前 AI 服务还没有正确配置 API Key，暂时不能调用大模型。"
+                "请检查后端 `.env` 里的 `AI_API_KEY`。"
+            )
             return
 
         use_model = model if model else self.default_model
-
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        }
+        headers = self._build_headers()
+        chat_messages = messages if messages is not None else [{"role": "user", "content": prompt}]
 
         payload = {
             "model": use_model,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": chat_messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
             "stream": True,
         }
 
-        logger.info(f"流式调用 AI API: model={use_model}, prompt长度={len(prompt)}")
-        logger.info(f"DEBUG: base_url={self.base_url}")
-        
-        async with self.client.stream(
-            "POST",
-            f"{self.base_url}/chat/completions",
-            headers=headers,
-            json=payload,
-        ) as response:
-            response.raise_for_status()
-            async for line in response.aiter_lines():
-                logger.info(f"DEBUG_RAW_LINE: {repr(line)}")
-                if not line or not line.startswith("data: "):
+        logger.info("Streaming AI API: model=%s, messages=%s", use_model, len(chat_messages))
+
+        attempts = self.max_retries + 1
+        for attempt in range(1, attempts + 1):
+            try:
+                async with self.client.stream(
+                    "POST",
+                    f"{self.base_url}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                ) as response:
+                    if response.status_code >= 400:
+                        error_text = (await response.aread()).decode("utf-8", errors="ignore")
+                        self._raise_ai_error(
+                            status_code=response.status_code,
+                            response_text=error_text,
+                            retry_after=response.headers.get("Retry-After"),
+                        )
+
+                    async for line in response.aiter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
+
+                        data_str = line[6:]
+                        if data_str == "[DONE]":
+                            break
+
+                        try:
+                            data = json.loads(data_str)
+                            content = data["choices"][0]["delta"].get("content", "")
+                            if content:
+                                yield content
+                        except Exception as exc:
+                            logger.warning("AI stream parse error: %s", exc)
+                    return
+            except AiServiceError as exc:
+                if exc.status_code == 429 and attempt < attempts:
+                    wait_seconds = min(2 * attempt, 4)
+                    logger.warning("AI stream rate-limited, retrying in %ss", wait_seconds)
+                    await asyncio.sleep(wait_seconds)
                     continue
-                
-                data_str = line[6:]
-                if data_str == "[DONE]":
-                    break
-                
-                try:
-                    data = json.loads(data_str)
-                    content = data["choices"][0]["delta"].get("content", "")
-                    if content:
-                        yield content
-                except Exception as e:
-                    logger.warning(f"流解析错误: {e}, 原始行: {line}")
+                raise
+            except httpx.HTTPError as exc:
+                raise self._wrap_transport_error(exc) from exc
+
+    def _build_headers(self) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+    async def _post_json(
+        self,
+        path: str,
+        *,
+        headers: dict[str, str],
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        attempts = self.max_retries + 1
+        for attempt in range(1, attempts + 1):
+            try:
+                response = await self.client.post(
+                    f"{self.base_url}{path}",
+                    headers=headers,
+                    json=payload,
+                )
+                if response.status_code >= 400:
+                    self._raise_ai_error(
+                        status_code=response.status_code,
+                        response_text=response.text,
+                        retry_after=response.headers.get("Retry-After"),
+                    )
+                return response.json()
+            except AiServiceError as exc:
+                if exc.status_code == 429 and attempt < attempts:
+                    wait_seconds = min(2 * attempt, 4)
+                    logger.warning("AI completion rate-limited, retrying in %ss", wait_seconds)
+                    await asyncio.sleep(wait_seconds)
+                    continue
+                raise
+            except httpx.HTTPError as exc:
+                raise self._wrap_transport_error(exc) from exc
+
+    def _raise_ai_error(
+        self,
+        *,
+        status_code: int,
+        response_text: str = "",
+        retry_after: str | None = None,
+    ) -> None:
+        if status_code == 429:
+            hint = f"建议等待 {retry_after} 秒后再试。" if retry_after else "请稍等 10 到 30 秒后再试。"
+            raise AiServiceError(
+                f"AI 服务当前请求太频繁，已被限流。{hint}",
+                status_code=status_code,
+                retryable=True,
+            )
+
+        if status_code in {401, 403}:
+            raise AiServiceError(
+                "AI 服务鉴权失败，请检查后端模型配置。",
+                status_code=status_code,
+            )
+
+        if status_code >= 500:
+            raise AiServiceError(
+                "AI 服务暂时不可用，请稍后重试。",
+                status_code=status_code,
+                retryable=True,
+            )
+
+        compact_text = response_text.strip().replace("\n", " ")
+        if len(compact_text) > 160:
+            compact_text = compact_text[:157] + "..."
+        suffix = f" 详情: {compact_text}" if compact_text else ""
+        raise AiServiceError(
+            f"AI 服务请求失败（HTTP {status_code}）。{suffix}",
+            status_code=status_code,
+        )
+
+    def _wrap_transport_error(self, exc: httpx.HTTPError) -> AiServiceError:
+        if isinstance(exc, httpx.TimeoutException):
+            return AiServiceError("AI 服务响应超时，请稍后重试。", retryable=True)
+        return AiServiceError(f"AI 服务连接失败：{exc}")
 
 
-
-# 全局单例
 ai_client = AiClient()

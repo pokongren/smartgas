@@ -20,6 +20,8 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import type { PipelineNode, PipelineLine } from '@/types'
+import { BACKEND_BASE_URL } from '@/services/apiBase'
+import { getLinePipelineKind, getNodeRawType } from '@/utils/pipelineDomain'
 
 // =============================================================================
 // 类型定义
@@ -159,17 +161,19 @@ export interface UseTopologyReturn {
 // 工具函数
 // =============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+const API_BASE_URL = BACKEND_BASE_URL
 
 /**
  * 将 PipelineNode 转换为 TopoNode
  */
 function convertPipelineNode(node: PipelineNode): TopoNode {
+    const rawType = getNodeRawType(node)
     let type: NodeType = 'junction'
-    if (node.name.includes('压气站')) type = 'compressor'
-    else if (node.name.includes('分输站') || node.name.includes('门站')) type = 'distribution'
-    else if (node.name.includes('阀室')) type = 'valve'
-    else if (node.name.includes('首站') || node.name.includes('末站')) type = 'source'
+    if (rawType === 'source') type = 'source'
+    else if (rawType === 'compressor') type = 'compressor'
+    else if (rawType === 'distribution') type = 'distribution'
+    else if (rawType === 'valve') type = 'valve'
+    else if (rawType === 'storage') type = 'storage'
     
     return {
         id: node.id,
@@ -208,7 +212,7 @@ function convertPipelineLine(line: PipelineLine): TopoEdge {
         source: line.startNodeId,
         target: line.endNodeId,
         name: line.name,
-        type: 'trunk',  // 默认干线
+        type: getLinePipelineKind(line),
         length_km,
         diameter_mm: line.diameter,
         design_pressure_mpa: line.designPressure || 10.0,

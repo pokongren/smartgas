@@ -9,9 +9,9 @@ import math
 from typing import Any
 from datetime import datetime, timedelta
 
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select
 
-from app.models import Station, Pipeline
+from app.services.raw_excel_ai_index import STATION_TYPE_LABELS, raw_excel_ai_index
 from app.services.topology import TopologyService
 from app.services.simulation_service import OptimizedSimulationEngine as SimulationEngine
 
@@ -127,7 +127,7 @@ def build_tools_description() -> str:
     """
     lines = ["你可以使用以下工具来获取事实数据以回答用户的问题。你应该像使用知识库一样使用它们。\n"]
     lines.append("你的系统接入了【三大知识库】：")
-    lines.append("1. **业务数据库**（SQL）：通过 query_stations 等工具进行精确统计查询；")
+    lines.append("1. **AI 索引库**（raw_excel_index + JSON cache）：通过 query_stations 等工具进行精确检索；")
     lines.append("2. **规程向量库**（ChromaDB）：通过 search_knowledge_base 工具检索官方文档原文；")
     lines.append("3. **拓扑关系库**（NetworkX）：通过 analyze_impact, find_routes, simulate_failure, find_critical_nodes 进行图计算推理。\n")
     lines.append("当需要查询数据或执行分析时，请输出相应的工具调用指令。\n")
@@ -178,94 +178,83 @@ def _handle_get_station_details(args: dict, session: Session) -> str:
     if not station_id:
         return "请提供站场 ID 或名称"
 
-    # 先按 ID 查，查不到再按名称精确匹配
-    station = session.get(Station, station_id)
-    if not station:
-        station = session.exec(
-            select(Station).where(Station.name == station_id)
-        ).first()
-
+    station = raw_excel_ai_index.get_station(station_id)
     if not station:
         return f"未找到站场: {station_id}"
 
-    type_map = {"source": "气源站", "compressor": "压气站", "distribution": "分输站", "valve": "阀室", "shared": "转供站"}
-    lines = [f"站场详情 —— {station.name}（{type_map.get(station.type, station.type)}）"]
-    lines.append(f"  ID: {station.id}")
-    lines.append(f"  坐标: ({station.longitude}, {station.latitude})")
-    lines.append(f"  设计压力: {station.design_pressure or '未知'} MPa")
-    lines.append(f"  进站压力: {station.operating_pressure_in or '未知'} MPa")
-    lines.append(f"  出站压力: {station.operating_pressure_out or '未知'} MPa")
-    lines.append(f"  进站温度: {station.operating_temp_in or '未知'} °C")
-    lines.append(f"  出站温度: {station.operating_temp_out or '未知'} °C")
-    lines.append(f"  处理能力: {station.capacity or '未知'} 万方/天")
+    lines = [f"站场详情 —— {station.get('name')}（{station.get('type_label') or '站场'}）"]
+    lines.append(f"  索引ID: {station.get('id')}")
+    lines.append(f"  所属干线: {'、'.join(station.get('systems', [])) or '未知'}")
+    lines.append(f"  关联支线: {'、'.join(station.get('branches', [])) or '未知'}")
+    lines.append(f"  地理位置: {station.get('location') or '未知'}")
+    if station.get("compressor_unit_count"):
+        lines.append(f"  压缩机组记录数: {station.get('compressor_unit_count')} 台")
+    if station.get("compressor_configs"):
+        lines.append(f"  机组配置: {'、'.join(station.get('compressor_configs', []))}")
     return "\n".join(lines)
 
 
 
 def _handle_query_stations(args: dict, session: Session) -> str:
     """查询站场"""
-    stmt = select(Station)
     filters = []
 
     station_type = args.get("type")
     keyword = args.get("keyword")
 
     if station_type:
-        stmt = stmt.where(Station.type == station_type)
         filters.append(f"类型={station_type}")
     if keyword:
-        stmt = stmt.where(Station.name.contains(keyword))
         filters.append(f"名称含'{keyword}'")
 
-    stations = session.exec(stmt).all()
+    stations = raw_excel_ai_index.query_stations(station_type=station_type, keyword=keyword)
 
     if not stations:
         filter_desc = "、".join(filters) if filters else "无过滤条件"
         return f"未找到符合条件的站场（{filter_desc}）"
 
-    # 按类型分组统计
-    type_map = {"source": "气源站", "compressor": "压气站", "distribution": "分输站", "valve": "阀室"}
     lines = [f"共找到 {len(stations)} 个站场：\n"]
-    for s in stations[:20]:  # 最多显示 20 条，避免过长
-        type_label = type_map.get(s.type, s.type)
-        lines.append(f"  - {s.name}（{type_label}，ID: {s.id}）")
+    for s in stations[:50]:
+        type_label = STATION_TYPE_LABELS.get(s.get("type_code"), s.get("type_label") or "站场")
+        scope_name = "、".join(s.get("systems", [])[:2]) or "未知干线"
+        lines.append(f"  - {s.get('name')}（{type_label}，索引ID: {s.get('id')}，所属干线: {scope_name}）")
 
-    if len(stations) > 20:
-        lines.append(f"\n  ...还有 {len(stations) - 20} 个未显示")
+    if len(stations) > 50:
+        lines.append(f"\n  ...还有 {len(stations) - 50} 个未显示")
 
     return "\n".join(lines)
 
 
 def _handle_query_pipelines(args: dict, session: Session) -> str:
     """查询管线"""
-    stmt = select(Pipeline)
     filters = []
 
     category = args.get("category")
     keyword = args.get("keyword")
 
     if category:
-        stmt = stmt.where(Pipeline.category == category)
         filters.append(f"类别={category}")
     if keyword:
-        stmt = stmt.where(Pipeline.name.contains(keyword))
         filters.append(f"名称含'{keyword}'")
 
-    pipelines = session.exec(stmt).all()
+    pipelines = raw_excel_ai_index.query_pipelines(kind=category, keyword=keyword)
 
     if not pipelines:
         filter_desc = "、".join(filters) if filters else "无过滤条件"
         return f"未找到符合条件的管线（{filter_desc}）"
 
     lines = [f"共找到 {len(pipelines)} 条管线：\n"]
-    for p in pipelines[:20]:
-        diameter = f"管径{p.diameter_mm}mm" if p.diameter_mm else ""
-        length = f"长{p.length_km}km" if p.length_km else ""
-        detail = ", ".join(filter(None, [diameter, length]))
-        lines.append(f"  - {p.name}（{detail or '无详细参数'}，ID: {p.id}）")
+    for p in pipelines[:50]:
+        length = f"长度{p.get('length_km'):.2f}km" if p.get("length_km") is not None else ""
+        pressure = f"设计压力{p.get('design_pressure_mpa'):.2f}MPa" if p.get("design_pressure_mpa") is not None else ""
+        detail = "，".join(filter(None, [length, pressure]))
+        lines.append(
+            f"  - {p.get('name')}（{detail or '无详细参数'}，"
+            f"{'干线' if p.get('kind') == 'trunk' else '支线'}，索引ID: {p.get('id')}）"
+        )
 
-    if len(pipelines) > 20:
-        lines.append(f"\n  ...还有 {len(pipelines) - 20} 条未显示")
+    if len(pipelines) > 50:
+        lines.append(f"\n  ...还有 {len(pipelines) - 50} 条未显示")
 
     return "\n".join(lines)
 
@@ -275,11 +264,10 @@ def _handle_count_by_type(args: dict, session: Session) -> str:
     entity = args.get("entity", "station")
 
     if entity == "pipeline":
-        pipelines = session.exec(select(Pipeline)).all()
-        # 按 category 分组
+        pipelines = raw_excel_ai_index.query_pipelines()
         groups: dict[str, int] = {}
         for p in pipelines:
-            cat = p.category or "未分类"
+            cat = p.get("kind") or "未分类"
             groups[cat] = groups.get(cat, 0) + 1
 
         lines = [f"管线总数: {len(pipelines)} 条"]
@@ -289,16 +277,15 @@ def _handle_count_by_type(args: dict, session: Session) -> str:
             lines.append(f"  - {label}: {count} 条")
         return "\n".join(lines)
     else:
-        stations = session.exec(select(Station)).all()
+        stations = raw_excel_ai_index.query_stations()
         groups: dict[str, int] = {}
         for s in stations:
-            t = s.type or "未分类"
+            t = s.get("type_code") or "未分类"
             groups[t] = groups.get(t, 0) + 1
 
-        type_map = {"source": "气源站", "compressor": "压气站", "distribution": "分输站", "valve": "阀室"}
         lines = [f"站场总数: {len(stations)} 个"]
         for t, count in groups.items():
-            label = type_map.get(t, t)
+            label = STATION_TYPE_LABELS.get(t, t)
             lines.append(f"  - {label}: {count} 个")
         return "\n".join(lines)
 
@@ -494,11 +481,8 @@ def _handle_predict_trend(args: dict, session: Session) -> str:
     current_val = ys[-1]
     current_time_h = xs[-1]
 
-    # 查站场设计压力上限
-    station = session.exec(
-        select(Station).where(Station.name == station_id)
-    ).first()
-    design_limit = station.design_pressure if station and station.design_pressure else 12.0
+    # 查站场设计压力上限，优先走 raw_excel AI 索引
+    design_limit = raw_excel_ai_index.get_design_pressure(station_id) or 12.0
 
     lines = [f"📊 {station_id} {metric} 趋势预测（基于近 {len(records)} 个数据点）："]
     lines.append(f"  当前值: {current_val:.3f} {'MPa' if metric == 'pressure' else '°C'}")

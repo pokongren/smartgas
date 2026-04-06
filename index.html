@@ -5,34 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>智脉平台 | 智慧管网</title>
     
-    <!-- Fonts - 预连接优化 -->
+    <!-- Fonts - 预连接 -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
-    
-    <!-- Google Fonts - 异步加载（不阻塞渲染） -->
-    <link 
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" 
-      rel="stylesheet" 
-      media="print" 
-      onload="this.media='all'"
-    />
-    <noscript>
-      <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-    </noscript>
-    
-    <!-- Material Symbols - 仅加载 400 字重，异步加载 -->
-    <link 
-      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@24,400,0&display=swap" 
+
+    <!-- Google Fonts - 中文字体（Noto Sans SC）+ 英文字体（Space Grotesk）-->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
-      media="print" 
-      onload="this.media='all'"
     />
-    <noscript>
-      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@24,400,0&display=swap" rel="stylesheet" />
-    </noscript>
+
+    <!-- Material Symbols Outlined - 图标字体（CDN 加载，与本地兜底互补）-->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+      rel="stylesheet"
+    />
     
-    <!-- 关键 CSS 内联（首屏防闪烁） -->
+    <!-- Material Symbols 图标字体 - 基础样式定义 -->
+    <style>
+      .material-symbols-outlined {
+        font-family: "Material Symbols Outlined";
+        font-weight: normal;
+        font-style: normal;
+        font-size: 24px;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        direction: ltr;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        font-feature-settings: "liga";
+        font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+        user-select: none;
+      }
+    </style>
+
+    <!-- 关键 CSS 内联（首屏防闪烁）-->
     <style>
       /* Base Reset */
       html {

@@ -292,6 +292,45 @@
     border-bottom-left-radius: 6px;
 }
 
+.ai-msg-text-block + .ai-msg-text-block,
+.ai-msg-text-block + .ai-msg-table-wrap,
+.ai-msg-table-wrap + .ai-msg-text-block,
+.ai-msg-table-wrap + .ai-msg-table-wrap {
+    margin-top: 10px;
+}
+
+.ai-msg-table-wrap {
+    overflow-x: auto;
+}
+
+.ai-msg-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    line-height: 1.5;
+    min-width: 520px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.ai-msg-table th,
+.ai-msg-table td {
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    padding: 6px 8px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.ai-msg-table th {
+    background: rgba(59, 130, 246, 0.16);
+    color: #e2e8f0;
+    font-weight: 600;
+}
+
+.ai-msg-table td {
+    color: #cbd5e1;
+}
+
 /* 工具调用状态条 */
 .ai-tool-badge {
     align-self: center;

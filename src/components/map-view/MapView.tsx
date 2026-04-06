@@ -4,8 +4,6 @@ import type { MapViewProps, MapConfig } from './types'
 import styles from './MapView.module.css'
 import { renderPipelineLines, renderPipelineNodesWithClustering, renderPipelineDevices, clearMapOverlays, clearClusterCache, clearDragMappings } from '@/utils/mapRenderer'
 import { renderHubNode, clearHubNodeRender } from '@/utils/hubRenderer'
-import { sourceNodes as defaultSourceNodes, compressorStations as defaultCompressorStations } from '@/data'
-import { hubNodesSample } from '@/data/hubNodes'
 import { ClusterDetailPanel } from '../ClusterDetailPanel'
 import { HubDetailPanel } from '../HubDetailPanel'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
@@ -28,6 +26,16 @@ const DEFAULT_CONFIG: MapConfig = {
     maxZoom: 20,
     showScale: true,
     showCompass: true,
+}
+
+/**
+ * Demo 枢纽节点开关（默认关闭）
+ * 仅开发环境下，并且手动设置 window.__SMARTGAS_SHOW_DEMO_HUB_NODES__ = true 才会生效
+ */
+const shouldEnableDemoHubNodes = (): boolean => {
+    if (!import.meta.env.DEV) return false
+    if (typeof window === 'undefined') return false
+    return (window as any).__SMARTGAS_SHOW_DEMO_HUB_NODES__ === true
 }
 
 /**
@@ -119,6 +127,7 @@ function MapView({
     const hubRenderRef = useRef<{ ports: any[]; connections: any[] }[]>([])
 
     const mapConfig = { ...DEFAULT_CONFIG, ...config }
+    const showDemoHubNodes = useMemo(() => shouldEnableDemoHubNodes(), [])
 
     // 使用 ref 存储所有回调函数，避免 useEffect 依赖它们
     const callbacksRef = useRef({
@@ -229,6 +238,12 @@ function MapView({
             ])
         }
     }, [])
+
+    useEffect(() => {
+        if (!selectedCluster && !isClusterPanelVisible) return
+        setSelectedCluster(null)
+        setIsClusterPanelVisible(false)
+    }, [pipelineData, renderTrigger])
 
     /**
      * 初始化地图 - 修复无限循环
@@ -455,8 +470,6 @@ function MapView({
                     const nodeOverlays = await renderPipelineNodesWithClustering(
                         mapInstanceRef.current,
                         pipelineData.nodes,
-                        defaultSourceNodes,
-                        defaultCompressorStations,
                         onNodeClick ? (e) => onNodeClick({
                             type: 'node',
                             targetId: e.node.id,
@@ -544,6 +557,14 @@ function MapView({
                 visible={isClusterPanelVisible}
                 onClose={() => setIsClusterPanelVisible(false)}
                 onNodeSelect={(node) => {
+                    if (mapInstanceRef.current) {
+                        const currentZoom = mapInstanceRef.current.getZoom?.() ?? 10
+                        const nextZoom = Math.max(currentZoom, 14)
+                        mapInstanceRef.current.setZoomAndCenter?.(
+                            nextZoom,
+                            [node.coordinate.longitude, node.coordinate.latitude]
+                        )
+                    }
                     const { onNodeClick } = callbacksRef.current
                     if (onNodeClick) {
                         onNodeClick({

@@ -8,18 +8,39 @@
 4. 批量保存拓扑修改
 """
 
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 
 from app.database import get_session
-from app.models import Station, Pipeline
-from app.services.junction_groups import expand_station_ids_for_request, load_normalized_junction_groups
+from app.models import Station, Pipeline, JunctionGroup
+from app.services.junction_groups import (
+    build_manual_overlay_description,
+    expand_station_ids_for_request,
+    find_conflicting_manual_overlay_groups,
+    load_runtime_junction_groups,
+    validate_manual_overlay_station_span,
+)
 from app.services.position_commit import PositionCommitService
 from app.services.topology import TopologyService
 
 router = APIRouter(prefix="/api/topology", tags=["拓扑编辑器"])
+
+
+MANUAL_JUNCTION_EDIT_ENABLED = os.getenv("TOPOLOGY_MANUAL_JUNCTION_EDIT", "1") == "1"
+MANUAL_JUNCTION_EDIT_HINT = (
+    "当前枢纽由运行时重编结果维护，手工 merge/创建/删除已降级为只读。"
+    "如需关闭，请设置 TOPOLOGY_MANUAL_JUNCTION_EDIT=0 后重启后端。"
+)
+
+
+def ensure_manual_junction_edit_enabled() -> None:
+    if MANUAL_JUNCTION_EDIT_ENABLED:
+        return
+    raise HTTPException(status_code=409, detail=MANUAL_JUNCTION_EDIT_HINT)
 
 
 # ============ 请求/响应模型 ============
@@ -718,6 +739,8 @@ def merge_stations(
     4. 自动创建 junction_group 记录
     5. 删除因合并产生的自环管段
     """
+    ensure_manual_junction_edit_enabled()
+
     import json as json_mod
     from app.models import JunctionGroup
     
@@ -767,7 +790,10 @@ def merge_stations(
     try:
         junction = JunctionGroup(
             name=merged_name,
-            description=f"合建站：{old_keep_name} + {old_remove_name}",
+            description=build_manual_overlay_description(
+                f"merge_stations:{old_keep_name}+{old_remove_name}",
+                source="merge_stations",
+            ),
             station_ids=json_mod.dumps([request.keep_station_id])
         )
         session.add(junction)
@@ -797,6 +823,41 @@ class CreateJunctionGroupRequest(BaseModel):
     name: str
     description: Optional[str] = None
     station_ids: List[str]
+    append_mode: bool = True
+    target_junction_id: Optional[int] = None
+
+
+def _dedupe_station_ids(values: List[str]) -> List[str]:
+    seen: set[str] = set()
+    deduped: List[str] = []
+    for value in values:
+        normalized = str(value).strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+def _collect_conflict_group_ids(conflicts: List[Dict[str, Any]]) -> List[int]:
+    group_ids: List[int] = []
+    for conflict in conflicts:
+        raw_ids = conflict.get("raw_group_ids") or []
+        if raw_ids:
+            for raw_id in raw_ids:
+                try:
+                    group_ids.append(int(raw_id))
+                except Exception:
+                    continue
+            continue
+        conflict_id = conflict.get("id")
+        if conflict_id is None:
+            continue
+        try:
+            group_ids.append(int(conflict_id))
+        except Exception:
+            continue
+    return sorted(set(group_ids))
 
 @router.post("/junctions")
 def create_junction_group(
@@ -806,35 +867,119 @@ def create_junction_group(
     """
     在不删除原站场的情况下，将多个站场捏合为一个大枢纽节点
     """
+    ensure_manual_junction_edit_enabled()
+
     import json
-    from app.models import JunctionGroup
     
     normalized_station_ids = expand_station_ids_for_request(session, request.station_ids)
 
     if len(normalized_station_ids) < 2:
         raise HTTPException(status_code=400, detail="合并枢纽至少需要包含两个底层站场。")
+
+    span_error = validate_manual_overlay_station_span(session, normalized_station_ids)
+    if span_error:
+        raise HTTPException(status_code=400, detail=span_error)
+
+    conflicts = find_conflicting_manual_overlay_groups(session, normalized_station_ids)
+    if conflicts:
+        if not request.append_mode:
+            conflict_names = "、".join(group["name"] for group in conflicts)
+            raise HTTPException(
+                status_code=409,
+                detail=f"选中的站点已经存在手工捏合覆盖：{conflict_names}。请先拆分后再重建。",
+            )
+
+        conflict_group_ids = _collect_conflict_group_ids(conflicts)
+        if not conflict_group_ids:
+            raise HTTPException(status_code=409, detail="当前枢纽冲突数据不可用，请先拆分后再试。")
+
+        target_group_id = request.target_junction_id if request.target_junction_id is not None else max(conflict_group_ids)
+        if target_group_id not in conflict_group_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=f"目标枢纽 {target_group_id} 不在当前冲突范围内，无法追加。",
+            )
+
+        target_group = session.get(JunctionGroup, target_group_id)
+        if not target_group:
+            raise HTTPException(status_code=404, detail=f"目标枢纽 {target_group_id} 不存在。")
+
+        merged_station_ids = _dedupe_station_ids(
+            [
+                *normalized_station_ids,
+                *[
+                    station_id
+                    for conflict in conflicts
+                    for station_id in conflict.get("station_ids", [])
+                ],
+            ]
+        )
+        if len(merged_station_ids) < 2:
+            raise HTTPException(status_code=400, detail="追加后的枢纽至少需要两个站点。")
+
+        span_error = validate_manual_overlay_station_span(session, merged_station_ids)
+        if span_error:
+            raise HTTPException(status_code=400, detail=span_error)
+
+        target_group.name = (request.name or target_group.name).strip() or target_group.name
+        target_group.description = build_manual_overlay_description(
+            request.description or target_group.description,
+            source="api_topology_junctions_append",
+        )
+        target_group.station_ids = json.dumps(merged_station_ids, ensure_ascii=False)
+
+        removed_group_ids: List[int] = []
+        for group_id in conflict_group_ids:
+            if group_id == target_group_id:
+                continue
+            duplicate_group = session.get(JunctionGroup, group_id)
+            if duplicate_group:
+                session.delete(duplicate_group)
+                removed_group_ids.append(group_id)
+
+        session.add(target_group)
+        session.commit()
+        session.refresh(target_group)
+        TopologyService(session).refresh()
+        return {
+            "message": f"枢纽 '{target_group.name}' 追加成功",
+            "id": target_group.id,
+            "mode": "appended",
+            "member_count": len(merged_station_ids),
+            "merged_group_ids": conflict_group_ids,
+            "removed_group_ids": removed_group_ids,
+        }
         
     junction = JunctionGroup(
         name=request.name,
-        description=request.description,
-        station_ids=json.dumps(normalized_station_ids)
+        description=build_manual_overlay_description(
+            request.description,
+            source="api_topology_junctions_create",
+        ),
+        station_ids=json.dumps(normalized_station_ids, ensure_ascii=False)
     )
     session.add(junction)
     session.commit()
     session.refresh(junction)
     TopologyService(session).refresh()
     
-    return {"message": f"枢纽 '{request.name}' 合并成功！", "id": junction.id}
+    return {"message": f"枢纽 '{request.name}' 合并成功！", "id": junction.id, "mode": "created"}
 
 @router.get("/junctions")
 def get_junction_groups(session: Session = Depends(get_session)):
-    """获取所有枢纽群组"""
-    return {"junctions": load_normalized_junction_groups(session)}
+    """获取运行时枢纽群组（优先读取重编影子结果）"""
+    return {
+        "junctions": load_runtime_junction_groups(session),
+        "manual_editing_enabled": MANUAL_JUNCTION_EDIT_ENABLED,
+        "mode": "runtime_readonly" if not MANUAL_JUNCTION_EDIT_ENABLED else "legacy_editable",
+    }
 
 
 @router.delete("/junctions/{junction_id}")
 def delete_junction_group(junction_id: int, session: Session = Depends(get_session)):
     """拆分枢纽：删除 JunctionGroup 记录，还原物理站点的独立显示"""
+    ensure_manual_junction_edit_enabled()
+
     from app.models import JunctionGroup
 
     group = session.get(JunctionGroup, junction_id)

@@ -17,7 +17,7 @@ from sqlmodel import Session, select
 
 from app.database import get_session
 from app.models import PipelineSystem, Station, Pipeline
-from app.services.junction_groups import load_normalized_junction_groups
+from app.services.junction_groups import load_runtime_junction_groups
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,26 @@ def _map_node_type_to_frontend(raw_type: str) -> str:
         "junction": "junction",
     }
     return mapping.get(raw_type, "junction")
+
+
+def _normalize_pipeline_kind(raw_category: str) -> str:
+    if raw_category == "trunk":
+        return "trunk"
+    if raw_category == "branch":
+        return "branch"
+    return "interconnect"
+
+
+def _resolve_pipeline_kind(raw_category: Optional[str], layer_type: Optional[str]) -> str:
+    normalized = _normalize_pipeline_kind(str(raw_category or ""))
+    if normalized != "interconnect":
+        return normalized
+
+    layer_kind = _normalize_pipeline_kind(str(layer_type or ""))
+    if layer_kind != "interconnect":
+        return layer_kind
+
+    return "interconnect"
 
 
 @router.get("/pipeline-packages")
@@ -83,7 +103,7 @@ def get_pipeline_packages(
     station_to_junction_id: Dict[str, str] = {}
     junction_nodes: Dict[str, Dict[str, Any]] = {}
     try:
-        all_junctions = load_normalized_junction_groups(session)
+        all_junctions = load_runtime_junction_groups(session)
         for jg in all_junctions:
             ids = jg["station_ids"]
             member_stations = [station_map[sid] for sid in ids if sid in station_map]
@@ -96,6 +116,7 @@ def get_pipeline_packages(
                 "id": junction_id,
                 "name": jg["name"],
                 "type": "junction",
+                "rawType": "junction",
                 "coordinate": {
                     "longitude": center_lng,
                     "latitude": center_lat,
@@ -105,14 +126,20 @@ def get_pipeline_packages(
                 "isHub": True,
                 "properties": {
                     "rawType": "junction",
+                    "junctionKind": jg.get("junction_kind", "junction"),
                     "sourceStationIds": ids,
                     "junctionId": jg["id"],
                     "sourceGroupIds": jg.get("raw_group_ids", []),
+                    "systemIds": jg.get("system_ids", []),
+                    "memberCount": jg.get("member_count", len(ids)),
+                    "pipeline": jg["name"],
                 },
                 "hubInfo": {
                     "degree": len(ids),
                     "isJunction": True,
                     "junctionName": jg["name"],
+                    "junctionKind": jg.get("junction_kind", "junction"),
+                    "isMajorJunction": jg.get("junction_kind") == "major_junction",
                 },
             }
             for sid in ids:
@@ -155,6 +182,7 @@ def get_pipeline_packages(
             "id": s.id,
             "name": s.name,
             "type": _map_node_type_to_frontend(s.type),
+            "rawType": s.type,
             "coordinate": {
                 "longitude": s.longitude,
                 "latitude": s.latitude,
@@ -165,6 +193,7 @@ def get_pipeline_packages(
             "properties": {
                 "pipeline": layer_name,
                 "rawType": s.type,
+                "layerName": layer_name,
             },
         }
         if is_hub:
@@ -184,6 +213,7 @@ def get_pipeline_packages(
                 "properties": {
                     **base.get("properties", {}),
                     "pipeline": layer_name,
+                    "layerName": layer_name,
                 },
             }
             return node
@@ -228,6 +258,7 @@ def get_pipeline_packages(
             # 构建管段列表
             lines = []
             for p in layer_pipelines:
+                pipeline_kind = _resolve_pipeline_kind(p.category, layer_cfg.get("type"))
                 start_display_id = station_to_junction_id.get(p.start_station_id, p.start_station_id)
                 end_display_id = station_to_junction_id.get(p.end_station_id, p.end_station_id)
 
@@ -245,18 +276,26 @@ def get_pipeline_packages(
                     "startNodeId": start_display_id,
                     "endNodeId": end_display_id,
                     "path": path,
+                    "pipelineKind": pipeline_kind,
                     "diameter": p.diameter or (int(p.diameter_mm) if p.diameter_mm else 1016),
                     "material": "Steel",
                     "pressureLevel": "high",
                     "length": p.length_km * 1000 if p.length_km else p.length,
                     "status": "normal",
+                    "systemId": system.id,
+                    "layerName": layer_cfg["name"],
                     "properties": {
                         "category": system.name,
                         "color": system.color,
+                        "pipelineKind": pipeline_kind,
+                        "systemId": system.id,
+                        "layerName": layer_cfg["name"],
+                        "rawCategory": p.category,
                     },
                 })
             
             package_layers.append({
+                "id": f"{system.id}:{layer_cfg['type']}:{id_prefix}",
                 "name": layer_cfg["name"],
                 "type": layer_cfg["type"],
                 "nodes": nodes,

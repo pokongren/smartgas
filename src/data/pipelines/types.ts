@@ -4,6 +4,7 @@ import { PipelineNode, PipelineLine } from '@/types'
  * 管线层级定义 (对应一个干线或一个支线)
  */
 export interface PipelineLayer {
+    id?: string             // 稳定层级 ID，优先用于状态管理和跨视图引用
     name: string            // 层级名称 (如 "西二线干线", "丽江支线")
     type: 'trunk' | 'branch'
     nodes: PipelineNode[]

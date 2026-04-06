@@ -1,5 +1,5 @@
 """
-前端管线数据 → SQLite 一键同步脚本
+前端静态管线素材 → SQLite 一次性迁移脚本
 
 原理：
 1. 读取前端的 *_structure.json 文件（拓扑骨架：节点名称、类型、里程、连接关系）
@@ -7,6 +7,11 @@
 3. 合并后写入后端 SQLite 数据库的 stations / pipelines 表
 
 运行: cd backend && python scripts/sync_frontend_data.py
+
+注意：
+- 这个脚本用于把历史前端静态素材迁移进后端数据库
+- 迁移完成后，运行时主链路应以 `/api/pipeline-packages` 为准
+- 不建议继续把它当成日常同步入口
 """
 
 import json
@@ -256,6 +261,7 @@ def process_structure_json(
     print(f"  🔵 干线节点: {len(trunk_nodes)}")
     
     prev_station_id = None
+    prev_branch_name = None
     segment_count = 0
     
     for node in trunk_nodes:
@@ -278,7 +284,19 @@ def process_structure_json(
             }
         
         current_station_id = all_stations[name]['id']
-        
+
+        current_branch_name = str(node.get('branch_name') or '')
+        current_mileage = float(node.get('mileage', 0) or 0)
+        previous_mileage = float(trunk_nodes[idx - 1].get('mileage', 0) or 0) if idx > 0 else 0.0
+        segment_switched = (
+            bool(prev_branch_name and current_branch_name and prev_branch_name != current_branch_name)
+            and current_mileage < previous_mileage
+        )
+
+        # 干线允许按 structure.json 合并多个地理分段展示，但遇到里程重置的跨段边界时不能硬连成一条连续管段。
+        if segment_switched:
+            prev_station_id = None
+
         # 生成管段（连接相邻站点）
         if prev_station_id and prev_station_id != current_station_id:
             segment_count += 1
@@ -303,6 +321,7 @@ def process_structure_json(
             })
         
         prev_station_id = current_station_id
+        prev_branch_name = current_branch_name
 
     # 处理支线
     branches = structure.get('branches', [])

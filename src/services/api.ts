@@ -1,9 +1,16 @@
 import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+import { API_BASE_URL, BACKEND_BASE_URL } from './apiBase'
 
 export const api = axios.create({
     baseURL: API_BASE_URL,
+    timeout: 10000,
+    headers: {
+        'Content-Type': 'application/json',
+    },
+})
+
+const topologyApi = axios.create({
+    baseURL: BACKEND_BASE_URL,
     timeout: 10000,
     headers: {
         'Content-Type': 'application/json',
@@ -81,27 +88,21 @@ export interface SimulationResult {
 }
 
 export const topologyAPI = {
-    // 获取后端分析结果 (中心性等)
-    analyze: () => api.get<{ nodes: TopoNode[] }>('/api/topology/analyze'),
-    
-    // 执行故障仿真
-    simulate: (params: { failed_node_id: string; steps?: number }) =>
-        api.post<SimulationResult[]>('/api/topology/simulate', params),
-        
-    // 全球拓扑概览
-    getSummary: () => api.get('/api/topology/summary'),
-
-    // 修正预览（不写入数据库）
+    getGraph: () => api.get('/api/topology/graph'),
+    getStats: () => api.get('/api/topology/stats'),
+    analyze: () => api.get('/api/topology/stats'),
+    simulate: (params: { failed_node_id?: string; failure_node_id?: string; steps?: number; max_ticks?: number }) =>
+        api.post<SimulationResult[]>('/api/emergency/simulate-failure', {
+            failure_node_id: params.failure_node_id ?? params.failed_node_id,
+            max_ticks: params.max_ticks ?? params.steps,
+        }),
+    getSummary: () => api.get('/api/emergency/topology-summary'),
     correctPreview: (params: { pipeline_data: any; jump_threshold_km?: number }) =>
-        api.post('/api/topology/correct/preview', params),
-
-    // 确认修正并应用
+        topologyApi.post('/topology/correct/preview', params),
     correctApply: (params: { pipeline_data: any; jump_threshold_km?: number }) =>
-        api.post('/api/topology/correct/apply', params),
-
-    // 修正历史
+        topologyApi.post('/topology/correct/apply', params),
     correctionHistory: (pipeline_name?: string) =>
-        api.get('/api/topology/correct/history', { params: { pipeline_name } }),
+        topologyApi.get('/topology/correct/history', { params: { pipeline_name } }),
 }
 
 // ============ 管线数据包 API（替代前端硬编码） ============

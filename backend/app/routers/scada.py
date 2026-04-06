@@ -15,7 +15,7 @@ from sqlmodel import Session, select
 
 from app.database import get_scada_history_session, get_session
 from app.models import Station
-from app.services.junction_groups import load_normalized_junction_groups
+from app.services.junction_groups import load_runtime_junction_groups
 from app.scada_models import ScadaStation, ScadaHistory
 
 logger = logging.getLogger(__name__)
@@ -431,7 +431,7 @@ def get_history_by_id(
 
     if junction_id:
         normalized_junction_id = _normalize_junction_id(junction_id)
-        groups = load_normalized_junction_groups(main_session)
+        groups = load_runtime_junction_groups(main_session)
         group = next((item for item in groups if item["id"] == normalized_junction_id), None)
         if group:
             target_type = "junction"

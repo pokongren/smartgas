@@ -18,9 +18,12 @@ export interface ClusterGroup {
 
     /** 节点类型统计 */
     typeStats: {
+        source: number        // 气源/首末站数量
         compressor: number    // 压气站数量
         distribution: number  // 分输站数量
         valve: number         // 阀室数量
+        junction: number      // 枢纽/交汇点数量
+        majorJunction: number // 大枢纽数量
         other: number         // 其他类型数量
     }
 

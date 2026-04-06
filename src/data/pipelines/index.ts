@@ -7,46 +7,49 @@
  * 策略：
  * - loadAllPipelines()：异步加载 + 内存缓存，首次调用走网络，后续直接返回
  * - ALL_PIPELINES：向后兼容的同步引用，loadAllPipelines() 成功后自动填充
- * - 去重逻辑保留：跨管线共享站点仍然需要全局去重
+ * - 去重逻辑收敛：仅按稳定节点 ID 去重，避免按站名误合并同名异点
  */
 
 import { PipelinePackage } from './types'
 import { pipelinePackageAPI } from '@/services/api'
+import { normalizePipelinePackages } from './transform'
 
 export * from './types'
+export * from './transform'
 
 // 跨管线共享站点全局去重
-// NOTE: 阀室(valve)类型节点不参与名称去重——不同管线系统的阀室天然同名
-// （如"1#阀室""2#阀室"）但地理位置完全不同，强制合并会产生跨越数十度的飞线
+// 共享站点/JunctionGroup 已由后端显式输出稳定 ID，前端仅按节点 ID 去重。
+// 不再按站名硬合并，避免把同名异点错误吸附成一个节点。
 function deduplicateNodes(pipelines: PipelinePackage[]): void {
-    const seen = new Map<string, string>()
-    const idRemap = new Map<string, string>()
+    const seenNodeIds = new Set<string>()
+    const coordinateById = new Map<string, { longitude: number; latitude: number; name: string }>()
 
-    // 1. 遍历所有管线图层，进行全局节点去重并生成统一重映射表
     pipelines.forEach(pkg => pkg.layers.forEach(layer => {
         layer.nodes = layer.nodes.filter(node => {
-            // 阀室类型跳过去重，避免跨系统同名阀室被错误合并
-            if (node.type === 'valve') return true
+            const existing = coordinateById.get(node.id)
+            if (existing) {
+                const sameLongitude = existing.longitude === node.coordinate.longitude
+                const sameLatitude = existing.latitude === node.coordinate.latitude
+                if (!sameLongitude || !sameLatitude) {
+                    console.warn(
+                        `[Pipelines] 节点 ID 重复但坐标不一致，保留首次出现节点: ${node.id} (${existing.name} / ${node.name})`
+                    )
+                }
+            } else {
+                coordinateById.set(node.id, {
+                    longitude: node.coordinate.longitude,
+                    latitude: node.coordinate.latitude,
+                    name: node.name,
+                })
+            }
 
-            const firstId = seen.get(node.name)
-            if (firstId) {
-                idRemap.set(node.id, firstId)
+            if (seenNodeIds.has(node.id)) {
                 return false
             }
-            seen.set(node.name, node.id)
+            seenNodeIds.add(node.id)
             return true
         })
     }))
-
-    // 2. 全局无差别重定向所有线段端点引用
-    if (idRemap.size > 0) {
-        pipelines.forEach(pkg => pkg.layers.forEach(layer => {
-            layer.lines.forEach(line => {
-                line.startNodeId = idRemap.get(line.startNodeId) ?? line.startNodeId
-                line.endNodeId = idRemap.get(line.endNodeId) ?? line.endNodeId
-            })
-        }))
-    }
 }
 
 // 图层过滤（干线全部保留，支线按白名单控制）
@@ -107,7 +110,7 @@ export async function loadAllPipelines(): Promise<PipelinePackage[]> {
         try {
             console.log('[Pipelines] 从后端 API 加载管线数据...')
             const resp = await pipelinePackageAPI.getAll()
-            const packages: PipelinePackage[] = resp.data
+            const packages: PipelinePackage[] = normalizePipelinePackages(resp.data)
 
             // 执行图层过滤和节点去重
             filterLayers(packages)

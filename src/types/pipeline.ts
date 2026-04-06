@@ -6,6 +6,19 @@
 
 import type { Coordinate } from '@/components/map-view/types'
 
+export type RawStationType =
+    | 'source'
+    | 'compressor'
+    | 'distribution'
+    | 'valve'
+    | 'storage'
+    | 'junction'
+    | 'other'
+    | 'shared'
+
+export type PipelineKind = 'trunk' | 'branch' | 'interconnect'
+export type JunctionKind = 'junction' | 'major_junction'
+
 /**
  * 节点类型枚举
  */
@@ -76,6 +89,8 @@ export interface PipelineNode {
     name: string
     /** 节点类型 */
     type: NodeType
+    /** 后端统一业务类型，供拓扑/渲染直接使用 */
+    rawType?: RawStationType
     /** 节点坐标 */
     coordinate: Coordinate
     /** 压力等级 */
@@ -90,6 +105,18 @@ export interface PipelineNode {
     remarks?: string
     /** 扩展属性 */
     properties?: Record<string, any>
+    /** 是否为枢纽显示节点 */
+    isHub?: boolean
+    /** 枢纽附加信息 */
+    hubInfo?: {
+        degree?: number
+        isJunction?: boolean
+        junctionName?: string
+        junctionKind?: JunctionKind
+        isMajorJunction?: boolean
+        systemIds?: string[]
+        memberCount?: number
+    }
 }
 
 /**
@@ -106,6 +133,8 @@ export interface PipelineLine {
     endNodeId: string
     /** 管线路径坐标数组 */
     path: Coordinate[]
+    /** 后端统一干支线类型 */
+    pipelineKind?: PipelineKind
     /** 管径 (mm) */
     diameter: number
     /** 管材 */
@@ -130,6 +159,10 @@ export interface PipelineLine {
     remarks?: string
     /** 扩展属性 */
     properties?: Record<string, any>
+    /** 所属管线系统 ID */
+    systemId?: string
+    /** 所属图层名 */
+    layerName?: string
 }
 
 /**

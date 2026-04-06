@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'  // Tailwind CSS v4
 import './styles/index.css'
+// Material Symbols 图标字体已在 index.html 中通过本地 woff2 内联加载，无需此处引入
 import App from './App.tsx'
 
 const rootElement = document.getElementById('root');

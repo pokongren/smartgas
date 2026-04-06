@@ -1,0 +1,183 @@
+{
+  "db_path": "F:\\smartgas-grid\\backend\\data\\smartgas.rebuild-preview.db",
+  "tolerance_deg": 0.0008,
+  "generated_at": "2026-04-04T10:36:03.522766+00:00",
+  "group_count": 12,
+  "groups": [
+    {
+      "name": "九江枢纽",
+      "description": "rebuilt_by_rule;kind=junction;systems=ncsh,we2;tolerance_deg=0.0008",
+      "station_ids": [
+        "NCSH-B1-103",
+        "WE2-565"
+      ],
+      "junction_kind": "junction",
+      "system_ids": [
+        "ncsh",
+        "we2"
+      ],
+      "member_count": 2
+    },
+    {
+      "name": "南昌枢纽",
+      "description": "rebuilt_by_rule;kind=junction;systems=ncsh,we2;tolerance_deg=0.0008",
+      "station_ids": [
+        "NCSH-1",
+        "WE2-571"
+      ],
+      "junction_kind": "junction",
+      "system_ids": [
+        "ncsh",
+        "we2"
+      ],
+      "member_count": 2
+    },
+    {
+      "name": "哈密枢纽",
+      "description": "rebuilt_by_rule;kind=junction;systems=we1,we2;tolerance_deg=0.0008",
+      "station_ids": [
+        "WE1-25",
+        "WE2-434"
+      ],
+      "junction_kind": "junction",
+      "system_ids": [
+        "we1",
+        "we2"
+      ],
+      "member_count": 2
+    },
+    {
+      "name": "嘉兴枢纽",
+      "description": "rebuilt_by_rule;kind=junction;systems=jxlz,ncsh;tolerance_deg=0.0008",
+      "station_ids": [
+        "JXLZ-1",
+        "NCSH-21"
+      ],
+      "junction_kind": "junction",
+      "system_ids": [
+        "jxlz",
+        "ncsh"
+      ],
+      "member_count": 2
+    },
+    {
+      "name": "榆林枢纽",
+      "description": "rebuilt_by_rule;kind=junction;systems=sj2,sj3;tolerance_deg=0.0008",
+      "station_ids": [
+        "SJ2-5",
+        "SJ3-1"
+      ],
+      "junction_kind": "junction",
+      "system_ids": [
+        "sj2",
+        "sj3"
+      ],
+      "member_count": 2
+    },
+    {
+      "name": "永清枢纽",
+      "description": "rebuilt_by_rule;kind=junction;systems=sj2,sj3;tolerance_deg=0.0008",
+      "station_ids": [
+        "SJ2-62",
+        "SJ3-53"
+      ],
+      "junction_kind": "junction",
+      "system_ids": [
+        "sj2",
+        "sj3"
+      ],
+      "member_count": 2
+    },
+    {
+      "name": "石家庄枢纽",
+      "description": "rebuilt_by_rule;kind=junction;systems=sj2,sj3;tolerance_deg=0.0008",
+      "station_ids": [
+        "SJ2-44",
+        "SJ2-45",
+        "SJ2-46",
+        "SJ3-38"
+      ],
+      "junction_kind": "junction",
+      "system_ids": [
+        "sj2",
+        "sj3"
+      ],
+      "member_count": 4
+    },
+    {
+      "name": "西一靖边枢纽",
+      "description": "rebuilt_by_rule;kind=junction;systems=sj2,sj4;tolerance_deg=0.0008",
+      "station_ids": [
+        "SJ2-1",
+        "SJ4-1"
+      ],
+      "junction_kind": "junction",
+      "system_ids": [
+        "sj2",
+        "sj4"
+      ],
+      "member_count": 2
+    },
+    {
+      "name": "阳曲枢纽",
+      "description": "rebuilt_by_rule;kind=junction;systems=sj2,sj3;tolerance_deg=0.0008",
+      "station_ids": [
+        "SJ2-27",
+        "SJ2-28",
+        "SJ3-23"
+      ],
+      "junction_kind": "junction",
+      "system_ids": [
+        "sj2",
+        "sj3"
+      ],
+      "member_count": 3
+    },
+    {
+      "name": "霸州枢纽",
+      "description": "rebuilt_by_rule;kind=junction;systems=sj2,sj3;tolerance_deg=0.0008",
+      "station_ids": [
+        "SJ2-58",
+        "SJ3-50"
+      ],
+      "junction_kind": "junction",
+      "system_ids": [
+        "sj2",
+        "sj3"
+      ],
+      "member_count": 2
+    },
+    {
+      "name": "安平大枢纽",
+      "description": "rebuilt_by_rule;kind=major_junction;systems=cred,sj2,sj3;tolerance_deg=0.0008",
+      "station_ids": [
+        "CRED-2161",
+        "SJ2-50",
+        "SJ3-43"
+      ],
+      "junction_kind": "major_junction",
+      "system_ids": [
+        "cred",
+        "sj2",
+        "sj3"
+      ],
+      "member_count": 3
+    },
+    {
+      "name": "永清大枢纽",
+      "description": "rebuilt_by_rule;kind=major_junction;systems=cred,sj2,sj3;tolerance_deg=0.0008",
+      "station_ids": [
+        "CRED-2160",
+        "SJ2-61",
+        "SJ3-52"
+      ],
+      "junction_kind": "major_junction",
+      "system_ids": [
+        "cred",
+        "sj2",
+        "sj3"
+      ],
+      "member_count": 3
+    }
+  ]
+}

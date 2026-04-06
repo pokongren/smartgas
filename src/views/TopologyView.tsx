@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import '../styles/topology-view.css';
 import { loadAllPipelines } from '@/data/pipelines';
 import type { PipelinePackage } from '@/data/pipelines/types';
+import { resolveApiPath } from '@/services/apiBase';
 import { findIsolatedNodes, computeBetweennessCentrality, countComponents } from '@/utils/topology-validator';
 
 // ============ 类型定义 ============
@@ -47,6 +48,28 @@ interface TopoData {
         componentCount: number;
     };
 }
+
+interface CanvasPoint {
+    x: number;
+    y: number;
+}
+
+interface ViewportState {
+    zoom: number;
+    pan: CanvasPoint;
+}
+
+type TouchGestureState =
+    | { mode: 'none' }
+    | { mode: 'pan'; touchId: number; startTouch: CanvasPoint; startPan: CanvasPoint }
+    | { mode: 'drag-node'; touchId: number; node: TopoNode }
+    | {
+        mode: 'pinch';
+        touchIds: [number, number];
+        startZoom: number;
+        anchorWorld: CanvasPoint;
+        startDistance: number;
+    };
 
 // ============ 常量 ============
 
@@ -104,8 +127,57 @@ const EDGE_COLORS: Record<string, string> = {
     default: '#475569',
 };
 
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 5;
 const NODE_RADIUS = 16;
 const CRITICAL_RADIUS = 22;
+
+function clampZoom(zoom: number): number {
+    return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+}
+
+function getCanvasDisplaySize(canvas: HTMLCanvasElement | null): { width: number; height: number } {
+    if (!canvas) {
+        return { width: window.innerWidth, height: window.innerHeight };
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    return {
+        width: rect.width || window.innerWidth,
+        height: rect.height || window.innerHeight,
+    };
+}
+
+function getTouchPoint(touch: Touch, rect: DOMRect): CanvasPoint {
+    return {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top,
+    };
+}
+
+function getTouchMetrics(touches: TouchList, rect: DOMRect): { center: CanvasPoint; distance: number } | null {
+    if (touches.length < 2) return null;
+
+    const first = getTouchPoint(touches[0], rect);
+    const second = getTouchPoint(touches[1], rect);
+
+    return {
+        center: {
+            x: (first.x + second.x) / 2,
+            y: (first.y + second.y) / 2,
+        },
+        distance: Math.hypot(second.x - first.x, second.y - first.y),
+    };
+}
+
+function screenToWorldWithViewport(
+    sx: number,
+    sy: number,
+    zoom: number,
+    pan: CanvasPoint,
+): CanvasPoint {
+    return { x: (sx - pan.x) / zoom, y: (sy - pan.y) / zoom };
+}
 
 // ============ 力导向布局引擎 ============
 
@@ -411,6 +483,15 @@ const TopologyView: React.FC = () => {
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const isPanningRef = useRef(false);
     const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+    const viewportRef = useRef<ViewportState>({ zoom: 1, pan: { x: 0, y: 0 } });
+    const viewportSizeRef = useRef({ width: window.innerWidth, height: window.innerHeight });
+    const hoveredNodeIdRef = useRef<string | null>(null);
+    const selectedNodeIdsRef = useRef<Set<string>>(new Set());
+    const searchMatchIdsRef = useRef<Set<string>>(new Set());
+    const draggingNodeRef = useRef<TopoNode | null>(null);
+    const touchGestureRef = useRef<TouchGestureState>({ mode: 'none' });
+    const suppressClickUntilRef = useRef(0);
+    const hasInitializedViewportRef = useRef(false);
 
     const criticalSetRef = useRef(new Set<string>());
 
@@ -419,7 +500,7 @@ const TopologyView: React.FC = () => {
         const fetchTopologyData = async () => {
             try {
                 console.log('[Topology] 从后端 API 获取拓扑数据...');
-                const response = await fetch('/api/topology/graph');
+                const response = await fetch(resolveApiPath('/api/topology/graph'));
                 if (!response.ok) {
                     throw new Error(`API 请求失败: ${response.status}`);
                 }
@@ -492,8 +573,8 @@ const TopologyView: React.FC = () => {
                                     id: n.id,
                                     name: n.name,
                                     type: n.type || 'other',
-                                    longitude: n.coordinate?.[0] || 0,
-                                    latitude: n.coordinate?.[1] || 0,
+                                    longitude: n.coordinate?.longitude || 0,
+                                    latitude: n.coordinate?.latitude || 0,
                                     designPressure: n.designPressure || null,
                                     capacity: null,
                                     hasConnection: false,
@@ -669,12 +750,89 @@ const TopologyView: React.FC = () => {
         return new Set(rawData.nodes.filter(n => n.name.toLowerCase().includes(kw)).map(n => n.id));
     }, [searchText, rawData]);
 
+    useEffect(() => {
+        viewportRef.current = { zoom, pan };
+    }, [zoom, pan]);
+
+    useEffect(() => {
+        hoveredNodeIdRef.current = hoveredNodeId;
+    }, [hoveredNodeId]);
+
+    useEffect(() => {
+        selectedNodeIdsRef.current = selectedNodeIds;
+    }, [selectedNodeIds]);
+
+    useEffect(() => {
+        searchMatchIdsRef.current = searchMatchIds;
+    }, [searchMatchIds]);
+
+    useEffect(() => {
+        draggingNodeRef.current = draggingNode;
+    }, [draggingNode]);
+
+    const applyViewport = useCallback((nextZoom: number, nextPan: CanvasPoint) => {
+        const clampedZoom = clampZoom(nextZoom);
+        viewportRef.current = {
+            zoom: clampedZoom,
+            pan: nextPan,
+        };
+        setZoom(clampedZoom);
+        setPan(nextPan);
+    }, []);
+
+    const applyPan = useCallback((nextPan: CanvasPoint) => {
+        viewportRef.current = {
+            ...viewportRef.current,
+            pan: nextPan,
+        };
+        setPan(nextPan);
+    }, []);
+
+    const getViewportSize = useCallback(() => {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (rect && rect.width > 0 && rect.height > 0) {
+            return { width: rect.width, height: rect.height };
+        }
+        return viewportSizeRef.current;
+    }, []);
+
+    const zoomAroundScreenPoint = useCallback((screenPoint: CanvasPoint, nextZoom: number) => {
+        const currentViewport = viewportRef.current;
+        const clampedZoom = clampZoom(nextZoom);
+        const anchorWorld = screenToWorldWithViewport(
+            screenPoint.x,
+            screenPoint.y,
+            currentViewport.zoom,
+            currentViewport.pan,
+        );
+        applyViewport(clampedZoom, {
+            x: screenPoint.x - anchorWorld.x * clampedZoom,
+            y: screenPoint.y - anchorWorld.y * clampedZoom,
+        });
+    }, [applyViewport]);
+
+    const zoomFromViewportCenter = useCallback((factor: number) => {
+        const { width, height } = getViewportSize();
+        zoomAroundScreenPoint(
+            { x: width / 2, y: height / 2 },
+            viewportRef.current.zoom * factor,
+        );
+    }, [getViewportSize, zoomAroundScreenPoint]);
+
+    const releaseDraggingNode = useCallback(() => {
+        const activeNode = draggingNodeRef.current;
+        if (activeNode) {
+            activeNode.fx = null;
+            activeNode.fy = null;
+            draggingNodeRef.current = null;
+        }
+        setDraggingNode(null);
+    }, []);
+
     // ============ 过滤变化时重新初始化布局 ============
     useEffect(() => {
         if (!rawData || loading) return;
-        const canvas = canvasRef.current;
-        const w = canvas?.width ? canvas.width / (window.devicePixelRatio || 1) : window.innerWidth;
-        const h = canvas?.height ? canvas.height / (window.devicePixelRatio || 1) : window.innerHeight;
+        const { width: w, height: h } = getViewportSize();
 
         // 地理坐标映射
         const lons = filteredNodes.map(n => n.longitude).filter(v => v !== 0);
@@ -705,29 +863,55 @@ const TopologyView: React.FC = () => {
         nodesRef.current = nodes;
         edgesRef.current = filteredEdges;
         alphaRef.current = 1;
-        setZoom(1);
-        setPan({ x: 0, y: 0 });
+        touchGestureRef.current = { mode: 'none' };
+        isPanningRef.current = false;
+        if (!hasInitializedViewportRef.current) {
+            applyViewport(1, { x: 0, y: 0 });
+            hasInitializedViewportRef.current = true;
+        }
         setSelectedNodeIds(new Set()); setContextMenu(null);
         setHoveredNodeId(null);
-    }, [filteredNodes, filteredEdges, loading, rawData]);
+        releaseDraggingNode();
+    }, [applyViewport, filteredNodes, filteredEdges, getViewportSize, loading, rawData, releaseDraggingNode]);
 
     // ============ Canvas 尺寸 ============
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const resize = () => {
+            const prevSize = viewportSizeRef.current;
+            const currentViewport = viewportRef.current;
+            const centerWorld = prevSize.width > 0 && prevSize.height > 0
+                ? screenToWorldWithViewport(
+                    prevSize.width / 2,
+                    prevSize.height / 2,
+                    currentViewport.zoom,
+                    currentViewport.pan,
+                )
+                : null;
             const dpr = window.devicePixelRatio || 1;
-            canvas.width = window.innerWidth * dpr;
-            canvas.height = window.innerHeight * dpr;
-            canvas.style.width = `${window.innerWidth}px`;
-            canvas.style.height = `${window.innerHeight}px`;
+            const { width, height } = getCanvasDisplaySize(canvas);
+            canvas.width = Math.max(1, Math.round(width * dpr));
+            canvas.height = Math.max(1, Math.round(height * dpr));
+            canvas.style.width = `${width}px`;
+            canvas.style.height = `${height}px`;
+            viewportSizeRef.current = {
+                width,
+                height,
+            };
             const ctx = canvas.getContext('2d');
-            ctx?.scale(dpr, dpr);
+            ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
+            if (centerWorld) {
+                applyViewport(currentViewport.zoom, {
+                    x: width / 2 - centerWorld.x * currentViewport.zoom,
+                    y: height / 2 - centerWorld.y * currentViewport.zoom,
+                });
+            }
         };
         resize();
         window.addEventListener('resize', resize);
         return () => window.removeEventListener('resize', resize);
-    }, []);
+    }, [applyViewport]);
 
     // ============ 动画循环 ============
     useEffect(() => {
@@ -738,24 +922,32 @@ const TopologyView: React.FC = () => {
         if (!ctx) return;
 
         const animate = () => {
-            const w = window.innerWidth;
-            const h = window.innerHeight;
+            const { width: w, height: h } = viewportSizeRef.current;
             if (alphaRef.current > 0.005) {
                 simulateForces(nodesRef.current, edgesRef.current, w, h, alphaRef.current);
                 alphaRef.current *= 0.995;
             }
+            const currentViewport = viewportRef.current;
             drawGraph(ctx, nodesRef.current, edgesRef.current, criticalSetRef.current,
-                hoveredNodeId, selectedNodeIds, searchMatchIds, w, h, zoom, pan.x, pan.y);
+                hoveredNodeIdRef.current,
+                selectedNodeIdsRef.current,
+                searchMatchIdsRef.current,
+                w,
+                h,
+                currentViewport.zoom,
+                currentViewport.pan.x,
+                currentViewport.pan.y);
             animFrameRef.current = requestAnimationFrame(animate);
         };
         animFrameRef.current = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(animFrameRef.current);
-    }, [loading, hoveredNodeId, selectedNodeIds, searchMatchIds, zoom, pan]);
+    }, [loading]);
 
     // ============ 鼠标坐标转换（考虑缩放和平移） ============
     const screenToWorld = useCallback((sx: number, sy: number) => {
-        return { x: (sx - pan.x) / zoom, y: (sy - pan.y) / zoom };
-    }, [zoom, pan]);
+        const currentViewport = viewportRef.current;
+        return screenToWorldWithViewport(sx, sy, currentViewport.zoom, currentViewport.pan);
+    }, []);
 
     const findNodeAt = useCallback((wx: number, wy: number): TopoNode | null => {
         for (let i = nodesRef.current.length - 1; i >= 0; i--) {
@@ -777,17 +969,17 @@ const TopologyView: React.FC = () => {
 
         // 平移画布
         if (isPanningRef.current) {
-            setPan({
+            applyViewport(viewportRef.current.zoom, {
                 x: panStartRef.current.panX + (sx - panStartRef.current.x),
                 y: panStartRef.current.panY + (sy - panStartRef.current.y),
             });
             return;
         }
 
-        if (draggingNode) {
+        if (draggingNodeRef.current) {
             const { x, y } = screenToWorld(sx, sy);
-            draggingNode.fx = x;
-            draggingNode.fy = y;
+            draggingNodeRef.current.fx = x;
+            draggingNodeRef.current.fy = y;
             alphaRef.current = Math.max(alphaRef.current, 0.1);
             return;
         }
@@ -798,7 +990,7 @@ const TopologyView: React.FC = () => {
         if (canvasRef.current) {
             canvasRef.current.style.cursor = node ? 'pointer' : 'grab';
         }
-    }, [draggingNode, findNodeAt, screenToWorld]);
+    }, [applyViewport, findNodeAt, screenToWorld]);
 
     const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
         const rect = canvasRef.current?.getBoundingClientRect();
@@ -811,27 +1003,30 @@ const TopologyView: React.FC = () => {
         if (node) {
             node.fx = x;
             node.fy = y;
+            draggingNodeRef.current = node;
             setDraggingNode(node);
             if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing';
         } else {
             // 开始平移
             isPanningRef.current = true;
-            panStartRef.current = { x: sx, y: sy, panX: pan.x, panY: pan.y };
+            panStartRef.current = {
+                x: sx,
+                y: sy,
+                panX: viewportRef.current.pan.x,
+                panY: viewportRef.current.pan.y,
+            };
             if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing';
         }
-    }, [findNodeAt, screenToWorld, pan]);
+    }, [findNodeAt, screenToWorld]);
 
     const handleMouseUp = useCallback(() => {
-        if (draggingNode) {
-            draggingNode.fx = null;
-            draggingNode.fy = null;
-            setDraggingNode(null);
-        }
+        releaseDraggingNode();
         isPanningRef.current = false;
         if (canvasRef.current) canvasRef.current.style.cursor = 'grab';
-    }, [draggingNode]);
+    }, [releaseDraggingNode]);
 
     const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (Date.now() < suppressClickUntilRef.current) return;
         setContextMenu(null); // click closes menu
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect) return;
@@ -853,37 +1048,201 @@ const TopologyView: React.FC = () => {
         });
     }, [findNodeAt, screenToWorld]);
 
+    const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        setContextMenu(null);
+
+        if (e.touches.length >= 2) {
+            const metrics = getTouchMetrics(e.touches, rect);
+            if (!metrics) return;
+            e.preventDefault();
+            releaseDraggingNode();
+            touchGestureRef.current = {
+                mode: 'pinch',
+                touchIds: [e.touches[0].identifier, e.touches[1].identifier],
+                startZoom: viewportRef.current.zoom,
+                anchorWorld: screenToWorld(metrics.center.x, metrics.center.y),
+                startDistance: Math.max(metrics.distance, 1),
+            };
+            suppressClickUntilRef.current = Date.now() + 350;
+            if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing';
+            return;
+        }
+
+        if (e.touches.length !== 1) return;
+
+        const touch = e.touches[0];
+        const point = getTouchPoint(touch, rect);
+        const world = screenToWorld(point.x, point.y);
+        const node = findNodeAt(world.x, world.y);
+
+        if (node) {
+            node.fx = world.x;
+            node.fy = world.y;
+            draggingNodeRef.current = node;
+            setDraggingNode(node);
+            touchGestureRef.current = {
+                mode: 'drag-node',
+                touchId: touch.identifier,
+                node,
+            };
+            if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing';
+            return;
+        }
+
+        isPanningRef.current = true;
+        touchGestureRef.current = {
+            mode: 'pan',
+            touchId: touch.identifier,
+            startTouch: point,
+            startPan: viewportRef.current.pan,
+        };
+        if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing';
+    }, [findNodeAt, releaseDraggingNode, screenToWorld]);
+
+    const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+
+        if (e.touches.length >= 2) {
+            const metrics = getTouchMetrics(e.touches, rect);
+            if (!metrics) return;
+            e.preventDefault();
+
+            const gesture = touchGestureRef.current;
+            if (gesture.mode !== 'pinch') {
+                releaseDraggingNode();
+                isPanningRef.current = false;
+                touchGestureRef.current = {
+                    mode: 'pinch',
+                    touchIds: [e.touches[0].identifier, e.touches[1].identifier],
+                    startZoom: viewportRef.current.zoom,
+                    anchorWorld: screenToWorld(metrics.center.x, metrics.center.y),
+                    startDistance: Math.max(metrics.distance, 1),
+                };
+                suppressClickUntilRef.current = Date.now() + 350;
+                return;
+            }
+
+            const nextZoom = clampZoom(gesture.startZoom * (metrics.distance / Math.max(gesture.startDistance, 1)));
+            applyViewport(nextZoom, {
+                x: metrics.center.x - gesture.anchorWorld.x * nextZoom,
+                y: metrics.center.y - gesture.anchorWorld.y * nextZoom,
+            });
+            suppressClickUntilRef.current = Date.now() + 350;
+            return;
+        }
+
+        if (e.touches.length !== 1) return;
+
+        const touch = e.touches[0];
+        const point = getTouchPoint(touch, rect);
+        const gesture = touchGestureRef.current;
+
+        if (gesture.mode === 'pinch') {
+            isPanningRef.current = true;
+            touchGestureRef.current = {
+                mode: 'pan',
+                touchId: touch.identifier,
+                startTouch: point,
+                startPan: viewportRef.current.pan,
+            };
+            suppressClickUntilRef.current = Date.now() + 350;
+            return;
+        }
+
+        if (gesture.mode === 'drag-node' && gesture.touchId === touch.identifier) {
+            e.preventDefault();
+            const world = screenToWorld(point.x, point.y);
+            gesture.node.fx = world.x;
+            gesture.node.fy = world.y;
+            alphaRef.current = Math.max(alphaRef.current, 0.1);
+            suppressClickUntilRef.current = Date.now() + 350;
+            return;
+        }
+
+        if (gesture.mode === 'pan' && gesture.touchId === touch.identifier) {
+            e.preventDefault();
+            applyPan({
+                x: gesture.startPan.x + (point.x - gesture.startTouch.x),
+                y: gesture.startPan.y + (point.y - gesture.startTouch.y),
+            });
+            suppressClickUntilRef.current = Date.now() + 350;
+        }
+    }, [applyPan, applyViewport, releaseDraggingNode, screenToWorld]);
+
+    const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        const gesture = touchGestureRef.current;
+
+        if (e.touches.length >= 2) {
+            if (!rect) return;
+            const metrics = getTouchMetrics(e.touches, rect);
+            if (!metrics) return;
+            touchGestureRef.current = {
+                mode: 'pinch',
+                touchIds: [e.touches[0].identifier, e.touches[1].identifier],
+                startZoom: viewportRef.current.zoom,
+                anchorWorld: screenToWorld(metrics.center.x, metrics.center.y),
+                startDistance: Math.max(metrics.distance, 1),
+            };
+            suppressClickUntilRef.current = Date.now() + 350;
+            return;
+        }
+
+        if (e.touches.length === 1 && rect) {
+            const touch = e.touches[0];
+            isPanningRef.current = true;
+            touchGestureRef.current = {
+                mode: 'pan',
+                touchId: touch.identifier,
+                startTouch: getTouchPoint(touch, rect),
+                startPan: viewportRef.current.pan,
+            };
+            suppressClickUntilRef.current = Date.now() + 350;
+            return;
+        }
+
+        touchGestureRef.current = { mode: 'none' };
+        isPanningRef.current = false;
+        suppressClickUntilRef.current = Date.now() + 350;
+        if (canvasRef.current) canvasRef.current.style.cursor = 'grab';
+
+        if (gesture.mode === 'drag-node') {
+            releaseDraggingNode();
+            return;
+        }
+
+        if (gesture.mode === 'pan' && rect && e.changedTouches.length === 1) {
+            const changed = e.changedTouches[0];
+            const point = getTouchPoint(changed, rect);
+            const dx = point.x - gesture.startTouch.x;
+            const dy = point.y - gesture.startTouch.y;
+            if (Math.hypot(dx, dy) < 6) {
+                const world = screenToWorld(point.x, point.y);
+                const node = findNodeAt(world.x, world.y);
+                setSelectedNodeIds(node ? new Set([node.id]) : new Set());
+            }
+        }
+    }, [findNodeAt, releaseDraggingNode, screenToWorld]);
+
+    const handleTouchCancel = useCallback(() => {
+        touchGestureRef.current = { mode: 'none' };
+        isPanningRef.current = false;
+        suppressClickUntilRef.current = Date.now() + 350;
+        releaseDraggingNode();
+        if (canvasRef.current) canvasRef.current.style.cursor = 'grab';
+    }, [releaseDraggingNode]);
+
     const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
         e.preventDefault();
         if (selectedNodeIds.size > 1) {
             setContextMenu({ screenX: e.clientX, screenY: e.clientY });
+            return;
         }
+        setContextMenu(null);
     }, [selectedNodeIds]);
-
-    const handleCreateJunction = async () => {
-        if (selectedNodeIds.size < 2) return;
-        try {
-            const nodes = Array.from(selectedNodeIds);
-            const name = prompt("请输入联合大枢纽名称:", `联合大枢纽-` + Date.now().toString().slice(-4));
-            if (!name) return;
-            
-            const res = await fetch('/api/topology/junctions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: name, station_ids: nodes, description: '前端批量合成' })
-            });
-            if (res.ok) {
-                alert(`超级枢纽【${name}】融合成功！底层有向图已更新。`);
-                setContextMenu(null);
-                setSelectedNodeIds(new Set());
-            } else {
-                const err = await res.text();
-                alert(`合并失败: ${err}`);
-            }
-        } catch(e) {
-            console.error(e);
-        }
-    };
 
 
     // 滚轮缩放
@@ -895,15 +1254,10 @@ const TopologyView: React.FC = () => {
         const my = e.clientY - rect.top;
 
         const factor = e.deltaY > 0 ? 0.9 : 1.1;
-        const newZoom = Math.max(0.1, Math.min(5, zoom * factor));
+        zoomAroundScreenPoint({ x: mx, y: my }, viewportRef.current.zoom * factor);
 
         // 以鼠标位置为缩放中心
-        const newPanX = mx - (mx - pan.x) * (newZoom / zoom);
-        const newPanY = my - (my - pan.y) * (newZoom / zoom);
-
-        setZoom(newZoom);
-        setPan({ x: newPanX, y: newPanY });
-    }, [zoom, pan]);
+    }, [zoomAroundScreenPoint]);
 
     // 搜索定位
     const handleSearchLocate = useCallback(() => {
@@ -912,17 +1266,14 @@ const TopologyView: React.FC = () => {
         const node = nodesRef.current.find(n => n.id === firstId);
         if (!node) return;
         // 居中到该节点
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        setZoom(1.5);
-        setPan({ x: w / 2 - node.x * 1.5, y: h / 2 - node.y * 1.5 });
+        const { width: w, height: h } = getViewportSize();
+        applyViewport(1.5, { x: w / 2 - node.x * 1.5, y: h / 2 - node.y * 1.5 });
         setSelectedNodeIds(new Set([firstId]));
-    }, [searchMatchIds]);
+    }, [applyViewport, getViewportSize, searchMatchIds]);
 
     // 重置视图
     const handleReset = useCallback(() => {
-        setZoom(1);
-        setPan({ x: 0, y: 0 });
+        applyViewport(1, { x: 0, y: 0 });
         alphaRef.current = 1;
         for (const n of nodesRef.current) {
             n.vx = (Math.random() - 0.5) * 5;
@@ -930,7 +1281,9 @@ const TopologyView: React.FC = () => {
             n.fx = null;
             n.fy = null;
         }
-    }, []);
+        touchGestureRef.current = { mode: 'none' };
+        releaseDraggingNode();
+    }, [applyViewport, releaseDraggingNode]);
 
     // 获取选中节点的连接管线
     const getNodeConnections = useCallback((nodeId: string) => {
@@ -1088,6 +1441,10 @@ const TopologyView: React.FC = () => {
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
                 onClick={handleClick}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+                onTouchCancel={handleTouchCancel}
                 onWheel={handleWheel}
                 onContextMenu={handleContextMenu}
             />
@@ -1111,35 +1468,48 @@ const TopologyView: React.FC = () => {
                         minWidth: '120px'
                     }}
                 >
-                    <button 
-                        onClick={handleCreateJunction}
+                    <div
                         style={{
-                            background: 'transparent',
-                            border: 'none',
                             color: '#e2e8f0',
                             padding: '8px 12px',
                             textAlign: 'left',
-                            cursor: 'pointer',
                             fontSize: '14px',
-                            borderRadius: '4px'
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#334155'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
-                        合并为大枢纽
-                    </button>
+                        <div style={{ fontWeight: 600, marginBottom: '6px' }}>运行时枢纽只读说明</div>
+                        <div style={{ color: '#94a3b8', fontSize: '12px', lineHeight: 1.5 }}>
+                            当前选中了 {selectedNodeIds.size} 个节点。枢纽关系现在由后台按交汇规则实时重编，这个页面不再支持手工“合并为大枢纽”。
+                        </div>
+                        <button
+                            onClick={() => setContextMenu(null)}
+                            style={{
+                                marginTop: '10px',
+                                width: '100%',
+                                background: '#334155',
+                                border: 'none',
+                                color: '#e2e8f0',
+                                padding: '8px 12px',
+                                textAlign: 'center',
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                borderRadius: '4px'
+                            }}
+                        >
+                            知道了
+                        </button>
+                    </div>
                 </div>
             )}
 
             {/* ====== 底部工具栏 ====== */}
             <div className="topology-toolbar">
-                <button className="toolbar-btn" onClick={() => setZoom(z => Math.min(5, z * 1.3))}>
+                <button className="toolbar-btn" onClick={() => zoomFromViewportCenter(1.3)}>
                     <span className="material-symbols-outlined">zoom_in</span>
                 </button>
-                <button className="toolbar-btn" onClick={() => setZoom(z => Math.max(0.1, z * 0.7))}>
+                <button className="toolbar-btn" onClick={() => zoomFromViewportCenter(0.7)}>
                     <span className="material-symbols-outlined">zoom_out</span>
                 </button>
-                <button className="toolbar-btn" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>
+                <button className="toolbar-btn" onClick={() => applyViewport(1, { x: 0, y: 0 })}>
                     <span className="material-symbols-outlined">fit_screen</span>
                 </button>
                 <span className="toolbar-divider" />

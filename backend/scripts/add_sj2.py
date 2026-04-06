@@ -9,14 +9,12 @@
 """
 import sqlite3
 import json
-import os
 import sys
+from pathlib import Path
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-DB_PATH = os.path.join(os.getcwd(), 'backend', 'data', 'smartgas.db')
-if not os.path.exists(DB_PATH):
-    DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'backend', 'data', 'smartgas.db')
+DB_PATH = str(Path(__file__).resolve().parents[1] / 'data' / 'smartgas.db')
 
 SYSTEM_ID = 'sj2'
 SYSTEM_NAME = '陕京二线'
@@ -29,25 +27,26 @@ ID_PREFIX = 'SJ2'
 # 坐标来自真实地理位置
 TRUNK_STATIONS = [
     # (序号, 名称, 类型, 经度, 纬度)
+    # NOTE: 长阳分输站已确认不存在于陕京二线，已移除
     (1,  '西沙屯末站',     'distribution',  116.23, 40.22),   # 北京大兴，与 SJ3 共用
     (2,  '陕二1#阀室',     'valve',         0, 0),
     (3,  '陕二2#阀室',     'valve',         0, 0),
-    (4,  '长阳分输站',     'distribution',  116.18, 39.85),   # 房山区长阳
-    (5,  '陕二3#阀室',     'valve',         0, 0),
-    (6,  '陕二4#阀室',     'valve',         0, 0),
-    (7,  '琉璃河分输站',   'distribution',  116.00, 39.60),   # 房山区琉璃河
-    (8,  '陕二5#阀室',     'valve',         0, 0),
-    (9,  '陕二6#阀室',     'valve',         0, 0),
-    (10, '固安分输站',     'distribution',  116.30, 39.44),   # 河北固安
-    (11, '陕二7#阀室',     'valve',         0, 0),
-    (12, '陕二8#阀室',     'valve',         0, 0),
-    (13, '永清压气站',     'compressor',    116.50, 39.32),   # 河北永清
+    (4,  '陕二3#阀室',     'valve',         0, 0),
+    (5,  '陕二4#阀室',     'valve',         0, 0),
+    (6,  '琉璃河分输站',   'distribution',  116.00, 39.60),   # 房山区琉璃河
+    (7,  '陕二5#阀室',     'valve',         0, 0),
+    (8,  '陕二6#阀室',     'valve',         0, 0),
+    (9,  '固安分输站',     'distribution',  116.30, 39.44),   # 河北固安
+    (10, '陕二7#阀室',     'valve',         0, 0),
+    (11, '陕二8#阀室',     'valve',         0, 0),
+    (12, '永清压气站',     'compressor',    116.50, 39.32),   # 河北永清
 ]
 
 
 def main():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
+    print(f"DB_PATH = {DB_PATH}")
 
     # ============================================================
     # Step 0: 清理旧数据（重复运行安全）
@@ -100,7 +99,7 @@ def main():
             INSERT INTO pipelines (id, name, start_station_id, end_station_id,
                                    diameter_mm, length_km, diameter, length, category)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (seg_id, seg_name, start_id, end_id, 1016, 0, 1016, 0, SYSTEM_NAME))
+        """, (seg_id, seg_name, start_id, end_id, 1016, 0, 1016, 0, "trunk"))
         segment_count += 1
 
     print(f"✅ 写入管段: {segment_count} 条")
@@ -146,11 +145,20 @@ def main():
     total_segments = cur.fetchone()[0]
     cur.execute("SELECT COUNT(*) FROM stations WHERE id LIKE ? AND (longitude = 0 OR latitude = 0)", (f"{ID_PREFIX}%",))
     zero_coords = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM pipeline_systems WHERE id = ?", (SYSTEM_ID,))
+    sys_count = cur.fetchone()[0]
+    cur.execute(
+        "SELECT COUNT(*) FROM pipelines WHERE id LIKE ? AND category NOT IN ('trunk','branch')",
+        (f"{ID_PREFIX}%",),
+    )
+    non_standard_category = cur.fetchone()[0]
 
     print(f"\n=== 验证 ===")
+    print(f"  pipeline_systems[{SYSTEM_ID}] count: {sys_count}")
     print(f"  站场总数: {total_stations}")
     print(f"  管段总数: {total_segments}")
     print(f"  零坐标:   {zero_coords}")
+    print(f"  非标准 category 管段: {non_standard_category}")
 
     # 打印完整坐标链
     print(f"\n=== 坐标链 ===")

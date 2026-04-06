@@ -17,11 +17,23 @@ export default defineConfig(({ mode }) => {
       hmr: {
         overlay: false,
       },
-      // API 代理 - 将工作流 API 转发到后端
+      // API 代理 - 将工作流 API 转发到后端 (修改为 8080 避开系统保留端口冲突)
       // NOTE: 将所有 /api 请求代理到后端，包括工作流、AI 助手等所有 API
       proxy: {
         '/api': {
-          target: 'http://localhost:8000',
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+        },
+        '/topology': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+        },
+        '/docs': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+        },
+        '/openapi.json': {
+          target: 'http://localhost:8080',
           changeOrigin: true,
         },
       },

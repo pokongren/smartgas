@@ -6,10 +6,17 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import MapView from '@/components/map-view/MapView'
 import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
-import { invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
 import type { PipelinePackage } from '@/data/pipelines/types'
+import type { SimulationResult } from '@/services/api'
+import {
+    topologyEditorApi,
+    type JunctionGroup,
+    type PositionPreviewResult,
+} from '@/services/topologyEditorApi'
 import type { PipelineNode, PipelineLine } from '@/types'
 import {
     validateTopology,
@@ -19,10 +26,9 @@ import {
 import type { ValidationReport } from '@/utils/topology-validator'
 import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
 import type { CutoffResult } from '@/utils/cutoff-simulator'
-import type { SimulationResult } from '../services/api'
 
 // ================== 类型 ==================
-type PointType = 'station' | 'valve' | 'distribution' | 'compressor'
+type PointType = 'station' | 'valve' | 'distribution' | 'compressor' | 'junction'
 type EditMode = 'view' | 'draw-point' | 'connect' | 'merge'
 type PanelTab = 'edit' | 'validate' | 'search' | 'centrality' | 'cutoff'
 
@@ -34,6 +40,8 @@ interface TopoNode {
     sourceNodeIds?: string[]
     junctionId?: number
     isJunction?: boolean
+    junctionKind?: string
+    sourceTable?: string
     marker?: any
 }
 
@@ -60,30 +68,28 @@ interface BaseTopoEdge {
     name?: string
 }
 
-interface JunctionGroup {
-    id: number
-    name: string
-    description?: string | null
-    station_ids: string[]
-}
+function resolveFocusTarget(nodes: TopoNode[], focusNodeId: string): TopoNode | null {
+    const directNode = nodes.find(node => node.id === focusNodeId)
+    if (directNode) return directNode
 
-interface PositionPreviewResult {
-    updated_station_ids: string[]
-    updated_valve_ids: string[]
-    affected_layers: string[]
-    impacted_segments: Array<{
-        start_id: string
-        end_id: string
-        valve_ids: string[]
-    }>
-    errors: Array<{ id?: string | null; error: string }>
-    preview_only?: boolean
+    const sourceNode = nodes.find(node => node.sourceNodeIds?.includes(focusNodeId))
+    if (sourceNode) return sourceNode
+
+    if (focusNodeId.startsWith('JUNCTION-')) {
+        const junctionId = Number.parseInt(focusNodeId.slice('JUNCTION-'.length), 10)
+        if (Number.isFinite(junctionId)) {
+            return nodes.find(node => node.junctionId === junctionId) || null
+        }
+    }
+
+    return null
 }
 
 // ================== 拓扑样式（极简圆点 + 颜色区分） ==================
 const TOPO_COLORS: Record<PointType, string> = {
     compressor: '#FF9800',
     distribution: '#2196F3',
+    junction: '#00e5ff',
     station: '#F44336',
     valve: '#9E9E9E',
 }
@@ -91,6 +97,7 @@ const TOPO_COLORS: Record<PointType, string> = {
 const TOPO_LABELS: Record<PointType, string> = {
     compressor: '压气站',
     distribution: '分输站',
+    junction: '交汇枢纽',
     station: '站场',
     valve: '阀室',
 }
@@ -98,8 +105,17 @@ const TOPO_LABELS: Record<PointType, string> = {
 const TOPO_SIZES: Record<PointType, number> = {
     compressor: 10,
     distribution: 8,
+    junction: 9,
     station: 8,
     valve: 5,
+}
+
+const MANUAL_JUNCTION_EDIT_ENABLED_BY_DEFAULT =
+    String(import.meta.env.VITE_TOPOLOGY_MANUAL_JUNCTION_EDIT ?? '1').trim() !== '0'
+const JUNCTION_READONLY_HINT = '当前枢纽由运行时重编结果维护，编辑器仅支持只读查看，不再以手工捏合作为主流程。'
+const JUNCTION_MODE_LABELS: Record<string, string> = {
+    runtime_readonly: '只读模式',
+    legacy_editable: '旧流程兼容',
 }
 
 const LINE_COLOR = '#34d399'
@@ -110,7 +126,7 @@ const TYPE_MAP: Record<string, PointType> = {
     regulator: 'compressor',
     metering: 'distribution',
     valve: 'valve',
-    junction: 'station',
+    junction: 'junction',
     // NOTE: sj4 等新数据文件直接使用 compressor/distribution 等值
     compressor: 'compressor',
     distribution: 'distribution',
@@ -136,9 +152,11 @@ function createTopoMarkerContent(type: PointType, name: string = '', isHighlight
 
 // ================== 主组件 ==================
 const MapTopologyView: React.FC = () => {
+    const location = useLocation()
     const [mapInstance, setMapInstance] = useState<any>(null)
     const handleMapLoad = useCallback((map: any) => setMapInstance(map), [])
     const importedOnceRef = useRef(false)
+    const appliedFocusNodeRef = useRef<string | null>(null)
 
     // 管线数据异步加载
     const [pipelines, setPipelines] = useState<PipelinePackage[]>([])
@@ -154,10 +172,19 @@ const MapTopologyView: React.FC = () => {
     const [topoNodes, setTopoNodes] = useState<TopoNode[]>([])
     const [topoEdges, setTopoEdges] = useState<TopoEdge[]>([])
     const [junctionGroups, setJunctionGroups] = useState<JunctionGroup[]>([])
+    const [manualJunctionEditingEnabled, setManualJunctionEditingEnabled] = useState(
+        MANUAL_JUNCTION_EDIT_ENABLED_BY_DEFAULT
+    )
+    const [junctionMode, setJunctionMode] = useState<string>('runtime_readonly')
     const [editMode, setEditMode] = useState<EditMode>('view')
     const [pointType, setPointType] = useState<PointType>('station')
     const [connectFrom, setConnectFrom] = useState<string | null>(null)
     const [statusMsg, setStatusMsg] = useState('点击「导入拓扑」加载已有管线')
+    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+    const [mergeJunctionName, setMergeJunctionName] = useState('')
+    const [mergeJunctionDescription, setMergeJunctionDescription] = useState('')
+    const [isMerging, setIsMerging] = useState(false)
+    const [deletingJunctionId, setDeletingJunctionId] = useState<number | null>(null)
     const [activeTab, setActiveTab] = useState<PanelTab>('edit')
     const [searchText, setSearchText] = useState('')
     const [report, setReport] = useState<ValidationReport | null>(null)
@@ -176,10 +203,10 @@ const MapTopologyView: React.FC = () => {
     }>(null)
 
     // 撤销栈
-    type UndoAction = 
+    type UndoAction =
         | { type: 'add-node'; nodeId: string }
         | { type: 'add-edge'; edgeId: string }
-        | { type: 'create-junction'; junctionId: number; name: string; stationIds: string[] }
+        | { type: 'create-junction'; junctionId: number; name: string }
         | { type: 'delete-junction'; group: JunctionGroup }
     const [undoStack, setUndoStack] = useState<UndoAction[]>([])
 
@@ -195,8 +222,6 @@ const MapTopologyView: React.FC = () => {
     const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
     const [isPreviewing, setIsPreviewing] = useState(false)
 
-    // 合建站：合并模式状态
-    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
     // 已高亮的 marker 原始 content，用于恢复
     const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
 
@@ -213,14 +238,7 @@ const MapTopologyView: React.FC = () => {
 
     // ================== 收集全部管线原始数据（不传给 MapView，仅供导入用） ==================
     const rawPipelineData = useMemo(() => {
-        const nodes: PipelineNode[] = []
-        const lines: PipelineLine[] = []
-        for (const pkg of pipelines) {
-            for (const layer of pkg.layers) {
-                for (const n of layer.nodes) nodes.push(n)
-                for (const l of layer.lines) lines.push(l)
-            }
-        }
+        const { nodes, lines } = buildPipelineDataFromPackages(pipelines)
         return { nodes, lines }
     }, [pipelines])
 
@@ -263,17 +281,44 @@ const MapTopologyView: React.FC = () => {
 
     const loadJunctionGroups = useCallback(async () => {
         try {
-            const res = await fetch('/api/topology/junctions')
-            if (!res.ok) throw new Error(`HTTP ${res.status}`)
-            const data = await res.json()
-            setJunctionGroups(Array.isArray(data.junctions) ? data.junctions : [])
-            return Array.isArray(data.junctions) ? data.junctions as JunctionGroup[] : []
+            const result = await topologyEditorApi.getJunctionGroups()
+            setJunctionGroups(result.junctions)
+            setManualJunctionEditingEnabled(result.manual_editing_enabled)
+            setJunctionMode(result.mode)
+            return result.junctions
         } catch (error) {
             console.error('[MapTopologyView] 枢纽组加载失败:', error)
-            setStatusMsg('加载枢纽组失败')
+            setStatusMsg(error instanceof Error ? `加载枢纽组失败：${error.message}` : '加载枢纽组失败')
             return []
         }
     }, [])
+
+    const isRuntimeReadonlyGroup = useCallback((group: JunctionGroup) => {
+        return group.source_table === 'junction_groups_rebuilt'
+    }, [])
+
+    const manualEditableJunctionGroups = useMemo(() => {
+        return junctionGroups.filter(group => !isRuntimeReadonlyGroup(group))
+    }, [junctionGroups, isRuntimeReadonlyGroup])
+
+    const selectedMergeNodeSet = useMemo(() => new Set(selectedMergeNodeIds), [selectedMergeNodeIds])
+    const selectedMergeNodes = useMemo(() => {
+        return topoNodes.filter(node => !node.isJunction && selectedMergeNodeSet.has(node.id))
+    }, [selectedMergeNodeSet, topoNodes])
+    const selectedMergeAutoName = useMemo(() => {
+        const names = selectedMergeNodes.map(node => node.name).filter(Boolean)
+        if (names.length === 0) return ''
+        if (names.length === 1) return `${names[0]}枢纽`
+        const preview = names.slice(0, 2).join(' / ')
+        return `${preview}${names.length > 2 ? ` 等 ${names.length} 站` : ''}枢纽`
+    }, [selectedMergeNodes])
+    const selectedJunctionGroup = useMemo(() => {
+        if (!selectedNode?.isJunction || !selectedNode.junctionId) return null
+        return junctionGroups.find(group => group.id === selectedNode.junctionId) ?? null
+    }, [junctionGroups, selectedNode])
+    const canDeleteSelectedJunction = !!(
+        selectedJunctionGroup && !isRuntimeReadonlyGroup(selectedJunctionGroup)
+    )
 
     const buildCollapsedGraph = useCallback((
         nodes: BaseTopoNode[],
@@ -295,11 +340,13 @@ const MapTopologyView: React.FC = () => {
             displayNodes.push({
                 id: junctionNodeId,
                 name: group.name,
-                type: 'station',
+                type: 'junction',
                 position: [centerLng, centerLat],
                 sourceNodeIds: [...group.station_ids],
                 junctionId: group.id,
                 isJunction: true,
+                junctionKind: group.junction_kind,
+                sourceTable: group.source_table,
             })
         })
 
@@ -423,9 +470,47 @@ const MapTopologyView: React.FC = () => {
         mapInstance.setDefaultCursor(editMode === 'view' ? 'grab' : 'crosshair')
         if (editMode === 'draw-point') setStatusMsg(`绘制：点击地图添加「${TOPO_LABELS[pointType]}」`)
         else if (editMode === 'connect') { setStatusMsg('连线：点击起点节点'); setConnectFrom(null) }
-        else if (editMode === 'merge') { setStatusMsg('捏合：点击节点进行多选，再点击「创建枢纽」'); setConnectFrom(null) }
         else setStatusMsg('浏览模式')
     }, [editMode, pointType, mapInstance])
+
+    useEffect(() => {
+        if (editMode !== 'merge') return
+        setConnectFrom(null)
+        setStatusMsg('手工捏合：点击底层站点加入/移除，再在左侧创建枢纽')
+    }, [editMode])
+
+    const paintMergeSelection = useCallback((selectedIds: Set<string>) => {
+        for (const node of nodesRef.current) {
+            if (!node.marker) continue
+            const isSelected = !node.isJunction && selectedIds.has(node.id)
+            node.marker.setContent(createTopoMarkerContent(node.type, node.name, isSelected, !!node.isJunction))
+        }
+    }, [])
+
+    useEffect(() => {
+        if (editMode !== 'merge') {
+            if (selectedMergeNodeIds.length > 0) {
+                setSelectedMergeNodeIds([])
+            }
+            if (mergeJunctionName) {
+                setMergeJunctionName('')
+            }
+            if (mergeJunctionDescription) {
+                setMergeJunctionDescription('')
+            }
+            paintMergeSelection(new Set())
+            return
+        }
+        paintMergeSelection(selectedMergeNodeSet)
+    }, [
+        editMode,
+        mergeJunctionDescription,
+        mergeJunctionName,
+        paintMergeSelection,
+        selectedMergeNodeIds.length,
+        selectedMergeNodeSet,
+        topoNodes,
+    ])
 
     // ================== 节点操作 ==================
     const doAddNode = (lnglat: any, type: PointType) => {
@@ -441,33 +526,7 @@ const MapTopologyView: React.FC = () => {
     /** 拖拽后同步关联管线 */
     const syncEdges = (_nodeId: string, _newPos: [number, number]) => {}
 
-    const extractShiftPressed = (event: any) => {
-        return Boolean(
-            event?.originEvent?.shiftKey ??
-            event?.originEvent?.domEvent?.shiftKey ??
-            event?.domEvent?.shiftKey
-        )
-    }
-
-    const toggleMergeSelection = useCallback((nodeId: string) => {
-        const clickedNode = nodesRef.current.find(node => node.id === nodeId)
-        const targetIds = clickedNode?.isJunction && clickedNode.sourceNodeIds?.length
-            ? clickedNode.sourceNodeIds
-            : [nodeId]
-
-        setSelectedMergeNodeIds(prev => {
-            const shouldRemove = targetIds.every(id => prev.includes(id))
-            const next = shouldRemove
-                ? prev.filter(id => !targetIds.includes(id))
-                : [...prev, ...targetIds.filter(id => !prev.includes(id))]
-            setStatusMsg(`已选择 ${next.length} 个待捏合节点`)
-            return next
-        })
-    }, [])
-
-    const doNodeClick = (nodeId: string, event?: any) => {
-        const shiftPressed = extractShiftPressed(event)
-
+    const doNodeClick = (nodeId: string) => {
         if (modeRef.current === 'connect') {
             const from = cfRef.current
             if (!from) {
@@ -482,12 +541,28 @@ const MapTopologyView: React.FC = () => {
             }
             return
         }
-        if (modeRef.current === 'merge' || shiftPressed) {
-            toggleMergeSelection(nodeId)
+
+        const clickedNode = nodesRef.current.find(n => n.id === nodeId) || null
+
+        if (modeRef.current === 'merge') {
+            if (!clickedNode) return
+            if (clickedNode.isJunction) {
+                setStatusMsg('手工捏合请选底层站点，枢纽节点不能直接捏合')
+                setSelectedNode(clickedNode)
+                return
+            }
+
+            setSelectedNode(clickedNode)
+            setSelectedMergeNodeIds(prev => {
+                const next = prev.includes(nodeId)
+                    ? prev.filter(id => id !== nodeId)
+                    : [...prev, nodeId]
+                setStatusMsg(`已选择 ${next.length} 个站点用于手工捏合`)
+                return next
+            })
             return
         }
 
-        const clickedNode = nodesRef.current.find(n => n.id === nodeId) || null
         setSelectedNode(clickedNode)
 
         // 截断模式：点击节点设为截断点
@@ -519,80 +594,6 @@ const MapTopologyView: React.FC = () => {
     // ================== 导入：将 ALL_PIPELINES 数据转为纯拓扑点+线（阀室链路合并） ==================
 
     // ================== 撤销操作 ==================
-    const restoreSelectionHighlights = useCallback(() => {
-        nodesRef.current.forEach(node => {
-            if (!node.marker) return
-            const isHighlighted = selectedMergeNodeIds.includes(node.id)
-            node.marker.setContent(createTopoMarkerContent(node.type, node.name, isHighlighted, !!node.isJunction))
-        })
-    }, [selectedMergeNodeIds])
-
-    useEffect(() => {
-        restoreSelectionHighlights()
-    }, [restoreSelectionHighlights, topoNodes])
-
-    const handleCreateJunction = useCallback(async () => {
-        if (selectedMergeNodeIds.length < 2) {
-            setStatusMsg('至少选择两个节点才能捏合')
-            return
-        }
-
-        const selectedNodes = baseTopoNodes.filter(node => selectedMergeNodeIds.includes(node.id))
-        const defaultName = selectedNodes.map(node => node.name).slice(0, 2).join('-') || `联合枢纽-${Date.now().toString().slice(-4)}`
-        const junctionName = window.prompt('请输入枢纽名称', `${defaultName}枢纽`)
-        if (!junctionName?.trim()) return
-
-        try {
-            const res = await fetch('/api/topology/junctions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: junctionName.trim(),
-                    station_ids: selectedMergeNodeIds,
-                    description: 'MapTopologyView 创建',
-                }),
-            })
-            if (!res.ok) throw new Error(await res.text())
-
-            const data = await res.json()
-            invalidatePipelineCache()
-            await loadJunctionGroups()
-            setUndoStack(prev => [...prev, {
-                type: 'create-junction',
-                junctionId: data.id,
-                name: junctionName.trim(),
-                stationIds: [...selectedMergeNodeIds],
-            }])
-            setSelectedMergeNodeIds([])
-            setEditMode('view')
-            setStatusMsg(`已捏合 ${selectedMergeNodeIds.length} 个节点为「${junctionName.trim()}」`)
-        } catch (error) {
-            console.error(error)
-            setStatusMsg('创建枢纽失败')
-        }
-    }, [baseTopoNodes, loadJunctionGroups, selectedMergeNodeIds])
-
-    const handleDeleteJunction = useCallback((group: JunctionGroup) => {
-        if (!window.confirm(`确认拆分枢纽「${group.name}」，并恢复 ${group.station_ids.length} 个底层站点吗？`)) {
-            return
-        }
-        ; (async () => {
-            try {
-                const res = await fetch(`/api/topology/junctions/${group.id}`, { method: 'DELETE' })
-                if (!res.ok) throw new Error(await res.text())
-                invalidatePipelineCache()
-                await loadJunctionGroups()
-                setUndoStack(prev => [...prev, { type: 'delete-junction', group }])
-                setSelectedNode(null)
-                setSelectedMergeNodeIds([])
-                setStatusMsg(`枢纽「${group.name}」已拆分`)
-            } catch (error) {
-                console.error(error)
-                setStatusMsg('拆分枢纽失败')
-            }
-        })()
-    }, [loadJunctionGroups])
-
     const doUndo = useCallback(async () => {
         const stack = [...undoStack]
         const action = stack.pop()
@@ -610,34 +611,28 @@ const MapTopologyView: React.FC = () => {
             setStatusMsg(`已撤销: 删除 ${node?.name || '节点'}`)
         } else if (action.type === 'create-junction') {
             try {
-                const res = await fetch(`/api/topology/junctions/${action.junctionId}`, { method: 'DELETE' })
-                if (!res.ok) throw new Error(await res.text())
+                await topologyEditorApi.deleteJunctionGroup(action.junctionId)
                 invalidatePipelineCache()
                 await loadJunctionGroups()
                 setSelectedNode(null)
                 setStatusMsg(`已撤销: 拆分枢纽「${action.name}」`)
             } catch (error) {
                 console.error(error)
-                setStatusMsg('撤销枢纽创建失败')
+                setStatusMsg(error instanceof Error ? `撤销枢纽创建失败：${error.message}` : '撤销枢纽创建失败')
             }
         } else if (action.type === 'delete-junction') {
             try {
-                const res = await fetch('/api/topology/junctions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: action.group.name,
-                        station_ids: action.group.station_ids,
-                        description: action.group.description,
-                    }),
+                await topologyEditorApi.createJunctionGroup({
+                    name: action.group.name,
+                    station_ids: action.group.station_ids,
+                    description: action.group.description ?? undefined,
                 })
-                if (!res.ok) throw new Error(await res.text())
                 invalidatePipelineCache()
                 await loadJunctionGroups()
                 setStatusMsg(`已撤销: 恢复枢纽「${action.group.name}」`)
             } catch (error) {
                 console.error(error)
-                setStatusMsg('撤销枢纽拆分失败')
+                setStatusMsg(error instanceof Error ? `撤销枢纽拆分失败：${error.message}` : '撤销枢纽拆分失败')
             }
         }
     }, [baseTopoNodes, loadJunctionGroups, undoStack])
@@ -665,7 +660,6 @@ const MapTopologyView: React.FC = () => {
         setTopoNodes([])
         setTopoEdges([])
         setSelectedNode(null)
-        setSelectedMergeNodeIds([])
 
         // ------- 阀室链路合并算法 -------
         // 1. 归类：哪些是阀室、哪些是站场
@@ -766,6 +760,27 @@ const MapTopologyView: React.FC = () => {
         setSelectedNode(nextSelected)
     }, [selectedNode?.id, topoNodes])
 
+    const flyTo = useCallback((node: TopoNode) => {
+        if (!mapInstance) return
+        mapInstance.setZoomAndCenter(10, node.position, true, 500)
+        setStatusMsg(`已定位: ${node.name}`)
+    }, [mapInstance])
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search)
+        const focusNodeId = params.get('focusNode')
+        if (!focusNodeId || topoNodes.length === 0) return
+        if (appliedFocusNodeRef.current === focusNodeId) return
+
+        const targetNode = resolveFocusTarget(topoNodes, focusNodeId)
+        if (!targetNode) return
+
+        appliedFocusNodeRef.current = focusNodeId
+        flyTo(targetNode)
+        setSelectedNode(targetNode)
+        setStatusMsg(`已从地图联动定位到拓扑节点：${targetNode.name}`)
+    }, [flyTo, location.search, topoNodes])
+
     // ================== 截断仿真 ==================
     const runCutoffSimulation = useCallback(() => {
         if (!cutoffNodeId || topoNodes.length === 0) return
@@ -860,12 +875,6 @@ const MapTopologyView: React.FC = () => {
         return topoNodes.filter(n => n.name.toLowerCase().includes(kw))
     }, [searchText, topoNodes])
 
-    const flyTo = useCallback((node: TopoNode) => {
-        if (!mapInstance) return
-        mapInstance.setZoomAndCenter(10, node.position, true, 500)
-        setStatusMsg(`已定位: ${node.name}`)
-    }, [mapInstance])
-
     // ================== 导出 ==================
     const exportJSON = () => {
         const obj = {
@@ -899,6 +908,73 @@ const MapTopologyView: React.FC = () => {
         setStatusMsg('已清空')
     }
 
+    const handleCreateManualJunction = useCallback(async () => {
+        if (!manualJunctionEditingEnabled) {
+            setStatusMsg('当前环境未开放手工捏合写入')
+            return
+        }
+        if (selectedMergeNodeIds.length < 2 || isMerging) return
+
+        const name = mergeJunctionName.trim() || selectedMergeAutoName
+        if (!name) {
+            setStatusMsg('请先选择至少两个站点，再创建捏合枢纽')
+            return
+        }
+
+        setIsMerging(true)
+        try {
+            const result = await topologyEditorApi.createJunctionGroup({
+                name,
+                description: mergeJunctionDescription.trim() || undefined,
+                station_ids: selectedMergeNodeIds,
+            })
+            invalidatePipelineCache()
+            await loadJunctionGroups()
+            setUndoStack(prev => [...prev, { type: 'create-junction', junctionId: result.id, name }])
+            setEditMode('view')
+            setSelectedMergeNodeIds([])
+            setMergeJunctionName('')
+            setMergeJunctionDescription('')
+            setStatusMsg(`已创建手工捏合枢纽：${name}`)
+        } catch (error) {
+            console.error(error)
+            setStatusMsg(error instanceof Error ? `创建手工捏合失败：${error.message}` : '创建手工捏合失败')
+        } finally {
+            setIsMerging(false)
+        }
+    }, [
+        isMerging,
+        loadJunctionGroups,
+        manualJunctionEditingEnabled,
+        mergeJunctionDescription,
+        mergeJunctionName,
+        selectedMergeAutoName,
+        selectedMergeNodeIds,
+    ])
+
+    const handleDeleteManualJunction = useCallback(async (group: JunctionGroup) => {
+        if (isRuntimeReadonlyGroup(group) || deletingJunctionId === group.id) {
+            return
+        }
+
+        setDeletingJunctionId(group.id)
+        try {
+            await topologyEditorApi.deleteJunctionGroup(group.id)
+            invalidatePipelineCache()
+            await loadJunctionGroups()
+            setUndoStack(prev => [...prev, { type: 'delete-junction', group }])
+            setSelectedNode(current => (
+                current?.junctionId === group.id ? null : current
+            ))
+            setStatusMsg(`已拆分手工捏合枢纽：${group.name}`)
+        } catch (error) {
+            console.error(error)
+            setStatusMsg(error instanceof Error ? `拆分手工捏合失败：${error.message}` : '拆分手工捏合失败')
+        } finally {
+            setDeletingJunctionId(null)
+        }
+    }, [deletingJunctionId, isRuntimeReadonlyGroup, loadJunctionGroups])
+
     const handleSavePositions = useCallback(async () => {
         if (dirtyPositions.size === 0 || isSaving) return
         setIsSaving(true)
@@ -908,18 +984,11 @@ const MapTopologyView: React.FC = () => {
                 longitude: position[0],
                 latitude: position[1],
             }))
-            const res = await fetch('/api/topology/positions/commit', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    updates,
-                    cascade_valves: cascadeValves,
-                    cascade_scope: 'segment',
-                }),
+            const data = await topologyEditorApi.commitPositions({
+                updates,
+                cascade_valves: cascadeValves,
+                cascade_scope: 'segment',
             })
-            if (!res.ok) throw new Error(await res.text())
-
-            const data = await res.json()
             invalidatePipelineCache()
             const packages = await loadAllPipelines()
             setPipelines(packages)
@@ -930,7 +999,7 @@ const MapTopologyView: React.FC = () => {
             )
         } catch (error) {
             console.error(error)
-            setStatusMsg('保存点位失败')
+            setStatusMsg(error instanceof Error ? `保存点位失败：${error.message}` : '保存点位失败')
         } finally {
             setIsSaving(false)
         }
@@ -945,30 +1014,102 @@ const MapTopologyView: React.FC = () => {
                 longitude: position[0],
                 latitude: position[1],
             }))
-            const res = await fetch('/api/topology/positions/preview', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    updates,
-                    cascade_valves: cascadeValves,
-                    cascade_scope: 'segment',
-                }),
+            const data = await topologyEditorApi.previewPositions({
+                updates,
+                cascade_valves: cascadeValves,
+                cascade_scope: 'segment',
             })
-            if (!res.ok) throw new Error(await res.text())
-            const data = await res.json()
             setPositionPreview(data)
             setStatusMsg(
                 `预览完成：将影响 ${data.updated_station_ids?.length ?? 0} 个主点、${data.updated_valve_ids?.length ?? 0} 个阀室`
             )
         } catch (error) {
             console.error(error)
-            setStatusMsg('预览影响失败')
+            setStatusMsg(error instanceof Error ? `预览影响失败：${error.message}` : '预览影响失败')
         } finally {
             setIsPreviewing(false)
         }
     }, [cascadeValves, dirtyPositions, isPreviewing, isSaving])
 
     // ================== 实时统计 ==================
+    const createManualJunction = useCallback(async () => {
+        if (!manualJunctionEditingEnabled) {
+            setStatusMsg('当前后端处于只读模式，不能创建手工捏合')
+            return
+        }
+        if (selectedMergeNodeIds.length < 2) {
+            setStatusMsg('至少选择 2 个底层站点才能创建手工捏合')
+            return
+        }
+        if (isMerging) return
+
+        const fallbackName = `手工枢纽-${new Date().toISOString().slice(0, 10)}`
+        const payloadName = mergeJunctionName.trim() || fallbackName
+
+        setIsMerging(true)
+        try {
+            const result = await topologyEditorApi.createJunctionGroup({
+                name: payloadName,
+                description: mergeJunctionDescription.trim() || undefined,
+                station_ids: selectedMergeNodeIds,
+            })
+            setUndoStack(prev => [...prev, { type: 'create-junction', junctionId: result.id, name: payloadName }])
+            setSelectedMergeNodeIds([])
+            setMergeJunctionName('')
+            setMergeJunctionDescription('')
+            invalidatePipelineCache()
+            await loadJunctionGroups()
+            setStatusMsg(`手工捏合已创建：${payloadName}`)
+        } catch (error) {
+            console.error(error)
+            setStatusMsg(error instanceof Error ? `创建手工捏合失败：${error.message}` : '创建手工捏合失败')
+        } finally {
+            setIsMerging(false)
+        }
+    }, [
+        isMerging,
+        loadJunctionGroups,
+        manualJunctionEditingEnabled,
+        mergeJunctionDescription,
+        mergeJunctionName,
+        selectedMergeNodeIds,
+    ])
+
+    const removeManualJunction = useCallback(async (group: JunctionGroup) => {
+        if (!manualJunctionEditingEnabled) {
+            setStatusMsg('当前后端处于只读模式，不能删除手工捏合')
+            return
+        }
+        if (isRuntimeReadonlyGroup(group)) {
+            setStatusMsg('这是运行时重编枢纽，不能在这里删除')
+            return
+        }
+        if (deletingJunctionId === group.id) return
+
+        setDeletingJunctionId(group.id)
+        try {
+            await topologyEditorApi.deleteJunctionGroup(group.id)
+            setUndoStack(prev => [...prev, { type: 'delete-junction', group }])
+            invalidatePipelineCache()
+            await loadJunctionGroups()
+            if (selectedNode?.junctionId === group.id) {
+                setSelectedNode(null)
+            }
+            setStatusMsg(`已拆分手工捏合：${group.name}`)
+        } catch (error) {
+            console.error(error)
+            setStatusMsg(error instanceof Error ? `拆分手工捏合失败：${error.message}` : '拆分手工捏合失败')
+        } finally {
+            setDeletingJunctionId(null)
+        }
+    }, [
+        deletingJunctionId,
+        isRuntimeReadonlyGroup,
+        loadJunctionGroups,
+        manualJunctionEditingEnabled,
+        selectedNode?.junctionId,
+    ])
+
     const stats = useMemo(() => ({
         nodes: topoNodes.length,
         edges: topoEdges.length,
@@ -1040,12 +1181,11 @@ const MapTopologyView: React.FC = () => {
                             <div className="space-y-3">
                                 <div>
                                     <p className="text-[10px] text-gray-500 mb-1.5 uppercase tracking-wider">操作模式</p>
-                                    <div className="grid grid-cols-4 gap-1.5">
+                                    <div className="grid grid-cols-3 gap-1.5">
                                         {([
                                             { m: 'view' as EditMode, label: '浏览', icon: 'pan_tool' },
                                             { m: 'draw-point' as EditMode, label: '添点', icon: 'add_location' },
                                             { m: 'connect' as EditMode, label: '连线', icon: 'timeline' },
-                                            { m: 'merge' as EditMode, label: '捏合', icon: 'hub' },
                                         ]).map(item => (
                                             <button key={item.m} onClick={() => setEditMode(item.m)}
                                                 className={`py-2 rounded-lg text-[11px] transition-all flex flex-col items-center gap-0.5
@@ -1053,6 +1193,44 @@ const MapTopologyView: React.FC = () => {
                                                 <span className="material-symbols-outlined text-base">{item.icon}</span>{item.label}
                                             </button>
                                         ))}
+                                    </div>
+                                    {manualJunctionEditingEnabled && (
+                                        <button
+                                            onClick={() => setEditMode('merge')}
+                                            className={`mt-2 w-full py-2 rounded-lg text-[11px] transition-all flex items-center justify-center gap-1.5
+                                                ${editMode === 'merge' ? 'bg-purple-700/80 text-white' : 'bg-purple-900/40 text-purple-200 hover:bg-purple-800/50'}`}
+                                        >
+                                            <span className="material-symbols-outlined text-sm">hub</span>
+                                            兼容手工捏合（旧流程）
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="border border-sky-500/20 bg-sky-950/20 rounded-lg p-2.5 space-y-2">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="text-[10px] text-sky-300 uppercase tracking-wider">运行时枢纽</p>
+                                        <span className="text-[10px] text-sky-400">
+                                            {JUNCTION_MODE_LABELS[junctionMode] || junctionMode}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-300 leading-5">{JUNCTION_READONLY_HINT}</p>
+                                    <div className="grid grid-cols-3 gap-2 text-[11px]">
+                                        <div className="rounded bg-white/5 px-2 py-2">
+                                            <div className="text-gray-500">枢纽数</div>
+                                            <div className="mt-1 text-white font-medium">{junctionGroups.length}</div>
+                                        </div>
+                                        <div className="rounded bg-white/5 px-2 py-2">
+                                            <div className="text-gray-500">大枢纽</div>
+                                            <div className="mt-1 text-white font-medium">
+                                                {junctionGroups.filter(group => group.junction_kind === 'major_junction').length}
+                                            </div>
+                                        </div>
+                                        <div className="rounded bg-white/5 px-2 py-2">
+                                            <div className="text-gray-500">覆盖站点</div>
+                                            <div className="mt-1 text-white font-medium">
+                                                {junctionGroups.reduce((sum, group) => sum + (group.member_count ?? group.station_ids.length ?? 0), 0)}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -1072,52 +1250,96 @@ const MapTopologyView: React.FC = () => {
                                     </div>
                                 )}
 
-                                {(editMode === 'merge' || selectedMergeNodeIds.length > 0) && (
+                                {editMode === 'merge' && (
                                     <div className="border border-purple-500/20 bg-purple-950/20 rounded-lg p-2.5 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-[10px] text-purple-300 uppercase tracking-wider">待捏合节点</p>
-                                            <span className="text-[10px] text-purple-400">{selectedMergeNodeIds.length} 个</span>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="text-[10px] text-purple-300 uppercase tracking-wider">手工捏合</p>
+                                            <span className="text-[10px] text-purple-400">已选 {selectedMergeNodeIds.length} 站</span>
                                         </div>
-                                        <div className="max-h-28 overflow-y-auto space-y-1">
-                                            {selectedMergeNodeIds.length === 0 && (
-                                                <p className="text-[10px] text-gray-500">进入捏合模式后点击节点，或在浏览模式按住 Shift 进行多选。</p>
-                                            )}
-                                            {selectedMergeNodeIds.map(nodeId => {
-                                                const node = baseTopoNodes.find(item => item.id === nodeId)
-                                                    ?? topoNodes.find(item => item.id === nodeId)
-                                                if (!node) return null
-                                                return (
-                                                    <div key={nodeId} className="flex items-center gap-2 text-[11px] bg-white/5 rounded px-2 py-1">
-                                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TOPO_COLORS[node.type] }} />
-                                                        <span className="text-gray-200 flex-1 truncate">{node.name}</span>
-                                                        <button
-                                                            onClick={() => toggleMergeSelection(nodeId)}
-                                                            className="text-gray-500 hover:text-red-400 transition-colors"
-                                                        >
-                                                            <span className="material-symbols-outlined text-sm">close</span>
-                                                        </button>
+                                        <p className="text-xs text-gray-300 leading-5">
+                                            这块是修正入口。点地图上的底层站点，把需要归成同一个枢纽的站选出来，再创建覆盖层。
+                                            运行时重编结果继续作为底座，手工捏合只覆盖你明确选中的站点。
+                                        </p>
+                                        <input
+                                            value={mergeJunctionName}
+                                            onChange={e => setMergeJunctionName(e.target.value)}
+                                            placeholder={selectedMergeAutoName || '给这次手工捏合起个名字'}
+                                            className="w-full rounded-lg border border-purple-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none focus:border-purple-400"
+                                        />
+                                        <textarea
+                                            value={mergeJunctionDescription}
+                                            onChange={e => setMergeJunctionDescription(e.target.value)}
+                                            placeholder="可选：写下修正原因，后面复盘更容易看懂"
+                                            rows={3}
+                                            className="w-full resize-none rounded-lg border border-purple-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none focus:border-purple-400"
+                                        />
+                                        <div className="rounded-lg bg-black/20 p-2">
+                                            <div className="flex items-center justify-between text-[10px] text-gray-400">
+                                                <span>本次选中的站点</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedMergeNodeIds([])}
+                                                    disabled={selectedMergeNodeIds.length === 0}
+                                                    className="text-gray-400 hover:text-white disabled:opacity-40"
+                                                >
+                                                    清空
+                                                </button>
+                                            </div>
+                                            <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
+                                                {selectedMergeNodes.length > 0 ? selectedMergeNodes.map(node => (
+                                                    <div key={node.id} className="flex items-center gap-2 rounded bg-white/5 px-2 py-1 text-xs text-gray-200">
+                                                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: TOPO_COLORS[node.type] }} />
+                                                        <span className="flex-1 truncate">{node.name}</span>
+                                                        <span className="text-[10px] text-gray-500">{node.id}</span>
                                                     </div>
-                                                )
-                                            })}
+                                                )) : (
+                                                    <div className="rounded bg-white/5 px-2 py-2 text-xs text-gray-500">
+                                                        还没选站点。先去地图上点两个及以上底层站点。
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="flex gap-1.5">
-                                            <button
-                                                onClick={() => setSelectedMergeNodeIds([])}
-                                                disabled={selectedMergeNodeIds.length === 0}
-                                                className="flex-1 bg-gray-800/60 hover:bg-gray-700 text-gray-300 py-2 rounded-lg text-xs transition-colors disabled:opacity-40"
-                                            >
-                                                清空选择
-                                            </button>
-                                            <button
-                                                onClick={() => void handleCreateJunction()}
-                                                disabled={selectedMergeNodeIds.length < 2}
-                                                className="flex-1 bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
-                                            >
-                                                <span className="material-symbols-outlined text-sm">hub</span>创建枢纽
-                                            </button>
+                                        <button
+                                            onClick={() => void handleCreateManualJunction()}
+                                            disabled={selectedMergeNodeIds.length < 2 || isMerging}
+                                            className="w-full bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">hub</span>
+                                            {isMerging ? '创建中...' : '创建手工捏合枢纽'}
+                                        </button>
+                                        <div className="rounded-lg border border-white/10 bg-black/10 p-2">
+                                            <div className="flex items-center justify-between text-[10px] text-gray-400">
+                                                <span>当前可拆分的手工捏合</span>
+                                                <span>{manualEditableJunctionGroups.length} 个</span>
+                                            </div>
+                                            <div className="mt-2 max-h-32 space-y-1 overflow-y-auto">
+                                                {manualEditableJunctionGroups.length > 0 ? manualEditableJunctionGroups.map(group => (
+                                                    <div key={group.id} className="rounded bg-white/5 px-2 py-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="flex-1 truncate text-xs text-gray-200">{group.name}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => void handleDeleteManualJunction(group)}
+                                                                disabled={deletingJunctionId === group.id}
+                                                                className="text-[10px] text-red-300 hover:text-red-200 disabled:opacity-40"
+                                                            >
+                                                                {deletingJunctionId === group.id ? '拆分中...' : '拆分'}
+                                                            </button>
+                                                        </div>
+                                                        <div className="mt-1 text-[10px] text-gray-500">
+                                                            覆盖 {group.member_count ?? group.station_ids.length} 个站点
+                                                        </div>
+                                                    </div>
+                                                )) : (
+                                                    <div className="rounded bg-white/5 px-2 py-2 text-xs text-gray-500">
+                                                        现在没有手工捏合覆盖层。
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 )}
+
 
                                 <div className="border border-cyan-500/20 bg-cyan-950/20 rounded-lg p-2.5 space-y-2">
                                     <div className="flex items-center justify-between">
@@ -1501,15 +1723,27 @@ const MapTopologyView: React.FC = () => {
                                             })}
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => {
-                                            const group = junctionGroups.find(item => item.id === selectedNode.junctionId)
-                                            if (group) handleDeleteJunction(group)
-                                        }}
-                                        className="w-full bg-red-700/80 hover:bg-red-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
-                                    >
-                                        <span className="material-symbols-outlined text-sm">device_hub</span>解除捏合
-                                    </button>
+                                    <div className="rounded-lg bg-black/15 px-3 py-2 text-xs text-gray-300 space-y-1">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span>来源</span>
+                                            <span className="text-[10px] text-gray-400">
+                                                {selectedJunctionGroup && isRuntimeReadonlyGroup(selectedJunctionGroup)
+                                                    ? '运行时重编'
+                                                    : '手工捏合覆盖'}
+                                            </span>
+                                        </div>
+                                        {selectedNode.junctionKind && (
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span>枢纽类型</span>
+                                                <span className="text-[10px] text-gray-400">{selectedNode.junctionKind}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {!manualJunctionEditingEnabled && (
+                                        <div className="rounded-lg border border-sky-500/20 bg-sky-950/20 px-3 py-2.5 text-xs text-gray-300 leading-5">
+                                            当前枢纽来自运行时重编影子表，继续作为拓扑枢纽参与展示和计算，但这里不再把手工拆分当主流程。
+                                        </div>
+                                    )}
                                     <button
                                         onClick={() => setHistoryChartTarget({
                                             junctionId: selectedNode.junctionId ? `JUNCTION-${selectedNode.junctionId}` : selectedNode.id,
@@ -1519,18 +1753,22 @@ const MapTopologyView: React.FC = () => {
                                     >
                                         <span className="material-symbols-outlined text-sm">show_chart</span>查看枢纽历史
                                     </button>
+                                    {canDeleteSelectedJunction && selectedJunctionGroup && (
+                                        <button
+                                            onClick={() => void handleDeleteManualJunction(selectedJunctionGroup)}
+                                            disabled={deletingJunctionId === selectedJunctionGroup.id}
+                                            className="w-full bg-red-900/60 hover:bg-red-800 text-red-200 py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1 disabled:opacity-40"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">account_tree_off</span>
+                                            {deletingJunctionId === selectedJunctionGroup.id ? '拆分中...' : '拆分这个手工捏合'}
+                                        </button>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="rounded-lg border border-gray-700/40 bg-white/5 p-3">
-                                    <button
-                                        onClick={() => {
-                                            setEditMode('merge')
-                                            toggleMergeSelection(selectedNode.id)
-                                        }}
-                                        className="w-full bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
-                                    >
-                                        <span className="material-symbols-outlined text-sm">hub</span>加入待捏合列表
-                                    </button>
+                                    <p className="text-xs text-gray-300 leading-5">
+                                        这里保留站点查看和点位编辑。枢纽关系由后台按交汇规则运行时生成，不再在这个面板里手工捏合。
+                                    </p>
                                 </div>
                             )}
                         </div>
