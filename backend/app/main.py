@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import create_db_and_tables
-from app.routers import basic, emergency, workflow, ai_assistant, topology_editor, topology_computation, scada, pipeline_packages, feishu
+from app.routers import basic, emergency, workflow, ai_assistant, topology_editor, topology_computation, scada, pipeline_packages, feishu, topology_simulation
 from app.mcp import setup_mcp
 # NOTE: 导入模型以触发 SQLModel 建表
 import app.workflow_models  # noqa: F401
@@ -75,6 +75,7 @@ app.include_router(topology_computation.router, tags=["拓扑网络：计算分�
 app.include_router(scada.router, tags=["SCADA：实时监测与数据集成"])
 app.include_router(pipeline_packages.router, tags=["管线数据包：分组与图层"])
 app.include_router(feishu.router, tags=["飞书集成"])
+app.include_router(topology_simulation.router, tags=["稳态仿真：压力流量求解"])
 
 # 挂载 MCP Server（/mcp 端点）
 setup_mcp(app)

@@ -12,9 +12,9 @@ export enum NodeImportance {
 export type ClusterDisplayMode = 'cluster' | 'expanded'
 
 export const NODE_LOD_THRESHOLDS = {
-    criticalZoom: 6,
-    highZoom: 10,
-    mediumZoom: 14,
+    criticalZoom: 4,   // 降为 4：全国视图 zoom 4-5 下枢纽（HIGH）也需要可见
+    highZoom: 7,       // 降为 7：省域视图开始显示压气站/分输站
+    mediumZoom: 13,    // 13 以上再显示阀室以外的普通节点
     valveMinZoom: 11,
     expandClusterZoom: 12,
 } as const
@@ -80,8 +80,15 @@ export function getNodeImportance(node: PipelineNode): NodeImportance {
     if (rawType === 'source') return NodeImportance.CRITICAL
     if (isLayerStartNode(node)) return NodeImportance.CRITICAL
     if (isCriticalJunctionNode(node, rawType)) return NodeImportance.CRITICAL
+
+    // Hub 超级节点（isHub=true）代表合并后的枢纽点，至少是 CRITICAL
+    // 确保在全国视图缩放级别（zoom 3-4）下始终可见
+    if ((node as any).isHub === true) return NodeImportance.CRITICAL
+
     if (rawType === 'junction') {
-        return getJunctionKind(node) === 'junction' ? NodeImportance.HIGH : NodeImportance.MEDIUM
+        const junctionKind = getJunctionKind(node)
+        if (junctionKind === 'major_junction') return NodeImportance.CRITICAL
+        return junctionKind === 'junction' ? NodeImportance.HIGH : NodeImportance.HIGH
     }
     if (rawType === 'compressor') return NodeImportance.HIGH
     if (rawType === 'storage') return NodeImportance.HIGH

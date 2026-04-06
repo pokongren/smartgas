@@ -4,6 +4,10 @@ import { loadAllPipelines } from '@/data/pipelines';
 import type { PipelinePackage } from '@/data/pipelines/types';
 import { resolveApiPath } from '@/services/apiBase';
 import { findIsolatedNodes, computeBetweennessCentrality, countComponents } from '@/utils/topology-validator';
+import { useSimulation } from '@/hooks/useSimulation';
+import { SimPanel } from '@/components/topology/SimPanel';
+import { MAINLINE_SCENARIOS } from '@/types/simulation';
+import type { SimulationOverlay } from '@/types/simulation';
 
 // ============ 类型定义 ============
 
@@ -271,7 +275,10 @@ function drawGraph(
     zoom: number,
     panX: number,
     panY: number,
+    simOverlay?: SimulationOverlay | null,
 ): void {
+    const simEdgeMap = new Map(simOverlay?.edges.map(e => [e.id, e]) ?? []);
+    const simNodeMap = new Map(simOverlay?.nodes.map(n => [n.id, n]) ?? []);
     ctx.save();
     ctx.clearRect(0, 0, width, height);
 
@@ -308,31 +315,39 @@ function drawGraph(
         const source = nodeMap.get(edge.source);
         const target = nodeMap.get(edge.target);
         if (!source || !target) continue;
-
-        const color = EDGE_COLORS[edge.category] || EDGE_COLORS.default;
+        const simEdge = simEdgeMap.get(edge.id);
+        const color = simEdge ? simEdge.color : (EDGE_COLORS[edge.category] || EDGE_COLORS.default);
+        const baseW = edge.category === 'trunk' ? 3 : 1.5;
         ctx.strokeStyle = color;
-        ctx.lineWidth = (edge.category === 'trunk' ? 3 : 1.5) / zoom;
-        ctx.globalAlpha = 0.6;
+        ctx.lineWidth = (simEdge ? baseW * simEdge.width_factor : baseW) / zoom;
+        ctx.globalAlpha = simEdge ? 0.85 : 0.6;
         ctx.setLineDash([]);
-
         ctx.beginPath();
         ctx.moveTo(source.x, source.y);
         ctx.lineTo(target.x, target.y);
         ctx.stroke();
-
-        // 箭头
-        const angle = Math.atan2(target.y - source.y, target.x - source.x);
+        const isRev = simEdge?.direction === 'reverse';
+        const angle = isRev
+            ? Math.atan2(source.y - target.y, source.x - target.x)
+            : Math.atan2(target.y - source.y, target.x - source.x);
         const arrowLen = 8 / zoom;
         const midX = (source.x + target.x) / 2;
         const midY = (source.y + target.y) / 2;
         ctx.fillStyle = color;
-        ctx.globalAlpha = 0.7;
+        ctx.globalAlpha = 0.85;
         ctx.beginPath();
         ctx.moveTo(midX + arrowLen * Math.cos(angle), midY + arrowLen * Math.sin(angle));
         ctx.lineTo(midX + arrowLen * Math.cos(angle + 2.5), midY + arrowLen * Math.sin(angle + 2.5));
         ctx.lineTo(midX + arrowLen * Math.cos(angle - 2.5), midY + arrowLen * Math.sin(angle - 2.5));
         ctx.closePath();
         ctx.fill();
+        if (simEdge && simEdge.flow_rate > 0 && zoom > 0.8) {
+            ctx.font = `${8 / zoom}px Inter, sans-serif`;
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.9;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${simEdge.flow_rate.toFixed(0)}`, midX, midY - 8 / zoom);
+        }
         ctx.globalAlpha = 1;
     }
 
@@ -423,22 +438,38 @@ function drawGraph(
             ctx.fillText(node.name, node.x, node.y + radius + 12 / zoom);
         }
 
-        // SCADA 实时参数挂载渲染（如果有数据则始终显示在节点正上方）
-        const scadaData = REAL_SCADA_DATA[node.name];
-        if (scadaData) {
-            const inText = `入 P:${scadaData.inP.toFixed(2)} ${scadaData.inT ? `T:${scadaData.inT}` : ''}`;
-            const outText = `出 P:${scadaData.outP.toFixed(2)} ${scadaData.outT ? `T:${scadaData.outT}` : ''}`;
-
+        // 仿真压力标签 / SCADA 历史数据（互斥显示）
+        const simNode = simNodeMap.get(node.id);
+        if (simNode) {
+            if (simNode.alert_level !== 'normal') {
+                const ac = simNode.alert_level === 'critical' ? '#ef4444' : '#f97316';
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, radius + 6, 0, Math.PI * 2);
+                ctx.strokeStyle = ac;
+                ctx.lineWidth = 2 / zoom;
+                ctx.setLineDash([3, 2]);
+                ctx.globalAlpha = 0.9;
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.globalAlpha = 1;
+            }
+            const pc = simNode.alert_level === 'critical' ? '#f87171' : simNode.alert_level === 'warning' ? '#fdba74' : '#34d399';
             ctx.textAlign = 'center';
-            ctx.font = `${9 / zoom}px Inter, sans-serif`;
-
-            // 绘制上方第一行：进站参数 (绿)
-            ctx.fillStyle = '#10b981';
-            ctx.fillText(inText, node.x, node.y - radius - 14 / zoom);
-
-            // 绘制上方第二行：出站参数 (蓝)
-            ctx.fillStyle = '#3b82f6';
-            ctx.fillText(outText, node.x, node.y - radius - 4 / zoom);
+            ctx.font = `bold ${9 / zoom}px Inter, sans-serif`;
+            ctx.fillStyle = pc;
+            ctx.fillText(`${simNode.pressure_mpa.toFixed(2)} MPa`, node.x, node.y - radius - 6 / zoom);
+        } else {
+            const scadaData = REAL_SCADA_DATA[node.name];
+            if (scadaData) {
+                const inText = `入 P:${scadaData.inP.toFixed(2)} ${scadaData.inT ? `T:${scadaData.inT}` : ''}`;
+                const outText = `出 P:${scadaData.outP.toFixed(2)} ${scadaData.outT ? `T:${scadaData.outT}` : ''}`;
+                ctx.textAlign = 'center';
+                ctx.font = `${9 / zoom}px Inter, sans-serif`;
+                ctx.fillStyle = '#10b981';
+                ctx.fillText(inText, node.x, node.y - radius - 14 / zoom);
+                ctx.fillStyle = '#3b82f6';
+                ctx.fillText(outText, node.x, node.y - radius - 4 / zoom);
+            }
         }
     }
 
@@ -913,6 +944,12 @@ const TopologyView: React.FC = () => {
         return () => window.removeEventListener('resize', resize);
     }, [applyViewport]);
 
+    // ============ 仿真覆盖层 ============
+    const simOverlayRef = useRef<SimulationOverlay | null>(null);
+    const { overlay, isLoading: simLoading, error: simError, currentScenario, setScenario, runSimulation, clearOverlay } =
+        useSimulation({ pilotId: 'mainline_zhongwei_jingbian', scenarios: MAINLINE_SCENARIOS });
+    useEffect(() => { simOverlayRef.current = overlay; }, [overlay]);
+
     // ============ 动画循环 ============
     useEffect(() => {
         if (loading) return;
@@ -936,7 +973,9 @@ const TopologyView: React.FC = () => {
                 h,
                 currentViewport.zoom,
                 currentViewport.pan.x,
-                currentViewport.pan.y);
+                currentViewport.pan.y,
+                simOverlayRef.current,
+            );
             animFrameRef.current = requestAnimationFrame(animate);
         };
         animFrameRef.current = requestAnimationFrame(animate);
@@ -1296,6 +1335,7 @@ const TopologyView: React.FC = () => {
         : null;
 
     return (
+        <>
         <div className="topology-view">
             {loading && (
                 <div className="topology-loading">
@@ -1645,6 +1685,17 @@ const TopologyView: React.FC = () => {
                 )}
             </div>
         </div>
+        <SimPanel
+            scenarioId={currentScenario}
+            scenarios={MAINLINE_SCENARIOS}
+            isLoading={simLoading}
+            error={simError}
+            overlay={overlay}
+            onScenarioChange={setScenario}
+            onRun={runSimulation}
+            onClear={clearOverlay}
+        />
+        </>
     );
 };
 
