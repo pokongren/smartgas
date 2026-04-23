@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 AI_API_KEY = os.getenv("AI_API_KEY", "")
 AI_BASE_URL = os.getenv("AI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 AI_DEFAULT_MODEL = os.getenv("AI_DEFAULT_MODEL", "gpt-3.5-turbo")
+AI_PROVIDER = os.getenv("AI_PROVIDER", "openai_compatible").strip().lower()
+MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "").strip()
+MINIMAX_BASE_URL = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.chat/v1").rstrip("/")
+MINIMAX_DEFAULT_MODEL = os.getenv("MINIMAX_DEFAULT_MODEL", "").strip()
 
 
 class AiServiceError(Exception):
@@ -34,22 +38,57 @@ class AiServiceError(Exception):
 
 class AiClient:
     def __init__(self):
-        self.api_key = AI_API_KEY
-        self.base_url = AI_BASE_URL
-        self.default_model = AI_DEFAULT_MODEL
+        self.provider = "openai_compatible"
+        self.api_key = ""
+        self.base_url = ""
+        self.default_model = ""
         self._client: httpx.AsyncClient | None = None
         self.max_retries = 1
+        self.reload_settings()
 
     @property
     def client(self) -> httpx.AsyncClient:
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=120.0)
+            self._client = httpx.AsyncClient(timeout=120.0, trust_env=False)
         return self._client
 
     async def close(self):
         if self._client:
             await self._client.aclose()
             self._client = None
+
+    def reload_settings(self) -> None:
+        provider = os.getenv("AI_PROVIDER", AI_PROVIDER or "openai_compatible").strip().lower()
+        if provider not in {"openai_compatible", "minimax"}:
+            logger.warning("Unknown AI_PROVIDER=%s, fallback to openai_compatible", provider)
+            provider = "openai_compatible"
+
+        ai_api_key = os.getenv("AI_API_KEY", AI_API_KEY).strip()
+        ai_base_url = os.getenv("AI_BASE_URL", AI_BASE_URL).strip() or "https://api.openai.com/v1"
+        ai_default_model = os.getenv("AI_DEFAULT_MODEL", AI_DEFAULT_MODEL).strip() or "gpt-3.5-turbo"
+        minimax_api_key = os.getenv("MINIMAX_API_KEY", MINIMAX_API_KEY).strip()
+        minimax_base_url = os.getenv("MINIMAX_BASE_URL", MINIMAX_BASE_URL).strip() or "https://api.minimax.chat/v1"
+        minimax_default_model = os.getenv("MINIMAX_DEFAULT_MODEL", MINIMAX_DEFAULT_MODEL).strip()
+
+        if provider == "minimax":
+            api_key = minimax_api_key or ai_api_key
+            base_url = minimax_base_url
+            default_model = minimax_default_model or ai_default_model or "minimax-m2.5"
+        else:
+            api_key = ai_api_key
+            base_url = ai_base_url
+            default_model = ai_default_model
+
+        self.provider = provider
+        self.api_key = api_key
+        self.base_url = base_url.rstrip("/")
+        self.default_model = default_model
+        logger.info(
+            "AI client configured: provider=%s, base_url=%s, default_model=%s",
+            self.provider,
+            self.base_url,
+            self.default_model,
+        )
 
     async def chat_completion(
         self,
@@ -59,6 +98,13 @@ class AiClient:
         temperature: float = 0.7,
         max_tokens: int = 2000,
     ) -> str:
+        self.reload_settings()
+        if not self.api_key or self.api_key == "your_api_key_here":
+            raise AiServiceError(
+                f"{self._provider_label()} 未配置有效 API Key，请检查后端 `.env`。",
+                status_code=401,
+            )
+
         use_model = model if model else self.default_model
         headers = self._build_headers()
         chat_messages = messages if messages is not None else [{"role": "user", "content": prompt}]
@@ -70,10 +116,15 @@ class AiClient:
             "max_tokens": max_tokens,
         }
 
-        logger.info("Calling AI API: model=%s, messages=%s", use_model, len(chat_messages))
+        logger.info(
+            "Calling AI API: provider=%s, model=%s, messages=%s",
+            self.provider,
+            use_model,
+            len(chat_messages),
+        )
         data = await self._post_json("/chat/completions", headers=headers, payload=payload)
 
-        result = data["choices"][0]["message"]["content"]
+        result = self._extract_completion_text(data)
         logger.info("AI completion succeeded: length=%s", len(result))
         return result
 
@@ -85,11 +136,12 @@ class AiClient:
         temperature: float = 0.7,
         max_tokens: int = 2000,
     ):
+        self.reload_settings()
         if not self.api_key or self.api_key == "your_api_key_here":
-            logger.warning("AI_API_KEY is missing, returning fallback message")
+            logger.warning("%s API key is missing, returning fallback message", self._provider_label())
             yield (
-                "当前 AI 服务还没有正确配置 API Key，暂时不能调用大模型。"
-                "请检查后端 `.env` 里的 `AI_API_KEY`。"
+                f"当前 {self._provider_label()} 还没有正确配置 API Key，暂时不能调用大模型。"
+                "请检查后端 `.env` 里的模型配置。"
             )
             return
 
@@ -105,7 +157,12 @@ class AiClient:
             "stream": True,
         }
 
-        logger.info("Streaming AI API: model=%s, messages=%s", use_model, len(chat_messages))
+        logger.info(
+            "Streaming AI API: provider=%s, model=%s, messages=%s",
+            self.provider,
+            use_model,
+            len(chat_messages),
+        )
 
         attempts = self.max_retries + 1
         for attempt in range(1, attempts + 1):
@@ -134,7 +191,7 @@ class AiClient:
 
                         try:
                             data = json.loads(data_str)
-                            content = data["choices"][0]["delta"].get("content", "")
+                            content = self._extract_stream_chunk(data)
                             if content:
                                 yield content
                         except Exception as exc:
@@ -155,6 +212,59 @@ class AiClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+
+    def _provider_label(self) -> str:
+        return "MiniMax" if self.provider == "minimax" else "AI 服务"
+
+    def _extract_completion_text(self, data: dict[str, Any]) -> str:
+        try:
+            choices = data.get("choices")
+            if not isinstance(choices, list) or not choices:
+                raise ValueError("choices missing")
+            message = choices[0].get("message")
+            if not isinstance(message, dict):
+                raise ValueError("message missing")
+            content = message.get("content")
+            return self._normalize_content(content)
+        except Exception as exc:
+            raise AiServiceError(f"{self._provider_label()} 返回内容解析失败：{exc}") from exc
+
+    def _extract_stream_chunk(self, data: dict[str, Any]) -> str:
+        choices = data.get("choices")
+        if not isinstance(choices, list) or not choices:
+            return ""
+        delta = choices[0].get("delta")
+        if not isinstance(delta, dict):
+            return ""
+        content = delta.get("content")
+        return self._normalize_content(content)
+
+    def _normalize_content(self, content: Any) -> str:
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                if isinstance(item, str):
+                    parts.append(item)
+                    continue
+                if not isinstance(item, dict):
+                    continue
+                text_value = item.get("text")
+                if isinstance(text_value, str):
+                    parts.append(text_value)
+                    continue
+                if isinstance(item.get("content"), str):
+                    parts.append(str(item.get("content")))
+            return "".join(parts)
+        if isinstance(content, dict):
+            for key in ("text", "content"):
+                value = content.get(key)
+                if isinstance(value, str):
+                    return value
+        return str(content)
 
     async def _post_json(
         self,
@@ -205,7 +315,7 @@ class AiClient:
 
         if status_code in {401, 403}:
             raise AiServiceError(
-                "AI 服务鉴权失败，请检查后端模型配置。",
+                f"{self._provider_label()} 鉴权失败，请检查后端模型配置。",
                 status_code=status_code,
             )
 

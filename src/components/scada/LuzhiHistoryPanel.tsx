@@ -2,7 +2,7 @@
  * 甪直分输站 · 历史数据展示面板（试点）
  * 数据来源：真实 SCADA 历史文件（2026-03-11 ~ 2026-03-12）
  */
-import React, { useMemo, useState, useCallback } from 'react'
+import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import Icon from '@/components/ui/Icon'
 import ReactEChartsCore from 'echarts-for-react/lib/core'
 import * as echarts from 'echarts/core'
@@ -28,6 +28,9 @@ interface Props {
   onClose: () => void
   onMouseDown?: (e: React.MouseEvent) => void
   isDragging?: boolean
+  initialHours?: 0 | 6 | 12
+  initialViewMode?: ViewMode
+  focusHint?: string
 }
 
 const TIME_RANGES = [
@@ -46,12 +49,27 @@ const VIEW_LABELS: Record<ViewMode, string> = {
   dewpoint:    '水露点',
 }
 
-const LuzhiHistoryPanel: React.FC<Props> = ({ onClose, onMouseDown, isDragging }) => {
-  const [selectedHours, setSelectedHours] = useState(0)
-  const [viewMode, setViewMode] = useState<ViewMode>('pressure')
+const LuzhiHistoryPanel: React.FC<Props> = ({
+  onClose,
+  onMouseDown,
+  isDragging,
+  initialHours = 0,
+  initialViewMode = 'pressure',
+  focusHint,
+}) => {
+  const [selectedHours, setSelectedHours] = useState(initialHours)
+  const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode)
   const [selectedPipelines, setSelectedPipelines] = useState<Set<string>>(
     new Set(['西一线', '西二线', '中俄线'])
   )
+
+  useEffect(() => {
+    setSelectedHours(initialHours)
+  }, [initialHours])
+
+  useEffect(() => {
+    setViewMode(initialViewMode)
+  }, [initialViewMode])
 
   const timeRange = getLuzhiTimeRange()
 
@@ -237,6 +255,21 @@ const LuzhiHistoryPanel: React.FC<Props> = ({ onClose, onMouseDown, isDragging }
           {timeRange && (
             <span style={{ fontSize: '9px', color: '#475569' }}>
               {new Date(timeRange.start).toLocaleDateString('zh-CN')} ~ {new Date(timeRange.end).toLocaleDateString('zh-CN')}
+            </span>
+          )}
+          {focusHint && (
+            <span
+              style={{
+                fontSize: '9px',
+                color: '#67e8f9',
+                background: 'rgba(8,145,178,0.18)',
+                padding: '1px 6px',
+                borderRadius: '8px',
+                border: '1px solid rgba(8,145,178,0.35)',
+              }}
+              title={focusHint}
+            >
+              AI定位：{focusHint}
             </span>
           )}
         </div>

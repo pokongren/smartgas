@@ -122,8 +122,8 @@ interface RawNode {
 }
 
 // ================== 颜色定义 ==================
-const COLOR_TRUNK = '#2196f3'  // 蓝色 - 干线
-const COLOR_BRANCH = '#64b5f6' // 浅蓝色 - 支线
+const COLOR_TRUNK = '#8b5cf6'  // 紫色 - 干线 (Violet 500)
+const COLOR_BRANCH = '#a78bfa' // 浅紫色 - 支线 (Violet 400)
 
 // 全局 ID 缓存 (确保跨层连接一致性)
 const stationIdMap = new Map<string, string>()

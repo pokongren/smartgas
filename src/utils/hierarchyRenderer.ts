@@ -12,9 +12,9 @@ export enum NodeImportance {
 export type ClusterDisplayMode = 'cluster' | 'expanded'
 
 export const NODE_LOD_THRESHOLDS = {
-    criticalZoom: 4,   // 降为 4：全国视图 zoom 4-5 下枢纽（HIGH）也需要可见
-    highZoom: 7,       // 降为 7：省域视图开始显示压气站/分输站
-    mediumZoom: 13,    // 13 以上再显示阀室以外的普通节点
+    criticalZoom: 4,   // 全国视图 zoom 4-5 下枢纽（HIGH）可见
+    highZoom: 9,       // 调高为 9：拉近到 9 以上才开始显示压气站（HIGH）
+    mediumZoom: 12,    // 调为 12：分输站在 12 时才显示
     valveMinZoom: 11,
     expandClusterZoom: 12,
 } as const
@@ -23,6 +23,7 @@ export interface NodeLODStrategy {
     maxVisibleImportance: NodeImportance
     showValveRooms: boolean
     clusterDisplayMode: ClusterDisplayMode
+    showFlowArrows?: boolean
 }
 
 const SOURCE_KEYWORDS = [
@@ -123,6 +124,7 @@ export function getNodeLODStrategy(zoom: number): NodeLODStrategy {
         maxVisibleImportance: getMaxVisibleImportanceForZoom(zoom),
         showValveRooms: zoom >= NODE_LOD_THRESHOLDS.valveMinZoom,
         clusterDisplayMode: getClusterDisplayModeForZoom(zoom),
+        showFlowArrows: zoom >= 10,
     }
 }
 

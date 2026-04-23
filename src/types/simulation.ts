@@ -7,6 +7,7 @@
 export interface SimNodeResult {
   id: string
   pressure_mpa: number
+  temperature_c?: number
   demand_served: number
   supply_actual: number
   alert_level: 'normal' | 'warning' | 'critical'
@@ -39,24 +40,125 @@ export interface SimMeta {
   available_scenarios: string[]
   node_count: number
   edge_count: number
+  solver_input_version?: string
+}
+
+export interface SimulationSnapshotSummary {
+  snapshot_version: string
+  run_id: string
+  pilot_id: string
+  scenario_id: string
+  generated_at: string
+  saved_at: string
+  solver_status: 'converged' | 'max_iter' | 'error'
+  iterations: number
+  output_summary: SimSummary
+  key_nodes: Array<{
+    id: string
+    pressure_mpa: number
+    temperature_c?: number
+    alert_level: 'normal' | 'warning' | 'critical'
+    demand_served: number
+    supply_actual: number
+  }>
+  key_edges: Array<{
+    id: string
+    flow_rate: number
+    utilization: number
+    direction: 'forward' | 'reverse' | 'zero'
+    alert_level: 'normal' | 'warning' | 'critical'
+  }>
+  snapshot_path?: string
+}
+
+export interface SimulationSnapshotRecord extends SimulationSnapshotSummary {
+  input_summary: {
+    solver_input_version?: string
+    seed_file?: string
+    node_count: number
+    edge_count: number
+    valve_count: number
+    scenario_count: number
+    available_scenarios: string[]
+  }
+  result: SimulationOverlay
+}
+
+export interface SimulationDeltaMetric {
+  current: number
+  baseline: number
+  delta: number
+}
+
+export interface SimulationComparison {
+  baseline_run_id: string
+  baseline_scenario_id: string
+  current_run_id: string
+  current_scenario_id: string
+  summary_delta: {
+    total_supply: SimulationDeltaMetric
+    total_demand: SimulationDeltaMetric
+    unserved_demand: SimulationDeltaMetric
+    avg_utilization: SimulationDeltaMetric
+    alert_count: SimulationDeltaMetric
+  }
+  top_node_pressure_changes: Array<{
+    id: string
+    current_pressure_mpa: number
+    baseline_pressure_mpa: number
+    delta_pressure_mpa: number
+  }>
+  top_edge_flow_changes: Array<{
+    id: string
+    current_flow_rate: number
+    baseline_flow_rate: number
+    delta_flow_rate: number
+  }>
+}
+
+export interface SimulationTrialRunItem {
+  scenario_id: string
+  label: string
+  covered: boolean
+  snapshot_count: number
+  last_run_id?: string
+  last_saved_at?: string
 }
 
 /** 完整仿真结果（来自 simulation-overlay 接口） */
 export interface SimulationOverlay {
   pilot_id: string
   scenario_id: string
+  run_id: string
+  generated_at: string
   solver_status: 'converged' | 'max_iter' | 'error'
   iterations: number
   nodes: SimNodeResult[]
   edges: SimEdgeResult[]
   summary: SimSummary
-  meta?: SimMeta
+  meta: SimMeta
 }
 
 /** 场景选项 */
 export interface ScenarioOption {
   id: string
   label: string
+}
+
+export interface SimulationInitialInput {
+  node_overrides?: Array<{
+    node_id: string
+    target_pressure_mpa?: number
+    temperature_c?: number
+  }>
+  edge_overrides?: Array<{
+    edge_id: string
+    flow_rate?: number
+  }>
+  default_pressure_mpa?: number
+  default_temperature_c?: number
+  default_flow_rate?: number
+  apply_to_sources?: boolean
 }
 
 /** 主样板场景列表 */

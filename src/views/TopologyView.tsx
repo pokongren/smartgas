@@ -8,6 +8,8 @@ import { useSimulation } from '@/hooks/useSimulation';
 import { SimPanel } from '@/components/topology/SimPanel';
 import { MAINLINE_SCENARIOS } from '@/types/simulation';
 import type { SimulationOverlay } from '@/types/simulation';
+import { readSimulationShowcaseSyncContext } from '@/utils/simulationShowcaseSync';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // ============ 类型定义 ============
 
@@ -58,6 +60,8 @@ interface CanvasPoint {
     y: number;
 }
 
+const INTERNAL_TOPOLOGY_DEBUG_KEY = 'smartgas-grid:topology-internal-debug';
+
 interface ViewportState {
     zoom: number;
     pan: CanvasPoint;
@@ -104,6 +108,10 @@ const REAL_SCADA_DATA: Record<string, { inP: number, outP: number, inT?: number,
     '甪直分输站': { inP: 5.094, outP: 5.106, outT: 7.9 },
     '昆山分输站': { inP: 5.073, outP: 5.065, outT: 12.4 },
     '上海白鹤末站': { inP: 5.050, outP: 5.050, outT: 13.7 },
+}
+
+function estimateNodeTemperatureC(pressureMpa: number): number {
+    return Number((13 + pressureMpa * 1.7).toFixed(1));
 }
 
 const NODE_COLORS: Record<string, string> = {
@@ -276,6 +284,7 @@ function drawGraph(
     panX: number,
     panY: number,
     simOverlay?: SimulationOverlay | null,
+    animationMs = 0,
 ): void {
     const simEdgeMap = new Map(simOverlay?.edges.map(e => [e.id, e]) ?? []);
     const simNodeMap = new Map(simOverlay?.nodes.map(n => [n.id, n]) ?? []);
@@ -318,6 +327,12 @@ function drawGraph(
         const simEdge = simEdgeMap.get(edge.id);
         const color = simEdge ? simEdge.color : (EDGE_COLORS[edge.category] || EDGE_COLORS.default);
         const baseW = edge.category === 'trunk' ? 3 : 1.5;
+        const isRev = simEdge?.direction === 'reverse';
+        const flowStart = isRev ? target : source;
+        const flowEnd = isRev ? source : target;
+        const flowDx = flowEnd.x - flowStart.x;
+        const flowDy = flowEnd.y - flowStart.y;
+        const flowLen = Math.hypot(flowDx, flowDy);
         ctx.strokeStyle = color;
         ctx.lineWidth = (simEdge ? baseW * simEdge.width_factor : baseW) / zoom;
         ctx.globalAlpha = simEdge ? 0.85 : 0.6;
@@ -326,13 +341,38 @@ function drawGraph(
         ctx.moveTo(source.x, source.y);
         ctx.lineTo(target.x, target.y);
         ctx.stroke();
-        const isRev = simEdge?.direction === 'reverse';
         const angle = isRev
             ? Math.atan2(source.y - target.y, source.x - target.x)
             : Math.atan2(target.y - source.y, target.x - source.x);
         const arrowLen = 8 / zoom;
         const midX = (source.x + target.x) / 2;
         const midY = (source.y + target.y) / 2;
+        if (simEdge && simEdge.flow_rate > 0 && flowLen > 1) {
+            const speed = 0.18 + Math.min(simEdge.utilization, 1) * 0.45;
+            const pulseT = (animationMs / 1000) * speed;
+            const tracerRadius = (edge.category === 'trunk' ? 3.6 : 2.6) / zoom;
+            const tracerOffsets = [pulseT % 1, (pulseT + 0.45) % 1];
+            ctx.save();
+            tracerOffsets.forEach((offset, index) => {
+                const tx = flowStart.x + flowDx * offset;
+                const ty = flowStart.y + flowDy * offset;
+                const glow = ctx.createRadialGradient(tx, ty, 0, tx, ty, tracerRadius * 3.6);
+                glow.addColorStop(0, `${color}ee`);
+                glow.addColorStop(0.4, `${color}88`);
+                glow.addColorStop(1, `${color}00`);
+                ctx.fillStyle = glow;
+                ctx.globalAlpha = index === 0 ? 0.92 : 0.56;
+                ctx.beginPath();
+                ctx.arc(tx, ty, tracerRadius * 3.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#f8fafc';
+                ctx.globalAlpha = index === 0 ? 0.95 : 0.72;
+                ctx.beginPath();
+                ctx.arc(tx, ty, tracerRadius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.restore();
+        }
         ctx.fillStyle = color;
         ctx.globalAlpha = 0.85;
         ctx.beginPath();
@@ -443,12 +483,23 @@ function drawGraph(
         if (simNode) {
             if (simNode.alert_level !== 'normal') {
                 const ac = simNode.alert_level === 'critical' ? '#ef4444' : '#f97316';
+                const pulse = (Math.sin(animationMs / (simNode.alert_level === 'critical' ? 180 : 260)) + 1) / 2;
+                const alertRadius = radius + 6 + (simNode.alert_level === 'critical' ? 4 : 2.5) * pulse;
+                const alertGlow = ctx.createRadialGradient(node.x, node.y, radius, node.x, node.y, alertRadius + 7);
+                alertGlow.addColorStop(0, `${ac}22`);
+                alertGlow.addColorStop(0.55, `${ac}${simNode.alert_level === 'critical' ? '30' : '22'}`);
+                alertGlow.addColorStop(1, `${ac}00`);
+                ctx.fillStyle = alertGlow;
+                ctx.globalAlpha = simNode.alert_level === 'critical' ? 0.72 : 0.5;
                 ctx.beginPath();
-                ctx.arc(node.x, node.y, radius + 6, 0, Math.PI * 2);
+                ctx.arc(node.x, node.y, alertRadius + 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, alertRadius, 0, Math.PI * 2);
                 ctx.strokeStyle = ac;
-                ctx.lineWidth = 2 / zoom;
-                ctx.setLineDash([3, 2]);
-                ctx.globalAlpha = 0.9;
+                ctx.lineWidth = (simNode.alert_level === 'critical' ? 2.4 : 1.8) / zoom;
+                ctx.setLineDash(simNode.alert_level === 'critical' ? [2, 2] : [3, 2]);
+                ctx.globalAlpha = 0.6 + pulse * 0.35;
                 ctx.stroke();
                 ctx.setLineDash([]);
                 ctx.globalAlpha = 1;
@@ -457,7 +508,11 @@ function drawGraph(
             ctx.textAlign = 'center';
             ctx.font = `bold ${9 / zoom}px Inter, sans-serif`;
             ctx.fillStyle = pc;
-            ctx.fillText(`${simNode.pressure_mpa.toFixed(2)} MPa`, node.x, node.y - radius - 6 / zoom);
+            ctx.fillText(`${simNode.pressure_mpa.toFixed(2)} MPa`, node.x, node.y - radius - 14 / zoom);
+            const nodeTemp = simNode.temperature_c ?? estimateNodeTemperatureC(simNode.pressure_mpa);
+            ctx.font = `${8 / zoom}px Inter, sans-serif`;
+            ctx.fillStyle = '#93c5fd';
+            ctx.fillText(`T:${nodeTemp.toFixed(1)}°C`, node.x, node.y - radius - 4 / zoom);
         } else {
             const scadaData = REAL_SCADA_DATA[node.name];
             if (scadaData) {
@@ -479,6 +534,8 @@ function drawGraph(
 // ============ 主组件 ============
 
 const TopologyView: React.FC = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animFrameRef = useRef<number>(0);
     const nodesRef = useRef<TopoNode[]>([]);
@@ -946,9 +1003,38 @@ const TopologyView: React.FC = () => {
 
     // ============ 仿真覆盖层 ============
     const simOverlayRef = useRef<SimulationOverlay | null>(null);
-    const { overlay, isLoading: simLoading, error: simError, currentScenario, setScenario, runSimulation, clearOverlay } =
+    const {
+        overlay,
+        isLoading: simLoading,
+        error: simError,
+        currentScenario,
+        snapshots,
+        snapshotLoading,
+        baselineSnapshotLoading,
+        snapshotError,
+        selectedSnapshotRunId,
+        baselineSnapshotRunId,
+        trialRunScenarioId,
+        bulkTrialRunActive,
+        comparison,
+        trialRunItems,
+        setScenario,
+        setSelectedSnapshotRunId,
+        setBaselineSnapshotRunId,
+        runSimulation,
+        saveSnapshot,
+        refreshSnapshots,
+        loadSelectedSnapshot,
+        loadSnapshotByRunId,
+        runTrialScenario,
+        runMissingTrialScenarios,
+        hydrateFromContext,
+        clearOverlay,
+    } =
         useSimulation({ pilotId: 'mainline_zhongwei_jingbian', scenarios: MAINLINE_SCENARIOS });
     useEffect(() => { simOverlayRef.current = overlay; }, [overlay]);
+    const showcaseSyncAppliedRef = useRef(false);
+    const [showcaseSyncUpdatedAt, setShowcaseSyncUpdatedAt] = useState<string | null>(null);
 
     // ============ 动画循环 ============
     useEffect(() => {
@@ -975,6 +1061,7 @@ const TopologyView: React.FC = () => {
                 currentViewport.pan.x,
                 currentViewport.pan.y,
                 simOverlayRef.current,
+                performance.now(),
             );
             animFrameRef.current = requestAnimationFrame(animate);
         };
@@ -1333,6 +1420,123 @@ const TopologyView: React.FC = () => {
     const selectedNode = selectedNodeId
         ? nodesRef.current.find(n => n.id === selectedNodeId) || null
         : null;
+    const selectedSimulationNode = useMemo(() => {
+        if (!selectedNode || !overlay) return null;
+        return overlay.nodes.find(item => item.id === selectedNode.id) ?? null;
+    }, [overlay, selectedNode]);
+    const internalDebugEnabled = useMemo(() => {
+        if (import.meta.env.DEV) return true;
+        if (typeof window === 'undefined') return false;
+        return window.localStorage.getItem(INTERNAL_TOPOLOGY_DEBUG_KEY) === '1';
+    }, []);
+    const debugActionsEnabled = useMemo(() => {
+        const params = new URLSearchParams(location.search);
+        return internalDebugEnabled && params.get('debugActions') === '1';
+    }, [internalDebugEnabled, location.search]);
+    useEffect(() => {
+        if (showcaseSyncAppliedRef.current) return;
+
+        const syncedContext = readSimulationShowcaseSyncContext('mainline_zhongwei_jingbian');
+        if (!syncedContext) return;
+
+        showcaseSyncAppliedRef.current = true;
+        hydrateFromContext({
+            scenarioId: syncedContext.scenarioId,
+            selectedSnapshotRunId: syncedContext.selectedSnapshotRunId,
+            baselineSnapshotRunId: syncedContext.baselineSnapshotRunId,
+            overlay: syncedContext.overlay,
+        });
+        setShowcaseSyncUpdatedAt(syncedContext.updatedAt || null);
+
+        if (syncedContext.selectedSnapshotRunId) {
+            void loadSnapshotByRunId(syncedContext.selectedSnapshotRunId).catch(() => {
+                // Keep the hydrated overlay as a fallback if snapshot reload fails.
+            });
+        }
+    }, [hydrateFromContext, loadSnapshotByRunId]);
+    const currentScenarioOption = useMemo(() => {
+        return MAINLINE_SCENARIOS.find(item => item.id === currentScenario) || null;
+    }, [currentScenario]);
+    const selectedSnapshotSummary = useMemo(() => {
+        if (!selectedSnapshotRunId) return null;
+        return snapshots.find(item => item.run_id === selectedSnapshotRunId) || null;
+    }, [selectedSnapshotRunId, snapshots]);
+    const selectedBaselineSnapshotSummary = useMemo(() => {
+        if (!baselineSnapshotRunId) return null;
+        return snapshots.find(item => item.run_id === baselineSnapshotRunId) || null;
+    }, [baselineSnapshotRunId, snapshots]);
+    const latestSnapshotSummary = useMemo(() => {
+        return [...snapshots]
+            .sort((left, right) => (right.saved_at || '').localeCompare(left.saved_at || ''))[0] || null;
+    }, [snapshots]);
+    const simulationStatusTone = simLoading
+        ? {
+            dot: '#fbbf24',
+            text: '#fde68a',
+            border: 'rgba(251, 191, 36, 0.35)',
+            background: 'rgba(251, 191, 36, 0.12)',
+            label: '求解中',
+        }
+        : overlay?.solver_status === 'converged'
+            ? {
+                dot: '#34d399',
+                text: '#bbf7d0',
+                border: 'rgba(52, 211, 153, 0.35)',
+                background: 'rgba(52, 211, 153, 0.12)',
+                label: '已收敛',
+            }
+            : overlay?.solver_status === 'max_iter'
+                ? {
+                    dot: '#fbbf24',
+                    text: '#fde68a',
+                    border: 'rgba(251, 191, 36, 0.35)',
+                    background: 'rgba(251, 191, 36, 0.12)',
+                    label: '达到迭代上限',
+                }
+                : overlay?.solver_status === 'error' || simError
+                    ? {
+                        dot: '#f87171',
+                        text: '#fecaca',
+                        border: 'rgba(248, 113, 113, 0.35)',
+                        background: 'rgba(248, 113, 113, 0.12)',
+                        label: '仿真失败',
+                    }
+                    : {
+                        dot: '#22d3ee',
+                        text: '#bae6fd',
+                        border: 'rgba(34, 211, 238, 0.35)',
+                        background: 'rgba(34, 211, 238, 0.12)',
+                        label: '等待结果',
+                    };
+    const simulationShowcaseCards = overlay
+        ? [
+            { label: '当前场景', value: currentScenarioOption?.label || overlay.scenario_id, accent: '#67e8f9' },
+            { label: '运行编号', value: overlay.run_id.slice(0, 12), accent: '#c4b5fd' },
+            { label: '平均利用率', value: overlay.summary.avg_utilization.toFixed(3), accent: '#86efac' },
+            { label: '告警数', value: String(overlay.summary.alert_count), accent: '#fcd34d' },
+        ]
+        : [
+            { label: '当前场景', value: currentScenarioOption?.label || currentScenario, accent: '#67e8f9' },
+            { label: '快照数量', value: `${snapshots.length} 条`, accent: '#93c5fd' },
+            { label: '基线快照', value: selectedBaselineSnapshotSummary?.scenario_id || '未选择', accent: '#c4b5fd' },
+            { label: '最近留档', value: latestSnapshotSummary ? latestSnapshotSummary.scenario_id : '暂无', accent: '#86efac' },
+        ];
+    const simulationShowcaseSummary = overlay
+        ? `当前展示 ${currentScenarioOption?.label || overlay.scenario_id}，生成时间 ${new Date(overlay.generated_at).toLocaleString('zh-CN', { hour12: false })}。`
+        : debugActionsEnabled
+            ? '当前还没有正式结果，先用调试操作面跑一条场景，再回到这里看展示效果。'
+            : '当前只展示仿真专页骨架，正式运行入口仍在第一张图主仿真页。';
+    const showcaseModeText = debugActionsEnabled ? '当前处于调试模式' : '当前处于正式展示模式';
+    const showcaseSyncText = showcaseSyncUpdatedAt
+        ? `已同步第一张图主仿真上下文 · ${new Date(showcaseSyncUpdatedAt).toLocaleString('zh-CN', { hour12: false })} · 联动上下文 2 小时内有效`
+        : `${showcaseModeText} · 联动上下文 2 小时内有效`;
+    const simulationMotionState = simLoading
+        ? 'loading'
+        : overlay?.solver_status === 'error' || simError
+            ? 'error'
+            : overlay?.solver_status === 'converged'
+                ? 'ready'
+                : 'idle';
 
     return (
         <>
@@ -1430,6 +1634,94 @@ const TopologyView: React.FC = () => {
                 </div>
             </div>
 
+            <div
+                className={`topology-sim-showcase topology-sim-showcase--${simulationMotionState}`}
+                style={{
+                    position: 'fixed',
+                    top: 132,
+                    left: 24,
+                    zIndex: 140,
+                    width: '420px',
+                    color: '#e2e8f0',
+                    ['--sim-accent' as any]: simulationStatusTone.dot,
+                    ['--sim-border' as any]: simulationStatusTone.border,
+                    ['--sim-badge-bg' as any]: simulationStatusTone.background,
+                    ['--sim-badge-text' as any]: simulationStatusTone.text,
+                } as React.CSSProperties}
+            >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="topology-sim-kicker">
+                            Simulation Showcase
+                        </div>
+                        <div className="topology-sim-title">
+                            WE1 第三张图仿真展示专页
+                        </div>
+                    </div>
+                    <div className="topology-sim-badge">
+                        <span className={`topology-sim-dot ${simulationMotionState === 'loading' ? 'is-pulsing' : ''}`} />
+                        {simulationStatusTone.label}
+                    </div>
+                </div>
+                <div className="topology-sim-chip-row">
+                    <span className="topology-sim-chip">
+                        场景：{currentScenarioOption?.label || currentScenario}
+                    </span>
+                    <span className="topology-sim-chip">
+                        run_id：{overlay ? overlay.run_id.slice(0, 12) : '未运行'}
+                    </span>
+                    <span className="topology-sim-chip">
+                        快照：{snapshots.length} 条
+                    </span>
+                    <span className="topology-sim-chip">
+                        已选快照：{selectedSnapshotSummary ? selectedSnapshotSummary.scenario_id : '未选择'}
+                    </span>
+                </div>
+                <div className="topology-sim-summary" style={{ marginTop: 10, color: debugActionsEnabled ? '#fde68a' : '#cbd5e1' }}>
+                    {showcaseModeText}
+                </div>
+                {showcaseSyncText && (
+                    <div className="topology-sim-summary" style={{ marginTop: 10, color: '#bae6fd' }}>
+                        {showcaseSyncText}
+                    </div>
+                )}
+                <div className="topology-sim-summary">
+                    {simulationShowcaseSummary}
+                </div>
+                <div className="topology-sim-card-grid">
+                    {simulationShowcaseCards.map((item, index) => (
+                        <div
+                            key={`showcase-card-${item.label}`}
+                            className={`topology-sim-card topology-sim-card--${simulationMotionState}`}
+                            style={{ ['--card-accent' as any]: item.accent, animationDelay: `${index * 120}ms` } as React.CSSProperties}
+                        >
+                            <div className="topology-sim-card-label">
+                                {item.label}
+                            </div>
+                            <div className="topology-sim-card-value">
+                                {item.value}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    <button
+                        className="control-btn"
+                        onClick={() => navigate('/map-topology')}
+                    >
+                        返回第一张图主仿真入口
+                    </button>
+                    {debugActionsEnabled ? (
+                        <button
+                            className="control-btn"
+                            onClick={() => navigate('/topology')}
+                        >
+                            收起调试操作面
+                        </button>
+                    ) : null}
+                </div>
+            </div>
+
             {/* ====== 右侧统计 ====== */}
             <div className="topology-stats">
                 <div className="stat-card">
@@ -1461,6 +1753,24 @@ const TopologyView: React.FC = () => {
                         </div>
                     </div>
                 )}
+                <div className={`stat-card topology-sim-stat-card topology-sim-stat-card--${simulationMotionState}`}>
+                    <div className="stat-icon" style={{ background: simulationStatusTone.background, color: simulationStatusTone.dot }}>
+                        <span className="material-symbols-outlined">science</span>
+                    </div>
+                    <div className="stat-info">
+                        <span className="stat-value" style={{ fontSize: 14, color: simulationStatusTone.text }}>{simulationStatusTone.label}</span>
+                        <span className="stat-label">仿真状态</span>
+                    </div>
+                </div>
+                <div className={`stat-card topology-sim-stat-card ${overlay ? 'topology-sim-stat-card--active' : ''}`}>
+                    <div className="stat-icon" style={{ background: 'rgba(96, 165, 250, 0.15)', color: '#93c5fd' }}>
+                        <span className="material-symbols-outlined">inventory_2</span>
+                    </div>
+                    <div className="stat-info">
+                        <span className="stat-value" style={{ fontSize: 14 }}>{overlay ? overlay.run_id.slice(0, 8) : `${snapshots.length}`}</span>
+                        <span className="stat-label">{overlay ? '当前 run' : '历史快照'}</span>
+                    </div>
+                </div>
             </div>
 
             {/* ====== 图例（简化版） ====== */}
@@ -1586,6 +1896,21 @@ const TopologyView: React.FC = () => {
                             <div className="detail-row"><span className="label">处理能力</span><span className="value">{selectedNode.capacity ? `${selectedNode.capacity} 万m³/天` : '—'}</span></div>
                         </div>
                         <div className="detail-section">
+                            <h4>仿真状态</h4>
+                            <div className="detail-row">
+                                <span className="label">当前压力</span>
+                                <span className="value">{selectedSimulationNode ? `${selectedSimulationNode.pressure_mpa.toFixed(2)} MPa` : '未运行仿真'}</span>
+                            </div>
+                            <div className="detail-row">
+                                <span className="label">当前温度</span>
+                                <span className="value">
+                                    {selectedSimulationNode
+                                        ? `${(selectedSimulationNode.temperature_c ?? estimateNodeTemperatureC(selectedSimulationNode.pressure_mpa)).toFixed(1)}°C${selectedSimulationNode.temperature_c == null ? '（估算）' : ''}`
+                                        : '未运行仿真'}
+                                </span>
+                            </div>
+                        </div>
+                        <div className="detail-section">
                             <h4>拓扑状态</h4>
                             <div className="detail-row">
                                 <span className="label">连接状态</span>
@@ -1685,16 +2010,35 @@ const TopologyView: React.FC = () => {
                 )}
             </div>
         </div>
-        <SimPanel
-            scenarioId={currentScenario}
-            scenarios={MAINLINE_SCENARIOS}
-            isLoading={simLoading}
-            error={simError}
-            overlay={overlay}
-            onScenarioChange={setScenario}
-            onRun={runSimulation}
-            onClear={clearOverlay}
-        />
+        {debugActionsEnabled && (
+            <SimPanel
+                scenarioId={currentScenario}
+                scenarios={MAINLINE_SCENARIOS}
+                isLoading={simLoading}
+                snapshotLoading={snapshotLoading}
+                baselineSnapshotLoading={baselineSnapshotLoading}
+                error={simError}
+                snapshotError={snapshotError}
+                overlay={overlay}
+                snapshots={snapshots}
+                selectedSnapshotRunId={selectedSnapshotRunId}
+                baselineSnapshotRunId={baselineSnapshotRunId}
+                trialRunScenarioId={trialRunScenarioId}
+                bulkTrialRunActive={bulkTrialRunActive}
+                comparison={comparison}
+                trialRunItems={trialRunItems}
+                onScenarioChange={setScenario}
+                onSnapshotSelect={setSelectedSnapshotRunId}
+                onBaselineSnapshotSelect={setBaselineSnapshotRunId}
+                onRun={runSimulation}
+                onSaveSnapshot={saveSnapshot}
+                onRefreshSnapshots={refreshSnapshots}
+                onLoadSnapshot={loadSelectedSnapshot}
+                onRunTrialScenario={runTrialScenario}
+                onRunMissingTrialScenarios={runMissingTrialScenarios}
+                onClear={clearOverlay}
+            />
+        )}
         </>
     );
 };

@@ -66,6 +66,7 @@ WE1_PILOTS: Dict[str, Dict[str, Any]] = {
             "nodes": [
                 "role",
                 "supply_max",
+                "demand_nominal",
                 "target_pressure_mpa",
                 "min_pressure_mpa",
                 "max_pressure_mpa",

@@ -1,0 +1,12 @@
+﻿=== sheet_分输 字段名 ===
+python.exe : Traceback (most recent call last):
+所在位置 行:1 字符: 1
++ & ".venv\Scripts\python.exe" check_tables.py 2>&1 | Out-File -Encodin ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "F:\smartgas-grid\check_tables.py", line 7, in <module>
+    row = c.execute("SELECT * FROM [sheet_分输] LIMIT 1").fetchone()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: no such table: sheet_分输

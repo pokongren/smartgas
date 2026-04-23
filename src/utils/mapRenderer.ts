@@ -659,7 +659,8 @@ function createClusterMarker(
         content: createClusterMarkerContent(group),
         offset: new AMap.Pixel(-20, -20),
         zIndex: 150,
-        extData: { type: 'cluster', group }
+        extData: { type: 'cluster', group },
+        zooms: [2, 30]
     })
 
     if (onClick) {
@@ -845,8 +846,9 @@ function createOffsetNodeMarker(
             draggable: true,
             cursor: 'move',
             zIndex: 140,
-            extData: { node }
-        })
+            extData: { node },
+        zooms: [2, 30]
+    })
     } else if (isDistribution) {
         markerSize = 16
         marker = new AMap.Marker({
@@ -856,8 +858,9 @@ function createOffsetNodeMarker(
             draggable: true,
             cursor: 'move',
             zIndex: 130,
-            extData: { node }
-        })
+            extData: { node },
+        zooms: [2, 30]
+    })
     } else if (isHub) {
         // 枢纽节点：菱形图标
         const hubSize = isMajorJunction ? 22 : isJunction ? 18 : 14
@@ -871,8 +874,9 @@ function createOffsetNodeMarker(
             draggable: true,
             cursor: 'move',
             zIndex: 145,
-            extData: { node }
-        })
+            extData: { node },
+        zooms: [2, 30]
+    })
     } else {
         markerSize = 10
         marker = new AMap.Marker({
@@ -882,8 +886,9 @@ function createOffsetNodeMarker(
             draggable: true,
             cursor: 'move',
             zIndex: 120,
-            extData: { node }
-        })
+            extData: { node },
+        zooms: [2, 30]
+    })
     }
 
     // 注册到映射表，方便管线查找对应 marker
@@ -904,7 +909,8 @@ function createOffsetNodeMarker(
             'padding': '1px 3px',
             'border': 'none'
         },
-        zIndex: 121
+        zIndex: 121,
+        zooms: [2, 30]
     })
 
     // NOTE: dragging 事件实时触发，拖拽过程中管线跟随移动
@@ -979,6 +985,7 @@ export function renderPipelineLines(
                         zIndex: 50,
                         lineJoin: 'round',
                         lineCap: 'round',
+                        zooms: [2, 30]
                     })
 
                     if (onLineClick) {
@@ -1254,8 +1261,9 @@ export function renderPipelineDevices(
                         fillOpacity: 0.8,
                         strokeColor: '#ffffff',
                         strokeWeight: 2,
-                        zIndex: 110
-                    })
+                        zIndex: 110,
+        zooms: [2, 30]
+    })
 
                     if (onDeviceClick) {
                         circle.on('click', (e: any) => {

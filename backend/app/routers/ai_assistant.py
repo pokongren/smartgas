@@ -6,15 +6,20 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
-from app.database import get_session
+from app.database import get_session, scada_history_engine
 from app.models import Pipeline, PipelineSystem, Station
+from app.scada_models import ScadaHistory
 from app.services.ai_analysis_orchestrator import AiAnalysisOrchestrator, AssistantContext
 from app.services.ai_client import AiServiceError, ai_client
 from app.services.assistant_tools import build_tools_description, execute_tool
@@ -28,6 +33,72 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/ai-assistant", tags=["AI 对话助手"])
 ai_analysis_orchestrator = AiAnalysisOrchestrator()
+
+LUZHI_PILOT_STATION = "甪直分输站"
+LUZHI_ANALYSIS_KEYWORDS = (
+    "分析",
+    "异常",
+    "趋势",
+    "建议",
+    "诊断",
+    "评估",
+    "波动",
+    "风险",
+    "压力",
+    "温度",
+    "露点",
+    "变化",
+    "判断",
+)
+
+LUZHI_RISK_ORDER = {"正常": 0, "低": 1, "中": 2, "高": 3}
+LUZHI_PILOT_ENV_KEY = "SMARTGAS_LUZHI_PILOT_ENABLED"
+LUZHI_TRACE_PATH = Path(__file__).resolve().parents[2] / "data" / "ai_traces" / "luzhi_pilot_trace.jsonl"
+DATA_ANALYSIS_ENTER_COMMAND = "/数据分析"
+DATA_ANALYSIS_EXIT_COMMAND = "/退出数据分析"
+DEWPOINT_QUERY_KEYWORDS = ("水露点", "露点", "dewpoint")
+DEWPOINT_COMPARE_KEYWORDS = ("对比", "比较", "差异", "对照")
+DATA_ANALYSIS_ENTER_PATTERN = re.compile(r"^\s*/数据分析(?:\s+(?P<payload>.+))?\s*$", re.IGNORECASE)
+DATA_ANALYSIS_EXIT_PATTERN = re.compile(r"^\s*/退出数据分析\s*$", re.IGNORECASE)
+SUBAGENT_ENTER_PATTERN = re.compile(r"^\s*/subagent(?:\s+.+)?\s*$", re.IGNORECASE)
+SUBAGENT_EXIT_PATTERN = re.compile(r"^\s*/退出subagent\s*$", re.IGNORECASE)
+STATION_PAIR_PATTERN = re.compile(
+    r"(?P<left>[\u4e00-\u9fa5A-Za-z0-9]{1,24}(?:分输联络站|分输压气站|分输清管站|分输站|压气站|清管站|站)?)"
+    r"(?:和|与|跟)"
+    r"(?P<right>[\u4e00-\u9fa5A-Za-z0-9]{1,24}(?:分输联络站|分输压气站|分输清管站|分输站|压气站|清管站|站)?)"
+)
+STATION_SUFFIXES = ("分输联络站", "分输压气站", "分输清管站", "分输站", "压气站", "清管站", "站")
+
+MULTI_STATION_COMPARE_KEYWORDS = ("对比", "比较", "差异", "对照", "横向", "对比分析")
+PRESSURE_KEYWORDS = ("压力", "pressure", "MPa", "mpa")
+TEMPERATURE_KEYWORDS = ("温度", "温层", "temperature")
+HISTORY_CURVE_KEYWORDS = ("历史", "曲线", "趋势", "查询", "query", "trend", "history", "chart")
+
+
+CANONICAL_STATION_SUFFIXES = (
+    "\u5206\u8f93\u8054\u7edc\u7ad9",
+    "\u5206\u8f93\u538b\u6c14\u7ad9",
+    "\u5206\u8f93\u6e05\u7ba1\u7ad9",
+    "\u5206\u8f93\u7ad9",
+    "\u538b\u6c14\u7ad9",
+    "\u6e05\u7ba1\u7ad9",
+    "\u67a2\u7ebd\u7ad9",
+    "\u67a2\u7ebd",
+    "\u7ad9",
+)
+CANONICAL_PIPELINE_PREFIXES = (
+    "\u897f\u6c14\u4e1c\u8f93\u4e00\u7ebf",
+    "\u897f\u6c14\u4e1c\u8f93\u4e8c\u7ebf",
+    "\u897f\u6c14\u4e1c\u8f93",
+    "\u897f\u4e00\u7ebf",
+    "\u897f\u4e8c\u7ebf",
+    "\u4e2d\u4fc4",
+    "\u4e2d\u7f05",
+    "\u4e2d\u4e9a",
+    "\u5ddd\u6c14\u4e1c\u9001",
+    "\u9655\u4eac",
+    "\u5fe0\u6b66",
+)
 
 
 class ChatMessage(BaseModel):
@@ -73,6 +144,33 @@ SYSTEM_PROMPT = """你是 SmartGas Grid 的智能调度助手，既懂天然气�
 {tools_description}
 """
 
+YUQIAN_STYLE_PROMPT = """
+额外人格要求：
+1. 统一使用“于谦式”说话风格：松弛、机灵、接地气，但不油腻、不冒犯。
+2. 先给结论，再给依据；能短就短，别端着。
+3. 可以有一两句轻微包袱，但安全结论、数字、阈值、单位必须严谨，不能拿来开玩笑。
+4. 如果用户要清单，必须给完整清单，不打马虎眼。
+"""
+
+
+def _apply_yuqian_style(reply: str) -> str:
+    text = (reply or "").strip()
+    if not text:
+        return reply
+
+    # 长文本或结构化输出不再强行加前缀，避免“模板腔”干扰阅读。
+    if len(text) >= 90 or text.count("\n") >= 2 or "|" in text:
+        return text
+
+    prefixes = (
+        "要我说，先给准话：",
+        "咱先把结论放这儿：",
+    )
+    if text.startswith(prefixes):
+        return text
+
+    return f"{prefixes[0]}{text}"
+
 
 @router.post("/chat")
 async def chat(
@@ -87,18 +185,60 @@ async def chat(
     if msg_clean.lower() in greetings:
 
         async def quick_gen():
-            reply_text = "你好，我在。你直接说想查什么、分析什么，或者哪里看着不对，我帮你一起看。"
+            reply_text = _apply_yuqian_style("你好，我在。你直接说想查什么、分析什么，或者哪里看着不对，我帮你一起看。")
             yield f"[REPLY] {json.dumps(reply_text, ensure_ascii=False)}\n"
 
         return StreamingResponse(quick_gen(), media_type="text/event-stream")
 
     logger.info("AI assistant received message: %s", msg_clean[:100])
 
+    data_analysis_skill_reply = try_data_analysis_skill_reply_v2(request)
+    if data_analysis_skill_reply:
+        _AI_INTERP_PREFIX = '__NEEDS_AI_INTERP__'
+        _needs_ai_interp = data_analysis_skill_reply.startswith(_AI_INTERP_PREFIX)
+        _da_reply_text = _apply_yuqian_style(
+            data_analysis_skill_reply[len(_AI_INTERP_PREFIX):] if _needs_ai_interp else data_analysis_skill_reply
+        )
+
+        async def data_analysis_gen():
+            # 先把数据表原文流式输出
+            yield f"[REPLY] {json.dumps(_da_reply_text, ensure_ascii=False)}\n"
+            if not _needs_ai_interp:
+                return
+            # 二次 AI 诊断：把数据表喂给大模型，流式输出诊断段落
+            _ai_prompt = (
+                '你是一名天然气长输管道调度专家，精通压力管理、露点控制和多站指标对比诊断。\n'
+                '用户刚刚在系统内查询了多个站场的实时运行数据，对比结果如下：\n\n'
+                + _da_reply_text
+                + '\n\n---\n'
+                '请根据以上数据，用于谦式中文给出 AI 辅助诊断：\n'
+                '【格式要求】\n'
+                '- 先给一句结论：最需要关注哪个站，风险等级（正常/低/中/高）\n'
+                '- 再分析 2~3 个关键异常点（每条对应一个数据指标，说清楚为什么异常）\n'
+                '- 最后给 1~2 条可操作的调度建议（具体到动作，不要说"关注"）\n'
+                '【风格要求】先结论后分析，口语化，松弛机灵；安全数字不开玩笑；\n'
+                '禁止照抄数据表，禁止说废话，直接给诊断意见。'
+            )
+            _ai_interp_parts: list[str] = []
+            try:
+                yield f"[REPLY] {json.dumps(chr(10) + chr(10) + '---' + chr(10) + '**AI 诊断分析**' + chr(10), ensure_ascii=False)}\n"
+                async for _chunk in ai_client.chat_stream(
+                    prompt=_ai_prompt,
+                    temperature=0.6,
+                    max_tokens=800,
+                ):
+                    _ai_interp_parts.append(_chunk)
+                    yield f"[REPLY] {json.dumps(_chunk, ensure_ascii=False)}\n"
+            except Exception as _ai_exc:
+                logger.warning('AI interp for data analysis failed: %s', _ai_exc)
+
+        return StreamingResponse(data_analysis_gen(), media_type="text/event-stream")
+
     direct_count_reply = try_raw_excel_direct_count_reply(msg_clean)
     if direct_count_reply:
 
         async def direct_count_gen():
-            yield f"[REPLY] {json.dumps(direct_count_reply, ensure_ascii=False)}\n"
+            yield f"[REPLY] {json.dumps(_apply_yuqian_style(direct_count_reply), ensure_ascii=False)}\n"
 
         return StreamingResponse(direct_count_gen(), media_type="text/event-stream")
 
@@ -106,7 +246,7 @@ async def chat(
     if direct_list_reply:
 
         async def direct_list_gen():
-            yield f"[REPLY] {json.dumps(direct_list_reply, ensure_ascii=False)}\n"
+            yield f"[REPLY] {json.dumps(_apply_yuqian_style(direct_list_reply), ensure_ascii=False)}\n"
 
         return StreamingResponse(direct_list_gen(), media_type="text/event-stream")
 
@@ -114,9 +254,17 @@ async def chat(
     if direct_lookup_reply:
 
         async def direct_gen():
-            yield f"[REPLY] {json.dumps(direct_lookup_reply, ensure_ascii=False)}\n"
+            yield f"[REPLY] {json.dumps(_apply_yuqian_style(direct_lookup_reply), ensure_ascii=False)}\n"
 
         return StreamingResponse(direct_gen(), media_type="text/event-stream")
+
+    luzhi_pilot_reply = try_luzhi_pilot_reply(request.context, msg_clean)
+    if luzhi_pilot_reply:
+
+        async def luzhi_pilot_gen():
+            yield f"[REPLY] {json.dumps(_apply_yuqian_style(luzhi_pilot_reply), ensure_ascii=False)}\n"
+
+        return StreamingResponse(luzhi_pilot_gen(), media_type="text/event-stream")
 
     if ai_analysis_orchestrator.should_use_orchestration(request.context, request.analysis_mode):
         return StreamingResponse(
@@ -130,6 +278,62 @@ async def chat(
     )
 
 
+@router.get("/luzhi-pilot/trace")
+async def get_luzhi_pilot_trace(
+    limit: int = Query(default=20, ge=1, le=200),
+):
+    trace_items, total_lines = _load_luzhi_pilot_trace(limit=limit)
+    return {
+        "pilot_enabled": _is_luzhi_pilot_globally_enabled(),
+        "env_key": LUZHI_PILOT_ENV_KEY,
+        "trace_path": str(LUZHI_TRACE_PATH),
+        "trace_total": total_lines,
+        "items": trace_items,
+    }
+
+
+@router.get("/luzhi-pilot/summary")
+async def get_luzhi_pilot_summary(
+    days: int = Query(default=7, ge=1, le=30),
+    scan_limit: int = Query(default=800, ge=50, le=5000),
+):
+    trace_items, _ = _load_luzhi_pilot_trace(limit=scan_limit)
+    summary = _build_luzhi_trace_summary(trace_items, days=days)
+    return {
+        "pilot_enabled": _is_luzhi_pilot_globally_enabled(),
+        "window_days": days,
+        **summary,
+    }
+
+
+@router.get("/luzhi-pilot/report")
+async def get_luzhi_pilot_report(
+    days: int = Query(default=7, ge=1, le=30),
+    scan_limit: int = Query(default=1000, ge=50, le=5000),
+    recent_limit: int = Query(default=20, ge=5, le=200),
+):
+    trace_items, _ = _load_luzhi_pilot_trace(limit=scan_limit)
+    summary = _build_luzhi_trace_summary(trace_items, days=days)
+    report_markdown = _build_luzhi_trace_report_markdown(
+        items=trace_items,
+        summary=summary,
+        days=days,
+        recent_limit=recent_limit,
+    )
+    generated_at = datetime.now(timezone.utc).isoformat()
+    date_text = datetime.now(timezone.utc).strftime("%Y%m%d")
+    return {
+        "pilot_enabled": _is_luzhi_pilot_globally_enabled(),
+        "window_days": days,
+        "scan_limit": scan_limit,
+        "recent_limit": recent_limit,
+        "generated_at": generated_at,
+        "report_filename": f"luzhi-pilot-review-{date_text}.md",
+        "summary": summary,
+        "report_markdown": report_markdown,
+    }
+
+
 async def generate_chat_response(request: ChatRequest, session: Session) -> ChatResponse:
     """
     给非流式入口复用 AI 助手能力。
@@ -139,9 +343,17 @@ async def generate_chat_response(request: ChatRequest, session: Session) -> Chat
     if not msg_clean:
         raise HTTPException(status_code=400, detail="消息不能为空")
 
+    data_analysis_skill_reply = try_data_analysis_skill_reply_v2(request)
+    if data_analysis_skill_reply is not None:
+        return ChatResponse(reply=_apply_yuqian_style(data_analysis_skill_reply))
+
     direct_reply = _resolve_direct_reply(msg_clean)
     if direct_reply is not None:
         return ChatResponse(reply=direct_reply)
+
+    luzhi_pilot_reply = try_luzhi_pilot_reply(request.context, msg_clean)
+    if luzhi_pilot_reply is not None:
+        return ChatResponse(reply=luzhi_pilot_reply)
 
     if ai_analysis_orchestrator.should_use_orchestration(request.context, request.analysis_mode):
         event_generator = _orchestrated_event_generator(request=request, session=session)
@@ -155,20 +367,1985 @@ def _resolve_direct_reply(message: str) -> str | None:
     msg_clean = message.strip()
     greetings = {"你好", "您好", "hello", "hi", "在吗", "早上好", "中午好", "下午好", "晚上好"}
     if msg_clean.lower() in greetings:
-        return "你好，我在。你直接说想查什么、分析什么，或者哪里看着不对，我帮你一起看。"
+        return _apply_yuqian_style("你好，我在。你直接说想查什么、分析什么，或者哪里看着不对，我帮你一起看。")
+
+    if SUBAGENT_ENTER_PATTERN.match(msg_clean):
+        return _apply_yuqian_style(
+            _append_completeness_hint(
+                "已进入 SubAgent 协作模式。你可以直接点“并行侦察 / 实施方案 / 独立验证”。",
+                message,
+                is_complete=True,
+                reason="已执行 subagent 进入命令。",
+            )
+        )
+    if SUBAGENT_EXIT_PATTERN.match(msg_clean):
+        return _apply_yuqian_style(
+            _append_completeness_hint(
+                "已退出 SubAgent 协作模式，回到常规问答。",
+                message,
+                is_complete=True,
+                reason="已执行 subagent 退出命令。",
+            )
+        )
 
     direct_count_reply = try_raw_excel_direct_count_reply(msg_clean)
     if direct_count_reply:
-        return direct_count_reply
+        return _apply_yuqian_style(direct_count_reply)
 
     direct_list_reply = try_raw_excel_direct_list_reply(msg_clean)
     if direct_list_reply:
-        return direct_list_reply
+        return _apply_yuqian_style(direct_list_reply)
 
     direct_lookup_reply = try_raw_excel_direct_entity_lookup(msg_clean)
     if direct_lookup_reply:
-        return direct_lookup_reply
+        return _apply_yuqian_style(direct_lookup_reply)
 
+    return None
+
+
+def try_data_analysis_skill_reply(request: ChatRequest) -> str | None:
+    command, payload = _parse_data_analysis_command(request.message)
+    mode_active_before = _is_data_analysis_mode_active(request.history)
+
+    if command == "exit":
+        return _append_completeness_hint(
+            "已退出数据分析状态。后续会回到常规问答模式。",
+            request.message,
+            is_complete=True,
+            reason="已执行退出命令。",
+        )
+
+    if command == "enter" and not payload:
+        return _append_completeness_hint(
+            "已进入数据分析状态。你可以直接说“甪直水露点”，或“甲站和乙站水露点对比”。",
+            request.message,
+            is_complete=True,
+            reason="已执行进入命令。",
+        )
+
+    if not (mode_active_before or command == "enter"):
+        return None
+
+    target_message = payload if command == "enter" else request.message.strip()
+    normalized_message = re.sub(r"\s+", "", target_message).lower()
+
+    if _looks_like_history_curve_query(normalized_message):
+        metric_type = _detect_history_metric_type(normalized_message)
+        station_name_input = _extract_station_name_for_dewpoint(target_message, request.context)
+        if not station_name_input:
+            return _append_completeness_hint(
+                "我识别到你要查历史曲线了，但这句里没抓到站名。请带上站名再发一次，比如“中卫站压力曲线”。",
+                request.message,
+                is_complete=False,
+                reason="历史曲线查询缺少站名。",
+            )
+
+        resolved_station, has_metric_data = _resolve_station_for_history_metric(station_name_input, metric_type)
+        if not has_metric_data:
+            metric_label = "压力" if metric_type == "pressure" else ("温度" if metric_type == "temperature" else "水露点")
+            return _append_completeness_hint(
+                f"{station_name_input}目前没有可用的{metric_label}历史数据，先导入该指标后就能出曲线。",
+                request.message,
+                is_complete=False,
+                reason=f"目标站点缺少{metric_type}时序数据。",
+            )
+
+        history_reply = _build_history_curve_action_reply(resolved_station, metric_type)
+        return _append_completeness_hint(
+            history_reply,
+            request.message,
+            is_complete=True,
+            reason=f"已识别{resolved_station}{metric_type}历史曲线查询并生成动作。",
+        )
+
+    if not _looks_like_dewpoint_query(normalized_message):
+        return None
+
+    snapshot_index, alias_index = _collect_station_snapshots(request.context)
+    if not snapshot_index:
+        return _append_completeness_hint(
+            "当前没有可用的露点快照，先打开甪直历史面板再发起分析。",
+            request.message,
+            is_complete=False,
+            reason="上下文缺少 station snapshot。",
+        )
+
+    if _looks_like_dewpoint_compare_query(normalized_message):
+        station_pair = _extract_station_pair_for_compare(target_message)
+        if not station_pair:
+            return _append_completeness_hint(
+                "你这句里我没识别出两个站名。请按“甲站和乙站水露点对比”再发一次。",
+                request.message,
+                is_complete=False,
+                reason="双站对比缺少可解析的站名。",
+            )
+
+        left_station_input, right_station_input = station_pair
+        left_station_name, left_snapshot = _resolve_station_snapshot(left_station_input, snapshot_index, alias_index)
+        right_station_name, right_snapshot = _resolve_station_snapshot(right_station_input, snapshot_index, alias_index)
+
+        missing_stations: list[str] = []
+        if left_snapshot is None:
+            missing_stations.append(left_station_input)
+        if right_snapshot is None:
+            missing_stations.append(right_station_input)
+        if missing_stations:
+            available = sorted(snapshot_index.keys())
+            return _append_completeness_hint(
+                _build_missing_station_snapshot_reply(missing_stations, available),
+                request.message,
+                is_complete=False,
+                reason="目标站缺少露点快照。",
+            )
+
+        left_analysis = _analyze_station_dewpoint(left_snapshot)
+        right_analysis = _analyze_station_dewpoint(right_snapshot)
+        if left_analysis is None or right_analysis is None:
+            available = sorted(snapshot_index.keys())
+            return _append_completeness_hint(
+                f"站点已命中，但露点指标为空。当前可分析站：{'、'.join(available) if available else '无'}。",
+                request.message,
+                is_complete=False,
+                reason="快照存在但无 dewpoint 指标。",
+            )
+
+        compare_reply = _build_dewpoint_compare_reply(
+            left_station_name,
+            right_station_name,
+            left_snapshot,
+            right_snapshot,
+            left_analysis,
+            right_analysis,
+        )
+        return _append_completeness_hint(
+            compare_reply,
+            request.message,
+            is_complete=True,
+            reason="已完成双站露点并行分析和对比。",
+        )
+
+    station_name_input = _extract_station_name_for_dewpoint(target_message, request.context)
+    resolved_station_name, resolved_snapshot = _resolve_station_snapshot(station_name_input, snapshot_index, alias_index)
+    if resolved_snapshot is None:
+        available = sorted(snapshot_index.keys())
+        query_station_text = station_name_input or "目标站"
+        return _append_completeness_hint(
+            f"{query_station_text}没有露点快照。当前可分析站：{'、'.join(available) if available else '无'}。",
+            request.message,
+            is_complete=False,
+            reason="单站请求缺少对应站点快照。",
+        )
+
+    station_analysis = _analyze_station_dewpoint(resolved_snapshot)
+    if station_analysis is None:
+        return _append_completeness_hint(
+            f"{resolved_station_name}当前快照没有露点指标，暂时无法分析。",
+            request.message,
+            is_complete=False,
+            reason="站点快照缺少 dewpoint 指标。",
+        )
+
+    single_station_reply = _build_single_station_dewpoint_reply(
+        resolved_station_name,
+        resolved_snapshot,
+        station_analysis,
+    )
+    return _append_completeness_hint(
+        single_station_reply,
+        request.message,
+        is_complete=True,
+        reason="已完成单站露点分析。",
+    )
+
+
+def _parse_data_analysis_command(message: str) -> tuple[str | None, str]:
+    raw_message = (message or "").strip()
+    exit_match = DATA_ANALYSIS_EXIT_PATTERN.match(raw_message)
+    if exit_match:
+        return "exit", ""
+
+    enter_match = DATA_ANALYSIS_ENTER_PATTERN.match(raw_message)
+    if enter_match:
+        payload = str(enter_match.group("payload") or "").strip()
+        return "enter", payload
+
+    return None, ""
+
+
+def _is_data_analysis_mode_active(history: list[ChatMessage] | None) -> bool:
+    if not history:
+        return False
+
+    mode_active = False
+    for item in history:
+        if str(getattr(item, "role", "")).strip().lower() != "user":
+            continue
+        command, _ = _parse_data_analysis_command(str(getattr(item, "content", "")))
+        if command == "enter":
+            mode_active = True
+        elif command == "exit":
+            mode_active = False
+    return mode_active
+
+
+def _looks_like_dewpoint_query(normalized_message: str) -> bool:
+    return any(keyword in normalized_message for keyword in DEWPOINT_QUERY_KEYWORDS)
+
+
+def _looks_like_dewpoint_compare_query(normalized_message: str) -> bool:
+    if not _looks_like_dewpoint_query(normalized_message):
+        return False
+    return any(keyword in normalized_message for keyword in DEWPOINT_COMPARE_KEYWORDS)
+
+
+def _collect_station_snapshots(
+    context: AssistantContext | None,
+) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
+    station_snapshots: dict[str, dict[str, Any]] = {}
+    alias_index: dict[str, str] = {}
+
+    single_snapshot = _extract_luzhi_snapshot(context)
+    if single_snapshot:
+        _register_station_snapshot(station_snapshots, alias_index, single_snapshot)
+
+    if context is None or not context.selection:
+        return station_snapshots, alias_index
+
+    raw_sources = (
+        context.selection.get("station_snapshots"),
+        context.selection.get("luzhi_station_snapshots"),
+    )
+    for raw_source in raw_sources:
+        if isinstance(raw_source, dict):
+            iterator = raw_source.values()
+        elif isinstance(raw_source, list):
+            iterator = raw_source
+        else:
+            continue
+
+        for raw_snapshot in iterator:
+            if not isinstance(raw_snapshot, dict):
+                continue
+            normalized_snapshot = _normalize_station_snapshot(raw_snapshot, fallback_station_name="")
+            if not normalized_snapshot:
+                continue
+            _register_station_snapshot(station_snapshots, alias_index, normalized_snapshot)
+
+    return station_snapshots, alias_index
+
+
+def _register_station_snapshot(
+    station_snapshots: dict[str, dict[str, Any]],
+    alias_index: dict[str, str],
+    snapshot: dict[str, Any],
+) -> None:
+    station_name = str(snapshot.get("station_name") or "").strip()
+    if not station_name:
+        return
+
+    station_snapshots[station_name] = snapshot
+    alias_index[station_name] = station_name
+    normalized_station_name = _normalize_station_name_v2(station_name)
+    if normalized_station_name:
+        alias_index[normalized_station_name] = station_name
+
+    if "甪直" in station_name:
+        alias_index["甪直"] = station_name
+        alias_index["甪直站"] = station_name
+        alias_index[_normalize_station_name_v2("甪直分输站")] = station_name
+
+
+def _normalize_station_name(raw_name: str) -> str:
+    station_name = re.sub(r"[（(][^()（）]*[)）]", "", str(raw_name or ""))
+    station_name = re.sub(r"\s+", "", station_name)
+    for suffix in STATION_SUFFIXES:
+        if station_name.endswith(suffix) and len(station_name) > len(suffix):
+            station_name = station_name[: -len(suffix)]
+            break
+    return station_name.lower()
+
+
+def _normalize_station_name_v2(raw_name: str) -> str:
+    station_name = re.sub(r"[（(][^()（）]*[)）]", "", str(raw_name or ""))
+    station_name = re.sub(r"\s+", "", station_name)
+    station_name = _strip_pipeline_prefix(station_name)
+    station_name = _strip_station_suffix(station_name)
+    return station_name.lower()
+
+
+def _strip_station_suffix(station_name: str) -> str:
+    text = str(station_name or "")
+    for suffix in CANONICAL_STATION_SUFFIXES:
+        if text.endswith(suffix) and len(text) > len(suffix):
+            return text[: -len(suffix)]
+    return text
+
+
+def _strip_pipeline_prefix(station_name: str) -> str:
+    text = str(station_name or "")
+    if not text:
+        return text
+
+    changed = True
+    while changed:
+        changed = False
+        for prefix in CANONICAL_PIPELINE_PREFIXES:
+            if text.startswith(prefix) and len(text) > len(prefix):
+                text = text[len(prefix):]
+                changed = True
+                break
+    return text
+
+
+def _has_pipeline_prefix(station_name: str) -> bool:
+    text = re.sub(r"\s+", "", str(station_name or ""))
+    return any(text.startswith(prefix) for prefix in CANONICAL_PIPELINE_PREFIXES)
+
+
+def _extract_station_pair_for_compare(message: str) -> tuple[str, str] | None:
+    compact = re.sub(r"\s+", "", (message or ""))
+    match = STATION_PAIR_PATTERN.search(compact)
+    if match:
+        left = _clean_station_fragment(match.group("left"))
+        right = _clean_station_fragment(match.group("right"))
+        if left and right:
+            return left, right
+
+    for connector in ("和", "与", "跟"):
+        if connector not in compact:
+            continue
+        left_part, right_part = compact.split(connector, 1)
+        left = _extract_station_name_from_fragment(left_part, prefer_tail=True)
+        right = _extract_station_name_from_fragment(right_part, prefer_tail=False)
+        if left and right:
+            return left, right
+    return None
+
+
+def _extract_station_name_from_fragment(fragment: str, *, prefer_tail: bool) -> str | None:
+    tokens = re.findall(
+        r"[\u4e00-\u9fa5A-Za-z0-9]{1,24}(?:分输联络站|分输压气站|分输清管站|分输站|压气站|清管站|站)",
+        fragment,
+    )
+    if tokens:
+        selected = tokens[-1] if prefer_tail else tokens[0]
+        cleaned = _clean_station_fragment(selected)
+        if cleaned:
+            return cleaned
+
+    cleaned_fragment = _clean_station_fragment(fragment)
+    if not cleaned_fragment:
+        return None
+
+    if "甪直" in cleaned_fragment:
+        return "甪直"
+
+    if re.search(r"[\u4e00-\u9fa5A-Za-z]", cleaned_fragment):
+        return cleaned_fragment
+
+    return None
+
+
+def _clean_station_fragment(fragment: str) -> str:
+    text = re.sub(r"\s+", "", str(fragment or ""))
+    text = re.sub(r"(水?露点|dewpoint|对比|比较|差异|对照|分析|趋势|并行)+$", "", text, flags=re.IGNORECASE)
+    text = text.strip("，。；;：:,")
+    return text
+
+
+def _extract_station_name_for_dewpoint(
+    message: str,
+    context: AssistantContext | None,
+) -> str:
+    compact = re.sub(r"\s+", "", (message or ""))
+    tokens = re.findall(
+        r"[\u4e00-\u9fa5A-Za-z0-9]{1,24}(?:分输联络站|分输压气站|分输清管站|分输站|压气站|清管站|站)",
+        compact,
+    )
+    if tokens:
+        station = _clean_station_fragment(tokens[-1])
+        if station:
+            return station
+
+    if "甪直" in compact or "luzhi" in compact.lower():
+        return "甪直"
+
+    if context and context.selection:
+        history_target = str(context.selection.get("history_target_station") or "").strip()
+        if history_target:
+            return history_target
+
+    return ""
+
+
+def _resolve_station_snapshot(
+    station_name: str,
+    station_snapshots: dict[str, dict[str, Any]],
+    alias_index: dict[str, str],
+) -> tuple[str, dict[str, Any] | None]:
+    requested = str(station_name or "").strip()
+    if not requested:
+        if LUZHI_PILOT_STATION in station_snapshots:
+            return LUZHI_PILOT_STATION, station_snapshots.get(LUZHI_PILOT_STATION)
+        if station_snapshots:
+            first_name = next(iter(station_snapshots))
+            return first_name, station_snapshots.get(first_name)
+        return "", None
+
+    if requested in station_snapshots:
+        return requested, station_snapshots[requested]
+
+    normalized_requested = _normalize_station_name_v2(requested)
+    mapped_name = alias_index.get(requested) or alias_index.get(normalized_requested)
+    if mapped_name and mapped_name in station_snapshots:
+        return mapped_name, station_snapshots[mapped_name]
+
+    return requested, None
+
+
+def _build_missing_station_snapshot_reply(missing_stations: list[str], available_stations: list[str]) -> str:
+    missing_text = "、".join(dict.fromkeys(station for station in missing_stations if station))
+    available_text = "、".join(available_stations) if available_stations else "无"
+    return f"未找到这些站的露点快照：{missing_text}。当前可分析站：{available_text}。"
+
+
+def _analyze_station_dewpoint(snapshot: dict[str, Any]) -> dict[str, Any] | None:
+    metrics: list[dict[str, Any]] = snapshot.get("metrics") or []
+    dewpoint_metrics = [metric for metric in metrics if str(metric.get("type")) == "dewpoint"]
+    if not dewpoint_metrics:
+        return None
+
+    evaluated_items: list[dict[str, Any]] = []
+    for metric in dewpoint_metrics:
+        metric_eval = _evaluate_luzhi_metric(metric)
+        evaluated_items.append(metric | metric_eval)
+
+    evaluated_items.sort(
+        key=lambda item: (
+            LUZHI_RISK_ORDER.get(str(item.get("risk_level") or "正常"), 0),
+            abs(float(item.get("delta6h") or 0.0)),
+            str(item.get("label") or ""),
+        ),
+        reverse=True,
+    )
+    strongest_metric = evaluated_items[0]
+    overall_risk = _choose_overall_risk(evaluated_items)
+    overall_confidence = _aggregate_confidence(evaluated_items)
+    avg_latest = sum(float(item.get("latest") or 0.0) for item in evaluated_items) / len(evaluated_items)
+
+    return {
+        "overall_risk": overall_risk,
+        "overall_confidence": overall_confidence,
+        "strongest_metric": strongest_metric,
+        "avg_latest": avg_latest,
+        "items": evaluated_items,
+    }
+
+
+def _build_station_dewpoint_conclusion(analysis: dict[str, Any]) -> str:
+    strongest_metric = analysis["strongest_metric"]
+    overall_risk = str(analysis["overall_risk"])
+    metric_label = str(strongest_metric["label"])
+    metric_delta = _format_signed_value(float(strongest_metric["delta6h"]), str(strongest_metric["unit"]))
+
+    if overall_risk == "高":
+        return f"露点波动偏高，重点关注{metric_label}，近6小时变化{metric_delta}。"
+    if overall_risk == "中":
+        return f"露点存在中等波动，重点关注{metric_label}，近6小时变化{metric_delta}。"
+    if overall_risk == "低":
+        return f"露点整体可控，有轻微波动，重点项是{metric_label}。"
+    return f"露点整体平稳，当前主要观测项是{metric_label}。"
+
+
+def _build_single_station_dewpoint_reply(
+    station_name: str,
+    snapshot: dict[str, Any],
+    analysis: dict[str, Any],
+) -> str:
+    lines: list[str] = []
+    conclusion = _build_station_dewpoint_conclusion(analysis)
+    lines.append(f"{station_name}水露点结论：{conclusion}")
+    lines.append(f"风险等级：{analysis['overall_risk']}（置信度 {analysis['overall_confidence']:.0%}）")
+    lines.append(f"分析窗口：{_format_time_window(snapshot)}")
+    lines.append("1. 露点指标明细")
+
+    for idx, item in enumerate(analysis["items"], start=1):
+        lines.append(
+            "{index}. {label} 当前{latest}，6小时变化{delta6h}，区间{range_text}，风险{risk}，建议{action}".format(
+                index=idx,
+                label=item["label"],
+                latest=_format_metric_value(float(item["latest"]), str(item["unit"])),
+                delta6h=_format_signed_value(float(item["delta6h"]), str(item["unit"])),
+                range_text=f"{_format_metric_number(float(item['min']))} ~ {_format_metric_number(float(item['max']))} {item['unit']}".strip(),
+                risk=item["risk_level"],
+                action=item["action_hint"],
+            )
+        )
+
+    strongest_metric = analysis.get("strongest_metric")
+    if strongest_metric:
+        action_target = _infer_luzhi_action_target(snapshot, strongest_metric)
+        action_target["view"] = "dewpoint"
+        lines.extend(
+            [
+                "",
+                (
+                    "[ACTION:OPEN_HISTORY_PANEL"
+                    f"|station={action_target['station']}"
+                    f"|view={action_target['view']}"
+                    f"|hours={action_target['hours']}"
+                    f"|time_start={action_target['time_start']}"
+                    f"|time_end={action_target['time_end']}"
+                    f"|metric={action_target['metric']}]"
+                ),
+            ]
+        )
+
+    return "\n".join(lines)
+
+
+def _build_dewpoint_compare_reply(
+    left_station_name: str,
+    right_station_name: str,
+    left_snapshot: dict[str, Any],
+    right_snapshot: dict[str, Any],
+    left_analysis: dict[str, Any],
+    right_analysis: dict[str, Any],
+) -> str:
+    left_conclusion = _build_station_dewpoint_conclusion(left_analysis)
+    right_conclusion = _build_station_dewpoint_conclusion(right_analysis)
+    left_risk = str(left_analysis["overall_risk"])
+    right_risk = str(right_analysis["overall_risk"])
+    risk_delta = LUZHI_RISK_ORDER.get(left_risk, 0) - LUZHI_RISK_ORDER.get(right_risk, 0)
+
+    if risk_delta > 0:
+        overall_conclusion = f"{left_station_name}风险高于{right_station_name}，优先处理{left_station_name}。"
+    elif risk_delta < 0:
+        overall_conclusion = f"{right_station_name}风险高于{left_station_name}，优先处理{right_station_name}。"
+    else:
+        overall_conclusion = "两站风险等级一致，建议按波动幅度排序处置。"
+
+    lines: list[str] = [
+        f"{left_station_name}和{right_station_name}水露点对比结论：{overall_conclusion}",
+        f"1. 并行分析A（{left_station_name}）：{left_conclusion}",
+        f"2. 并行分析B（{right_station_name}）：{right_conclusion}",
+    ]
+
+    left_by_pipeline = {str(item.get("pipeline") or item["label"]): item for item in left_analysis["items"]}
+    right_by_pipeline = {str(item.get("pipeline") or item["label"]): item for item in right_analysis["items"]}
+    common_pipelines = sorted(set(left_by_pipeline.keys()) & set(right_by_pipeline.keys()))
+
+    if common_pipelines:
+        lines.append("3. 同管线露点差值（A-B）")
+        for idx, pipeline in enumerate(common_pipelines, start=1):
+            left_item = left_by_pipeline[pipeline]
+            right_item = right_by_pipeline[pipeline]
+            unit = str(left_item.get("unit") or right_item.get("unit") or "")
+            latest_diff = float(left_item["latest"]) - float(right_item["latest"])
+            delta6h_diff = float(left_item["delta6h"]) - float(right_item["delta6h"])
+            lines.append(
+                f"{idx}. {pipeline} 当前差值{_format_signed_value(latest_diff, unit)}，6小时变化差{_format_signed_value(delta6h_diff, unit)}。"
+            )
+    else:
+        left_unit = str(left_analysis["strongest_metric"].get("unit") or "")
+        average_diff = float(left_analysis["avg_latest"]) - float(right_analysis["avg_latest"])
+        lines.append("3. 同名管线不足，改用站级平均露点对比")
+        lines.append(f"1. 站级平均露点差值（A-B）{_format_signed_value(average_diff, left_unit)}。")
+
+    if left_analysis.get("strongest_metric"):
+        action_target = _infer_luzhi_action_target(left_snapshot, left_analysis["strongest_metric"])
+        action_target["view"] = "dewpoint"
+        lines.extend(
+            [
+                "",
+                (
+                    "[ACTION:OPEN_HISTORY_PANEL"
+                    f"|station={action_target['station']}"
+                    f"|view={action_target['view']}"
+                    f"|hours={action_target['hours']}"
+                    f"|time_start={action_target['time_start']}"
+                    f"|time_end={action_target['time_end']}"
+                    f"|metric={action_target['metric']}]"
+                ),
+            ]
+        )
+
+    return "\n".join(lines)
+
+
+
+def _looks_like_multi_station_compare(msg: str) -> bool:
+    """判断是否是多站横向对比意图（压力/温度/水露点）"""
+    if not any(kw in msg for kw in MULTI_STATION_COMPARE_KEYWORDS):
+        return False
+    # 包含连接词（和/与/跟）或多个站名匹配
+    has_connector = any(c in msg for c in ('和', '与', '跟', '、', ',', '，'))
+    return has_connector
+
+
+def _detect_compare_metric(msg: str) -> str:
+    """识别对比的指标类型。返回 pressure / temperature / dewpoint / all"""
+    has_pressure = any(kw in msg for kw in PRESSURE_KEYWORDS)
+    has_temperature = any(kw in msg for kw in TEMPERATURE_KEYWORDS)
+    has_dewpoint = any(kw in msg for kw in DEWPOINT_QUERY_KEYWORDS)
+    if has_pressure and not has_temperature and not has_dewpoint:
+        return 'pressure'
+    if has_temperature and not has_pressure and not has_dewpoint:
+        return 'temperature'
+    if has_dewpoint and not has_pressure and not has_temperature:
+        return 'dewpoint'
+    return 'all'
+
+
+def _extract_multi_station_list(message: str) -> list[str]:
+    """从消息中提取多个站场名称，支持逗号/顿号/和/与分隔"""
+    compact = re.sub(r'\s+', '', (message or ''))
+    # 先尝试按分隔符分割
+    parts: list[str] = re.split(r'[,，、和与跟]', compact)
+    station_names: list[str] = []
+    for part in parts:
+        # 尝试匹配站名（含站后缀）
+        matches = re.findall(
+            r'[\u4e00-\u9fa5A-Za-z0-9]{1,24}(?:分输联络站|分输压气站|分输清管站|分输站|压气站|清管站|站)',
+            part
+        )
+        if matches:
+            sname = _clean_station_fragment(matches[-1])
+            if sname:
+                station_names.append(sname)
+        else:
+            cleaned = _clean_station_fragment(part)
+            if cleaned and re.search(r'[\u4e00-\u9fa5]', cleaned):
+                station_names.append(cleaned)
+    # 去重并保持顺序
+    seen: set[str] = set()
+    unique: list[str] = []
+    for s in station_names:
+        if s and s not in seen:
+            seen.add(s)
+            unique.append(s)
+    return unique[:5]
+
+
+def _looks_like_history_curve_query(message: str) -> bool:
+    compact = re.sub(r"\s+", "", str(message or "")).lower()
+    has_metric = (
+        any(kw.lower() in compact for kw in PRESSURE_KEYWORDS)
+        or any(kw.lower() in compact for kw in TEMPERATURE_KEYWORDS)
+        or any(kw.lower() in compact for kw in DEWPOINT_QUERY_KEYWORDS)
+    )
+    has_curve_intent = any(kw.lower() in compact for kw in HISTORY_CURVE_KEYWORDS)
+    return has_metric and has_curve_intent
+
+
+def _detect_history_metric_type(message: str) -> str:
+    compact = re.sub(r"\s+", "", str(message or "")).lower()
+    has_pressure = any(kw.lower() in compact for kw in PRESSURE_KEYWORDS)
+    has_temperature = any(kw.lower() in compact for kw in TEMPERATURE_KEYWORDS)
+    has_dewpoint = any(kw.lower() in compact for kw in DEWPOINT_QUERY_KEYWORDS)
+    if has_temperature and not has_pressure and not has_dewpoint:
+        return "temperature"
+    if has_dewpoint and not has_pressure and not has_temperature:
+        return "dewpoint"
+    return "pressure"
+
+
+def _resolve_station_for_history_metric(requested_station: str, metric_type: str) -> tuple[str, bool]:
+    requested = str(requested_station or "").strip()
+    if not requested:
+        return "", False
+
+    try:
+        with Session(scada_history_engine) as history_session:
+            available_rows = history_session.exec(
+                select(ScadaHistory.station_name).where(ScadaHistory.metric_type == metric_type)
+            ).all()
+            available_names = sorted({str(name).strip() for name in available_rows if str(name).strip()})
+    except Exception as exc:
+        logger.warning("load station names from scada_history failed: %s", exc)
+        return requested, False
+
+    if not available_names:
+        return requested, False
+
+    resolved = _resolve_db_station_name_for_dewpoint_v2(requested, available_names)
+    if not resolved:
+        return requested, False
+    return resolved, True
+
+
+def _build_history_curve_action_reply(station_name: str, metric_type: str) -> str:
+    view = "pressure"
+    metric_label = "压力"
+    if metric_type == "temperature":
+        view = "temperature"
+        metric_label = "温度"
+    elif metric_type == "dewpoint":
+        view = "dewpoint"
+        metric_label = "水露点"
+
+    station_token = _sanitize_action_token_text(station_name)
+    metric_token = _sanitize_action_token_text(metric_label)
+    return (
+        f"{station_name}{metric_label}历史曲线已就位，点下面按钮直接开图看趋势。\n\n"
+        "[ACTION:OPEN_HISTORY_PANEL"
+        f"|station={station_token}"
+        f"|view={view}"
+        "|hours=12"
+        "|time_start="
+        "|time_end="
+        f"|metric={metric_token}]"
+    )
+
+
+def try_data_analysis_skill_reply_v2(request: ChatRequest) -> str | None:
+    command, payload = _parse_data_analysis_command(request.message)
+    mode_active_before = _is_data_analysis_mode_active(request.history)
+
+    if command == "exit":
+        return _append_completeness_hint(
+            "已退出数据分析状态。后续会回到常规问答模式。",
+            request.message,
+            is_complete=True,
+            reason="已执行退出命令。",
+        )
+
+    if command == "enter" and not payload:
+        return _append_completeness_hint(
+            "已进入数据分析状态。你可以直接说“甪直水露点”，或“甲站和乙站水露点对比”。",
+            request.message,
+            is_complete=True,
+            reason="已执行进入命令。",
+        )
+
+    if not (mode_active_before or command == "enter"):
+        return None
+
+    target_message = payload if command == "enter" else request.message.strip()
+    normalized_message = re.sub(r"\s+", "", target_message).lower()
+    if not _looks_like_dewpoint_query(normalized_message):
+        return None
+
+    snapshot_index, alias_index = _collect_station_snapshots(request.context)
+
+    # —— 多站横向对比：压力 / 温度 / 水露点 ——
+    if _looks_like_multi_station_compare(normalized_message):
+        station_list = _extract_multi_station_list(target_message)
+        if len(station_list) >= 2:
+            compare_metric = _detect_compare_metric(normalized_message)
+            stations_arg = ','.join(station_list)
+            try:
+                from app.services.assistant_tools import TOOL_HANDLERS
+                from app.database import get_session
+                with next(get_session()) as db_session:
+                    compare_result = TOOL_HANDLERS['compare_stations'](
+                        {'stations': stations_arg, 'metric': compare_metric, 'hours': 24},
+                        db_session
+                    )
+                # 加前缀标记，通知下游生成器需要触发 AI 二次解读
+                _compare_hint = _append_completeness_hint(
+                    compare_result,
+                    request.message,
+                    is_complete=True,
+                    reason=f'已完成{len(station_list)}站{compare_metric}横向对比分析。',
+                )
+                return '__NEEDS_AI_INTERP__' + _compare_hint
+            except Exception as _exc:
+                logger.warning('多站对比工具调用失败: %s', _exc)
+                # 失败时降级继续
+
+    if _looks_like_dewpoint_compare_query(normalized_message):
+        station_pair = _extract_station_pair_for_compare(target_message)
+        if not station_pair:
+            return _append_completeness_hint(
+                "你这句里我没识别出两个站名。请按“甲站和乙站水露点对比”再发一次。",
+                request.message,
+                is_complete=False,
+                reason="双站对比缺少可解析的站名。",
+            )
+
+        left_station_input, right_station_input = station_pair
+        left_station_name, left_snapshot = _resolve_station_snapshot(left_station_input, snapshot_index, alias_index)
+        right_station_name, right_snapshot = _resolve_station_snapshot(right_station_input, snapshot_index, alias_index)
+
+        if left_snapshot is None:
+            left_station_name, left_snapshot = _ensure_station_snapshot_from_db(
+                left_station_name or left_station_input,
+                snapshot_index,
+                alias_index,
+            )
+        if right_snapshot is None:
+            right_station_name, right_snapshot = _ensure_station_snapshot_from_db(
+                right_station_name or right_station_input,
+                snapshot_index,
+                alias_index,
+            )
+
+        missing_stations: list[str] = []
+        if left_snapshot is None:
+            missing_stations.append(left_station_input)
+        if right_snapshot is None:
+            missing_stations.append(right_station_input)
+        if missing_stations:
+            available = sorted(snapshot_index.keys())
+            return _append_completeness_hint(
+                _build_missing_station_snapshot_reply(missing_stations, available),
+                request.message,
+                is_complete=False,
+                reason="目标站缺少露点快照。",
+            )
+
+        left_analysis = _analyze_station_dewpoint(left_snapshot)
+        right_analysis = _analyze_station_dewpoint(right_snapshot)
+        if left_analysis is None or right_analysis is None:
+            available = sorted(snapshot_index.keys())
+            return _append_completeness_hint(
+                f"站点已命中，但露点指标为空。当前可分析站：{'、'.join(available) if available else '无'}。",
+                request.message,
+                is_complete=False,
+                reason="快照存在但无 dewpoint 指标。",
+            )
+
+        compare_reply = _build_dewpoint_compare_reply(
+            left_station_name,
+            right_station_name,
+            left_snapshot,
+            right_snapshot,
+            left_analysis,
+            right_analysis,
+        )
+        return _append_completeness_hint(
+            compare_reply,
+            request.message,
+            is_complete=True,
+            reason="已完成双站露点并行分析和对比。",
+        )
+
+    station_name_input = _extract_station_name_for_dewpoint(target_message, request.context)
+    resolved_station_name, resolved_snapshot = _resolve_station_snapshot(station_name_input, snapshot_index, alias_index)
+    if resolved_snapshot is None:
+        resolved_station_name, resolved_snapshot = _ensure_station_snapshot_from_db(
+            resolved_station_name or station_name_input,
+            snapshot_index,
+            alias_index,
+        )
+
+    if resolved_snapshot is None:
+        available = sorted(snapshot_index.keys())
+        query_station_text = station_name_input or "目标站"
+        return _append_completeness_hint(
+            f"{query_station_text}没有露点快照。当前可分析站：{'、'.join(available) if available else '无'}。",
+            request.message,
+            is_complete=False,
+            reason="单站请求缺少对应站点快照，且数据库无可用露点历史。",
+        )
+
+    station_analysis = _analyze_station_dewpoint(resolved_snapshot)
+    if station_analysis is None:
+        return _append_completeness_hint(
+            f"{resolved_station_name}当前快照没有露点指标，暂时无法分析。",
+            request.message,
+            is_complete=False,
+            reason="站点快照缺少 dewpoint 指标。",
+        )
+
+    single_station_reply = _build_single_station_dewpoint_reply(
+        resolved_station_name,
+        resolved_snapshot,
+        station_analysis,
+    )
+    return _append_completeness_hint(
+        single_station_reply,
+        request.message,
+        is_complete=True,
+        reason="已完成单站露点分析。",
+    )
+
+
+def _ensure_station_snapshot_from_db(
+    station_name: str,
+    station_snapshots: dict[str, dict[str, Any]],
+    alias_index: dict[str, str],
+) -> tuple[str, dict[str, Any] | None]:
+    db_station_name, db_snapshot = _load_station_snapshot_from_scada_history(station_name)
+    if db_snapshot is None:
+        return station_name, None
+    _register_station_snapshot(station_snapshots, alias_index, db_snapshot)
+    return _resolve_station_snapshot(db_station_name, station_snapshots, alias_index)
+
+
+def _load_station_snapshot_from_scada_history(
+    station_name: str,
+    *,
+    lookback_hours: int = 24,
+) -> tuple[str, dict[str, Any] | None]:
+    requested = str(station_name or "").strip()
+    if not requested:
+        return "", None
+
+    try:
+        with Session(scada_history_engine) as history_session:
+            available_rows = history_session.exec(
+                select(ScadaHistory.station_name).where(ScadaHistory.metric_type == "dewpoint")
+            ).all()
+            available_names = sorted({str(name).strip() for name in available_rows if str(name).strip()})
+            if not available_names:
+                return requested, None
+
+            resolved_station = _resolve_db_station_name_for_dewpoint_v2(requested, available_names)
+            if not resolved_station:
+                return requested, None
+
+            latest_record = history_session.exec(
+                select(ScadaHistory)
+                .where(
+                    ScadaHistory.station_name == resolved_station,
+                    ScadaHistory.metric_type == "dewpoint",
+                )
+                .order_by(ScadaHistory.recorded_at.desc())
+            ).first()
+            if latest_record is None:
+                return resolved_station, None
+
+            cutoff = latest_record.recorded_at - timedelta(hours=max(lookback_hours, 1))
+            candidate_rows = history_session.exec(
+                select(ScadaHistory)
+                .where(
+                    ScadaHistory.station_name == resolved_station,
+                    ScadaHistory.metric_type == "dewpoint",
+                    ScadaHistory.recorded_at >= cutoff,
+                )
+                .order_by(ScadaHistory.recorded_at)
+            ).all()
+            rows = list(candidate_rows)
+            if not rows:
+                rows = [
+                    row
+                    for row in history_session.exec(
+                        select(ScadaHistory)
+                        .where(
+                            ScadaHistory.station_name == resolved_station,
+                            ScadaHistory.metric_type == "dewpoint",
+                        )
+                        .order_by(ScadaHistory.recorded_at)
+                    ).all()
+                ]
+            if not rows:
+                return resolved_station, None
+
+    except Exception as exc:
+        logger.warning("load dewpoint snapshot from scada_history failed: %s", exc)
+        return requested, None
+
+    snapshot = _build_dewpoint_snapshot_from_history_rows(
+        station_name=resolved_station,
+        rows=rows,
+    )
+    return resolved_station, snapshot
+
+
+def _resolve_db_station_name_for_dewpoint(requested: str, available_names: list[str]) -> str | None:
+    requested_text = str(requested or "").strip()
+    if not requested_text:
+        return None
+    if requested_text in available_names:
+        return requested_text
+
+    requested_norm = _normalize_station_name(requested_text)
+    normalized_map: dict[str, list[str]] = {}
+    for name in available_names:
+        norm = _normalize_station_name(name)
+        if not norm:
+            continue
+        normalized_map.setdefault(norm, []).append(name)
+    if requested_norm in normalized_map:
+        return normalized_map[requested_norm][0]
+
+    if "甪直" in requested_text:
+        for name in available_names:
+            if "甪直" in name:
+                return name
+
+    fuzzy_candidates: list[tuple[int, str]] = []
+    for name in available_names:
+        norm = _normalize_station_name(name)
+        if not norm:
+            continue
+        score = 0
+        if requested_norm and requested_norm in norm:
+            score += 2
+        if requested_norm and norm in requested_norm:
+            score += 1
+        if requested_text in name:
+            score += 1
+        if score > 0:
+            fuzzy_candidates.append((score, name))
+    if not fuzzy_candidates:
+        return None
+    fuzzy_candidates.sort(key=lambda item: (item[0], -len(item[1])), reverse=True)
+    return fuzzy_candidates[0][1]
+
+
+def _resolve_db_station_name_for_dewpoint_v2(requested: str, available_names: list[str]) -> str | None:
+    requested_text = str(requested or "").strip()
+    if not requested_text:
+        return None
+    if requested_text in available_names and not _has_pipeline_prefix(requested_text):
+        return requested_text
+
+    requested_norm = _normalize_station_name_v2(requested_text)
+    if not requested_norm:
+        return None
+
+    same_key_candidates = [name for name in available_names if _normalize_station_name_v2(name) == requested_norm]
+    if same_key_candidates:
+        return _pick_canonical_station_name(requested_text, same_key_candidates)
+
+    fuzzy_candidates: list[tuple[int, str]] = []
+    for name in available_names:
+        norm = _normalize_station_name_v2(name)
+        if not norm:
+            continue
+        score = 0
+        if requested_norm in norm:
+            score += 3
+        if norm in requested_norm:
+            score += 2
+        if requested_text in name:
+            score += 1
+        if score > 0:
+            fuzzy_candidates.append((score, name))
+
+    if not fuzzy_candidates:
+        return None
+
+    fuzzy_candidates.sort(
+        key=lambda item: (
+            item[0],
+            _station_name_rank(item[1], requested_text),
+        ),
+        reverse=True,
+    )
+    best_score = fuzzy_candidates[0][0]
+    best_names = [name for score, name in fuzzy_candidates if score == best_score]
+    return _pick_canonical_station_name(requested_text, best_names)
+
+
+def _station_name_rank(candidate_name: str, requested_name: str) -> tuple[int, int, int]:
+    candidate = str(candidate_name or "").strip()
+    requested = str(requested_name or "").strip()
+    exact_match = 1 if candidate == requested else 0
+    no_pipeline_prefix = 1 if not _has_pipeline_prefix(candidate) else 0
+    length_score = -abs(len(candidate) - len(requested))
+    return no_pipeline_prefix, exact_match, length_score
+
+
+def _pick_canonical_station_name(requested_name: str, candidate_names: list[str]) -> str | None:
+    if not candidate_names:
+        return None
+    preferred = sorted(
+        candidate_names,
+        key=lambda name: (
+            _station_name_rank(name, requested_name),
+            -len(name),
+        ),
+        reverse=True,
+    )
+    return preferred[0]
+
+
+def _build_dewpoint_snapshot_from_history_rows(
+    *,
+    station_name: str,
+    rows: list[ScadaHistory],
+) -> dict[str, Any] | None:
+    if not rows:
+        return None
+
+    grouped: dict[tuple[str, str], list[ScadaHistory]] = {}
+    for row in rows:
+        pipeline_id = str(row.pipeline_id or "").strip()
+        tag_name = str(row.tag_name or "").strip()
+        grouped.setdefault((pipeline_id, tag_name), []).append(row)
+
+    metrics: list[dict[str, Any]] = []
+    time_start = rows[0].recorded_at
+    time_end = rows[-1].recorded_at
+
+    for (pipeline_id, tag_name), metric_rows in grouped.items():
+        if not metric_rows:
+            continue
+        metric_rows.sort(key=lambda item: item.recorded_at)
+        values = [float(item.value) for item in metric_rows]
+        latest_value = values[-1]
+        earliest_value = values[0]
+        min_value = min(values)
+        max_value = max(values)
+        avg_value = sum(values) / len(values)
+        metric_label = _build_dewpoint_metric_label(pipeline_id, tag_name)
+        metrics.append(
+            {
+                "label": metric_label,
+                "pipeline": pipeline_id.upper() or metric_label,
+                "type": "dewpoint",
+                "unit": "°C",
+                "latest": round(latest_value, 4),
+                "min": round(min_value, 4),
+                "max": round(max_value, 4),
+                "avg": round(avg_value, 4),
+                "delta6h": round(latest_value - earliest_value, 4),
+            }
+        )
+
+    if not metrics:
+        return None
+
+    return {
+        "station_name": station_name,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "time_start": time_start.isoformat(),
+        "time_end": time_end.isoformat(),
+        "metrics": metrics,
+    }
+
+
+def _build_dewpoint_metric_label(pipeline_id: str, tag_name: str) -> str:
+    pipeline_map = {
+        "we1": "西一线",
+        "we2": "西二线",
+        "cred": "中俄线",
+        "pt": "普唐线",
+    }
+    pipeline_key = str(pipeline_id or "").strip().lower()
+    pipeline_label = pipeline_map.get(pipeline_key) or str(pipeline_id or "").upper() or "未知管线"
+    if tag_name:
+        return f"{pipeline_label} 水露点 ({tag_name})"
+    return f"{pipeline_label} 水露点"
+
+
+def try_luzhi_pilot_reply(context: AssistantContext | None, user_message: str) -> str | None:
+    if not _is_luzhi_pilot_context(context):
+        return None
+
+    normalized_message = re.sub(r"\s+", "", (user_message or "")).lower()
+    if not _looks_like_luzhi_analysis_query(normalized_message):
+        return None
+
+    snapshot = _extract_luzhi_snapshot(context)
+    if not snapshot:
+        return _apply_yuqian_style(
+            _append_completeness_hint(
+                "甪直试点已命中，但当前上下文里没有可分析的历史快照。请先打开“甪直历史”面板后再提问。",
+                user_message,
+                is_complete=False,
+                reason="当前请求缺少甪直快照数据，暂时不能给出完整分析。",
+            )
+        )
+
+    report, report_meta = _build_luzhi_pilot_report(snapshot)
+    final_reply = _append_completeness_hint(
+        report,
+        user_message,
+        is_complete=True,
+        reason="已基于甪直历史快照生成结构化分析。",
+    )
+    _persist_luzhi_pilot_trace(
+        user_message=user_message,
+        snapshot=snapshot,
+        report_meta=report_meta,
+    )
+    return _apply_yuqian_style(final_reply)
+
+
+def _is_luzhi_pilot_context(context: AssistantContext | None) -> bool:
+    if not _is_luzhi_pilot_globally_enabled():
+        return False
+
+    if context is None or not context.selection:
+        return False
+
+    station_name = str(context.selection.get("pilot_station_name") or "").strip()
+    if station_name != LUZHI_PILOT_STATION:
+        return False
+
+    pilot_enabled = context.selection.get("pilot_enabled")
+    return bool(pilot_enabled) if isinstance(pilot_enabled, bool) else True
+
+
+def _is_luzhi_pilot_globally_enabled() -> bool:
+    raw = os.getenv(LUZHI_PILOT_ENV_KEY, "1").strip().lower()
+    return raw not in {"0", "false", "off", "no"}
+
+
+def _looks_like_luzhi_analysis_query(normalized_message: str) -> bool:
+    if not normalized_message:
+        return False
+
+    if "甪直" in normalized_message or "luzhi" in normalized_message:
+        return True
+
+    return any(keyword in normalized_message for keyword in LUZHI_ANALYSIS_KEYWORDS)
+
+
+def _extract_luzhi_snapshot(context: AssistantContext | None) -> dict[str, Any] | None:
+    if context is None or not context.selection:
+        return None
+
+    raw_snapshot = context.selection.get("luzhi_snapshot")
+    if not isinstance(raw_snapshot, dict):
+        return None
+
+    return _normalize_station_snapshot(raw_snapshot, fallback_station_name=LUZHI_PILOT_STATION)
+
+
+def _normalize_station_snapshot(
+    raw_snapshot: dict[str, Any],
+    *,
+    fallback_station_name: str,
+) -> dict[str, Any] | None:
+    raw_metrics = raw_snapshot.get("metrics")
+    if not isinstance(raw_metrics, list):
+        return None
+
+    metrics: list[dict[str, Any]] = []
+    for raw_metric in raw_metrics:
+        if not isinstance(raw_metric, dict):
+            continue
+
+        latest = _to_float(raw_metric.get("latest"))
+        minimum = _to_float(raw_metric.get("min"))
+        maximum = _to_float(raw_metric.get("max"))
+        average = _to_float(raw_metric.get("avg"))
+        delta6h = _to_float(raw_metric.get("delta6h"))
+        if None in {latest, minimum, maximum, average, delta6h}:
+            continue
+
+        metrics.append(
+            {
+                "label": str(raw_metric.get("label") or raw_metric.get("key") or "未命名指标"),
+                "pipeline": str(raw_metric.get("pipeline") or ""),
+                "type": str(raw_metric.get("type") or "unknown"),
+                "unit": str(raw_metric.get("unit") or ""),
+                "latest": latest,
+                "min": minimum,
+                "max": maximum,
+                "avg": average,
+                "delta6h": delta6h,
+            }
+        )
+
+    if not metrics:
+        return None
+
+    time_range = raw_snapshot.get("timeRange")
+    if not isinstance(time_range, dict):
+        time_range = {}
+
+    return {
+        "station_name": str(raw_snapshot.get("stationName") or fallback_station_name or LUZHI_PILOT_STATION),
+        "generated_at": str(raw_snapshot.get("generatedAt") or ""),
+        "time_start": str(time_range.get("start") or ""),
+        "time_end": str(time_range.get("end") or ""),
+        "metrics": metrics,
+    }
+
+
+def _build_luzhi_pilot_report(snapshot: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    metrics: list[dict[str, Any]] = snapshot["metrics"]
+
+    table_rows: list[str] = []
+    evaluated_items: list[dict[str, Any]] = []
+    pressure_risk_items: list[str] = []
+    strongest_metric: dict[str, Any] | None = None
+    strongest_score = -1.0
+
+    for metric in metrics:
+        metric_eval = _evaluate_luzhi_metric(metric)
+        evaluated = metric | metric_eval
+        evaluated_items.append(evaluated)
+
+        if metric["type"] == "pressure" and metric_eval["risk_level"] in {"中", "高"}:
+            pressure_risk_items.append(metric["label"])
+
+        score = abs(metric["delta6h"]) + metric_eval["swing"] + (LUZHI_RISK_ORDER.get(metric_eval["risk_level"], 0) * 0.3)
+        if score > strongest_score:
+            strongest_score = score
+            strongest_metric = evaluated
+
+        table_rows.append(
+            "| {label} | {latest} | {delta6h} | {range_text} | {avg} | {risk} | {confidence} | {trigger} | {action} |".format(
+                label=metric["label"],
+                latest=_format_metric_value(metric["latest"], metric["unit"]),
+                delta6h=_format_signed_value(metric["delta6h"], metric["unit"]),
+                range_text=f"{_format_metric_number(metric['min'])} ~ {_format_metric_number(metric['max'])} {metric['unit']}".strip(),
+                avg=_format_metric_value(metric["avg"], metric["unit"]),
+                risk=metric_eval["risk_level"],
+                confidence=f"{metric_eval['confidence']:.0%}",
+                trigger=metric_eval["trigger_reason"],
+                action=metric_eval["action_hint"],
+            )
+        )
+
+    overall_risk = _choose_overall_risk(evaluated_items)
+    overall_confidence = _aggregate_confidence(evaluated_items)
+    conclusion = _build_luzhi_conclusion(overall_risk, pressure_risk_items, evaluated_items)
+    strongest_desc = "无明显单项波动。"
+    if strongest_metric is not None:
+        strongest_desc = (
+            f"{strongest_metric['label']}近6小时{strongest_metric['trend']}，"
+            f"变化{_format_signed_value(strongest_metric['delta6h'], strongest_metric['unit'])}，"
+            f"风险{strongest_metric['risk_level']}。"
+        )
+
+    schedule_suggestion, inspection_suggestion, alarm_suggestion = _build_luzhi_action_templates(overall_risk, evaluated_items)
+    action_target = _infer_luzhi_action_target(snapshot, strongest_metric)
+    time_window = _format_time_window(snapshot)
+
+    lines = [
+        f"甪直分输站试点结论：{conclusion}",
+        "",
+        f"总体风险等级：{overall_risk}（置信度 {overall_confidence:.0%}）",
+        f"分析窗口：{time_window}",
+        f"最大变化项：{strongest_desc}",
+        "",
+        "证据表（快照）",
+        "",
+        "| 指标 | 最新值 | 6小时变化 | 波动区间 | 均值 | 风险等级 | 置信度 | 触发原因 | 建议动作 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        *table_rows,
+        "",
+        "动作建议（模板）：",
+        f"- 调度建议：{schedule_suggestion}",
+        f"- 巡检建议：{inspection_suggestion}",
+        f"- 告警建议：{alarm_suggestion}",
+        "",
+        "回链操作：",
+        (
+            "[ACTION:OPEN_HISTORY_PANEL"
+            f"|station={action_target['station']}"
+            f"|view={action_target['view']}"
+            f"|hours={action_target['hours']}"
+            f"|time_start={action_target['time_start']}"
+            f"|time_end={action_target['time_end']}"
+            f"|metric={action_target['metric']}]"
+        ),
+        "",
+        "说明：本次结果基于甪直历史快照规则判级，建议结合当班调度计划做最终确认。",
+    ]
+    report_meta = {
+        "overall_risk": overall_risk,
+        "overall_confidence": overall_confidence,
+        "time_window": time_window,
+        "action_target": action_target,
+        "focused_metric": strongest_metric.get("label") if strongest_metric else "",
+        "focused_metric_risk": strongest_metric.get("risk_level") if strongest_metric else "",
+    }
+    return "\n".join(lines), report_meta
+
+
+def _evaluate_luzhi_metric(metric: dict[str, Any]) -> dict[str, Any]:
+    swing = max(float(metric["max"]) - float(metric["min"]), 0.0)
+    delta6h = float(metric["delta6h"])
+    abs_delta = abs(delta6h)
+    metric_type = str(metric.get("type") or "unknown")
+
+    if abs_delta < 1e-4:
+        trend = "基本持平"
+    elif delta6h > 0:
+        trend = "上升"
+    else:
+        trend = "下降"
+
+    risk_level, trigger_reason = _grade_metric_risk(metric_type, swing, abs_delta)
+    action_hint = _build_metric_action_hint(metric_type, risk_level)
+    confidence = _estimate_metric_confidence(metric_type, risk_level, swing, abs_delta)
+
+    return {
+        "trend": trend,
+        "swing": swing,
+        "risk_level": risk_level,
+        "trigger_reason": trigger_reason,
+        "action_hint": action_hint,
+        "confidence": confidence,
+    }
+
+
+def _grade_metric_risk(metric_type: str, swing: float, abs_delta: float) -> tuple[str, str]:
+    if metric_type == "pressure":
+        if swing >= 0.45 or abs_delta >= 0.22:
+            return "高", "压力波动较大（幅度或短时变化超高风险阈值）"
+        if swing >= 0.30 or abs_delta >= 0.15:
+            return "中", "压力波动偏大（达到中风险阈值）"
+        if swing >= 0.20 or abs_delta >= 0.10:
+            return "低", "压力有轻微波动（达到低风险阈值）"
+        return "正常", "压力变化在稳态区间"
+
+    if metric_type == "temperature":
+        if swing >= 8.0 or abs_delta >= 4.0:
+            return "高", "温度变化过快（幅度或短时变化超高风险阈值）"
+        if swing >= 5.0 or abs_delta >= 2.5:
+            return "中", "温度波动偏大（达到中风险阈值）"
+        if swing >= 3.0 or abs_delta >= 1.5:
+            return "低", "温度有可见波动（达到低风险阈值）"
+        return "正常", "温度变化在稳态区间"
+
+    if metric_type == "dewpoint":
+        if swing >= 6.0 or abs_delta >= 3.0:
+            return "高", "露点变化较大（幅度或短时变化超高风险阈值）"
+        if swing >= 4.0 or abs_delta >= 2.0:
+            return "中", "露点波动偏大（达到中风险阈值）"
+        if swing >= 2.5 or abs_delta >= 1.2:
+            return "低", "露点有可见波动（达到低风险阈值）"
+        return "正常", "露点变化在稳态区间"
+
+    if swing >= 2.0 or abs_delta >= 1.0:
+        return "中", "通用指标波动偏大"
+    if swing >= 1.0 or abs_delta >= 0.5:
+        return "低", "通用指标存在波动"
+    return "正常", "通用指标变化稳定"
+
+
+def _build_metric_action_hint(metric_type: str, risk_level: str) -> str:
+    if risk_level == "正常":
+        return "维持当前策略，持续观测"
+
+    if metric_type == "pressure":
+        return "核对上下游计划与调压阀开度"
+    if metric_type == "temperature":
+        return "复核换热与环境温度影响"
+    if metric_type == "dewpoint":
+        return "复核气质与脱水工况"
+    return "复核现场工况并持续跟踪"
+
+
+def _estimate_metric_confidence(metric_type: str, risk_level: str, swing: float, abs_delta: float) -> float:
+    base = 0.72
+    base += min(swing * 0.08, 0.12)
+    base += min(abs_delta * 0.10, 0.10)
+
+    if risk_level == "低":
+        base += 0.03
+    elif risk_level == "中":
+        base += 0.06
+    elif risk_level == "高":
+        base += 0.09
+
+    if metric_type == "pressure":
+        base += 0.02
+    return max(0.60, min(base, 0.95))
+
+
+def _choose_overall_risk(evaluated_items: list[dict[str, Any]]) -> str:
+    if not evaluated_items:
+        return "正常"
+    return max(
+        (str(item.get("risk_level") or "正常") for item in evaluated_items),
+        key=lambda risk: LUZHI_RISK_ORDER.get(risk, 0),
+    )
+
+
+def _aggregate_confidence(evaluated_items: list[dict[str, Any]]) -> float:
+    if not evaluated_items:
+        return 0.65
+    total = 0.0
+    for item in evaluated_items:
+        total += float(item.get("confidence") or 0.0)
+    return max(0.60, min(total / len(evaluated_items), 0.95))
+
+
+def _build_luzhi_conclusion(overall_risk: str, pressure_risk_items: list[str], evaluated_items: list[dict[str, Any]]) -> str:
+    watched_items = [str(item["label"]) for item in evaluated_items if str(item.get("risk_level")) in {"低", "中", "高"}]
+    if overall_risk == "高":
+        if pressure_risk_items:
+            return f"甪直分输站存在高风险波动，压力重点项：{'、'.join(pressure_risk_items)}。建议优先调度处置。"
+        return "甪直分输站存在高风险波动，建议立即组织调度与现场联合复核。"
+    if overall_risk == "中":
+        if pressure_risk_items:
+            return f"甪直分输站存在中风险波动，压力关注项：{'、'.join(pressure_risk_items)}。建议当班重点跟踪。"
+        return f"甪直分输站存在中风险波动，关注项：{'、'.join(watched_items) if watched_items else '无'}。"
+    if overall_risk == "低":
+        return f"甪直分输站整体可控，存在低风险波动项：{'、'.join(watched_items) if watched_items else '无'}。"
+    return "甪直分输站关键指标整体平稳，未发现明显异常抬升或突降。"
+
+
+def _build_luzhi_action_templates(overall_risk: str, evaluated_items: list[dict[str, Any]]) -> tuple[str, str, str]:
+    pressure_items = [str(item["label"]) for item in evaluated_items if item.get("type") == "pressure" and item.get("risk_level") in {"中", "高"}]
+    dewpoint_items = [str(item["label"]) for item in evaluated_items if item.get("type") == "dewpoint" and item.get("risk_level") in {"中", "高"}]
+
+    if overall_risk == "高":
+        schedule = "30分钟内复核上下游输量计划，必要时执行限幅调压。"
+        inspection = "优先巡检调压阀、过滤分离及关键测点，确认设备状态。"
+        alarm = "触发站级高优先告警并要求值班人员闭环反馈。"
+        return schedule, inspection, alarm
+
+    if overall_risk == "中":
+        schedule = "当班内复核计划与实时偏差，按小时跟踪波动项。"
+        inspection = "按关注项做专项巡检，重点核对压力/露点测点漂移。"
+        alarm = "触发中优先告警，连续两次升级则转高优先处理。"
+        return schedule, inspection, alarm
+
+    if pressure_items or dewpoint_items:
+        schedule = "保持现有调度策略，补充一次短周期复测。"
+        inspection = "按低风险项安排例行复核，确认无持续放大趋势。"
+        alarm = "保持观察告警，不做升级。"
+        return schedule, inspection, alarm
+
+    return "维持当前调度策略。", "按常规频次巡检。", "维持常规告警策略。"
+
+
+def _infer_luzhi_action_target(snapshot: dict[str, Any], strongest_metric: dict[str, Any] | None) -> dict[str, str]:
+    metric_type = str((strongest_metric or {}).get("type") or "pressure")
+    if metric_type == "temperature":
+        view = "temperature"
+    elif metric_type == "dewpoint":
+        view = "dewpoint"
+    else:
+        view = "pressure"
+
+    return {
+        "station": _sanitize_action_token_text(str(snapshot.get("station_name") or LUZHI_PILOT_STATION)),
+        "view": view,
+        "hours": "6",
+        "time_start": _sanitize_action_token_text(str(snapshot.get("time_start") or "")),
+        "time_end": _sanitize_action_token_text(str(snapshot.get("time_end") or "")),
+        "metric": _sanitize_action_token_text(str((strongest_metric or {}).get("label") or "")),
+    }
+
+
+def _persist_luzhi_pilot_trace(
+    *,
+    user_message: str,
+    snapshot: dict[str, Any],
+    report_meta: dict[str, Any],
+) -> None:
+    try:
+        LUZHI_TRACE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        trace_payload = {
+            "trace_time": datetime.now(timezone.utc).isoformat(),
+            "pilot_enabled_env": os.getenv(LUZHI_PILOT_ENV_KEY, "1"),
+            "station": snapshot.get("station_name"),
+            "time_start": snapshot.get("time_start"),
+            "time_end": snapshot.get("time_end"),
+            "user_message": user_message,
+            "metric_count": len(snapshot.get("metrics") or []),
+            "overall_risk": report_meta.get("overall_risk"),
+            "overall_confidence": report_meta.get("overall_confidence"),
+            "focused_metric": report_meta.get("focused_metric"),
+            "focused_metric_risk": report_meta.get("focused_metric_risk"),
+            "action_target": report_meta.get("action_target"),
+        }
+        with LUZHI_TRACE_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(trace_payload, ensure_ascii=False))
+            handle.write("\n")
+    except Exception as exc:
+        logger.warning("Failed to persist luzhi pilot trace: %s", exc)
+
+
+def _load_luzhi_pilot_trace(*, limit: int) -> tuple[list[dict[str, Any]], int]:
+    if not LUZHI_TRACE_PATH.exists():
+        return [], 0
+
+    try:
+        raw_lines = LUZHI_TRACE_PATH.read_text(encoding="utf-8").splitlines()
+    except Exception as exc:
+        logger.warning("Failed to read luzhi pilot trace file: %s", exc)
+        return [], 0
+
+    valid_items: list[dict[str, Any]] = []
+    for raw_line in raw_lines:
+        if not raw_line.strip():
+            continue
+        try:
+            payload = json.loads(raw_line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            valid_items.append(payload)
+
+    if limit > 0:
+        valid_items = valid_items[-limit:]
+    valid_items.reverse()
+    return valid_items, len(raw_lines)
+
+
+def _build_luzhi_trace_summary(items: list[dict[str, Any]], *, days: int) -> dict[str, Any]:
+    risk_distribution = {"正常": 0, "低": 0, "中": 0, "高": 0}
+    metric_counter: dict[str, int] = {}
+    metric_risk_counter: dict[str, dict[str, int]] = {}
+    metric_latest_risk: dict[str, dict[str, str]] = {}
+    confidence_total = 0.0
+    confidence_count = 0
+    latest_trace_time: str | None = None
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=days)
+    in_window_items: list[dict[str, Any]] = []
+
+    for item in items:
+        trace_dt = _parse_trace_datetime(item.get("trace_time"))
+        if trace_dt is None or trace_dt < cutoff:
+            continue
+        in_window_items.append(item)
+
+        risk = str(item.get("overall_risk") or "").strip()
+        if risk in risk_distribution:
+            risk_distribution[risk] += 1
+
+        confidence = item.get("overall_confidence")
+        if isinstance(confidence, (int, float)):
+            confidence_total += float(confidence)
+            confidence_count += 1
+
+        metric = str(item.get("focused_metric") or "").strip()
+        if metric:
+            metric_counter[metric] = metric_counter.get(metric, 0) + 1
+            metric_risk = str(item.get("focused_metric_risk") or "").strip()
+            metric_risk_bucket = metric_risk_counter.setdefault(metric, {})
+            metric_risk_bucket[metric_risk] = metric_risk_bucket.get(metric_risk, 0) + 1
+
+            trace_time_text = str(item.get("trace_time") or "")
+            current_latest = metric_latest_risk.get(metric)
+            if (
+                trace_time_text
+                and (
+                    current_latest is None
+                    or trace_time_text > current_latest.get("latest_trace_time", "")
+                )
+            ):
+                metric_latest_risk[metric] = {
+                    "latest_trace_time": trace_time_text,
+                    "latest_risk": metric_risk,
+                }
+
+        trace_time_text = str(item.get("trace_time") or "")
+        if trace_time_text and (latest_trace_time is None or trace_time_text > latest_trace_time):
+            latest_trace_time = trace_time_text
+
+    top_metrics = sorted(
+        ({"metric": metric, "count": count} for metric, count in metric_counter.items()),
+        key=lambda row: row["count"],
+        reverse=True,
+    )[:5]
+    hotspots = _build_luzhi_hotspots(
+        metric_counter=metric_counter,
+        metric_risk_counter=metric_risk_counter,
+        metric_latest_risk=metric_latest_risk,
+    )
+    continuous_alerts = _build_luzhi_continuous_alerts(in_window_items)
+
+    avg_confidence = (confidence_total / confidence_count) if confidence_count else None
+    return {
+        "total_in_window": len(in_window_items),
+        "risk_distribution": risk_distribution,
+        "avg_confidence": avg_confidence,
+        "top_metrics": top_metrics,
+        "hotspots": hotspots,
+        "continuous_alerts": continuous_alerts,
+        "latest_trace_time": latest_trace_time,
+    }
+
+
+def _build_luzhi_hotspots(
+    *,
+    metric_counter: dict[str, int],
+    metric_risk_counter: dict[str, dict[str, int]],
+    metric_latest_risk: dict[str, dict[str, str]],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for metric, count in metric_counter.items():
+        risk_counter = metric_risk_counter.get(metric) or {}
+        high_risk_count = int(risk_counter.get("高", 0) + risk_counter.get("中", 0))
+        latest_meta = metric_latest_risk.get(metric) or {}
+        dominant_risk = max(
+            risk_counter.items(),
+            key=lambda item: (item[1], _risk_rank(item[0])),
+            default=("", 0),
+        )[0]
+        rows.append(
+            {
+                "metric": metric,
+                "count": count,
+                "high_risk_count": high_risk_count,
+                "high_risk_ratio": round((high_risk_count / count), 4) if count > 0 else 0.0,
+                "dominant_risk": dominant_risk,
+                "latest_risk": latest_meta.get("latest_risk", ""),
+                "latest_trace_time": latest_meta.get("latest_trace_time", ""),
+            }
+        )
+
+    rows.sort(
+        key=lambda row: (
+            int(row.get("high_risk_count") or 0),
+            int(row.get("count") or 0),
+            _risk_rank(str(row.get("latest_risk") or "")),
+        ),
+        reverse=True,
+    )
+    return rows[:5]
+
+
+def _build_luzhi_continuous_alerts(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    metric_histories: dict[str, list[tuple[str, str]]] = {}
+    for item in items:
+        metric = str(item.get("focused_metric") or "").strip()
+        if not metric:
+            continue
+        trace_time_text = str(item.get("trace_time") or "").strip()
+        if not trace_time_text:
+            continue
+        risk = str(item.get("focused_metric_risk") or "").strip()
+        metric_histories.setdefault(metric, []).append((trace_time_text, risk))
+
+    alert_rows: list[dict[str, Any]] = []
+    for metric, history in metric_histories.items():
+        history.sort(key=lambda row: row[0])
+        streak = 0
+        streak_last_seen = ""
+        streak_peak_risk = ""
+        for trace_time_text, risk in reversed(history):
+            if risk not in {"中", "高"}:
+                break
+            streak += 1
+            if not streak_last_seen:
+                streak_last_seen = trace_time_text
+            if _risk_rank(risk) > _risk_rank(streak_peak_risk):
+                streak_peak_risk = risk
+
+        if streak >= 2:
+            alert_rows.append(
+                {
+                    "metric": metric,
+                    "streak": streak,
+                    "risk": streak_peak_risk or "中",
+                    "last_seen": streak_last_seen,
+                }
+            )
+
+    alert_rows.sort(
+        key=lambda row: (
+            int(row.get("streak") or 0),
+            _risk_rank(str(row.get("risk") or "")),
+            str(row.get("last_seen") or ""),
+        ),
+        reverse=True,
+    )
+    return alert_rows[:5]
+
+
+def _build_luzhi_trace_report_markdown(
+    *,
+    items: list[dict[str, Any]],
+    summary: dict[str, Any],
+    days: int,
+    recent_limit: int,
+) -> str:
+    generated_at = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M:%S %z")
+    risk_distribution = summary.get("risk_distribution") if isinstance(summary.get("risk_distribution"), dict) else {}
+    avg_confidence = summary.get("avg_confidence")
+    avg_confidence_text = f"{float(avg_confidence):.0%}" if isinstance(avg_confidence, (int, float)) else "--"
+    total_in_window = int(summary.get("total_in_window") or 0)
+    latest_trace_time = _format_time_text(summary.get("latest_trace_time")) or "--"
+    top_metrics = summary.get("top_metrics") if isinstance(summary.get("top_metrics"), list) else []
+    hotspots = summary.get("hotspots") if isinstance(summary.get("hotspots"), list) else []
+    continuous_alerts = summary.get("continuous_alerts") if isinstance(summary.get("continuous_alerts"), list) else []
+
+    top_metrics_text = "、".join(
+        f"{_markdown_cell(str(row.get('metric') or '--'))}({int(row.get('count') or 0)})"
+        for row in top_metrics
+        if isinstance(row, dict)
+    ) or "无"
+    hotspot_text = "、".join(
+        (
+            f"{_markdown_cell(str(row.get('metric') or '--'))}"
+            f"(中高风险 {int(row.get('high_risk_count') or 0)}/{int(row.get('count') or 0)})"
+        )
+        for row in hotspots
+        if isinstance(row, dict)
+    ) or "无"
+
+    lines = [
+        "# 甪直站AI试点复盘报告",
+        "",
+        f"- 生成时间：{generated_at}",
+        f"- 统计窗口：最近 {days} 天",
+        f"- 纳入记录：{total_in_window}",
+        f"- 平均置信度：{avg_confidence_text}",
+        f"- 最近分析时间：{latest_trace_time}",
+        f"- 高频指标：{top_metrics_text}",
+        f"- 异常热点：{hotspot_text}",
+        "",
+        "## 风险分布",
+        "",
+        "| 级别 | 次数 |",
+        "| --- | ---: |",
+        f"| 正常 | {int(risk_distribution.get('正常') or 0)} |",
+        f"| 低 | {int(risk_distribution.get('低') or 0)} |",
+        f"| 中 | {int(risk_distribution.get('中') or 0)} |",
+        f"| 高 | {int(risk_distribution.get('高') or 0)} |",
+        "",
+        "## 异常热点（按中高风险频次）",
+        "",
+        "| 指标 | 记录次数 | 中高风险次数 | 占比 | 当前风险 | 最近出现 |",
+        "| --- | ---: | ---: | ---: | --- | --- |",
+    ]
+    if hotspots:
+        for row in hotspots:
+            if not isinstance(row, dict):
+                continue
+            ratio = float(row.get("high_risk_ratio") or 0.0)
+            lines.append(
+                "| {metric} | {count} | {high_risk_count} | {ratio:.0%} | {latest_risk} | {latest_time} |".format(
+                    metric=_markdown_cell(str(row.get("metric") or "--")),
+                    count=int(row.get("count") or 0),
+                    high_risk_count=int(row.get("high_risk_count") or 0),
+                    ratio=ratio,
+                    latest_risk=_markdown_cell(str(row.get("latest_risk") or "--")),
+                    latest_time=_markdown_cell(_format_time_text(row.get("latest_trace_time")) or "--"),
+                )
+            )
+    else:
+        lines.append("| -- | 0 | 0 | 0% | -- | -- |")
+
+    lines.extend(
+        [
+            "",
+            "## 连续告警（仅列出连续 >=2 次的指标）",
+            "",
+            "| 指标 | 连续次数 | 风险峰值 | 最近一次 |",
+            "| --- | ---: | --- | --- |",
+        ]
+    )
+    if continuous_alerts:
+        for row in continuous_alerts:
+            if not isinstance(row, dict):
+                continue
+            lines.append(
+                "| {metric} | {streak} | {risk} | {last_seen} |".format(
+                    metric=_markdown_cell(str(row.get("metric") or "--")),
+                    streak=int(row.get("streak") or 0),
+                    risk=_markdown_cell(str(row.get("risk") or "--")),
+                    last_seen=_markdown_cell(_format_time_text(row.get("last_seen")) or "--"),
+                )
+            )
+    else:
+        lines.append("| -- | 0 | -- | -- |")
+
+    recent_items = items[: max(1, recent_limit)]
+    lines.extend(
+        [
+            "",
+            f"## 最近分析明细（最新 {len(recent_items)} 条）",
+            "",
+            "| 时间 | 总体风险 | 置信度 | 聚焦指标 | 指标风险 | 用户问题 | 回链动作 |",
+            "| --- | --- | ---: | --- | --- | --- | --- |",
+        ]
+    )
+    for item in recent_items:
+        if not isinstance(item, dict):
+            continue
+        confidence = item.get("overall_confidence")
+        confidence_text = f"{float(confidence):.0%}" if isinstance(confidence, (int, float)) else "--"
+        action_target = item.get("action_target")
+        if isinstance(action_target, dict):
+            action_text = "/".join(
+                part
+                for part in [
+                    str(action_target.get("view") or "").strip(),
+                    str(action_target.get("metric") or "").strip(),
+                ]
+                if part
+            )
+        else:
+            action_text = ""
+        lines.append(
+            "| {trace_time} | {overall_risk} | {confidence} | {focused_metric} | {focused_metric_risk} | {user_message} | {action_text} |".format(
+                trace_time=_markdown_cell(_format_time_text(item.get("trace_time")) or "--"),
+                overall_risk=_markdown_cell(str(item.get("overall_risk") or "--")),
+                confidence=confidence_text,
+                focused_metric=_markdown_cell(str(item.get("focused_metric") or "--")),
+                focused_metric_risk=_markdown_cell(str(item.get("focused_metric_risk") or "--")),
+                user_message=_markdown_cell(str(item.get("user_message") or "").replace("\n", " ").strip() or "--"),
+                action_text=_markdown_cell(action_text or "--"),
+            )
+        )
+
+    return "\n".join(lines).strip() + "\n"
+
+
+def _markdown_cell(raw_text: str) -> str:
+    return raw_text.replace("|", "/").replace("\n", " ").strip()
+
+
+def _risk_rank(risk: str) -> int:
+    risk_text = str(risk or "").strip()
+    local_order = {"正常": 0, "低": 1, "中": 2, "高": 3}
+    if risk_text in local_order:
+        return local_order[risk_text]
+    return int(LUZHI_RISK_ORDER.get(risk_text, -1))
+
+
+def _parse_trace_datetime(raw_time: Any) -> datetime | None:
+    text = str(raw_time or "").strip()
+    if not text:
+        return None
+    normalized = text.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _sanitize_action_token_text(raw: str) -> str:
+    return raw.replace("|", "/").replace("]", "")
+
+
+def _format_time_window(snapshot: dict[str, Any]) -> str:
+    start = _format_time_text(snapshot.get("time_start"))
+    end = _format_time_text(snapshot.get("time_end"))
+    if start and end:
+        return f"{start} ~ {end}"
+    generated_at = _format_time_text(snapshot.get("generated_at"))
+    return generated_at or "未提供时间范围"
+
+
+def _format_time_text(raw_time: Any) -> str:
+    text = str(raw_time or "").strip()
+    if not text:
+        return ""
+    return text.replace("T", " ")[:16]
+
+
+def _format_metric_number(value: float) -> str:
+    if abs(value) >= 100:
+        return f"{value:.1f}"
+    if abs(value) >= 10:
+        return f"{value:.2f}"
+    return f"{value:.3f}"
+
+
+def _format_metric_value(value: float, unit: str) -> str:
+    return f"{_format_metric_number(value)} {unit}".strip()
+
+
+def _format_signed_value(value: float, unit: str) -> str:
+    sign = "+" if value > 0 else ""
+    return f"{sign}{_format_metric_number(value)} {unit}".strip()
+
+
+def _to_float(value: Any) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError:
+            return None
     return None
 
 
@@ -201,7 +2378,7 @@ async def _collect_chat_response(event_generator) -> ChatResponse:
 
 async def _legacy_event_generator(request: ChatRequest, session: Session):
     tools_desc = build_tools_description()
-    system_prompt = SYSTEM_PROMPT.format(tools_description=tools_desc)
+    system_prompt = f"{SYSTEM_PROMPT.format(tools_description=tools_desc)}\n{YUQIAN_STYLE_PROMPT}"
 
     messages = [{"role": "system", "content": system_prompt}]
     for msg in request.history[-10:]:
@@ -254,6 +2431,7 @@ async def _legacy_event_generator(request: ChatRequest, session: Session):
                         f"工具 {tool_name} 的执行结果如下：\n\n{tool_result}\n\n"
                         "请根据以上结果，用自然、友好的语言回答用户的原始问题。"
                         "先给结论，再补充必要说明；避免客服腔和模板腔。"
+                        "全程保持于谦式口吻：松弛、机灵、尊重用户。"
                         "如果用户要列表，就直接给完整列表。"
                         "最后补一行“完整性提示：是/否 + 原因”。"
                     ),
@@ -373,6 +2551,7 @@ async def _orchestrated_event_generator(request: ChatRequest, session: Session):
         )
 
         final_reply = _salvage_user_facing_reply(draft_reply, first_response) or _strip_think_tags(draft_reply)
+        can_run_rebuttal = bool(prompt_bundle.use_orchestration)
         if validation_report.requires_revision:
             conversation_messages.append({"role": "assistant", "content": draft_reply})
             conversation_messages.append(
@@ -405,10 +2584,61 @@ async def _orchestrated_event_generator(request: ChatRequest, session: Session):
                     "我先没法给你一个可靠结论。"
                     "你可以换个问法，或者告诉我当前页面和对象，我再重新分析。"
                 )
+                can_run_rebuttal = False
             else:
                 final_reply = _salvage_user_facing_reply(repaired_reply, draft_reply) or _strip_think_tags(repaired_reply)
 
+        if can_run_rebuttal:
+            try:
+                debate_messages = list(conversation_messages)
+                debate_messages.append({"role": "assistant", "content": final_reply})
+                debate_messages.append(
+                    {
+                        "role": "user",
+                        "content": ai_analysis_orchestrator.build_yuqian_rebuttal_prompt(
+                            original_question=request.message,
+                            candidate_reply=final_reply,
+                        ),
+                    }
+                )
+                rebuttal_reply = await ai_client.chat_completion(
+                    messages=debate_messages,
+                    temperature=0.45,
+                    max_tokens=1200,
+                )
+                debate_messages.append({"role": "assistant", "content": rebuttal_reply})
+                debate_messages.append(
+                    {
+                        "role": "user",
+                        "content": ai_analysis_orchestrator.build_post_rebuttal_finalize_prompt(
+                            original_question=request.message,
+                            candidate_reply=final_reply,
+                            rebuttal_reply=rebuttal_reply,
+                        ),
+                    }
+                )
+                debated_final_reply = await ai_client.chat_completion(
+                    messages=debate_messages,
+                    temperature=0.45,
+                    max_tokens=2000,
+                )
+                debated_candidate = _salvage_user_facing_reply(debated_final_reply, final_reply) or _strip_think_tags(debated_final_reply)
+                debated_validation = ai_analysis_orchestrator.validate_reply(
+                    user_message=request.message,
+                    reply=debated_candidate,
+                    tool_name=tool_name,
+                    tool_result=tool_result,
+                    context_summary=prompt_bundle.context_summary,
+                )
+                if debated_validation.requires_revision:
+                    logger.warning("Orchestrated rebuttal reply failed validation, fallback to pre-rebuttal answer")
+                else:
+                    final_reply = debated_candidate
+            except Exception as debate_exc:
+                logger.warning("Orchestrated rebuttal stage skipped: %s", debate_exc)
+
         final_reply = _append_completeness_hint(final_reply, request.message)
+        final_reply = _apply_yuqian_style(final_reply)
         yield f"[REPLY] {json.dumps(final_reply, ensure_ascii=False)}\n"
     except AiServiceError as exc:
         logger.warning("Orchestrated AI flow service error: %s", exc.message)

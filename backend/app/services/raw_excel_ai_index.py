@@ -17,6 +17,7 @@ AI_CACHE_DIR = DATA_DIR / "ai_cache"
 STATION_CACHE_PATH = AI_CACHE_DIR / "raw_station_catalog.json"
 PIPELINE_CACHE_PATH = AI_CACHE_DIR / "raw_pipeline_catalog.json"
 SYSTEM_CACHE_PATH = AI_CACHE_DIR / "raw_system_aliases.json"
+DISTRIBUTION_CACHE_PATH = AI_CACHE_DIR / "raw_distribution_catalog.json"
 
 STATION_TYPE_MAP = {
     "压气站": "compressor",
@@ -110,9 +111,11 @@ class RawExcelAiIndex:
         self.station_catalog: list[dict[str, Any]] = []
         self.pipeline_catalog: list[dict[str, Any]] = []
         self.system_aliases: list[dict[str, Any]] = []
+        self.distribution_catalog: list[dict[str, Any]] = []  # 分输口/用户/下载点
         self._station_id_map: dict[str, dict[str, Any]] = {}
         self._pipeline_id_map: dict[str, dict[str, Any]] = {}
         self._system_by_name: dict[str, dict[str, Any]] = {}
+        self._distribution_id_map: dict[str, dict[str, Any]] = {}
 
     def ensure_loaded(self, force_rebuild: bool = False) -> None:
         if force_rebuild or not self._loaded or self._cache_is_stale():
@@ -302,6 +305,33 @@ class RawExcelAiIndex:
             len(station.get("name", "")),
         )
 
+    def query_distributions(
+        self,
+        *,
+        keyword: str | None = None,
+        trunk_name: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """查询分输口（也叫用户 / 下载点 / 下载用户）。"""
+        self.ensure_loaded()
+        results = list(self.distribution_catalog)
+        if trunk_name:
+            trunk_key = _normalize_text(trunk_name)
+            results = [item for item in results if trunk_key in _normalize_text(item.get("trunk_name", ""))]
+        if keyword:
+            keyword_key = _normalize_text(keyword)
+            results = [item for item in results if keyword_key in item.get("search_text", "")]
+        return sorted(results, key=lambda item: (item.get("trunk_name", ""), item.get("name", "")))
+
+    def get_distribution(self, ref: str) -> dict[str, Any] | None:
+        """按 ID 或名称查单个分输口。"""
+        self.ensure_loaded()
+        item = self._distribution_id_map.get(ref)
+        if item:
+            return item
+        key = _normalize_text(ref)
+        matches = [d for d in self.distribution_catalog if key in d.get("search_text", "")]
+        return matches[0] if matches else None
+
     def _load_or_rebuild(self, *, force_rebuild: bool) -> None:
         if force_rebuild or self._cache_is_stale():
             self._rebuild_cache_files()
@@ -309,19 +339,23 @@ class RawExcelAiIndex:
         self.station_catalog = json.loads(STATION_CACHE_PATH.read_text(encoding="utf-8"))
         self.pipeline_catalog = json.loads(PIPELINE_CACHE_PATH.read_text(encoding="utf-8"))
         self.system_aliases = json.loads(SYSTEM_CACHE_PATH.read_text(encoding="utf-8"))
+        self.distribution_catalog = json.loads(DISTRIBUTION_CACHE_PATH.read_text(encoding="utf-8")) \
+            if DISTRIBUTION_CACHE_PATH.exists() else []
 
         self._station_id_map = {item["id"]: item for item in self.station_catalog}
         self._pipeline_id_map = {item["id"]: item for item in self.pipeline_catalog}
         self._system_by_name = {item["name"]: item for item in self.system_aliases}
+        self._distribution_id_map = {item["id"]: item for item in self.distribution_catalog}
         self._loaded = True
 
     def _cache_is_stale(self) -> bool:
         if not RAW_EXCEL_DB_PATH.exists():
             return False
-        if not STATION_CACHE_PATH.exists() or not PIPELINE_CACHE_PATH.exists() or not SYSTEM_CACHE_PATH.exists():
+        cache_paths = (STATION_CACHE_PATH, PIPELINE_CACHE_PATH, SYSTEM_CACHE_PATH, DISTRIBUTION_CACHE_PATH)
+        if not all(p.exists() for p in cache_paths):
             return True
         db_mtime = RAW_EXCEL_DB_PATH.stat().st_mtime
-        return any(path.stat().st_mtime < db_mtime for path in (STATION_CACHE_PATH, PIPELINE_CACHE_PATH, SYSTEM_CACHE_PATH))
+        return any(path.stat().st_mtime < db_mtime for path in cache_paths)
 
     def _rebuild_cache_files(self) -> None:
         if not RAW_EXCEL_DB_PATH.exists():
@@ -333,10 +367,12 @@ class RawExcelAiIndex:
             stations = self._build_station_catalog(conn)
             pipelines = self._build_pipeline_catalog(conn)
             systems = self._build_system_aliases(stations, pipelines)
+            distributions = self._build_distribution_catalog(conn)
 
         STATION_CACHE_PATH.write_text(json.dumps(stations, ensure_ascii=False, indent=2), encoding="utf-8")
         PIPELINE_CACHE_PATH.write_text(json.dumps(pipelines, ensure_ascii=False, indent=2), encoding="utf-8")
         SYSTEM_CACHE_PATH.write_text(json.dumps(systems, ensure_ascii=False, indent=2), encoding="utf-8")
+        DISTRIBUTION_CACHE_PATH.write_text(json.dumps(distributions, ensure_ascii=False, indent=2), encoding="utf-8")
         logger.info("Raw excel AI cache rebuilt: %s", AI_CACHE_DIR)
 
     def _build_station_catalog(self, conn: sqlite3.Connection) -> list[dict[str, Any]]:
@@ -530,6 +566,60 @@ class RawExcelAiIndex:
         for item in records:
             item["branch_names"] = _unique_sorted(item["branch_names"])
             item["aliases"] = _unique_sorted(item["aliases"] | set(item["branch_names"]))
+        return records
+
+    def _build_distribution_catalog(self, conn: sqlite3.Connection) -> list[dict[str, Any]]:
+        """从 sheet_分输口 构建分输口（用户/下载点/下载用户）目录。"""
+        rows = conn.execute('SELECT * FROM "sheet_分输口" ORDER BY "_row_number"').fetchall()
+        dist_map: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            payload = dict(row)
+            raw_name = _to_text(payload.get("原始__分输口"))
+            auto_name = _to_text(payload.get("原始__自动分输"))
+            station_abbr = _to_text(payload.get("关联_站场简称"))
+            trunk_name = _to_text(payload.get("关联__干线管道"))
+            dispatch = _to_text(payload.get("关联_调度台"))
+            note = _to_text(payload.get("备注"))
+            pressure = _to_text(payload.get("用户合同接气压力_mpa"))
+            commission_date = _to_text(payload.get("投产时间"))
+            open_type = _to_text(payload.get("原始_站场_阀室_干线开口"))
+            metering = _to_text(payload.get("站场计量设备情况"))
+            pressure_reg = _to_text(payload.get("站场调压设备情况"))
+
+            name = raw_name or auto_name or station_abbr
+            if not name:
+                continue
+
+            key = _normalize_text(name) + "||" + _normalize_text(trunk_name)
+            record = dist_map.setdefault(key, {
+                "name": name,
+                "trunk_name": trunk_name,
+                "station_abbr": station_abbr,
+                "dispatch_console": dispatch,
+                "open_type": open_type,
+                "contract_pressure_mpa": pressure,
+                "metering_info": metering,
+                "pressure_reg_info": pressure_reg,
+                "commission_date": commission_date,
+                "note": note,
+                "aliases": set(),
+            })
+            record["aliases"].update(filter(None, [raw_name, auto_name, station_abbr]))
+
+        records = sorted(dist_map.values(), key=lambda item: (item.get("trunk_name", ""), item.get("name", "")))
+        for index, item in enumerate(records, start=1):
+            item["id"] = f"RAW-DP-{index:04d}"
+            item["aliases"] = _unique_sorted(item["aliases"])
+            # search_text 支持「用户」「下载点」「下载用户」「分输点」「分输口」等别名命中
+            item["search_text"] = _normalize_text(
+                " ".join(filter(None, [
+                    item["name"],
+                    *item["aliases"],
+                    item["trunk_name"],
+                    item["station_abbr"],
+                    item["dispatch_console"],
+                ]))
+            )
         return records
 
     def _build_compressor_map(self, conn: sqlite3.Connection) -> dict[tuple[str, str], dict[str, Any]]:

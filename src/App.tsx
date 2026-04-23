@@ -15,6 +15,85 @@ const TopologyDemoView = lazy(() => import('./views/TopologyDemoView'));
 import { AiAssistantStandalone } from './components/ai-assistant/AiAssistant';
 import { ScadaStandalone } from './views/GlobalPipelineView';
 
+interface AppErrorBoundaryState {
+  hasError: boolean;
+  message: string;
+}
+
+class AppErrorBoundary extends React.Component<React.PropsWithChildren, AppErrorBoundaryState> {
+  constructor(props: React.PropsWithChildren) {
+    super(props);
+    this.state = { hasError: false, message: '' };
+  }
+
+  static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
+    return {
+      hasError: true,
+      message: error?.message || 'Unknown render error',
+    };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    console.error('[AppErrorBoundary] render crashed', error, info);
+  }
+
+  private handleUnhandledRejection = (event: PromiseRejectionEvent): void => {
+    const message =
+      event?.reason instanceof Error
+        ? event.reason.message
+        : typeof event?.reason === 'string'
+          ? event.reason
+          : 'Unhandled promise rejection';
+    this.setState({ hasError: true, message });
+    console.error('[AppErrorBoundary] unhandled rejection', event?.reason);
+  };
+
+  private handleWindowError = (event: ErrorEvent): void => {
+    const message = event?.error?.message || event?.message || 'Window runtime error';
+    this.setState({ hasError: true, message });
+    console.error('[AppErrorBoundary] window error', event?.error || event);
+  };
+
+  componentDidMount(): void {
+    if (typeof window === 'undefined') return;
+    window.addEventListener('unhandledrejection', this.handleUnhandledRejection);
+    window.addEventListener('error', this.handleWindowError);
+  }
+
+  componentWillUnmount(): void {
+    if (typeof window === 'undefined') return;
+    window.removeEventListener('unhandledrejection', this.handleUnhandledRejection);
+    window.removeEventListener('error', this.handleWindowError);
+  }
+
+  private handleReload = (): void => {
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[#0b1220] px-6 text-white">
+          <div className="w-full max-w-xl rounded-xl border border-red-400/30 bg-red-950/20 p-6">
+            <div className="text-lg font-semibold">页面渲染异常，已拦截白屏</div>
+            <div className="mt-3 break-all text-sm text-red-100">{this.state.message}</div>
+            <button
+              onClick={this.handleReload}
+              className="mt-5 rounded-lg border border-red-300/40 bg-red-700/60 px-4 py-2 text-sm hover:bg-red-700"
+            >
+              刷新重试
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 /**
  * 页面加载状态组件
  * 在视图组件懒加载时显示
@@ -47,7 +126,7 @@ const ViewSwitcher: React.FC = () => {
   return (
     <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 group">
       <div className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-black/80 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-        Switch Dashboard View
+        切换第一张图主仿真页 / 第三张图展示页
       </div>
 
       <button
@@ -56,7 +135,7 @@ const ViewSwitcher: React.FC = () => {
           ? 'bg-teal-600 text-white shadow-teal-500/50'
           : 'bg-gray-700 text-white hover:bg-teal-500'
           }`}
-        title="地图拓扑管理"
+        title="第一张图主仿真入口"
       >
         <span className="material-symbols-outlined text-2xl">conversion_path</span>
       </button>
@@ -67,7 +146,7 @@ const ViewSwitcher: React.FC = () => {
           ? 'bg-cyan-600 text-white shadow-cyan-500/50'
           : 'bg-gray-700 text-white hover:bg-cyan-500'
           }`}
-        title="Canvas 拓扑图"
+        title="WE1 第三张图展示页"
       >
         <span className="material-symbols-outlined text-2xl">hub</span>
       </button>
@@ -107,6 +186,7 @@ const ViewSwitcher: React.FC = () => {
 const AppContent: React.FC = () => {
   const location = useLocation();
   const isPopout = location.pathname.startsWith('/popout');
+  const hideAiAssistantOnHeavyPage = location.pathname === '/map-topology';
 
   // 如果处于独立弹出窗口模式，不渲染主应用的叠加组件 (侧边栏/Switcher 等)
   if (isPopout) {
@@ -124,7 +204,7 @@ const AppContent: React.FC = () => {
   return (
     <>
       <ViewSwitcher />
-      <AiAssistant />
+      {!hideAiAssistantOnHeavyPage && <AiAssistant />}
       {/* ✅ Suspense 包裹路由，提供懒加载状态 */}
       <Suspense fallback={<PageLoader />}>
         <Routes>
@@ -144,7 +224,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <HashRouter>
-      <AppContent />
+      <AppErrorBoundary>
+        <AppContent />
+      </AppErrorBoundary>
     </HashRouter>
   );
 };

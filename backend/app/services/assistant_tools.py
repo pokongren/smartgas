@@ -6,18 +6,37 @@ AI 助手工具注册表
 import json
 import logging
 import math
+import re
 from typing import Any
 from datetime import datetime, timedelta
 
 from sqlmodel import Session, select
 
+from app.database import scada_history_engine
 from app.services.raw_excel_ai_index import STATION_TYPE_LABELS, raw_excel_ai_index
 from app.services.topology import TopologyService
 from app.services.simulation_service import OptimizedSimulationEngine as SimulationEngine
 
 logger = logging.getLogger(__name__)
 
-
+SCADA_STATION_SUFFIXES = ("分输站", "压气站", "气源站", "阀室", "站")
+SCADA_PIPELINE_PREFIXES = (
+    "西气东输一线",
+    "西气东输二线",
+    "西气东输三线",
+    "西气东输四线",
+    "西气东输",
+    "西一线",
+    "西二线",
+    "西三线",
+    "西四线",
+    "中俄",
+    "中缅",
+    "中亚",
+    "川气东送",
+    "陕京",
+    "忠武",
+)
 # ============ 工具定义（供 AI System Prompt 使用） ============
 
 TOOL_DEFINITIONS = [
@@ -88,7 +107,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "search_knowledge_base",
-        "description": "专门用于检索《天然气管网操作规程》、《现场处置应急预案》等官方文档，以回答如何处理故障、参数对标、操作步骤等特定业务知识问题。",
+        "description": "专门用于检索天然气管网操作规程、现场处置应急预案等官方文档，以回答如何处理故障、参数对标、操作步骤等特定业务知识问题。",
         "parameters": {
             "query": {"description": "用户检索问题的关键字或完整句子", "required": True},
         },
@@ -117,9 +136,39 @@ TOOL_DEFINITIONS = [
             "station_id": {"description": "故障站场名称或 ID", "required": True},
         },
     },
+    {
+        "name": "query_users",
+        "description": (
+            "查询分输口（也叫用户、下载点、下载用户、分输点）。"
+            "当用户问多少个用户、几个下载点、干线有多少用户时调用此工具。"
+        ),
+        "parameters": {
+            "keyword": {"description": "分输口名称关键字", "required": False},
+            "trunk_name": {"description": "按干线名称过滤，如西一线、陕京二线", "required": False},
+        },
+    },
+    {
+        "name": "compare_stations",
+        "description": (
+            "横向对比多个站场（2~5站）的压力、温度、水露点数据，给出排名与调度建议。"
+            "当用户说A站和B站压力对比、甲乙丙三站温度对比、XX和YY综合对比时调用。"
+        ),
+        "parameters": {
+            "stations": {
+                "description": "站场名称列表，逗号分隔，如 甪直分输站,中卫分输站",
+                "required": True,
+            },
+            "metric": {
+                "description": "对比指标: pressure(压力) / temperature(温度) / dewpoint(水露点) / all(全量，默认)",
+                "required": False,
+            },
+            "hours": {
+                "description": "回溯小时数，默认 24",
+                "required": False,
+            },
+        },
+    },
 ]
-
-
 def build_tools_description() -> str:
     """
     将工具定义格式化为 AI 可理解的文本说明。
@@ -423,6 +472,38 @@ def _handle_search_knowledge_base(args: dict, session: Session) -> str:
         return f"知识库检索工具执行出错: {str(e)}\n详细错误信息: {err_msg}"
 
 
+def _handle_query_users(args: dict, session: Session) -> str:
+    """查询分输口（也叫用户/下载点/下载用户/分输点）"""
+    keyword = args.get("keyword")
+    trunk_name = args.get("trunk_name")
+
+    distributions = raw_excel_ai_index.query_distributions(
+        keyword=keyword,
+        trunk_name=trunk_name,
+    )
+
+    if not distributions:
+        conditions = []
+        if trunk_name:
+            conditions.append(f"干线={trunk_name}")
+        if keyword:
+            conditions.append(f"名称含'{keyword}'")
+        cond_str = "、".join(conditions) if conditions else "无过滤条件"
+        return f"未找到符合条件的分输口/用户（{cond_str}）"
+
+    lines = [f"共找到 {len(distributions)} 个分输口（用户/下载点）：\n"]
+    for d in distributions[:60]:
+        pressure = f"，接气压力 {d.get('contract_pressure_mpa')} MPa" if d.get("contract_pressure_mpa") else ""
+        trunk = f"，所属干线: {d.get('trunk_name')}" if d.get("trunk_name") else ""
+        abbr = f"（{d.get('station_abbr')}）" if d.get("station_abbr") and d.get("station_abbr") != d.get("name") else ""
+        lines.append(f"  - {d.get('name')}{abbr}{trunk}{pressure}")
+
+    if len(distributions) > 60:
+        lines.append(f"\n  ...还有 {len(distributions) - 60} 个未显示")
+
+    return "\n".join(lines)
+
+
 def _handle_find_critical_nodes(args: dict, session: Session) -> str:
     """识别管网中的关键节点（介数中心性）"""
     topo = TopologyService(session)
@@ -437,6 +518,283 @@ def _handle_find_critical_nodes(args: dict, session: Session) -> str:
     return "\n".join(lines)
 
 
+def _normalize_station_alias(name: str) -> str:
+    text = (name or "").strip()
+    if not text:
+        return ""
+    text = re.sub(r"[\s\-_/()（）【】\[\]<>《》,，.。:：;；'\"“”‘’]+", "", text)
+    for prefix in SCADA_PIPELINE_PREFIXES:
+        if text.startswith(prefix) and len(text) > len(prefix):
+            text = text[len(prefix):]
+            break
+    for suffix in SCADA_STATION_SUFFIXES:
+        if text.endswith(suffix) and len(text) > len(suffix):
+            text = text[: -len(suffix)]
+            break
+    return text.lower()
+
+
+def _candidate_station_aliases(name: str) -> list[str]:
+    raw = (name or "").strip()
+    if not raw:
+        return []
+    result: list[str] = [raw]
+
+    root = raw
+    for suffix in SCADA_STATION_SUFFIXES:
+        if root.endswith(suffix) and len(root) > len(suffix):
+            root = root[: -len(suffix)]
+            break
+
+    if root and root not in result:
+        result.append(root)
+    for suffix in SCADA_STATION_SUFFIXES:
+        candidate = f"{root}{suffix}" if root else raw
+        if candidate not in result:
+            result.append(candidate)
+    return result
+
+
+def _resolve_scada_station_name(
+    session: Session,
+    station_ref: str,
+    *,
+    metric_types: tuple[str, ...] = ("pressure", "temperature"),
+) -> tuple[str | None, str]:
+    from app.scada_models import ScadaHistory
+
+    ref = (station_ref or "").strip()
+    if not ref:
+        return None, ""
+
+    rows = session.exec(
+        select(ScadaHistory.station_name, ScadaHistory.metric_type)
+        .where(ScadaHistory.metric_type.in_(metric_types))
+        .distinct()
+        .order_by(ScadaHistory.station_name)
+    ).all()
+    if not rows:
+        return None, ""
+
+    name_set = {str(row[0]).strip() for row in rows if row and row[0]}
+    metric_map: dict[str, set[str]] = {}
+    for row in rows:
+        if not row or not row[0] or not row[1]:
+            continue
+        station_name = str(row[0]).strip()
+        metric_type = str(row[1]).strip()
+        metric_map.setdefault(station_name, set()).add(metric_type)
+
+    for alias in _candidate_station_aliases(ref):
+        if alias in name_set:
+            hint = "" if alias == ref else f"已按近似站名命中 {alias}。"
+            if metric_map.get(alias, set()) >= set(metric_types):
+                return alias, hint
+            partial_hint = f"当前仅匹配到 {alias} 的部分指标数据。"
+            if hint:
+                partial_hint = f"{hint}{partial_hint}"
+            return alias, partial_hint
+
+    ref_key = _normalize_station_alias(ref)
+    normalized_map: dict[str, list[str]] = {}
+    for station_name in name_set:
+        normalized_map.setdefault(_normalize_station_alias(station_name), []).append(station_name)
+
+    if ref_key in normalized_map:
+        candidates = sorted(normalized_map[ref_key], key=len)
+        best = candidates[0]
+        if metric_map.get(best, set()) >= set(metric_types):
+            return best, ""
+        return best, f"当前仅匹配到 {best} 的部分指标数据。"
+
+    fuzzy_candidates: list[tuple[int, str]] = []
+    for station_name in name_set:
+        station_key = _normalize_station_alias(station_name)
+        if not station_key:
+            continue
+        if ref_key in station_key or station_key in ref_key:
+            score = abs(len(station_key) - len(ref_key))
+            fuzzy_candidates.append((score, station_name))
+    if fuzzy_candidates:
+        fuzzy_candidates.sort(key=lambda item: (item[0], len(item[1])))
+        best_score = fuzzy_candidates[0][0]
+        best_bucket = [name for score, name in fuzzy_candidates if score == best_score]
+        if best_score > 2 or len(best_bucket) > 1:
+            suggestions = "、".join(sorted(best_bucket)[:5])
+            return None, f"近似站名存在歧义：{suggestions}。请补充站场全称。"
+        best = best_bucket[0]
+        return best, f"已按近似站名命中 {best}。"
+
+    suggestions = "、".join(sorted(name_set)[:8])
+    return None, f"未找到匹配站名，当前可用站名示例：{suggestions}。"
+
+
+def _fetch_scada_metric_records(
+    session: Session,
+    station_name: str,
+    metric_type: str,
+    *,
+    hours: int,
+):
+    from app.scada_models import ScadaHistory
+
+    base_query = (
+        select(ScadaHistory)
+        .where(
+            ScadaHistory.station_name == station_name,
+            ScadaHistory.metric_type == metric_type,
+        )
+        .order_by(ScadaHistory.recorded_at)
+    )
+    if hours > 0:
+        cutoff = datetime.now() - timedelta(hours=hours)
+        window_records = session.exec(
+            base_query.where(ScadaHistory.recorded_at >= cutoff)
+        ).all()
+        if len(window_records) >= 3:
+            return window_records
+    return session.exec(base_query).all()
+
+
+def _select_predict_dataset(
+    session: Session,
+    station_ref: str,
+    metric: str,
+    hours: int,
+) -> tuple[str | None, str, list[Any], str]:
+    preferred_candidate: tuple[str | None, str, list[Any], str] = (None, "", [], "scada_history.db")
+    fallback_candidate: tuple[str | None, str, list[Any], str] = (None, "", [], "smartgas.db")
+
+    try:
+        with Session(scada_history_engine) as scada_session:
+            resolved_station, resolve_hint = _resolve_scada_station_name(
+                scada_session,
+                station_ref,
+                metric_types=(metric,),
+            )
+            if resolved_station:
+                records = _fetch_scada_metric_records(
+                    scada_session,
+                    resolved_station,
+                    metric,
+                    hours=hours,
+                )
+                preferred_candidate = (resolved_station, resolve_hint, records, "scada_history.db")
+                if len(records) >= 3:
+                    return preferred_candidate
+    except Exception as exc:
+        logger.warning("读取 scada_history.db 失败，回退主库: %s", exc)
+
+    resolved_station, resolve_hint = _resolve_scada_station_name(
+        session,
+        station_ref,
+        metric_types=(metric,),
+    )
+    if resolved_station:
+        records = _fetch_scada_metric_records(
+            session,
+            resolved_station,
+            metric,
+            hours=hours,
+        )
+        fallback_candidate = (resolved_station, resolve_hint, records, "smartgas.db")
+        if len(records) >= 3:
+            return fallback_candidate
+
+    if preferred_candidate[0]:
+        return preferred_candidate
+    return fallback_candidate
+
+
+def _select_correlation_dataset(
+    session: Session,
+    station_ref: str,
+    hours: int,
+) -> tuple[str | None, str, list[Any], list[Any], str]:
+    preferred_candidate: tuple[str | None, str, list[Any], list[Any], str] = (None, "", [], [], "scada_history.db")
+    fallback_candidate: tuple[str | None, str, list[Any], list[Any], str] = (None, "", [], [], "smartgas.db")
+
+    try:
+        with Session(scada_history_engine) as scada_session:
+            resolved_station, resolve_hint = _resolve_scada_station_name(
+                scada_session,
+                station_ref,
+                metric_types=("pressure", "temperature"),
+            )
+            if resolved_station:
+                pressure_records = _fetch_scada_metric_records(
+                    scada_session,
+                    resolved_station,
+                    "pressure",
+                    hours=hours,
+                )
+                temp_records = _fetch_scada_metric_records(
+                    scada_session,
+                    resolved_station,
+                    "temperature",
+                    hours=hours,
+                )
+                preferred_candidate = (
+                    resolved_station,
+                    resolve_hint,
+                    pressure_records,
+                    temp_records,
+                    "scada_history.db",
+                )
+                if len(pressure_records) >= 3 and len(temp_records) >= 3:
+                    return preferred_candidate
+    except Exception as exc:
+        logger.warning("读取 scada_history.db 失败，回退主库: %s", exc)
+
+    resolved_station, resolve_hint = _resolve_scada_station_name(
+        session,
+        station_ref,
+        metric_types=("pressure", "temperature"),
+    )
+    if resolved_station:
+        pressure_records = _fetch_scada_metric_records(
+            session,
+            resolved_station,
+            "pressure",
+            hours=hours,
+        )
+        temp_records = _fetch_scada_metric_records(
+            session,
+            resolved_station,
+            "temperature",
+            hours=hours,
+        )
+        fallback_candidate = (
+            resolved_station,
+            resolve_hint,
+            pressure_records,
+            temp_records,
+            "smartgas.db",
+        )
+        if len(pressure_records) >= 3 and len(temp_records) >= 3:
+            return fallback_candidate
+
+    if preferred_candidate[0]:
+        return preferred_candidate
+    return fallback_candidate
+
+
+def _build_history_action_token(
+    station_name: str,
+    *,
+    view: str,
+    hours: int,
+    metric: str = "",
+) -> str:
+    safe_station = str(station_name or "").replace("|", " ").replace("]", " ").strip()
+    safe_view = str(view or "pressure").replace("|", "").replace("]", "").strip() or "pressure"
+    safe_metric = str(metric or "").replace("|", " ").replace("]", " ").strip()
+    safe_hours = max(int(hours or 0), 0)
+    return (
+        f"[ACTION:OPEN_HISTORY_PANEL|station={safe_station}|view={safe_view}|hours={safe_hours}|metric={safe_metric}]"
+    )
+
+
 def _handle_predict_trend(args: dict, session: Session) -> str:
     """时序预测：线性回归估算超标剩余时间"""
     station_id = args.get("station_id", "")
@@ -446,19 +804,20 @@ def _handle_predict_trend(args: dict, session: Session) -> str:
     if not station_id:
         return "请提供站场名称"
 
-    # 从 scada_history 表查询历史数据
-    from app.scada_models import ScadaHistory
-    records = session.exec(
-        select(ScadaHistory)
-        .where(
-            ScadaHistory.station_name == station_id,
-            ScadaHistory.metric_type == metric,
-        )
-        .order_by(ScadaHistory.recorded_at)
-    ).all()
+    resolved_station, resolve_hint, records, data_source = _select_predict_dataset(
+        session,
+        station_id,
+        metric,
+        hours,
+    )
+    if not resolved_station:
+        return f"目前查不到 {station_id} 的{metric}历史记录。{resolve_hint or '请确认站场全称。'}"
 
     if len(records) < 3:
-        return f"{station_id} 的 {metric} 历史数据点不足（仅 {len(records)} 条），无法进行趋势预测"
+        return (
+            f"{resolved_station} 的 {metric} 历史数据点不足（仅 {len(records)} 条），无法进行趋势预测。"
+            f"数据源: {data_source}"
+        )
 
     # 将时间转换为小时偏移量，做线性回归 y = a*x + b
     t0 = records[0].recorded_at
@@ -473,7 +832,7 @@ def _handle_predict_trend(args: dict, session: Session) -> str:
 
     denom = n * sum_x2 - sum_x * sum_x
     if abs(denom) < 1e-10:
-        return f"{station_id} 数据方差为0，无法回归"
+        return f"{resolved_station} 数据方差为0，无法回归"
 
     slope = (n * sum_xy - sum_x * sum_y) / denom  # MPa/h 或 °C/h
     intercept = (sum_y - slope * sum_x) / n
@@ -482,9 +841,12 @@ def _handle_predict_trend(args: dict, session: Session) -> str:
     current_time_h = xs[-1]
 
     # 查站场设计压力上限，优先走 raw_excel AI 索引
-    design_limit = raw_excel_ai_index.get_design_pressure(station_id) or 12.0
+    design_limit = raw_excel_ai_index.get_design_pressure(resolved_station) or 12.0
 
-    lines = [f"📊 {station_id} {metric} 趋势预测（基于近 {len(records)} 个数据点）："]
+    lines = [f"📊 {resolved_station} {metric} 趋势预测（基于近 {len(records)} 个数据点）："]
+    if resolve_hint:
+        lines.append(f"  站名命中说明: {resolve_hint}")
+    lines.append(f"  数据源: {data_source}")
     lines.append(f"  当前值: {current_val:.3f} {'MPa' if metric == 'pressure' else '°C'}")
     direction = "上升" if slope > 0 else "下降"
     lines.append(f"  变化速率: {abs(slope):.4f}/h（{direction}趋势）")
@@ -508,6 +870,7 @@ def _handle_predict_trend(args: dict, session: Session) -> str:
     else:
         lines.append("  趋势平稳，暂无超标风险")
 
+    lines.extend(["", _build_history_action_token(resolved_station, view=metric, hours=hours, metric=metric)])
     return "\n".join(lines)
 
 
@@ -519,29 +882,19 @@ def _handle_analyze_correlation(args: dict, session: Session) -> str:
     if not station_id:
         return "请提供站场名称"
 
-    from app.scada_models import ScadaHistory
-
-    # 查询压力和温度数据
-    pressure_records = session.exec(
-        select(ScadaHistory)
-        .where(
-            ScadaHistory.station_name == station_id,
-            ScadaHistory.metric_type == "pressure",
-        )
-        .order_by(ScadaHistory.recorded_at)
-    ).all()
-
-    temp_records = session.exec(
-        select(ScadaHistory)
-        .where(
-            ScadaHistory.station_name == station_id,
-            ScadaHistory.metric_type == "temperature",
-        )
-        .order_by(ScadaHistory.recorded_at)
-    ).all()
+    resolved_station, resolve_hint, pressure_records, temp_records, data_source = _select_correlation_dataset(
+        session,
+        station_id,
+        hours,
+    )
+    if not resolved_station:
+        return f"目前查不到 {station_id} 的压力或温度历史记录。{resolve_hint or '请确认站场全称。'}"
 
     if len(pressure_records) < 3 or len(temp_records) < 3:
-        return f"{station_id} 的压力或温度历史数据不足，无法进行相关性分析"
+        return (
+            f"{resolved_station} 的压力或温度历史数据不足，无法进行相关性分析。"
+            f"数据源: {data_source}"
+        )
 
     # 按时间对齐（取交集时间戳）
     p_map = {r.recorded_at.isoformat(): r.value for r in pressure_records}
@@ -567,7 +920,7 @@ def _handle_analyze_correlation(args: dict, session: Session) -> str:
     std_t = math.sqrt(sum((t - mean_t) ** 2 for t in t_vals) / n)
 
     if std_p < 1e-10 or std_t < 1e-10:
-        return f"{station_id} 数据无波动，无法计算相关性"
+        return f"{resolved_station} 数据无波动，无法计算相关性"
 
     r = cov / (std_p * std_t)
 
@@ -575,7 +928,10 @@ def _handle_analyze_correlation(args: dict, session: Session) -> str:
     p_change = p_vals[-1] - p_vals[0]
     t_change = t_vals[-1] - t_vals[0]
 
-    lines = [f"🔍 {station_id} 压力-温度相关性分析（{n} 个对齐数据点）："]
+    lines = [f"🔍 {resolved_station} 压力-温度相关性分析（{n} 个对齐数据点）："]
+    if resolve_hint:
+        lines.append(f"  站名命中说明: {resolve_hint}")
+    lines.append(f"  数据源: {data_source}")
     lines.append(f"  压力范围: {min(p_vals):.3f} ~ {max(p_vals):.3f} MPa（变化: {p_change:+.3f}）")
     lines.append(f"  温度范围: {min(t_vals):.1f} ~ {max(t_vals):.1f} °C（变化: {t_change:+.1f}）")
     lines.append(f"  皮尔逊相关系数 r = {r:.4f}")
@@ -594,6 +950,7 @@ def _handle_analyze_correlation(args: dict, session: Session) -> str:
     elif p_change < -0.3 and t_change > 1.0:
         lines.append("  ⚠️ 【异常模式】压力下降但温度上升，疑似管线泄漏导致节流效应")
 
+    lines.extend(["", _build_history_action_token(resolved_station, view="overview", hours=hours, metric="pressure-temperature")])
     return "\n".join(lines)
 
 
@@ -706,4 +1063,130 @@ TOOL_HANDLERS = {
     "predict_trend": _handle_predict_trend,
     "analyze_correlation": _handle_analyze_correlation,
     "simulate_cutoff": _handle_simulate_cutoff,
+    "query_users": _handle_query_users,
 }
+
+
+def _handle_compare_stations(args: dict, session: Session) -> str:
+    import datetime as _dt
+    raw_stations = args.get('stations', '')
+    metric = str(args.get('metric') or 'all').strip().lower()
+    hours = int(args.get('hours') or 24)
+
+    station_names = [
+        s.strip() for s in re.split(r'[,，、]', raw_stations) if s.strip()
+    ][:5]
+
+    if len(station_names) < 2:
+        return '请至少提供两个站场名称，用逗号分隔，如：璒直分输站,中卫分输站'
+
+    METRIC_LABEL = {
+        'pressure': ('pressure', '压力', 'MPa'),
+        'temperature': ('temperature', '温度', '°C'),
+        'dewpoint': ('dewpoint', '水露点', '°C'),
+    }
+
+    if metric == 'all':
+        selected_metrics = ['pressure', 'temperature', 'dewpoint']
+    elif metric in METRIC_LABEL:
+        selected_metrics = [metric]
+    else:
+        selected_metrics = ['pressure', 'temperature', 'dewpoint']
+
+    def _fetch_one(station_ref: str, metric_type: str) -> dict:
+        result: dict = {'station': station_ref, 'metric': metric_type, 'found': False}
+        try:
+            with Session(scada_history_engine) as sc:
+                resolved, hint = _resolve_scada_station_name(
+                    sc, station_ref, metric_types=(metric_type,)
+                )
+                if not resolved:
+                    result['hint'] = hint or '未匹配到展场'
+                    return result
+                records = _fetch_scada_metric_records(sc, resolved, metric_type, hours=hours)
+                if not records:
+                    result['hint'] = '无历史数据'
+                    return result
+                values = [r.value for r in records]
+                now_ts = records[-1].recorded_at
+                cutoff6h = now_ts - _dt.timedelta(hours=6)
+                recent = [r for r in records if r.recorded_at >= cutoff6h]
+                delta6h = (recent[-1].value - recent[0].value) if len(recent) >= 2 else 0.0
+                result.update({
+                    'found': True, 'resolved': resolved, 'hint': hint or '',
+                    'latest': values[-1], 'minimum': min(values),
+                    'maximum': max(values), 'delta6h': delta6h, 'count': len(values),
+                })
+        except Exception as exc:
+            logger.warning('compare_stations fetch failed: %s %s %s', station_ref, metric_type, exc)
+        return result
+
+    all_data: dict = {}
+    for sname in station_names:
+        all_data[sname] = {}
+        for m in selected_metrics:
+            all_data[sname][m] = _fetch_one(sname, m)
+
+    output_lines = ['【多站对比】回溯 ' + str(hours) + 'h\n']
+    dispatch: list = []
+
+    for m in selected_metrics:
+        _, label, unit = METRIC_LABEL[m]
+        output_lines.append('## ' + label + '对比（' + unit + '）\n')
+        output_lines.append('  站场                最新値    最小値    最大値    近6h变化    数据点')
+        output_lines.append('-' * 62)
+
+        valid: list = []
+        for sname in station_names:
+            r = all_data[sname][m]
+            if not r.get('found'):
+                hint_text = r.get('hint', '无数据')
+                output_lines.append('  ' + sname + '  ---   ---    ---    [' + hint_text + ']')
+            else:
+                dname = r.get('resolved', sname)
+                lat, lo, hi, d6, cnt = r['latest'], r['minimum'], r['maximum'], r['delta6h'], r['count']
+                d6s = ('+' if d6 >= 0 else '') + (f'{d6:.3f}' if m == 'pressure' else f'{d6:.2f}')
+                output_lines.append(f'  {dname:<16}{lat:>8.3f}  {lo:>8.3f}  {hi:>8.3f}  {d6s:>9}  {cnt:>5}')
+                valid.append((dname, r))
+
+        output_lines.append('')
+
+        if valid:
+            sorted_v = sorted(valid, key=lambda x: x[1]['latest'], reverse=True)
+            hi_name, hi_r = sorted_v[0]
+            lo_name, lo_r = sorted_v[-1]
+            diff = hi_r['latest'] - lo_r['latest']
+            if m == 'pressure':
+                advice = (
+                    '[压力] ' + hi_name + '最高(' + f"{hi_r['latest']:.3f}" + ' MPa)，'
+                    + lo_name + '最低(' + f"{lo_r['latest']:.3f}" + ' MPa)，'
+                    + ('压差 ' + f'{diff:.3f}' + ' MPa，建议关注来气量。'
+                       if diff > 0.5 else '平衡，最大压差 ' + f'{diff:.3f}' + ' MPa。')
+                )
+            elif m == 'temperature':
+                advice = (
+                    '[温度] ' + hi_name + '最高(' + f"{hi_r['latest']:.1f}" + unit + ')，'
+                    + lo_name + '最低(' + f"{lo_r['latest']:.1f}" + unit + ')，'
+                    + ('温差' + f'{diff:.1f}' + unit + '，差异较大。'
+                       if diff > 5 else '差多' + f'{diff:.1f}' + unit + '，正常。')
+                )
+            elif m == 'dewpoint':
+                advice = (
+                    '[水露点] ' + hi_name + '最高(' + f"{hi_r['latest']:.1f}" + unit + ')，'
+                    + lo_name + '最低(' + f"{lo_r['latest']:.1f}" + unit + ')，'
+                    + ('差値' + f'{diff:.1f}' + unit + '，请复核' + hi_name + '脱水效果。'
+                       if diff > 3 else '相近，差値' + f'{diff:.1f}' + unit + '，正常。')
+                )
+            else:
+                advice = '[' + label + '] 最高展场:' + hi_name + '，最低:' + lo_name
+            dispatch.append(advice)
+
+    if dispatch:
+        output_lines.append('综合调度建议\n')
+        for a in dispatch:
+            output_lines.append('- ' + a)
+
+    return '\n'.join(output_lines)
+
+
+TOOL_HANDLERS['compare_stations'] = _handle_compare_stations

@@ -9,8 +9,8 @@ import {
     PipelineLayer
 } from '@/data/pipelines'
 import type { PipelineData, PipelineLine, PipelineNode } from '@/types'
-import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
-import LuzhiHistoryPanel from '@/components/scada/LuzhiHistoryPanel'
+import ScadaHistoryChart from '@/components/scada/ScadaHistoryChartCompat'
+import StationHistoryPanel from '@/components/scada/StationHistoryPanel'
 import {
     CRED_SCADA_DATA,
     EXTRA_SCADA_PANELS,
@@ -24,6 +24,7 @@ import {
 import { EmptyScadaState, ScadaFloatingPanel } from '@/views/global-pipeline/ScadaFloatingPanel'
 import type { ScadaRecord } from '@/views/global-pipeline/scadaConfig'
 import { useNavigate } from 'react-router-dom'
+import { setAssistantRuntimeContext } from '@/components/ai-assistant/runtimeAssistantContext'
 
 import { getNodeMarkerMap } from '@/utils/mapRenderer'
 import { useNewWindow, usePopoutSync } from '@/hooks/useNewWindow'
@@ -792,8 +793,16 @@ const GlobalPipelineView: React.FC = () => {
     // SCADA 历史曲线面板状态，支持指定指标类型和基准值
     const [historyTarget, setHistoryTarget] = useState<{
         stationName: string
-        metricType: 'pressure' | 'temperature'
-        baseValue: number
+        metricType: 'pressure' | 'temperature' | 'dewpoint'
+        baseValue?: number
+        hours?: number
+    } | null>(null)
+    const [stationHistoryTarget, setStationHistoryTarget] = useState<{
+        stationName: string
+        displayName?: string
+        initialViewMode?: 'pressure' | 'temperature' | 'dewpoint' | 'overview'
+        initialHours?: 0 | 6 | 12
+        focusHint?: string
     } | null>(null)
     const [historyChartPos, setHistoryChartPos] = useState({ x: Math.round((typeof window !== 'undefined' ? window.innerWidth : 1280) / 2) - 300, y: 120 })
     const [isDraggingHistory, setIsDraggingHistory] = useState(false)
@@ -803,11 +812,90 @@ const GlobalPipelineView: React.FC = () => {
         historyOffsetRef.current = { x: e.clientX - historyChartPos.x, y: e.clientY - historyChartPos.y }
     }
     // 统一的指标点击处理函数
-    const handleMetricClick = useCallback((stationName: string, metricType: 'pressure' | 'temperature', baseValue: number) => {
+    const handleMetricClick = useCallback((stationName: string, metricType: 'pressure' | 'temperature' | 'dewpoint', baseValue: number) => {
         setHistoryTarget({ stationName, metricType, baseValue })
     }, [])
 
+    const openStationHistoryPanel = useCallback((
+        stationName: string,
+        options?: {
+            displayName?: string
+            initialViewMode?: 'pressure' | 'temperature' | 'dewpoint' | 'overview'
+            initialHours?: 0 | 6 | 12
+            focusHint?: string
+        },
+    ) => {
+        setStationHistoryTarget({
+            stationName,
+            displayName: options?.displayName || stationName,
+            initialViewMode: options?.initialViewMode || 'pressure',
+            initialHours: options?.initialHours ?? 0,
+            focusHint: options?.focusHint,
+        })
+    }, [])
+
+    useEffect(() => {
+        const handleAssistantHistoryOpen = (event: Event) => {
+            const detail = (event as CustomEvent).detail as {
+                station?: string
+                view?: string
+                hours?: number
+                metric?: string
+            } | undefined
+            const stationName = detail?.station?.trim()
+            if (!stationName) return
+            const view = String(detail?.view || '').toLowerCase()
+            const hoursRaw = Number(detail?.hours)
+            const initialHours = hoursRaw === 6 || hoursRaw === 12 ? hoursRaw : 0
+            openStationHistoryPanel(stationName, {
+                initialViewMode: view === 'temperature'
+                    ? 'temperature'
+                    : view === 'dewpoint'
+                        ? 'dewpoint'
+                        : view === 'overview'
+                            ? 'overview'
+                            : 'pressure',
+                initialHours,
+                focusHint: detail?.metric?.trim() || undefined,
+            })
+            setHistoryTarget(null)
+        }
+        const handleAssistantHistoryMessage = (event: MessageEvent) => {
+            const payload = event.data as {
+                type?: string
+                detail?: {
+                    station?: string
+                    view?: string
+                    hours?: number
+                    metric?: string
+                }
+            } | undefined
+            if (!payload) return
+            if (payload.type !== 'assistant-open-history' && payload.type !== 'assistant-open-luzhi-history') {
+                return
+            }
+            handleAssistantHistoryOpen({ detail: payload.detail } as CustomEvent)
+        }
+
+        window.addEventListener('assistant-open-history', handleAssistantHistoryOpen as EventListener)
+        window.addEventListener('assistant-open-luzhi-history', handleAssistantHistoryOpen as EventListener)
+        window.addEventListener('message', handleAssistantHistoryMessage)
+        return () => {
+            window.removeEventListener('assistant-open-history', handleAssistantHistoryOpen as EventListener)
+            window.removeEventListener('assistant-open-luzhi-history', handleAssistantHistoryOpen as EventListener)
+            window.removeEventListener('message', handleAssistantHistoryMessage)
+        }
+    }, [openStationHistoryPanel])
+
     // 西二线 SCADA 面板拖拽状态
+    useEffect(() => {
+        setAssistantRuntimeContext({
+            selection: {
+                history_target_station: stationHistoryTarget?.stationName || historyTarget?.stationName || '',
+            },
+        })
+    }, [historyTarget?.stationName, stationHistoryTarget?.stationName])
+
     const [we2ScadaPos, setWe2ScadaPos] = useState({
         x: typeof window !== 'undefined' ? Math.max(10, window.innerWidth - 450) : 800,
         y: typeof window !== 'undefined' ? window.innerHeight - 340 : 500
@@ -912,7 +1000,7 @@ const GlobalPipelineView: React.FC = () => {
         if (isDraggingPt)      setPtPos({      x: e.clientX - ptOffsetRef.current.x,      y: e.clientY - ptOffsetRef.current.y      })
         if (isDraggingTrend)   setTrendPos({   x: e.clientX - trendOffsetRef.current.x,   y: e.clientY - trendOffsetRef.current.y   })
         if (isDraggingHistory) setHistoryChartPos({ x: e.clientX - historyOffsetRef.current.x, y: e.clientY - historyOffsetRef.current.y })
-        if (isDraggingLuzhi)   setLuzhiPos({   x: e.clientX - luzhiOffsetRef.current.x,   y: e.clientY - luzhiOffsetRef.current.y   })
+        if (isDraggingStationHistory) setStationHistoryPos({ x: e.clientX - stationHistoryOffsetRef.current.x, y: e.clientY - stationHistoryOffsetRef.current.y })
     }
 
     const handleGlobalMouseUp = () => {
@@ -923,7 +1011,7 @@ const GlobalPipelineView: React.FC = () => {
         if (isDraggingPt)       setIsDraggingPt(false)
         if (isDraggingTrend)    setIsDraggingTrend(false)
         if (isDraggingHistory)  setIsDraggingHistory(false)
-        if (isDraggingLuzhi)    setIsDraggingLuzhi(false)
+        if (isDraggingStationHistory) setIsDraggingStationHistory(false)
     }
 
     const hasScadaStandalone = useCallback((pipelineId: string) => {
@@ -1080,13 +1168,12 @@ const GlobalPipelineView: React.FC = () => {
     }
 
     // 甪直历史面板状态
-    const [showLuzhiHistory, setShowLuzhiHistory] = useState(false)
-    const [luzhiPos, setLuzhiPos] = useState({ x: Math.round(W / 2) - 390, y: Math.round(H / 2) - 240 })
-    const [isDraggingLuzhi, setIsDraggingLuzhi] = useState(false)
-    const luzhiOffsetRef = React.useRef({ x: 0, y: 0 })
-    const handleLuzhiMouseDown = (e: React.MouseEvent) => {
-        setIsDraggingLuzhi(true)
-        luzhiOffsetRef.current = { x: e.clientX - luzhiPos.x, y: e.clientY - luzhiPos.y }
+    const [stationHistoryPos, setStationHistoryPos] = useState({ x: Math.round(W / 2) - 390, y: Math.round(H / 2) - 240 })
+    const [isDraggingStationHistory, setIsDraggingStationHistory] = useState(false)
+    const stationHistoryOffsetRef = React.useRef({ x: 0, y: 0 })
+    const handleStationHistoryMouseDown = (e: React.MouseEvent) => {
+        setIsDraggingStationHistory(true)
+        stationHistoryOffsetRef.current = { x: e.clientX - stationHistoryPos.x, y: e.clientY - stationHistoryPos.y }
     }
 
     // 展开状态
@@ -1370,18 +1457,44 @@ const GlobalPipelineView: React.FC = () => {
                     <div className="flex items-center gap-3">
                         {/* 甪直站历史数据入口 */}
                         <button
-                            onClick={() => setShowLuzhiHistory(v => !v)}
+                            onClick={() => {
+                                if (stationHistoryTarget?.stationName === '甪直分输站') {
+                                    setStationHistoryTarget(null)
+                                } else {
+                                    openStationHistoryPanel('甪直分输站', { displayName: '甪直分输站', initialViewMode: 'overview', initialHours: 0 })
+                                }
+                            }}
                             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all"
                             style={{
-                                background: showLuzhiHistory ? 'rgba(59,130,246,0.25)' : 'rgba(15,23,42,0.6)',
-                                border: `1px solid ${showLuzhiHistory ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.2)'}`,
-                                color: showLuzhiHistory ? '#93c5fd' : '#64748b',
+                                background: stationHistoryTarget?.stationName === '甪直分输站' ? 'rgba(59,130,246,0.25)' : 'rgba(15,23,42,0.6)',
+                                border: `1px solid ${stationHistoryTarget?.stationName === '甪直分输站' ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.2)'}`,
+                                color: stationHistoryTarget?.stationName === '甪直分输站' ? '#93c5fd' : '#64748b',
                             }}
                             title="甪直分输站历史回溯（试点）"
                         >
                             <span className="material-symbols-outlined text-base">history</span>
                             <span>甪直历史</span>
                             <span style={{ fontSize: '9px', color: '#10b981', background: 'rgba(16,185,129,0.15)', padding: '0 4px', borderRadius: '4px', border: '1px solid rgba(16,185,129,0.3)' }}>试点</span>
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (stationHistoryTarget?.stationName === '中卫压气站') {
+                                    setStationHistoryTarget(null)
+                                } else {
+                                    openStationHistoryPanel('中卫压气站', { displayName: '中卫压气站', initialViewMode: 'overview', initialHours: 0 })
+                                }
+                            }}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all"
+                            style={{
+                                background: stationHistoryTarget?.stationName === '中卫压气站' ? 'rgba(245,158,11,0.22)' : 'rgba(15,23,42,0.6)',
+                                border: `1px solid ${stationHistoryTarget?.stationName === '中卫压气站' ? 'rgba(245,158,11,0.48)' : 'rgba(245,158,11,0.2)'}`,
+                                color: stationHistoryTarget?.stationName === '中卫压气站' ? '#fde68a' : '#94a3b8',
+                            }}
+                            title="打开中卫压气站历史回溯面板"
+                        >
+                            <span className="material-symbols-outlined text-base">monitoring</span>
+                            <span>中卫历史</span>
+                            <span style={{ fontSize: '9px', color: '#facc15', background: 'rgba(250,204,21,0.12)', padding: '0 4px', borderRadius: '4px', border: '1px solid rgba(250,204,21,0.28)' }}>新接入</span>
                         </button>
                     </div>
                 </div>
@@ -1516,15 +1629,20 @@ const GlobalPipelineView: React.FC = () => {
             </div>
 
             {/* ====== 甪直分输站 · 历史回溯面板（试点） ====== */}
-            {showLuzhiHistory && (
+            {stationHistoryTarget && (
                 <div
                     className="absolute z-20"
-                    style={{ left: `${luzhiPos.x}px`, top: `${luzhiPos.y}px` }}
+                    style={{ left: `${stationHistoryPos.x}px`, top: `${stationHistoryPos.y}px` }}
                 >
-                    <LuzhiHistoryPanel
-                        onClose={() => setShowLuzhiHistory(false)}
-                        onMouseDown={handleLuzhiMouseDown}
-                        isDragging={isDraggingLuzhi}
+                    <StationHistoryPanel
+                        stationName={stationHistoryTarget.stationName}
+                        displayName={stationHistoryTarget.displayName}
+                        initialViewMode={stationHistoryTarget.initialViewMode}
+                        initialHours={stationHistoryTarget.initialHours}
+                        focusHint={stationHistoryTarget.focusHint}
+                        onClose={() => setStationHistoryTarget(null)}
+                        onMouseDown={handleStationHistoryMouseDown}
+                        isDragging={isDraggingStationHistory}
                     />
                 </div>
             )}
@@ -1646,6 +1764,7 @@ const GlobalPipelineView: React.FC = () => {
                         stationName={historyTarget.stationName}
                         displayName={historyTarget.stationName}
                         metricType={historyTarget.metricType}
+                        initialHours={historyTarget.hours}
                         baseValue={historyTarget.baseValue}
                         onClose={() => setHistoryTarget(null)}
                         onMouseDown={handleHistoryMouseDown}

@@ -23,9 +23,14 @@ const DEFAULT_CONFIG: MapConfig = {
     draggable: true,
     theme: 'light',
     minZoom: 3,
-    maxZoom: 20,
+    maxZoom: 18,
     showScale: true,
     showCompass: true,
+    viewMode: 'auto',
+    showProvinceLabels: true,
+    showDistrictLayer: true,
+    maxRenderNodes: 1200,
+    maxRenderLines: 1800,
 }
 
 /**
@@ -128,6 +133,35 @@ function MapView({
 
     const mapConfig = { ...DEFAULT_CONFIG, ...config }
     const showDemoHubNodes = useMemo(() => shouldEnableDemoHubNodes(), [])
+    const effectivePipelineData = useMemo(() => {
+        if (!pipelineData) return pipelineData
+
+        const maxNodes = Math.max(0, mapConfig.maxRenderNodes ?? DEFAULT_CONFIG.maxRenderNodes ?? 0)
+        const maxLines = Math.max(0, mapConfig.maxRenderLines ?? DEFAULT_CONFIG.maxRenderLines ?? 0)
+
+        const nodes = Array.isArray(pipelineData.nodes)
+            ? pipelineData.nodes.slice(0, maxNodes)
+            : pipelineData.nodes
+        const lines = Array.isArray(pipelineData.lines)
+            ? pipelineData.lines.slice(0, maxLines)
+            : pipelineData.lines
+
+        if (
+            Array.isArray(pipelineData.nodes) &&
+            Array.isArray(pipelineData.lines) &&
+            (pipelineData.nodes.length > maxNodes || pipelineData.lines.length > maxLines)
+        ) {
+            console.warn(
+                `[MapView] render budget applied: nodes ${pipelineData.nodes.length} -> ${nodes.length}, lines ${pipelineData.lines.length} -> ${lines.length}`,
+            )
+        }
+
+        return {
+            ...pipelineData,
+            nodes,
+            lines,
+        }
+    }, [mapConfig.maxRenderLines, mapConfig.maxRenderNodes, pipelineData])
 
     // 使用 ref 存储所有回调函数，避免 useEffect 依赖它们
     const callbacksRef = useRef({
@@ -267,11 +301,51 @@ function MapView({
                 }
 
                 // 预加载必要的插件
-                const AMap = await AMapLoader.load({
-                    key: amapKey,
-                    version: '2.0',
-                    plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.ControlBar', 'AMap.DistrictLayer'],
-                })
+                const loadAMapWithRetry = async () => {
+                    const maxAttempts = 3
+                    const attemptTimeoutMs = 12000
+                    let lastError: unknown = null
+                    const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
+                        return await new Promise<T>((resolve, reject) => {
+                            const timer = setTimeout(() => {
+                                reject(new Error(`AMap SDK load timeout (${timeoutMs}ms)`))
+                            }, timeoutMs)
+
+                            promise
+                                .then(result => {
+                                    clearTimeout(timer)
+                                    resolve(result)
+                                })
+                                .catch(error => {
+                                    clearTimeout(timer)
+                                    reject(error)
+                                })
+                        })
+                    }
+
+                    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+                        try {
+                            return await withTimeout(
+                                AMapLoader.load({
+                                    key: amapKey,
+                                    version: '2.0',
+                                    plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.ControlBar', 'AMap.DistrictLayer'],
+                                }),
+                                attemptTimeoutMs,
+                            )
+                        } catch (error) {
+                            lastError = error
+                            if (attempt < maxAttempts) {
+                                setLoadingStage(`地图 SDK 加载失败，正在第 ${attempt + 1} 次重试...`)
+                                await new Promise(resolve => setTimeout(resolve, attempt * 500))
+                            }
+                        }
+                    }
+
+                    throw (lastError instanceof Error ? lastError : new Error(String(lastError)))
+                }
+
+                const AMap = await loadAMapWithRetry()
 
                 setLoadingStage('初始化地图...')
 
@@ -281,15 +355,38 @@ function MapView({
                     mapContainerRef.current.style.height = '100%'
                 }
 
-                const map = new AMap.Map(mapContainerRef.current, {
-                    center: [mapConfig.center.longitude, mapConfig.center.latitude],
-                    zoom: mapConfig.zoom,
-                    mapStyle: 'amap://styles/dark',
-                    features: ['bg'],
-                    viewMode: '3D',
-                    pitch: 0,
-                    skyColor: '#1f263a',
-                })
+                const createMap = (viewMode: '2D' | '3D') => {
+                    const options: Record<string, unknown> = {
+                        center: [mapConfig.center.longitude, mapConfig.center.latitude],
+                        zoom: mapConfig.zoom,
+                        mapStyle: 'amap://styles/dark',
+                        viewMode,
+                    }
+
+                    if (viewMode === '3D') {
+                        options.pitch = 0
+                        options.skyColor = '#1f263a'
+                    }
+
+                    return new AMap.Map(mapContainerRef.current, options)
+                }
+
+                const desiredViewMode = mapConfig.viewMode ?? 'auto'
+                let map: any
+
+                if (desiredViewMode === '2D') {
+                    map = createMap('2D')
+                } else if (desiredViewMode === '3D') {
+                    map = createMap('3D')
+                } else {
+                    try {
+                        map = createMap('3D')
+                    } catch (error) {
+                        console.warn('[MapView] 3D map init failed, fallback to 2D.', error)
+                        setLoadingStage('3D 初始化失败，已切换 2D 渲染...')
+                        map = createMap('2D')
+                    }
+                }
 
                 // 设置中国边界限制 - 只显示中国区域
                 // 中国区域大致范围：经度 73°E - 135°E，纬度 18°N - 54°N
@@ -325,7 +422,9 @@ function MapView({
                 // 后台异步加载非关键资源
                 const loadNonCriticalResources = () => {
                     loadControls(AMap, map)
-                    loadDistrictLayer(AMap, map)
+                    if (mapConfig.showDistrictLayer) {
+                        loadDistrictLayer(AMap, map)
+                    }
                 }
 
                 if ('requestIdleCallback' in window) {
@@ -335,7 +434,9 @@ function MapView({
                 }
 
                 const loadLabels = () => {
-                    loadProvinceLabels(AMap, map)
+                    if (mapConfig.showProvinceLabels) {
+                        loadProvinceLabels(AMap, map)
+                    }
                 }
 
                 if ('requestIdleCallback' in window) {
@@ -372,13 +473,13 @@ function MapView({
             clearDragMappings()
         }
         // 注意：只依赖稳定的值，回调函数通过 ref 访问
-    }, [mapConfig.center.longitude, mapConfig.center.latitude, mapConfig.zoom, debouncedZoomEnd, loadControls, loadDistrictLayer, loadProvinceLabels])
+    }, [mapConfig.center.longitude, mapConfig.center.latitude, mapConfig.zoom, mapConfig.showDistrictLayer, mapConfig.showProvinceLabels, debouncedZoomEnd, loadControls, loadDistrictLayer, loadProvinceLabels])
 
     /**
      * 管线渲染
      */
     useEffect(() => {
-        if (!mapInstance || !pipelineData) return
+        if (!mapInstance || !effectivePipelineData) return
 
         // NOTE: 使用 AbortController 取消旧渲染，防止竞态导致覆盖物泄漏
         const abortController = new AbortController()
@@ -391,11 +492,11 @@ function MapView({
             lineOverlaysRef.current = []
 
             try {
-                if (pipelineData.lines && pipelineData.lines.length > 0 && !abortController.signal.aborted) {
+                if (effectivePipelineData.lines && effectivePipelineData.lines.length > 0 && !abortController.signal.aborted) {
                     const { onLineClick } = callbacksRef.current
                     const lineOverlays = await renderPipelineLines(
                         mapInstanceRef.current,
-                        pipelineData.lines,
+                        effectivePipelineData.lines,
                         onLineClick ? (e) => onLineClick({
                             type: 'line',
                             targetId: e.line.id,
@@ -412,11 +513,11 @@ function MapView({
                     }
                 }
 
-                if (pipelineData.devices && pipelineData.devices.length > 0 && !abortController.signal.aborted) {
+                if (effectivePipelineData.devices && effectivePipelineData.devices.length > 0 && !abortController.signal.aborted) {
                     const { onDeviceClick } = callbacksRef.current
                     const deviceOverlays = await renderPipelineDevices(
                         mapInstanceRef.current,
-                        pipelineData.devices,
+                        effectivePipelineData.devices,
                         onDeviceClick ? (e) => onDeviceClick({
                             type: 'device',
                             targetId: e.device.id,
@@ -440,13 +541,13 @@ function MapView({
         return () => {
             abortController.abort()
         }
-    }, [mapInstance, pipelineData])
+    }, [effectivePipelineData, mapInstance])
 
     /**
      * 节点渲染
      */
     useEffect(() => {
-        if (!mapInstance || !pipelineData) return
+        if (!mapInstance || !effectivePipelineData) return
 
         // NOTE: 使用 AbortController 取消旧渲染，防止竞态导致覆盖物泄漏
         const abortController = new AbortController()
@@ -465,11 +566,11 @@ function MapView({
             clearClusterCache()
 
             try {
-                if (pipelineData.nodes && pipelineData.nodes.length > 0 && !abortController.signal.aborted) {
+                if (effectivePipelineData.nodes && effectivePipelineData.nodes.length > 0 && !abortController.signal.aborted) {
                     const { onNodeClick } = callbacksRef.current
                     const nodeOverlays = await renderPipelineNodesWithClustering(
                         mapInstanceRef.current,
-                        pipelineData.nodes,
+                        effectivePipelineData.nodes,
                         onNodeClick ? (e) => onNodeClick({
                             type: 'node',
                             targetId: e.node.id,
@@ -521,7 +622,7 @@ function MapView({
         return () => {
             abortController.abort()
         }
-    }, [mapInstance, pipelineData, renderTrigger, handleClusterClick])
+    }, [effectivePipelineData, mapInstance, renderTrigger, handleClusterClick])
 
     return (
         <div className={`${styles.mapContainer} ${className}`} style={style}>

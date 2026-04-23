@@ -52,9 +52,10 @@ interface ScadaHistoryChartProps {
   onMouseDown?: (e: React.MouseEvent) => void
   isDragging?: boolean
   /** 指定显示的指标类型: pressure=压力, temperature=温度 */
-  metricType?: 'pressure' | 'temperature'
+  metricType?: 'pressure' | 'temperature' | 'dewpoint'
   /** 指标基准值，当 API 无数据时用于生成模拟历史曲线 */
   baseValue?: number
+  initialHours?: number
 }
 
 const TIME_RANGES = [
@@ -91,6 +92,7 @@ const METRIC_UNITS: Record<string, string> = {
   pressure: 'MPa',
   temperature: '°C',
 }
+METRIC_UNITS.dewpoint = METRIC_UNITS.dewpoint || METRIC_UNITS.temperature
 
 function getSeriesLabel(key: string): string {
   if (key.includes('__')) {
@@ -112,7 +114,7 @@ function getSeriesLabel(key: string): string {
 function generateSimulatedHistory(
   baseValue: number,
   hours: number,
-  metricType: 'pressure' | 'temperature'
+  metricType: 'pressure' | 'temperature' | 'dewpoint'
 ): Array<{ time: string; value: number }> {
   const totalHours = hours === 0 ? 48 : hours
   // 每 5 分钟一个采集点
@@ -158,11 +160,17 @@ const ScadaHistoryChart: React.FC<ScadaHistoryChartProps> = ({
   isDragging,
   metricType: propMetricType,
   baseValue,
+  initialHours,
 }) => {
-  const [selectedHours, setSelectedHours] = useState(6)
+  const [selectedHours, setSelectedHours] = useState(initialHours ?? 6)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<HistoryResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    if (typeof initialHours === 'number' && Number.isFinite(initialHours)) {
+      setSelectedHours(initialHours)
+    }
+  }, [initialHours])
   // 是否使用模拟数据
   const [useSimulated, setUseSimulated] = useState(false)
 
@@ -254,8 +262,17 @@ const ScadaHistoryChart: React.FC<ScadaHistoryChartProps> = ({
       return null
     }
 
-    const seriesEntries = Object.entries(effectiveData.series) as Array<[string, Array<{ time: string; value: number }>]>
+    const seriesEntriesRaw = Object.entries(effectiveData.series) as Array<[string, Array<{ time: string; value: number }>]>
     const meta = effectiveData.seriesMeta || (data?.seriesMeta)
+    const seriesEntries = propMetricType
+      ? seriesEntriesRaw.filter(([key]) => {
+          const seriesMeta = meta?.[key]
+          if (seriesMeta?.metricType) {
+            return seriesMeta.metricType === propMetricType
+          }
+          return key.includes(`_${propMetricType}`)
+        })
+      : seriesEntriesRaw
 
     const seriesConfig = seriesEntries.map(([key, points], index) => {
       const seriesMeta = meta?.[key]
@@ -300,7 +317,9 @@ const ScadaHistoryChart: React.FC<ScadaHistoryChartProps> = ({
         backgroundColor: 'rgba(15, 23, 42, 0.95)',
         borderColor: propMetricType === 'temperature'
           ? 'rgba(59, 130, 246, 0.3)'
-          : 'rgba(239, 68, 68, 0.3)',
+          : propMetricType === 'dewpoint'
+            ? 'rgba(245, 158, 11, 0.35)'
+            : 'rgba(239, 68, 68, 0.3)',
         textStyle: { color: '#e2e8f0', fontSize: 12 },
         axisPointer: { type: 'cross' as const, lineStyle: { color: 'rgba(148, 163, 184, 0.3)' } },
         formatter: (params: any) => {
@@ -370,8 +389,16 @@ const ScadaHistoryChart: React.FC<ScadaHistoryChartProps> = ({
           backgroundColor: 'rgba(15, 23, 42, 0.8)',
           fillerColor: propMetricType === 'temperature'
             ? 'rgba(59, 130, 246, 0.2)'
-            : 'rgba(239, 68, 68, 0.2)',
-          handleStyle: { color: propMetricType === 'temperature' ? '#3b82f6' : '#ef4444' },
+            : propMetricType === 'dewpoint'
+              ? 'rgba(245, 158, 11, 0.2)'
+              : 'rgba(239, 68, 68, 0.2)',
+          handleStyle: {
+            color: propMetricType === 'temperature'
+              ? '#3b82f6'
+              : propMetricType === 'dewpoint'
+                ? '#f59e0b'
+                : '#ef4444',
+          },
           textStyle: { color: '#64748b', fontSize: 9 },
         },
       ],
@@ -380,8 +407,16 @@ const ScadaHistoryChart: React.FC<ScadaHistoryChartProps> = ({
   }, [data, designPressure, useSimulated, simulatedData, propMetricType])
 
   // 指标对应的主题色
-  const themeColor = propMetricType === 'temperature' ? '#3b82f6' : '#ef4444'
-  const themeColorLight = propMetricType === 'temperature' ? '#93c5fd' : '#fca5a5'
+  const themeColor = propMetricType === 'temperature'
+    ? '#3b82f6'
+    : propMetricType === 'dewpoint'
+      ? '#f59e0b'
+      : '#ef4444'
+  const themeColorLight = propMetricType === 'temperature'
+    ? '#93c5fd'
+    : propMetricType === 'dewpoint'
+      ? '#fcd34d'
+      : '#fca5a5'
 
   return (
     <div

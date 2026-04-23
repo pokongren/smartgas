@@ -113,9 +113,69 @@ class SolverResult:
         }
 
 
+@dataclass
+class SolverInput:
+    """Normalized solver input built from pilot seed."""
+    pilot_id: str
+    system_id: str
+    graph_name: str
+    scenario_id: str
+    parameter_basis: Dict[str, Any] = field(default_factory=dict)
+    nodes: List[Dict[str, Any]] = field(default_factory=list)
+    edges: List[Dict[str, Any]] = field(default_factory=list)
+    valves: List[Dict[str, Any]] = field(default_factory=list)
+    scenarios: List[Dict[str, Any]] = field(default_factory=list)
+    active_scenario: Dict[str, Any] = field(default_factory=dict)
+    cross_hints: List[Dict[str, Any]] = field(default_factory=list)
+    merge_rules: Dict[str, Any] = field(default_factory=dict)
+    summary: Dict[str, Any] = field(default_factory=dict)
+    warnings: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "pilot_id": self.pilot_id,
+            "system_id": self.system_id,
+            "graph_name": self.graph_name,
+            "scenario_id": self.scenario_id,
+            "parameter_basis": deepcopy(self.parameter_basis),
+            "nodes": deepcopy(self.nodes),
+            "edges": deepcopy(self.edges),
+            "valves": deepcopy(self.valves),
+            "scenarios": deepcopy(self.scenarios),
+            "active_scenario": deepcopy(self.active_scenario),
+            "cross_hints": deepcopy(self.cross_hints),
+            "merge_rules": deepcopy(self.merge_rules),
+            "summary": deepcopy(self.summary),
+            "warnings": list(self.warnings),
+        }
+
+
 # ─────────────────────────────────────────────
 # Seed 装配层
 # ─────────────────────────────────────────────
+
+@dataclass
+class SolverInputSnapshot:
+    """Explicit solver input snapshot for the build endpoint."""
+    pilot_id: str
+    scenario_id: str
+    scenario: Dict[str, Any]
+    nodes: List[Dict[str, Any]]
+    edges: List[Dict[str, Any]]
+    valves: List[Dict[str, Any]]
+    summary: Dict[str, Any]
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "pilot_id": self.pilot_id,
+            "scenario_id": self.scenario_id,
+            "scenario": deepcopy(self.scenario),
+            "nodes": [deepcopy(item) for item in self.nodes],
+            "edges": [deepcopy(item) for item in self.edges],
+            "valves": [deepcopy(item) for item in self.valves],
+            "summary": deepcopy(self.summary),
+        }
+
 
 class SeedAssembler:
     """
@@ -147,6 +207,9 @@ class SeedAssembler:
     def _assemble_valves(self) -> Dict[str, Dict[str, Any]]:
         result = {}
         for v in self.seed.get("valves", []):
+            if v.get("id"):
+                result[v["id"]] = dict(v)
+                continue
             for vid in self._expand_range(v.get("id_range", [])):
                 result[vid] = dict(v)
         return result
@@ -154,6 +217,9 @@ class SeedAssembler:
     def _assemble_edges(self) -> Dict[str, Dict[str, Any]]:
         result = {}
         for e in self.seed.get("edges", []):
+            if e.get("id"):
+                result[e["id"]] = dict(e)
+                continue
             for eid in self._expand_range(e.get("id_range", [])):
                 result[eid] = dict(e)
         return result
@@ -199,6 +265,160 @@ def _split_id_suffix(id_str: str) -> Tuple[str, Optional[str]]:
     prefix = id_str[:i + 1]
     suffix = id_str[i + 1:] if i + 1 < len(id_str) else None
     return prefix, suffix
+
+
+def _normalize_node_record(node_id: str, node: Dict[str, Any]) -> Dict[str, Any]:
+    record = dict(node)
+    record["id"] = node_id
+    record.setdefault("role", "transit")
+    record.setdefault("type", "junction")
+    return record
+
+
+def _normalize_edge_record(
+    edge_id: str,
+    edge: Dict[str, Any],
+    sorted_node_ids: List[str],
+    warnings: List[str],
+) -> Dict[str, Any]:
+    record = dict(edge)
+    record["id"] = edge_id
+    source_node_id, target_node_id = _infer_edge_endpoints(edge_id, record, sorted_node_ids)
+    record["source_node_id"] = source_node_id
+    record["target_node_id"] = target_node_id
+    record["pipeline_kind"] = record.get(
+        "pipeline_kind",
+        "branch" if "-B" in edge_id else "trunk",
+    )
+    record["design_pressure_mpa"] = float(
+        record.get("design_pressure_mpa", record.get("design_pressure_mpa_default", 10.0))
+    )
+    record["roughness_mm"] = float(
+        record.get("roughness_mm", record.get("roughness_mm_default", 0.03))
+    )
+    record["diameter_mm"] = float(
+        record.get("diameter_mm", record.get("diameter_mm_default", 1016.0))
+    )
+    record["direction_mode"] = record.get(
+        "direction_mode",
+        record.get("direction_mode_default", "fixed"),
+    )
+    record["status"] = record.get("status", record.get("status_default", "open"))
+    record["max_flow"] = float(record.get("max_flow", 150.0))
+    record["start_pressure_mpa"] = float(record.get("start_pressure_mpa", 0.0))
+    record["end_pressure_mpa"] = float(record.get("end_pressure_mpa", 0.0))
+    if source_node_id is None or target_node_id is None:
+        warnings.append(f"edge-endpoints-unresolved:{edge_id}")
+    return record
+
+
+def _normalize_valve_record(valve_id: str, valve: Dict[str, Any]) -> Dict[str, Any]:
+    record = dict(valve)
+    record["id"] = valve_id
+    record["status"] = record.get("status", record.get("valve_status", "open"))
+    record["valve_opening"] = float(record.get("valve_opening", 1.0))
+    record["solver_enabled"] = bool(record.get("solver_enabled", True))
+    return record
+
+
+def _normalize_scenario_record(scenario: Dict[str, Any]) -> Dict[str, Any]:
+    record = dict(scenario)
+    record.setdefault("name", record.get("id", "unnamed"))
+    record.setdefault("node_overrides", [])
+    record.setdefault("edge_overrides", [])
+    record.setdefault("compressor_overrides", [])
+    return record
+
+
+def build_solver_input(
+    seed: Dict[str, Any],
+    pilot_id: str = "unknown",
+    scenario_id: Optional[str] = None,
+) -> SolverInput:
+    """Build a normalized solver input object from a pilot seed."""
+    assembler = SeedAssembler(seed)
+    nodes_map, edges_map, valves_map, scenarios = assembler.assemble()
+
+    warnings: List[str] = []
+    sorted_node_ids = sorted(nodes_map.keys(), key=_id_num_key)
+    sorted_edge_ids = sorted(edges_map.keys(), key=_id_num_key)
+    sorted_valve_ids = sorted(valves_map.keys(), key=_id_num_key)
+
+    node_records = [_normalize_node_record(node_id, nodes_map[node_id]) for node_id in sorted_node_ids]
+    edge_records = [
+        _normalize_edge_record(edge_id, edges_map[edge_id], sorted_node_ids, warnings)
+        for edge_id in sorted_edge_ids
+    ]
+    valve_records = [_normalize_valve_record(valve_id, valves_map[valve_id]) for valve_id in sorted_valve_ids]
+    scenario_records = [_normalize_scenario_record(scenario) for scenario in scenarios]
+
+    selected_scenario_id = scenario_id or (
+        scenario_records[0]["id"] if scenario_records else "steady_base"
+    )
+    active_scenario = next(
+        (scenario for scenario in scenario_records if scenario.get("id") == selected_scenario_id),
+        {
+            "id": selected_scenario_id,
+            "name": selected_scenario_id,
+            "node_overrides": [],
+            "edge_overrides": [],
+            "compressor_overrides": [],
+        },
+    )
+    if not any(s.get("id") == selected_scenario_id for s in scenario_records):
+        warnings.append(f"scenario-not-found:{selected_scenario_id}")
+
+    cross_hints: List[Dict[str, Any]] = []
+    cross_hints.extend(deepcopy(seed.get("cross_system_hints", [])))
+    cross_hints.extend(deepcopy(seed.get("cross_layer_hints", [])))
+
+    merge_rules = {
+        "node_source": "seed.nodes direct records",
+        "edge_source": "seed.edges id_range expanded to concrete edge ids",
+        "valve_source": "seed.valves id_range expanded to concrete valve ids",
+        "scenario_merge_order": [
+            "node_overrides",
+            "edge_overrides",
+            "compressor_overrides",
+        ],
+        "endpoint_strategy": "infer from edge id and ordered seed node ids",
+        "default_field_strategy": {
+            "edge.status": "status or status_default or open",
+            "edge.direction_mode": "direction_mode or direction_mode_default or fixed",
+            "edge.design_pressure_mpa": "design_pressure_mpa or design_pressure_mpa_default",
+            "edge.roughness_mm": "roughness_mm or roughness_mm_default",
+            "edge.diameter_mm": "diameter_mm or diameter_mm_default",
+        },
+    }
+
+    summary = {
+        "node_count": len(node_records),
+        "edge_count": len(edge_records),
+        "valve_count": len(valve_records),
+        "scenario_count": len(scenario_records),
+        "unresolved_edge_count": sum(
+            1
+            for edge in edge_records
+            if edge.get("source_node_id") is None or edge.get("target_node_id") is None
+        ),
+    }
+
+    return SolverInput(
+        pilot_id=pilot_id,
+        system_id=str(seed.get("system_id", "")),
+        graph_name=str(seed.get("name") or seed.get("pilot_id") or pilot_id),
+        scenario_id=selected_scenario_id,
+        parameter_basis=deepcopy(seed.get("parameter_basis", {})),
+        nodes=node_records,
+        edges=edge_records,
+        valves=valve_records,
+        scenarios=scenario_records,
+        active_scenario=active_scenario,
+        cross_hints=cross_hints,
+        merge_rules=merge_rules,
+        summary=summary,
+        warnings=warnings,
+    )
 
 
 # ─────────────────────────────────────────────
@@ -350,6 +570,91 @@ class SteadyStateSolver:
             key=lambda x: _id_num_key(x),
         )
 
+    def _resolve_scenario(self, scenario_id: str) -> Dict[str, Any]:
+        scenario = next(
+            (s for s in self._scenarios if s["id"] == scenario_id),
+            None,
+        )
+        if scenario is None:
+            logger.warning(f"scenario not found, fallback to empty overrides: {scenario_id}")
+            return {
+                "id": scenario_id,
+                "node_overrides": [],
+                "edge_overrides": [],
+                "compressor_overrides": [],
+            }
+        return deepcopy(scenario)
+
+    def _build_solver_input_maps(
+        self,
+        scenario_id: str,
+    ) -> Tuple[
+        Dict[str, Dict[str, Any]],
+        Dict[str, Dict[str, Any]],
+        Dict[str, Dict[str, Any]],
+        Dict[str, Any],
+    ]:
+        scenario = self._resolve_scenario(scenario_id)
+        nodes, edges, valves = _apply_scenario(
+            self._base_nodes,
+            self._base_edges,
+            self._base_valves,
+            scenario,
+        )
+        return nodes, edges, valves, scenario
+
+    def build_solver_input(self, scenario_id: str = "steady_base") -> SolverInputSnapshot:
+        nodes, edges, valves, scenario = self._build_solver_input_maps(scenario_id)
+
+        node_items: List[Dict[str, Any]] = []
+        for node_id in self._sorted_node_ids:
+            if node_id not in nodes:
+                continue
+            payload = deepcopy(nodes[node_id])
+            payload["id"] = node_id
+            node_items.append(payload)
+
+        edge_items: List[Dict[str, Any]] = []
+        for edge_id in self._sorted_edge_ids:
+            if edge_id not in edges:
+                continue
+            payload = deepcopy(edges[edge_id])
+            payload["id"] = edge_id
+            source_node_id, target_node_id = _infer_edge_endpoints(edge_id, payload, self._sorted_node_ids)
+            payload["source_node_id"] = source_node_id
+            payload["target_node_id"] = target_node_id
+            edge_items.append(payload)
+
+        valve_items: List[Dict[str, Any]] = []
+        for valve_id in sorted(valves.keys(), key=_id_num_key):
+            payload = deepcopy(valves[valve_id])
+            payload["id"] = valve_id
+            valve_items.append(payload)
+
+        summary = {
+            "node_count": len(node_items),
+            "edge_count": len(edge_items),
+            "valve_count": len(valve_items),
+            "source_count": sum(1 for item in node_items if item.get("role") == "source"),
+            "sink_count": sum(1 for item in node_items if item.get("role") == "sink"),
+            "compressor_count": sum(1 for item in node_items if item.get("type") == "compressor"),
+            "scenario_override_counts": {
+                "node_overrides": len(scenario.get("node_overrides", [])),
+                "edge_overrides": len(scenario.get("edge_overrides", [])),
+                "compressor_overrides": len(scenario.get("compressor_overrides", [])),
+            },
+        }
+
+        return SolverInputSnapshot(
+            pilot_id=self.pilot_id,
+            scenario_id=scenario_id,
+            scenario=scenario,
+            nodes=node_items,
+            edges=edge_items,
+            valves=valve_items,
+            summary=summary,
+        )
+
     def solve(self, scenario_id: str = "steady_base") -> SolverResult:
         """
         执行稳态求解，返回 SolverResult。
@@ -379,6 +684,12 @@ class SteadyStateSolver:
         # 迭代求解
         iterations = 0
         solver_status = "converged"
+        estimated_flows = _estimate_edge_flows(
+            nodes,
+            edges,
+            self._sorted_node_ids,
+            self._sorted_edge_ids,
+        )
 
         for iteration in range(self.MAX_ITER):
             new_pressure = dict(pressure)
@@ -391,7 +702,7 @@ class SteadyStateSolver:
                     continue
 
                 # 推断上下游节点（按管段 ID 数字顺序找相邻节点）
-                upstream, downstream = _infer_edge_endpoints(eid, self._sorted_node_ids)
+                upstream, downstream = _infer_edge_endpoints(eid, edata, self._sorted_node_ids)
                 if upstream is None or downstream is None:
                     continue
 
@@ -400,9 +711,8 @@ class SteadyStateSolver:
                     new_pressure[downstream] = 0.0
                     continue
 
-                # 计算流量（先按 source 供给和各 sink 需求分配）
-                flow = _estimate_flow(eid, edata, nodes, edges, valves,
-                                     self._sorted_node_ids, self._sorted_edge_ids)
+                # 这轮先用场景级流量估算表，保证负荷变化和限流场景能反映到结果上。
+                flow = float(estimated_flows.get(eid, 0.0))
 
                 # 限流（阀门或 limited 状态）
                 if status == "limited":
@@ -419,6 +729,12 @@ class SteadyStateSolver:
 
                 # 下游如果是压气站且开启，抬压
                 down_node = nodes.get(downstream, {})
+                if down_node.get("role") == "source":
+                    # source 节点是边界条件，不允许被上游 transit 节点反向覆盖。
+                    target = float(down_node.get("target_pressure_mpa", new_pressure.get(downstream, p_up)))
+                    new_pressure[downstream] = max(new_pressure.get(downstream, target), target)
+                    continue
+
                 if (
                     down_node.get("type") == "compressor"
                     and down_node.get("compressor_enabled", True)
@@ -426,6 +742,13 @@ class SteadyStateSolver:
                 ):
                     target = float(down_node.get("target_pressure_mpa", p_down))
                     p_down = max(p_down, target)
+                elif down_node.get("type") == "compressor" and not down_node.get("compressor_enabled", True):
+                    target = float(down_node.get("target_pressure_mpa", p_down))
+                    offline_cap = max(
+                        float(down_node.get("min_pressure_mpa", 0.0)),
+                        target - 0.4,
+                    )
+                    p_down = min(p_down, offline_cap)
 
                 # 保证压力在合理范围内
                 min_p = float(down_node.get("min_pressure_mpa", 0.0))
@@ -433,6 +756,11 @@ class SteadyStateSolver:
                 p_down = max(min_p, min(max_p, p_down))
 
                 new_pressure[downstream] = p_down
+
+            # 每轮迭代最后都把 source 节点重新钉回边界压力，避免后续边传播把源站压回去。
+            for nid, ndata in nodes.items():
+                if ndata.get("role") == "source":
+                    new_pressure[nid] = float(ndata.get("target_pressure_mpa", new_pressure.get(nid, 9.5)))
 
             # 检查收敛
             max_delta = max(
@@ -450,7 +778,7 @@ class SteadyStateSolver:
 
         # 组装结果
         node_states = self._build_node_states(nodes, pressure)
-        edge_states = self._build_edge_states(edges, valves, nodes, pressure)
+        edge_states = self._build_edge_states(edges, valves, nodes, pressure, estimated_flows)
         summary = self._build_summary(nodes, node_states, edge_states)
 
         return SolverResult(
@@ -498,6 +826,7 @@ class SteadyStateSolver:
         valves: Dict[str, Dict],
         nodes: Dict[str, Dict],
         pressure: Dict[str, float],
+        estimated_flows: Dict[str, float],
     ) -> List[EdgeState]:
         states = []
         for eid in self._sorted_edge_ids:
@@ -509,10 +838,7 @@ class SteadyStateSolver:
             if status == "closed":
                 flow = 0.0
             else:
-                flow = _estimate_flow(
-                    eid, edata, nodes, edges, valves,
-                    self._sorted_node_ids, self._sorted_edge_ids,
-                )
+                flow = float(estimated_flows.get(eid, 0.0))
                 if status == "limited":
                     flow = min(flow, max_flow)
 
@@ -583,6 +909,7 @@ def _id_num_key(id_str: str):
 
 def _infer_edge_endpoints(
     edge_id: str,
+    edge_data: Dict[str, Any],
     sorted_node_ids: List[str],
 ) -> Tuple[Optional[str], Optional[str]]:
     """
@@ -592,6 +919,11 @@ def _infer_edge_endpoints(
     """
     # WE1-T-66 → prefix=WE1, num=66
     # WE1-B1-T-1 → prefix=WE1-B1, num=1
+    source_id = str(edge_data.get("source_id") or "")
+    target_id = str(edge_data.get("target_id") or "")
+    if source_id and target_id:
+        return source_id, target_id
+
     import re
     m = re.match(r"^(.*?)-T-(\d+)$", edge_id)
     if not m:
@@ -639,6 +971,80 @@ def _estimate_flow(
 
     # 取管段额定容量和供给的较小值作为估算流量
     return min(total_supply * 0.85, max_flow * 0.85)
+
+
+def _estimate_edge_flows(
+    nodes: Dict[str, Dict],
+    edges: Dict[str, Dict],
+    sorted_node_ids: List[str],
+    sorted_edge_ids: List[str],
+) -> Dict[str, float]:
+    """
+    按当前场景估算每条边的目标流量。
+
+    有 sink 需求时，按“下游需求沿上游路径回溯”的方式分配，
+    并乘以 1.5 的工程裕量；没有 sink 时，退回主干供给近似。
+    """
+    sink_demands = [
+        (node_id, float(node.get("demand_nominal", 0.0)))
+        for node_id, node in nodes.items()
+        if node.get("role") == "sink" and float(node.get("demand_nominal", 0.0)) > 0
+    ]
+    if not sink_demands:
+        return {
+            edge_id: _estimate_flow(
+                edge_id,
+                edges.get(edge_id, {}),
+                nodes,
+                edges,
+                {},
+                sorted_node_ids,
+                sorted_edge_ids,
+            )
+            for edge_id in sorted_edge_ids
+        }
+
+    incoming_edge_map: Dict[str, List[str]] = {}
+    for edge_id in sorted_edge_ids:
+        edata = edges.get(edge_id, {})
+        _, target_id = _infer_edge_endpoints(edge_id, edata, sorted_node_ids)
+        if target_id:
+            incoming_edge_map.setdefault(target_id, []).append(edge_id)
+
+    flow_map: Dict[str, float] = {edge_id: 0.0 for edge_id in sorted_edge_ids}
+
+    for sink_id, demand in sink_demands:
+        current_node = sink_id
+        visited_nodes = set()
+        while current_node and current_node not in visited_nodes:
+            visited_nodes.add(current_node)
+            incoming_edges = incoming_edge_map.get(current_node, [])
+            if not incoming_edges:
+                linked_node = str(nodes.get(current_node, {}).get("linked_node_id") or "")
+                current_node = linked_node or None
+                continue
+
+            edge_id = sorted(incoming_edges, key=_id_num_key)[0]
+            flow_map[edge_id] += demand * 1.5
+            upstream_id, _ = _infer_edge_endpoints(edge_id, edges.get(edge_id, {}), sorted_node_ids)
+            current_node = upstream_id
+
+    for edge_id in sorted_edge_ids:
+        max_flow = float(edges.get(edge_id, {}).get("max_flow", 150.0))
+        flow_map[edge_id] = min(flow_map.get(edge_id, 0.0), max_flow)
+
+    for edge_id in sorted_edge_ids:
+        edge = edges.get(edge_id, {})
+        try:
+            preset_flow = float(edge.get("flow_rate", 0.0))
+        except (TypeError, ValueError):
+            preset_flow = 0.0
+        if preset_flow <= 0:
+            continue
+        max_flow = float(edge.get("max_flow", 150.0))
+        flow_map[edge_id] = min(preset_flow, max_flow)
+
+    return flow_map
 
 
 def _util_to_color(utilization: float) -> str:

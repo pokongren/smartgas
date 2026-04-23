@@ -21,16 +21,21 @@ export interface ChatRequestPayload {
 type StreamChunkType = 'REPLY' | 'TOOL' | 'LOG' | 'ERROR'
 
 const AI_ASSISTANT_API_URL = resolveApiPath('/api/ai-assistant/chat')
+const DATA_ANALYSIS_ENTER_PATTERN = /^\s*\/\u6570\u636e\u5206\u6790(?:\s+.+)?\s*$/i
+const DATA_ANALYSIS_EXIT_PATTERN = /^\s*\/\u9000\u51fa\u6570\u636e\u5206\u6790\s*$/i
+const SUBAGENT_ENTER_PATTERN = /^\s*\/subagent(?:\s+.+)?\s*$/i
+const SUBAGENT_EXIT_PATTERN = /^\s*\/\u9000\u51fasubagent\s*$/i
 
 async function* fetchChatStream(
     message: string,
     history: ChatMessage[],
-    context?: AssistantChatContext,
+    context: AssistantChatContext | undefined,
+    analysisMode: 'default' | 'subagents',
 ): AsyncGenerator<{ type: StreamChunkType; content: string }> {
     const payload: ChatRequestPayload = {
         message,
         history,
-        analysis_mode: context ? 'subagents' : 'default',
+        analysis_mode: analysisMode,
     }
 
     if (context) {
@@ -108,12 +113,34 @@ function updateLastAssistantMessage(
     return next
 }
 
+function resolveModesByCommand(
+    message: string,
+    currentDataMode: boolean,
+    currentSubagentMode: boolean,
+): { dataMode: boolean; subagentMode: boolean } {
+    if (DATA_ANALYSIS_EXIT_PATTERN.test(message)) {
+        return { dataMode: false, subagentMode: currentSubagentMode }
+    }
+    if (SUBAGENT_EXIT_PATTERN.test(message)) {
+        return { dataMode: currentDataMode, subagentMode: false }
+    }
+    if (DATA_ANALYSIS_ENTER_PATTERN.test(message)) {
+        return { dataMode: true, subagentMode: false }
+    }
+    if (SUBAGENT_ENTER_PATTERN.test(message)) {
+        return { dataMode: false, subagentMode: true }
+    }
+    return { dataMode: currentDataMode, subagentMode: currentSubagentMode }
+}
+
 export interface UseAiAssistantChatResult {
     messages: ChatMessage[]
     input: string
     setInput: Dispatch<SetStateAction<string>>
     loading: boolean
     activeToolName: string
+    dataAnalysisMode: boolean
+    subagentMode: boolean
     handleSend: (text?: string) => Promise<void>
     handleKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void
     handleExampleClick: (question: string) => void
@@ -125,11 +152,15 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
     const [input, setInput] = useState('')
     const [loading, setLoading] = useState(false)
     const [activeToolName, setActiveToolName] = useState('')
+    const [dataAnalysisMode, setDataAnalysisMode] = useState(false)
+    const [subagentMode, setSubagentMode] = useState(false)
 
     const handleSend = useCallback(async (text?: string) => {
         const nextMessage = (text || input).trim()
         if (!nextMessage || loading) return
 
+        const nextModes = resolveModesByCommand(nextMessage, dataAnalysisMode, subagentMode)
+        const analysisMode = nextModes.subagentMode ? 'subagents' : 'default'
         const historySnapshot = messages
         const userMessage: ChatMessage = { role: 'user', content: nextMessage }
         const assistantPlaceholder: ChatMessage = {
@@ -143,8 +174,15 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
         setLoading(true)
         setActiveToolName('')
 
+        if (nextModes.dataMode !== dataAnalysisMode) {
+            setDataAnalysisMode(nextModes.dataMode)
+        }
+        if (nextModes.subagentMode !== subagentMode) {
+            setSubagentMode(nextModes.subagentMode)
+        }
+
         try {
-            const stream = fetchChatStream(nextMessage, historySnapshot, pageContext)
+            const stream = fetchChatStream(nextMessage, historySnapshot, pageContext, analysisMode)
             let fullReply = ''
 
             for await (const chunk of stream) {
@@ -204,7 +242,7 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
             setLoading(false)
             setActiveToolName('')
         }
-    }, [input, loading, messages, pageContext])
+    }, [dataAnalysisMode, input, loading, messages, pageContext, subagentMode])
 
     const handleKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
         if (event.key === 'Enter' && !event.shiftKey) {
@@ -223,6 +261,8 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
         setInput,
         loading,
         activeToolName,
+        dataAnalysisMode,
+        subagentMode,
         handleSend,
         handleKeyDown,
         handleExampleClick,

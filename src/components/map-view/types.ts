@@ -37,6 +37,11 @@ export interface MapConfig {
     showScale?: boolean
     /** 是否显示指南针 */
     showCompass?: boolean
+    viewMode?: 'auto' | '2D' | '3D'
+    showProvinceLabels?: boolean
+    showDistrictLayer?: boolean
+    maxRenderNodes?: number
+    maxRenderLines?: number
 }
 
 /**

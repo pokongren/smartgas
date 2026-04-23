@@ -24,10 +24,16 @@ from app.services.we1_pilot_service import (
     get_we1_pilot_seed_or_raise,
     build_pilot_package,
 )
+from app.services.we1_solver_input_service import build_we1_solver_input
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
+
+PIPELINE_SYSTEM_COLOR_OVERRIDES: Dict[str, str] = {
+    "we1": "#10b981",
+    "we2": "#3b82f6",
+}
 
 
 def _build_line_path(start_station: Station, end_station: Station) -> list:
@@ -236,6 +242,7 @@ def get_pipeline_packages(
         ]
     
     for system in systems:
+        system_color = PIPELINE_SYSTEM_COLOR_OVERRIDES.get(system.id.lower(), system.color)
         layers_config = json.loads(system.layers_config) if system.layers_config else []
         
         package_layers = []
@@ -292,7 +299,7 @@ def get_pipeline_packages(
                     "layerName": layer_cfg["name"],
                     "properties": {
                         "category": system.name,
-                        "color": system.color,
+                        "color": system_color,
                         "pipelineKind": pipeline_kind,
                         "systemId": system.id,
                         "layerName": layer_cfg["name"],
@@ -312,7 +319,7 @@ def get_pipeline_packages(
         result.append({
             "id": system.id,
             "name": system.name,
-            "color": system.color,
+            "color": system_color,
             "layers": package_layers,
         })
     
@@ -363,3 +370,30 @@ def get_we1_pilot_seed(pilot_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"未找到 WE1 试点样板: {pilot_id}")
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"未找到 WE1 试点 seed: {exc}")
+
+
+@router.get("/pipeline-packages/pilots/we1/{pilot_id}/solver-input")
+def get_we1_pilot_solver_input(
+    pilot_id: str,
+    session: Session = Depends(get_session),
+) -> Dict[str, Any]:
+    """返回 WE1 指定试点样板的统一 solver input。"""
+    try:
+        pilot = get_we1_pilot_or_raise(pilot_id)
+        seed_data = get_we1_pilot_seed_or_raise(pilot_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"未找到 WE1 试点样板: {pilot_id}")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"未找到 WE1 试点 seed: {exc}")
+
+    packages = get_pipeline_packages(system_id="we1", session=session)
+    if not packages:
+        raise HTTPException(status_code=404, detail="未找到 WE1 管线数据包")
+
+    system_package = packages[0]
+    pilot_package = build_pilot_package(system_package, pilot)
+    return build_we1_solver_input(
+        pilot=pilot,
+        pilot_package=pilot_package,
+        seed_data=seed_data,
+    )

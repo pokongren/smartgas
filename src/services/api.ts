@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { API_BASE_URL, BACKEND_BASE_URL } from './apiBase'
+import type { SimulationSnapshotRecord, SimulationSnapshotSummary } from '@/types/simulation'
 
 export const api = axios.create({
     baseURL: API_BASE_URL,
@@ -91,6 +92,7 @@ export const topologyAPI = {
     getGraph: () => api.get('/api/topology/graph'),
     getStats: () => api.get('/api/topology/stats'),
     analyze: () => api.get('/api/topology/stats'),
+    // Legacy failure simulation entry kept only for backward compatibility.
     simulate: (params: { failed_node_id?: string; failure_node_id?: string; steps?: number; max_ticks?: number }) =>
         api.post<SimulationResult[]>('/api/emergency/simulate-failure', {
             failure_node_id: params.failure_node_id ?? params.failed_node_id,
@@ -103,6 +105,22 @@ export const topologyAPI = {
         topologyApi.post('/topology/correct/apply', params),
     correctionHistory: (pipeline_name?: string) =>
         topologyApi.get('/topology/correct/history', { params: { pipeline_name } }),
+}
+
+export const topologySimulationSnapshotAPI = {
+    create: (data: { pilot_id: string; scenario_id: string }) =>
+        topologyApi.post<SimulationSnapshotRecord>('/topology-simulation/snapshots', data),
+    list: (params?: { pilot_id?: string; scenario_id?: string; limit?: number }) =>
+        topologyApi.get<{
+            items: SimulationSnapshotSummary[]
+            count: number
+            pilot_id?: string
+            scenario_id?: string
+        }>('/topology-simulation/snapshots', { params }),
+    getByRunId: (runId: string, pilotId?: string) =>
+        topologyApi.get<SimulationSnapshotRecord>(`/topology-simulation/snapshots/${runId}`, {
+            params: pilotId ? { pilot_id: pilotId } : undefined,
+        }),
 }
 
 // ============ 管线数据包 API（替代前端硬编码） ============

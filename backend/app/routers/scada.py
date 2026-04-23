@@ -9,14 +9,17 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import Optional
+from pathlib import Path
+import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.database import get_scada_history_session, get_session
 from app.models import Station
 from app.services.junction_groups import load_runtime_junction_groups
-from app.scada_models import ScadaStation, ScadaHistory
+from app.scada_models import ScadaStation, ScadaHistory, ScadaIngestBatch, ScadaMetricCatalog
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/scada")
@@ -51,6 +54,32 @@ PIPELINE_META = {
     "cred":     {"name": "中俄东线",           "color": "#ec4899"},
     "pt":       {"name": "平泰支干线",         "color": "#a855f7"},
 }
+
+METRIC_TYPE_ALIASES = {
+    "pressure": "pressure",
+    "压力": "pressure",
+    "temperature": "temperature",
+    "temp": "temperature",
+    "温度": "temperature",
+    "dewpoint": "dewpoint",
+    "水露点": "dewpoint",
+    "露点": "dewpoint",
+    "h2s": "h2s",
+    "硫化氢": "h2s",
+    "hydrogen_sulfide": "h2s",
+}
+
+METRIC_DEFAULT_UNITS = {
+    "pressure": "MPa",
+    "temperature": "℃",
+    "dewpoint": "℃",
+    "h2s": "ppm",
+}
+
+
+def _normalize_metric_type(raw_metric: str) -> str:
+    metric = str(raw_metric or "").strip().lower()
+    return METRIC_TYPE_ALIASES.get(metric, metric or "pressure")
 
 
 # ============ API 端点 ============
@@ -216,6 +245,220 @@ def init_scada_data(session: Session = Depends(get_session)):
 _playback_index: dict[str, int] = {}
 
 
+def _read_excel_time_series_points(
+    file_path: str,
+    *,
+    sheet_name: str | int | None = None,
+) -> list[tuple[datetime, float]]:
+    """
+    读取 PI 图形导出的两列时序文件（x轴时间 + y轴数值），支持 xls/xlsx。
+    """
+    try:
+        import pandas as pd
+    except Exception as exc:
+        raise RuntimeError("缺少 pandas 依赖，无法读取 Excel。") from exc
+
+    source = Path(file_path).expanduser()
+    if not source.exists():
+        raise FileNotFoundError(f"未找到 Excel 文件: {source}")
+
+    ext = source.suffix.lower()
+    engine = None
+    if ext == ".xls":
+        engine = "xlrd"
+    elif ext in {".xlsx", ".xlsm"}:
+        engine = "openpyxl"
+
+    selected_sheet: str | int = 0
+    if sheet_name is not None and str(sheet_name).strip():
+        raw_sheet = str(sheet_name).strip()
+        selected_sheet = int(raw_sheet) if raw_sheet.isdigit() else raw_sheet
+
+    try:
+        raw_df = pd.read_excel(source, sheet_name=selected_sheet, header=None, engine=engine)
+    except ImportError as exc:
+        if ext == ".xls":
+            raise RuntimeError("读取 .xls 需要安装 xlrd>=2.0.1。") from exc
+        raise RuntimeError(f"读取 Excel 失败，缺少依赖: {exc}") from exc
+    except Exception as exc:
+        raise RuntimeError(f"读取 Excel 失败: {exc}") from exc
+
+    if raw_df.empty:
+        raise ValueError("Excel 内容为空。")
+    if raw_df.shape[1] < 2:
+        raise ValueError("Excel 至少需要两列：时间列和值列。")
+
+    raw_time_series = raw_df.iloc[:, 0].astype(str).str.strip()
+    time_series = pd.to_datetime(raw_time_series, format="%Y-%m-%d %H:%M:%S.%f", errors="coerce")
+    missing_time_mask = time_series.isna()
+    if missing_time_mask.any():
+        # 兜底兼容其它时间格式，避免因单一格式导致全量丢失。
+        time_series.loc[missing_time_mask] = pd.to_datetime(
+            raw_time_series[missing_time_mask],
+            errors="coerce",
+        )
+    value_series = pd.to_numeric(raw_df.iloc[:, 1], errors="coerce")
+
+    normalized_df = pd.DataFrame({"recorded_at": time_series, "value": value_series}).dropna()
+    if normalized_df.empty:
+        raise ValueError("未识别到有效时序点（时间或数值列为空）。")
+
+    normalized_df = normalized_df.drop_duplicates(subset=["recorded_at"], keep="last").sort_values("recorded_at")
+    points: list[tuple[datetime, float]] = []
+    for row in normalized_df.itertuples(index=False):
+        points.append((row.recorded_at.to_pydatetime(), float(row.value)))
+    return points
+
+
+def _import_history_points(
+    *,
+    history_session: Session,
+    station_name: str,
+    station_id: Optional[str],
+    pipeline_id: str,
+    metric_type: str,
+    metric_code: str,
+    unit: Optional[str],
+    tag_name: str,
+    points: list[tuple[datetime, float]],
+    replace_existing: bool,
+    source_system: Optional[str],
+    source_file: Optional[str],
+    quality_code: Optional[int],
+    ingest_batch_id: Optional[str],
+) -> dict:
+    cleared = 0
+    if replace_existing:
+        old_records = history_session.exec(
+            select(ScadaHistory).where(
+                ScadaHistory.station_name == station_name,
+                ScadaHistory.pipeline_id == pipeline_id,
+                ScadaHistory.metric_type == metric_type,
+            )
+        ).all()
+        cleared = len(old_records)
+        for record in old_records:
+            history_session.delete(record)
+        history_session.flush()
+
+    for recorded_at, value in points:
+        history_session.add(
+            ScadaHistory(
+                station_name=station_name,
+                station_id=station_id,
+                pipeline_id=pipeline_id,
+                tag_name=tag_name,
+                metric_type=metric_type,
+                metric_code=metric_code,
+                unit=unit,
+                quality_code=quality_code,
+                source_system=source_system,
+                source_file=source_file,
+                ingest_batch_id=ingest_batch_id,
+                recorded_at=recorded_at,
+                value=float(value),
+            )
+        )
+
+    if ingest_batch_id:
+        history_session.add(
+            ScadaIngestBatch(
+                batch_id=ingest_batch_id,
+                station_name=station_name,
+                pipeline_id=pipeline_id,
+                metric_type=metric_type,
+                source_system=source_system,
+                source_file=source_file,
+                row_count=len(points),
+                status="success",
+            )
+        )
+
+    history_session.commit()
+    _playback_index[station_name] = 0
+
+    return {
+        "station": station_name,
+        "pipeline": pipeline_id,
+        "metric": metric_type,
+        "imported": len(points),
+        "cleared": cleared,
+        "batchId": ingest_batch_id,
+        "timeRange": {
+            "from": points[0][0].isoformat() if points else None,
+            "to": points[-1][0].isoformat() if points else None,
+        },
+    }
+
+
+@router.post("/import-history-file")
+def import_history_file(
+    file_path: str = Query(..., description="Excel 文件绝对路径，支持 .xls / .xlsx"),
+    station_name: str = Query(..., description="站名，如：中卫压气站"),
+    station_id: Optional[str] = Query(None, description="站场ID，可选"),
+    pipeline_id: str = Query("we1", description="管线ID，如 we1/we2/cred"),
+    metric_type: str = Query("pressure", description="pressure/temperature/dewpoint/h2s/自定义"),
+    metric_code: Optional[str] = Query(None, description="统一指标编码，默认同 metric_type"),
+    unit: Optional[str] = Query(None, description="单位，不传则按指标默认单位"),
+    tag_name: Optional[str] = Query(None, description="PI Tag 名，不传则自动生成"),
+    sheet_name: Optional[str] = Query(None, description="工作表名或下标（从0开始）"),
+    replace_existing: bool = Query(True, description="是否先清空同站同管线同指标历史"),
+    source_system: str = Query("excel", description="来源系统标识"),
+    quality_code: Optional[int] = Query(0, description="质量码，0为正常"),
+    ingest_batch_id: Optional[str] = Query(None, description="导入批次ID，不传自动生成"),
+    history_session: Session = Depends(get_scada_history_session),
+):
+    metric = _normalize_metric_type(metric_type)
+    metric_code_value = (metric_code or metric).strip().lower()
+    if not metric_code_value:
+        raise HTTPException(status_code=400, detail="metric_code 不能为空")
+
+    station = (station_name or "").strip()
+    if not station:
+        raise HTTPException(status_code=400, detail="station_name 不能为空")
+
+    pipeline = (pipeline_id or "").strip().lower()
+    if not pipeline:
+        raise HTTPException(status_code=400, detail="pipeline_id 不能为空")
+
+    parsed_tag = (tag_name or f"{pipeline.upper()}_{station}_{metric}").strip()
+    parsed_station_id = (station_id or "").strip() or None
+    parsed_unit = (unit or METRIC_DEFAULT_UNITS.get(metric) or "").strip() or None
+    parsed_source_system = (source_system or "excel").strip() or "excel"
+    parsed_batch_id = (ingest_batch_id or "").strip() or uuid.uuid4().hex
+    try:
+        points = _read_excel_time_series_points(file_path, sheet_name=sheet_name)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    if not points:
+        raise HTTPException(status_code=400, detail="未读取到有效时序数据点")
+
+    result = _import_history_points(
+        history_session=history_session,
+        station_name=station,
+        station_id=parsed_station_id,
+        pipeline_id=pipeline,
+        metric_type=metric,
+        metric_code=metric_code_value,
+        unit=parsed_unit,
+        tag_name=parsed_tag,
+        points=points,
+        replace_existing=replace_existing,
+        source_system=parsed_source_system,
+        source_file=str(Path(file_path)),
+        quality_code=quality_code,
+        ingest_batch_id=parsed_batch_id,
+    )
+    result["sourceFile"] = str(Path(file_path))
+    result["sheet"] = sheet_name if sheet_name is not None else 0
+    return result
+
+
 @router.post("/import-excel")
 def import_excel(
     session: Session = Depends(get_session),
@@ -271,6 +514,10 @@ def import_excel(
                 pipeline_id=pid,
                 tag_name=tag,
                 metric_type=mtype,
+                metric_code=mtype,
+                unit=METRIC_DEFAULT_UNITS.get(mtype),
+                source_system="excel",
+                source_file=excel_path,
                 recorded_at=recorded,
                 value=float(value),
             )
@@ -283,6 +530,110 @@ def import_excel(
     _playback_index["甪直分输站"] = 0
 
     return {"msg": f"甪直站导入完成：{count} 条历史记录", "count": count, "rows": ws.max_row - 2}
+
+
+@router.get("/history-schema")
+def get_history_schema():
+    """返回时序库结构说明，便于前端/AI 分析模块做参数适配。"""
+    return {
+        "table": "scada_history",
+        "description": "多站点、多管线、多指标统一时序表（支持压力/温度/水露点/硫化氢扩展）",
+        "columns": [
+            {"name": "id", "type": "INTEGER", "nullable": False, "primaryKey": True},
+            {"name": "station_id", "type": "VARCHAR", "nullable": True, "index": True, "description": "站场ID，可选"},
+            {"name": "station_name", "type": "VARCHAR", "nullable": False, "index": True, "description": "站名"},
+            {"name": "pipeline_id", "type": "VARCHAR", "nullable": False, "index": True, "description": "管线ID"},
+            {"name": "tag_name", "type": "VARCHAR", "nullable": False, "description": "测点Tag"},
+            {"name": "metric_type", "type": "VARCHAR", "nullable": False, "description": "业务指标类型，示例 pressure/temperature/dewpoint/h2s"},
+            {"name": "metric_code", "type": "VARCHAR", "nullable": True, "index": True, "description": "统一指标编码"},
+            {"name": "unit", "type": "VARCHAR", "nullable": True, "description": "单位"},
+            {"name": "quality_code", "type": "INTEGER", "nullable": True, "description": "质量码"},
+            {"name": "source_system", "type": "VARCHAR", "nullable": True, "description": "来源系统"},
+            {"name": "source_file", "type": "VARCHAR", "nullable": True, "description": "来源文件"},
+            {"name": "ingest_batch_id", "type": "VARCHAR", "nullable": True, "index": True, "description": "导入批次"},
+            {"name": "extra_json", "type": "TEXT", "nullable": True, "description": "扩展字段JSON"},
+            {"name": "recorded_at", "type": "DATETIME", "nullable": False, "index": True, "description": "采样时间"},
+            {"name": "value", "type": "FLOAT", "nullable": False, "description": "测量值"},
+        ],
+        "indexes": [
+            "idx_scada_history_station_metric_time(station_name, metric_type, recorded_at)",
+            "idx_scada_history_station_pipeline_metric_time(station_name, pipeline_id, metric_type, recorded_at)",
+            "idx_scada_history_metric_code_time(metric_code, recorded_at)",
+            "idx_scada_history_ingest_batch(ingest_batch_id)",
+        ],
+        "analysisReady": {
+            "predict_trend": True,
+            "analyze_correlation_requires": ["pressure", "temperature"],
+            "multi_station_supported": True,
+        },
+        "recommendedApis": {
+            "import": "/api/scada/import-history-file",
+            "metrics": "/api/scada/history-metrics",
+            "stations": "/api/scada/history-stations",
+            "timeseries": "/api/scada/history/{station_name}",
+        },
+    }
+
+
+@router.get("/history-metrics")
+def list_history_metrics(history_session: Session = Depends(get_scada_history_session)):
+    """列出时序库当前已入库的指标及样本数量。"""
+    rows = history_session.exec(
+        select(
+            ScadaHistory.metric_type,
+            ScadaHistory.metric_code,
+            func.count(ScadaHistory.id),
+        )
+        .group_by(ScadaHistory.metric_type, ScadaHistory.metric_code)
+        .order_by(ScadaHistory.metric_type)
+    ).all()
+
+    catalog_rows = history_session.exec(
+        select(ScadaMetricCatalog).where(ScadaMetricCatalog.enabled.is_(True)).order_by(ScadaMetricCatalog.metric_code)
+    ).all()
+    catalog_map = {item.metric_code: item for item in catalog_rows}
+
+    result = []
+    for metric_type, metric_code, count in rows:
+        mt = str(metric_type or "")
+        mc = str(metric_code or metric_type or "")
+        catalog = catalog_map.get(mc)
+        result.append(
+            {
+                "metricType": mt,
+                "metricCode": mc,
+                "metricName": catalog.metric_name if catalog else mc,
+                "defaultUnit": catalog.default_unit if catalog else METRIC_DEFAULT_UNITS.get(mt),
+                "count": int(count or 0),
+            }
+        )
+    return {"metrics": result, "count": len(result)}
+
+
+@router.get("/history-stations")
+def list_history_stations(history_session: Session = Depends(get_scada_history_session)):
+    """列出时序库已有数据的站点（用于分析引导和前端选择器）。"""
+    rows = history_session.exec(
+        select(ScadaHistory.station_name)
+        .distinct()
+        .order_by(ScadaHistory.station_name)
+    ).all()
+    station_names = [str(name).strip() for name in rows if str(name).strip()]
+    return {"stations": station_names, "count": len(station_names)}
+
+
+@router.get("/history-guide")
+def get_history_guide():
+    """给前端和运维的时序库使用引导。"""
+    return {
+        "goal": "统一接入多站场多指标时序数据，支持 AI 分析",
+        "steps": [
+            "1. 调用 /api/scada/import-history-file 导入一个站点一个指标的时序文件",
+            "2. 调用 /api/scada/history-metrics 确认指标已入库",
+            "3. 调用 /api/scada/history-stations 确认站点已可检索",
+            "4. 调用 /api/scada/history/{station_name} 拉取曲线并联动 AI 分析",
+        ],
+    }
 
 
 @router.post("/playback/{station_name}")

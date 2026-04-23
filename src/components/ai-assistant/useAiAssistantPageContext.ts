@@ -1,4 +1,5 @@
 import { useLocation } from 'react-router-dom'
+import { useAssistantRuntimeContext } from './runtimeAssistantContext'
 
 export interface AssistantChatContext {
     page?: string
@@ -29,12 +30,12 @@ const PAGE_CONTEXT_MAP: Record<string, Omit<AssistantChatContext, 'route' | 'tit
     '/topology': {
         page: 'topology-canvas',
         module: 'topology-analysis',
-        summary: 'Topology analysis workspace for node relations, connectivity, and structure questions.',
+        summary: 'Debug-only topology canvas for raw graph inspection, overlay troubleshooting, and structure questions.',
     },
     '/map-topology': {
         page: 'map-topology',
-        module: 'topology-analysis',
-        summary: 'Map-linked topology workspace for combined geographic and topology analysis.',
+        module: 'we1-simulation',
+        summary: 'Primary WE1 simulation entry on the first map for scenario runs, snapshots, baseline comparison, and coverage review.',
     },
     '/topology-demo': {
         page: 'topology-demo',
@@ -50,6 +51,7 @@ const PAGE_CONTEXT_MAP: Record<string, Omit<AssistantChatContext, 'route' | 'tit
 
 export function useAiAssistantPageContext(): AssistantChatContext {
     const location = useLocation()
+    const runtimeContext = useAssistantRuntimeContext()
     const descriptor = PAGE_CONTEXT_MAP[location.pathname] || {
         page: 'generic-page',
         module: 'generic',
@@ -60,5 +62,7 @@ export function useAiAssistantPageContext(): AssistantChatContext {
         ...descriptor,
         route: location.pathname,
         title: typeof document !== 'undefined' ? document.title : descriptor.page,
+        selection: runtimeContext.selection || {},
+        filters: runtimeContext.filters || {},
     }
 }

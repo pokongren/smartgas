@@ -1,14 +1,24 @@
 === 数据库表 ===
-  stations: 0 条记录
-  pipelines: 0 条记录
+  stations: 1270 条记录
+  pipelines: 1251 条记录
   emergency_events: 0 条记录
-  trunk_pipeline_details: 64 条记录
-  branch_pipeline_details: 408 条记录
-  node_relation_details: 4075 条记录
-  distribution_point_details: 1645 条记录
-  compressor_details: 425 条记录
-  storage_details: 21 条记录
-  dispatch_console_details: 6 条记录
+  trunk_pipeline_details: 0 条记录
+  branch_pipeline_details: 0 条记录
+  node_relation_details: 0 条记录
+  distribution_point_details: 0 条记录
+  compressor_details: 0 条记录
+  storage_details: 0 条记录
+  dispatch_console_details: 0 条记录
+  ai_workflows: 0 条记录
+  ai_workflow_steps: 0 条记录
+  scada_stations: 0 条记录
+  scada_history: 1440 条记录
+  topology_correction_logs: 0 条记录
+  pipeline_systems: 13 条记录
+  junction_groups: 25 条记录
+  sqlite_sequence: 2 条记录
+  junction_groups_backup_20260404: 16 条记录
+  junction_groups_rebuilt: 7 条记录
 
 === 表 [stations] 结构 ===
   id (VARCHAR)
@@ -17,6 +27,11 @@
   longitude (FLOAT)
   latitude (FLOAT)
   design_pressure (FLOAT)
+  operating_pressure_in (FLOAT)
+  operating_pressure_out (FLOAT)
+  operating_temp_in (FLOAT)
+  operating_temp_out (FLOAT)
+  capacity (FLOAT)
   properties (VARCHAR)
 
 === 表 [pipelines] 结构 ===
@@ -24,6 +39,11 @@
   name (VARCHAR)
   start_station_id (VARCHAR)
   end_station_id (VARCHAR)
+  diameter_mm (FLOAT)
+  length_km (FLOAT)
+  design_pressure_mpa (FLOAT)
+  start_pressure_mpa (FLOAT)
+  end_pressure_mpa (FLOAT)
   diameter (INTEGER)
   length (FLOAT)
   category (VARCHAR)
@@ -74,6 +94,7 @@
   spacing (FLOAT)
   elevation (FLOAT)
   node_type_2025 (VARCHAR)
+  location_desc (VARCHAR)
 
 === 表 [distribution_point_details] 结构 ===
   id (INTEGER)
@@ -112,3 +133,91 @@
 === 表 [dispatch_console_details] 结构 ===
   id (INTEGER)
   name (VARCHAR)
+
+=== 表 [ai_workflows] 结构 ===
+  id (VARCHAR)
+  name (VARCHAR(100))
+  description (VARCHAR)
+  created_at (DATETIME)
+  updated_at (DATETIME)
+
+=== 表 [ai_workflow_steps] 结构 ===
+  id (VARCHAR)
+  workflow_id (VARCHAR)
+  step_order (INTEGER)
+  name (VARCHAR(100))
+  prompt_template (VARCHAR)
+  model (VARCHAR(50))
+  temperature (FLOAT)
+  max_tokens (INTEGER)
+
+=== 表 [scada_stations] 结构 ===
+  id (INTEGER)
+  pipeline_id (VARCHAR)
+  name (VARCHAR)
+  type (VARCHAR)
+  seq_order (INTEGER)
+  in_pressure (FLOAT)
+  out_pressure (FLOAT)
+  in_temp (FLOAT)
+  out_temp (FLOAT)
+  base_in_pressure (FLOAT)
+  base_out_pressure (FLOAT)
+  base_in_temp (FLOAT)
+  base_out_temp (FLOAT)
+  updated_at (DATETIME)
+
+=== 表 [scada_history] 结构 ===
+  id (INTEGER)
+  station_name (VARCHAR)
+  pipeline_id (VARCHAR)
+  tag_name (VARCHAR)
+  metric_type (VARCHAR)
+  recorded_at (DATETIME)
+  value (FLOAT)
+
+=== 表 [topology_correction_logs] 结构 ===
+  id (INTEGER)
+  pipeline_name (VARCHAR)
+  correction_type (VARCHAR)
+  severity (VARCHAR)
+  description (VARCHAR)
+  before_json (VARCHAR)
+  after_json (VARCHAR)
+  status (VARCHAR)
+  created_at (VARCHAR)
+  applied_at (VARCHAR)
+
+=== 表 [pipeline_systems] 结构 ===
+  id (VARCHAR)
+  name (VARCHAR)
+  color (VARCHAR)
+  sort_order (INTEGER)
+  layers_config (VARCHAR)
+
+=== 表 [junction_groups] 结构 ===
+  id (INTEGER)
+  name (VARCHAR)
+  description (VARCHAR)
+  station_ids (JSON)
+
+=== 表 [sqlite_sequence] 结构 ===
+  name ()
+  seq ()
+
+=== 表 [junction_groups_backup_20260404] 结构 ===
+  id (INT)
+  name (TEXT)
+  description (TEXT)
+  station_ids (NUM)
+
+=== 表 [junction_groups_rebuilt] 结构 ===
+  id (INTEGER)
+  name (TEXT)
+  description (TEXT)
+  station_ids (TEXT)
+  junction_kind (TEXT)
+  system_ids (TEXT)
+  member_count (INTEGER)
+  tolerance_deg (REAL)
+  generated_at (TEXT)

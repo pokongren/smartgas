@@ -17,6 +17,7 @@ const DEFAULT_CONFIG: MapConfig = {
     maxZoom: 20,
     showScale: true,
     showCompass: true,
+    viewMode: 'auto',
 }
 
 // 加载阶段定义
@@ -146,15 +147,38 @@ function MapView({
     const initMap = useCallback((AMap: any) => {
         updateLoadingState('map', '初始化地图...')
         
-        const map = new AMap.Map(mapContainerRef.current, {
-            center: [mapConfig.center.longitude, mapConfig.center.latitude],
-            zoom: mapConfig.zoom,
-            mapStyle: 'amap://styles/dark',
-            features: ['bg', 'road'],
-            viewMode: '3D',
-            pitch: 0,
-            skyColor: '#1f263a',
-        })
+        const createMap = (viewMode: '2D' | '3D') => {
+            const options: Record<string, unknown> = {
+                center: [mapConfig.center.longitude, mapConfig.center.latitude],
+                zoom: mapConfig.zoom,
+                mapStyle: 'amap://styles/dark',
+                features: ['bg', 'road'],
+                viewMode,
+            }
+
+            if (viewMode === '3D') {
+                options.pitch = 0
+                options.skyColor = '#1f263a'
+            }
+
+            return new AMap.Map(mapContainerRef.current, options)
+        }
+
+        const desiredViewMode = mapConfig.viewMode ?? 'auto'
+        let map: any
+
+        if (desiredViewMode === '2D') {
+            map = createMap('2D')
+        } else if (desiredViewMode === '3D') {
+            map = createMap('3D')
+        } else {
+            try {
+                map = createMap('3D')
+            } catch (error) {
+                console.warn('[MapView.optimized] 3D map init failed, fallback to 2D.', error)
+                map = createMap('2D')
+            }
+        }
 
         mapInstanceRef.current = map
         

@@ -180,6 +180,178 @@
     cursor: not-allowed;
 }
 
+/* ============ 仿真展示骨架 ============ */
+
+.topology-sim-showcase {
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid var(--sim-border, rgba(34, 211, 238, 0.18));
+    background:
+        radial-gradient(circle at top left, color-mix(in srgb, var(--sim-accent, #22d3ee) 16%, transparent) 0%, transparent 34%),
+        linear-gradient(145deg, rgba(12, 18, 32, 0.96), rgba(15, 23, 42, 0.88));
+    box-shadow: 0 18px 40px rgba(2, 6, 23, 0.36);
+    backdrop-filter: blur(14px);
+    overflow: hidden;
+}
+
+.topology-sim-showcase::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.04) 46%, transparent 70%);
+    transform: translateX(-120%);
+}
+
+.topology-sim-showcase--loading::after {
+    animation: topology-sim-scan 3s ease-in-out infinite;
+}
+
+.topology-sim-showcase--ready {
+    box-shadow: 0 18px 44px rgba(2, 6, 23, 0.38), 0 0 24px color-mix(in srgb, var(--sim-accent, #34d399) 18%, transparent);
+}
+
+.topology-sim-showcase--error {
+    box-shadow: 0 18px 44px rgba(2, 6, 23, 0.38), 0 0 24px rgba(248, 113, 113, 0.16);
+}
+
+.topology-sim-kicker {
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: #67e8f9;
+    opacity: 0.85;
+}
+
+.topology-sim-title {
+    margin-top: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.topology-sim-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--sim-border, rgba(34, 211, 238, 0.35));
+    background: var(--sim-badge-bg, rgba(34, 211, 238, 0.12));
+    color: var(--sim-badge-text, #bae6fd);
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 700;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.topology-sim-showcase:hover .topology-sim-badge {
+    transform: translateY(-1px);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--sim-accent, #22d3ee) 24%, transparent);
+}
+
+.topology-sim-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--sim-accent, #22d3ee);
+    box-shadow: 0 0 12px var(--sim-accent, #22d3ee);
+}
+
+.topology-sim-dot.is-pulsing {
+    animation: topology-sim-dot-pulse 1.3s ease-in-out infinite;
+}
+
+.topology-sim-chip-row {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.topology-sim-chip {
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.03);
+    font-size: 11px;
+    color: #cbd5e1;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.topology-sim-chip:hover {
+    border-color: rgba(103, 232, 249, 0.24);
+    background: rgba(255, 255, 255, 0.05);
+    transform: translateY(-1px);
+}
+
+.topology-sim-summary {
+    margin-top: 10px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #cbd5e1;
+}
+
+.topology-sim-card-grid {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.topology-sim-card {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    background: rgba(2, 6, 23, 0.42);
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.topology-sim-card:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--card-accent, #67e8f9) 38%, rgba(148, 163, 184, 0.14));
+    box-shadow: 0 10px 24px rgba(2, 6, 23, 0.28);
+}
+
+.topology-sim-card--loading,
+.topology-sim-card--ready {
+    animation: topology-sim-card-breathe 3.2s ease-in-out infinite;
+}
+
+.topology-sim-card-label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.topology-sim-card-value {
+    margin-top: 6px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--card-accent, #67e8f9);
+    word-break: break-word;
+}
+
+.topology-sim-stat-card {
+    transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.topology-sim-stat-card--loading,
+.topology-sim-stat-card--active {
+    animation: topology-sim-stat-float 3.4s ease-in-out infinite;
+}
+
+.topology-sim-stat-card--error {
+    border-color: rgba(248, 113, 113, 0.22);
+}
+
+.topology-sim-stat-card:hover {
+    transform: translateX(-2px);
+    border-color: rgba(103, 232, 249, 0.2);
+    box-shadow: 0 10px 22px rgba(2, 6, 23, 0.24);
+}
+
 /* ============ 统计卡片 ============ */
 
 .topology-stats {
@@ -486,7 +658,103 @@
     }
 }
 
+@keyframes topology-sim-dot-pulse {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 10px var(--sim-accent, #22d3ee);
+    }
+    50% {
+        transform: scale(1.35);
+        box-shadow: 0 0 18px var(--sim-accent, #22d3ee);
+    }
+}
+
+@keyframes topology-sim-card-breathe {
+    0%, 100% {
+        transform: translateY(0);
+        box-shadow: 0 0 0 rgba(2, 6, 23, 0);
+    }
+    50% {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 22px rgba(2, 6, 23, 0.18);
+    }
+}
+
+@keyframes topology-sim-stat-float {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    50% {
+        transform: translateX(-2px);
+    }
+}
+
+@keyframes topology-sim-scan {
+    0% {
+        transform: translateX(-120%);
+    }
+    100% {
+        transform: translateX(135%);
+    }
+}
+
 .topology-loading span {
     color: #94a3b8;
     font-size: 13px;
 }
+
+/* ============ Map Animation Overlays ============ */
+@keyframes rippleAlert {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { box-shadow: 0 0 0 25px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.map-alert-ripple {
+    animation: rippleAlert 1.5s infinite running !important;
+    background: #ef4444 !important;
+    border: 2px solid #fca5a5 !important;
+}
+
+.floating-data-tag {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #ef4444;
+    font-weight: bold;
+    font-size: 14px;
+    text-shadow: 0 0 4px #000;
+    pointer-events: none;
+    z-index: 999;
+    white-space: nowrap;
+    animation: floatUpFade 2.5s forwards ease-out alternate infinite;
+}
+
+@keyframes floatUpFade {
+    0% { opacity: 0; transform: translate(-50%, 0); }
+    20% { opacity: 1; transform: translate(-50%, -15px); }
+    80% { opacity: 1; transform: translate(-50%, -25px); }
+    100% { opacity: 0; transform: translate(-50%, -35px); }
+}
+
+.topology-vignette-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 12;
+    background: radial-gradient(circle, transparent 60%, rgba(239, 68, 68, 0) 100%);
+    transition: background 1s ease-in-out;
+}
+
+.topology-vignette-overlay.active {
+    background: radial-gradient(circle, transparent 60%, rgba(239, 68, 68, 0.35) 100%);
+    animation: vignetteBreathe 3s infinite ease-in-out;
+}
+
+@keyframes vignetteBreathe {
+    0% { background: radial-gradient(circle, transparent 60%, rgba(239, 68, 68, 0.2) 100%); }
+    50% { background: radial-gradient(circle, transparent 55%, rgba(239, 68, 68, 0.45) 100%); }
+    100% { background: radial-gradient(circle, transparent 60%, rgba(239, 68, 68, 0.2) 100%); }
+}
+

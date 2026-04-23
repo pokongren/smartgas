@@ -77,13 +77,22 @@ export function generateStations(
  * 
  * 将站点结构队列两两结合，形成真实地理的连接线段段落信息，携带材质、管径及属性。
  */
+export interface PhysicsConfig {
+    initialPressure: number; // 初始压力 MPa
+    constantFlowRate: number; // 稳定工况流量（10^4 Nm3/d）
+}
+
 export function generatePipelines(
     stations: PipelineNode[],
     pipelineCategory: string,
     idPrefix: string,
-    color: string
+    color: string,
+    physics?: PhysicsConfig
 ): PipelineLine[] {
     const lines: PipelineLine[] = []
+
+    let currentP = physics?.initialPressure || 0;
+    const flow = physics?.constantFlowRate || 0;
 
     for (let i = 0; i < stations.length - 1; i++) {
         const start = stations[i]
@@ -92,7 +101,21 @@ export function generatePipelines(
         // 估算球面大致距离（这里简化为欧式，高精度可改用 haversine）
         const dx = (end.coordinate.longitude - start.coordinate.longitude) * 100000
         const dy = (end.coordinate.latitude - start.coordinate.latitude) * 111000
-        const length = Math.sqrt(dx * dx + dy * dy)
+        const lengthMeters = Math.sqrt(dx * dx + dy * dy)
+        const lengthKm = lengthMeters / 1000;
+        
+        let pEnd = currentP;
+        let pDrop = 0;
+
+        if (physics) {
+            // 采用近似的 Weymouth 伪推演比例： Δ(P^2) ∝ L * Flow^2
+            // 使得在 3000 万方/天 流量下，每 100 公里管线压力下降约 0.3 - 0.5 MPa
+            const scale = 0.002; 
+            const deltaPSq = Math.pow(flow / 1000, 2) * lengthKm * scale;
+            const pSqEnd = Math.pow(currentP, 2) - deltaPSq;
+            pEnd = pSqEnd > 0 ? Math.sqrt(pSqEnd) : 0;
+            pDrop = currentP - pEnd;
+        }
 
         lines.push({
             id: `${idPrefix}-L-${i + 1}`,
@@ -104,9 +127,27 @@ export function generatePipelines(
             material: 'Steel',
             pressureLevel: start.pressureLevel,
             status: start.status,
-            length: length,
-            properties: { category: pipelineCategory, color }
-        })
+            length: lengthMeters,
+            flowRate: physics ? flow : undefined,
+            currentPressure: physics ? Number(((currentP + pEnd) / 2).toFixed(2)) : undefined, // 显示为中间压力
+            designPressure: 10.0,
+            properties: { 
+                category: pipelineCategory, 
+                color,
+                startPressureMpa: physics ? Number(currentP.toFixed(2)) : undefined,
+                endPressureMpa: physics ? Number(pEnd.toFixed(2)) : undefined
+            }
+        });
+
+        // 推演到下一段的起站压力
+        if (physics) {
+            // 如果到达压气站，压力重新恢复至出站高压设定值
+            if ((end.type as any) === 'compressor' || (end.type as string) === 'compressor') {
+                currentP = physics.initialPressure;
+            } else {
+                currentP = pEnd;
+            }
+        }
     }
 
     return lines
