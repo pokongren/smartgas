@@ -123,6 +123,17 @@ export const topologySimulationSnapshotAPI = {
         }),
 }
 
+// ============ 稳态仿真种子节点类型 ============
+
+export interface SeedNodePressure {
+    id: string
+    name?: string
+    operating_pressure_in?: number
+    operating_pressure_out?: number
+    target_pressure_mpa?: number
+    min_pressure_mpa?: number
+}
+
 // ============ 管线数据包 API（替代前端硬编码） ============
 
 import type { PipelinePackage } from '@/data/pipelines/types'
