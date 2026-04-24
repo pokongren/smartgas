@@ -13,9 +13,7 @@ import { SimPanel } from '@/components/topology/SimPanel'
 import SimParamEditor from '@/components/topology/SimParamEditor'
 import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
 import type { PipelinePackage } from '@/data/pipelines/types'
-import type { SimulationResult } from '@/services/api'
-import { seedNodeAPI } from '@/services/api'
-import type { SeedNodePressure } from '@/services/api'
+import type { SimulationResult, SeedNodePressure } from '@/services/api'
 import {
     topologyEditorApi,
     type JunctionGroup,
@@ -331,11 +329,26 @@ const MapTopologyView: React.FC = () => {
     const [simResults, setSimResults] = useState<SimulationResult[]>([])
     const [currentSimStep, setCurrentSimStep] = useState(0)
     const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
+    const [seedNodePressures, setSeedNodePressures] = useState<Map<string, SeedNodePressure>>(new Map())
+    const [nodeParamOverrides, setNodeParamOverrides] = useState<Record<string, { target_pressure_mpa?: number; min_pressure_mpa?: number; temperature_c?: number }>>({})
+    const [showSimParamEditor, setShowSimParamEditor] = useState(false)
+    const [showSnapshotPressureOverlay, setShowSnapshotPressureOverlay] = useState(false)
+    const [globalParamDefaults, setGlobalParamDefaults] = useState<{
+        default_pressure_mpa?: number
+        default_temperature_c?: number
+        default_flow_rate?: number
+        apply_to_sources?: boolean
+    }>({})
     const [historyChartTarget, setHistoryChartTarget] = useState<null | {
         stationName?: string
         junctionId?: string
         displayName?: string
     }>(null)
+
+    // Tooltip 悬浮框状态
+    const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
+    const [tooltipPos, setTooltipPos] = useState<{ x: number, y: number } | null>(null)
+    const activeTabRef = useRef<PanelTab>(activeTab)
 
     // ================== 稳态仿真 (useSimulation) ==================
     const PILOT_ID = 'we1'
@@ -346,6 +359,13 @@ const MapTopologyView: React.FC = () => {
     const [edgeLengthOverrides, setEdgeLengthOverrides] = useState<Record<string, number>>({})
     const [globalDefaults, setGlobalDefaults] = useState<{ default_pressure_mpa?: number; default_flow_rate?: number; apply_to_sources?: boolean }>({})
     const [paramValidationError, setParamValidationError] = useState<string | null>(null)
+
+    // 流动动画与渲染安全
+    const [lineFlowPhase, setLineFlowPhase] = useState(0)
+    const [damageFlashVisible, setDamageFlashVisible] = useState(false)
+    const [isMapInteracting, setIsMapInteracting] = useState(false)
+    const [renderSafetyMode, setRenderSafetyMode] = useState<'full' | 'lite'>('full')
+    const isLargeGraphMode = renderSafetyMode === 'lite' || topoNodes.length > 320 || topoEdges.length > 480
 
     // 撤销栈
     type UndoAction =
