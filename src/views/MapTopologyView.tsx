@@ -42,7 +42,7 @@ import type { CutoffResult } from '@/utils/cutoff-simulator'
 // ================== 类型 ==================
 type PointType = 'station' | 'valve' | 'distribution' | 'compressor' | 'junction'
 type EditMode = 'view' | 'draw-point' | 'connect' | 'merge'
-type PanelTab = 'edit' | 'validate' | 'search' | 'centrality' | 'cutoff' | 'sim-params'
+type PanelTab = 'edit' | 'validate' | 'search' | 'centrality' | 'cutoff' | 'simulation'
 
 interface TopoNode {
     id: string
@@ -1467,7 +1467,7 @@ const MapTopologyView: React.FC = () => {
                             { id: 'search' as PanelTab, label: '搜索', icon: 'search' },
                             { id: 'centrality' as PanelTab, label: '枢纽', icon: 'stars' },
                             { id: 'cutoff' as PanelTab, label: '截断', icon: 'cut' },
-                            { id: 'sim-params' as PanelTab, label: '参数', icon: 'tune' },
+                            { id: 'simulation' as PanelTab, label: '仿真', icon: 'science' },
                         ]).map(tab => (
                             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                                 className={`flex-1 py-2.5 text-[11px] flex items-center justify-center gap-1 transition-all border-b-2
@@ -1746,42 +1746,165 @@ const MapTopologyView: React.FC = () => {
                             </div>
                         )}
 
-                        {/* 仿真参数 */}
-                        {activeTab === 'sim-params' && (
+                        {/* 仿真控台 */}
+                        {activeTab === 'simulation' && (
                             <div className="space-y-3">
-                                <SimParamEditor
-                                    seedNodes={seedNodesForEditor}
-                                    edges={edgesForEditor}
-                                    nodeOverrides={nodeOverrides}
-                                    edgeLengthOverrides={edgeLengthOverrides}
-                                    globalDefaults={globalDefaults}
-                                    validationError={paramValidationError}
-                                    onNodeOverridesChange={setNodeOverrides}
-                                    onEdgeLengthOverridesChange={setEdgeLengthOverrides}
-                                    onGlobalDefaultsChange={setGlobalDefaults}
-                                />
-                                <button
-                                    onClick={handleRunSimulation}
-                                    disabled={sim.isLoading}
-                                    className="w-full py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5
-                                        bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    <span className="material-symbols-outlined text-sm">play_arrow</span>
-                                    {sim.isLoading ? '运行中...' : '运行稳态仿真'}
-                                </button>
-                                {sim.overlay && (
-                                    <div className="rounded-lg border border-green-500/20 bg-green-950/15 p-2.5 text-[10px] text-green-300">
-                                        <div className="flex items-center gap-1.5 mb-1">
-                                            <span className="material-symbols-outlined text-sm">check_circle</span>
-                                            <span className="font-bold">{sim.overlay.solver_status === 'converged' ? '已收敛' : '需复核'}</span>
-                                            <span className="text-green-500 ml-auto">{sim.overlay.iterations} 次迭代</span>
-                                        </div>
-                                        <div className="text-gray-400 space-y-0.5">
-                                            <div>总供气: {sim.overlay.summary.total_supply.toFixed(1)} 万方/天</div>
-                                            <div>未满足: {sim.overlay.summary.unserved_demand.toFixed(1)} 万方/天</div>
-                                            <div>利用率: {(sim.overlay.summary.avg_utilization * 100).toFixed(1)}%</div>
-                                            <div>告警: {sim.overlay.summary.alert_count}</div>
-                                        </div>
+                                {/* 标题栏 */}
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-lg text-indigo-400">tune</span>
+                                        <span className="font-bold text-sm text-white">仿真控台</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`w-2 h-2 rounded-full ${sim.overlay ? 'bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.6)]' : sim.isLoading ? 'bg-amber-400 animate-pulse' : 'bg-gray-500'}`} />
+                                        <span className="text-[10px] text-gray-400">
+                                            {sim.isLoading ? '运行中' : sim.overlay ? '已完成' : '待命'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* INPUT DATA */}
+                                <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/5 p-2.5 space-y-2">
+                                    <div className="text-[10px] uppercase tracking-widest text-cyan-300/80 font-semibold">INPUT DATA</div>
+                                    {/* 场景选择 */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm text-cyan-300">schema</span>
+                                        <select
+                                            value={sim.currentScenario}
+                                            onChange={e => sim.setScenario(e.target.value)}
+                                            className="flex-1 bg-slate-800/80 border border-indigo-500/25 rounded-lg text-[11px] text-slate-200 px-2 py-1.5 outline-none"
+                                        >
+                                            {MAINLINE_SCENARIOS.map(s => (
+                                                <option key={s.id} value={s.id}>{s.label}</option>
+                                            ))}
+                                        </select>
+                                        <span className="text-cyan-400">▾</span>
+                                    </div>
+                                    {/* 历史快照 */}
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm text-cyan-300">history</span>
+                                        <span className="text-[11px] text-slate-300">选择历史结果</span>
+                                        <span className="text-cyan-400">▾</span>
+                                        <select
+                                            value={sim.selectedSnapshotRunId}
+                                            onChange={e => sim.setSelectedSnapshotRunId(e.target.value)}
+                                            className="flex-1 bg-slate-800/80 border border-indigo-500/25 rounded-lg text-[11px] text-slate-200 px-2 py-1 outline-none"
+                                        >
+                                            <option value="">← 选择快照</option>
+                                            {sim.snapshots.map(s => (
+                                                <option key={s.run_id} value={s.run_id}>{s.scenario_id} | {s.run_id.slice(0, 12)}</option>
+                                            ))}
+                                        </select>
+                                        <span className="text-cyan-400">▾</span>
+                                    </div>
+                                    {/* 精细化参数 */}
+                                    <button
+                                        onClick={() => setShowSimParamEditor(!showSimParamEditor)}
+                                        className="w-full flex items-center gap-2 text-left py-1"
+                                    >
+                                        <span className="material-symbols-outlined text-sm text-cyan-300">code</span>
+                                        <span className="text-[11px] text-emerald-300">编辑精细化参数 (压力/流量)</span>
+                                        <span className="text-cyan-400 ml-auto">{showSimParamEditor ? '▴' : '▾'}</span>
+                                    </button>
+                                    {showSimParamEditor && (
+                                        <SimParamEditor
+                                            seedNodes={seedNodesForEditor}
+                                            edges={edgesForEditor}
+                                            nodeOverrides={nodeOverrides}
+                                            edgeLengthOverrides={edgeLengthOverrides}
+                                            globalDefaults={globalDefaults}
+                                            validationError={paramValidationError}
+                                            onNodeOverridesChange={setNodeOverrides}
+                                            onEdgeLengthOverridesChange={setEdgeLengthOverrides}
+                                            onGlobalDefaultsChange={setGlobalDefaults}
+                                        />
+                                    )}
+                                </div>
+
+                                {/* SOLVER ENGINE */}
+                                <div className="rounded-lg border border-emerald-500/15 bg-emerald-500/5 p-2.5 space-y-2">
+                                    <div className="text-[10px] uppercase tracking-widest text-emerald-300/80 font-semibold">SOLVER ENGINE</div>
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => { if (sim.selectedSnapshotRunId) sim.loadSelectedSnapshot() }}
+                                            disabled={sim.snapshotLoading || !sim.selectedSnapshotRunId}
+                                            className="flex-1 py-2.5 rounded-lg border border-emerald-500/25 bg-emerald-900/20 text-emerald-200 text-[11px] font-semibold flex flex-col items-center gap-1 transition-all hover:bg-emerald-900/40 disabled:opacity-30"
+                                        >
+                                            <span className="material-symbols-outlined text-lg text-emerald-400">edit_note</span>
+                                            按压力快照运行
+                                        </button>
+                                        <button
+                                            onClick={handleRunSimulation}
+                                            disabled={sim.isLoading}
+                                            className="flex-1 py-2.5 rounded-lg border border-cyan-500/25 bg-cyan-900/20 text-cyan-200 text-[11px] font-semibold flex flex-col items-center gap-1 transition-all hover:bg-cyan-900/40 disabled:opacity-30"
+                                        >
+                                            <span className="material-symbols-outlined text-lg text-cyan-400">{sim.isLoading ? 'hourglass_top' : 'play_circle'}</span>
+                                            {sim.isLoading ? '运行中...' : '场景参数仿真'}
+                                        </button>
+                                    </div>
+                                    {/* 运行状态 */}
+                                    <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                                        <span className="material-symbols-outlined text-sm">terminal</span>
+                                        {sim.isLoading ? '正在求解...' : sim.overlay ? `已完成 (${SOLVER_STATUS_LABELS[sim.overlay.solver_status] || sim.overlay.solver_status})` : '未运行'}
+                                    </div>
+                                </div>
+
+                                {/* OUTPUT VIEW */}
+                                <div className="rounded-lg border border-indigo-500/15 bg-indigo-500/5 p-2.5 space-y-2">
+                                    <div className="text-[10px] uppercase tracking-widest text-indigo-300/80 font-semibold">OUTPUT VIEW</div>
+                                    {sim.overlay ? (
+                                        <>
+                                            <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                                                <div className="bg-slate-800/50 rounded px-2 py-1.5">
+                                                    <div className="text-gray-500">总供气</div>
+                                                    <div className="text-emerald-300 font-bold">{sim.overlay.summary.total_supply.toFixed(1)} <span className="text-[9px] text-gray-500">万方/天</span></div>
+                                                </div>
+                                                <div className="bg-slate-800/50 rounded px-2 py-1.5">
+                                                    <div className="text-gray-500">未满足</div>
+                                                    <div className={`font-bold ${sim.overlay.summary.unserved_demand > 0 ? 'text-red-400' : 'text-green-400'}`}>{sim.overlay.summary.unserved_demand.toFixed(1)} <span className="text-[9px] text-gray-500">万方/天</span></div>
+                                                </div>
+                                                <div className="bg-slate-800/50 rounded px-2 py-1.5">
+                                                    <div className="text-gray-500">利用率</div>
+                                                    <div className="text-cyan-300 font-bold">{(sim.overlay.summary.avg_utilization * 100).toFixed(1)}%</div>
+                                                </div>
+                                                <div className="bg-slate-800/50 rounded px-2 py-1.5">
+                                                    <div className="text-gray-500">告警</div>
+                                                    <div className={`font-bold ${sim.overlay.summary.alert_count > 0 ? 'text-amber-400' : 'text-gray-300'}`}>{sim.overlay.summary.alert_count}</div>
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => setShowSnapshotPressureOverlay(!showSnapshotPressureOverlay)}
+                                                className="w-full py-2 rounded-lg border border-indigo-500/25 bg-indigo-900/20 text-indigo-200 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all hover:bg-indigo-900/40"
+                                            >
+                                                <span className="material-symbols-outlined text-sm">visibility</span>
+                                                全网稳态结果落图展示
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <div className="text-center py-3 text-[10px] text-gray-500">运行仿真后查看结果</div>
+                                    )}
+                                </div>
+
+                                {/* 底部操作栏 */}
+                                <div className="flex gap-2 text-[10px]">
+                                    <button onClick={() => sim.saveSnapshot()} disabled={!sim.overlay || sim.snapshotLoading}
+                                        className="flex-1 py-1.5 rounded-lg border border-gray-600/30 bg-slate-800/50 text-gray-300 flex items-center justify-center gap-1 hover:bg-slate-700/50 disabled:opacity-30">
+                                        <span className="material-symbols-outlined text-sm">save</span>归档
+                                    </button>
+                                    <button onClick={() => sim.refreshSnapshots()} disabled={sim.snapshotLoading}
+                                        className="flex-1 py-1.5 rounded-lg border border-gray-600/30 bg-slate-800/50 text-gray-300 flex items-center justify-center gap-1 hover:bg-slate-700/50 disabled:opacity-30">
+                                        <span className="material-symbols-outlined text-sm">refresh</span>刷新
+                                    </button>
+                                    <button onClick={() => sim.clearOverlay()} disabled={!sim.overlay}
+                                        className="flex-1 py-1.5 rounded-lg border border-gray-600/30 bg-slate-800/50 text-gray-300 flex items-center justify-center gap-1 hover:bg-slate-700/50 disabled:opacity-30">
+                                        <span className="material-symbols-outlined text-sm">restart_alt</span>重置
+                                    </button>
+                                </div>
+
+                                {/* 错误显示 */}
+                                {(sim.error || sim.snapshotError) && (
+                                    <div className="rounded-lg border border-red-900/40 bg-red-950/20 p-2.5 text-[10px] text-red-300">
+                                        {sim.error || sim.snapshotError}
                                     </div>
                                 )}
                             </div>
