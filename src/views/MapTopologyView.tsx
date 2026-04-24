@@ -14,6 +14,8 @@ import SimParamEditor from '@/components/topology/SimParamEditor'
 import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
 import type { PipelinePackage } from '@/data/pipelines/types'
 import type { SimulationResult } from '@/services/api'
+import { seedNodeAPI } from '@/services/api'
+import type { SeedNodePressure } from '@/services/api'
 import {
     topologyEditorApi,
     type JunctionGroup,
@@ -27,6 +29,7 @@ import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
 import {
     writeSimulationShowcaseSyncContext,
     readSimulationShowcaseSyncContext,
+    clearSimulationShowcaseSyncContext,
 } from '@/utils/simulationShowcaseSync'
 import { setAssistantRuntimeContext } from '@/components/ai-assistant/runtimeAssistantContext'
 import {
@@ -62,6 +65,8 @@ interface TopoEdge {
     endNodeId: string
     name?: string
     sourceEdgeIds?: string[]
+    /** 从原始管线数据汇总的默认长度（km），未被用户覆盖时作为仿真入参 */
+    defaultLengthKm?: number
     poly?: any
 }
 
@@ -77,7 +82,122 @@ interface BaseTopoEdge {
     startNodeId: string
     endNodeId: string
     name?: string
+    sourceEdgeIds?: string[]
+    /** 从原始管线数据汇总的默认长度（km） */
+    defaultLengthKm?: number
 }
+
+const WE1_PRIMARY_PILOT_ID = 'mainline_zhongwei_jingbian'
+const TOPOLOGY_DRAFT_STORAGE_KEY = 'smartgas-map-topology-draft-v1'
+
+function formatDateTimeLabel(value?: string): string {
+    if (!value) return '-'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function estimateTemperatureByPressure(pressureMpa: number): number {
+    return Number((13 + pressureMpa * 1.7).toFixed(1))
+}
+
+function clamp01(value: number): number {
+    if (!Number.isFinite(value)) return 0
+    if (value <= 0) return 0
+    if (value >= 1) return 1
+    return value
+}
+
+/** Haversine 公式计算两地理坐标间球面距离（km） */
+function haversineKm(lng1: number, lat1: number, lng2: number, lat2: number): number {
+    const R = 6371
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function formatSignedNumber(value: number, digits = 2): string {
+    const sign = value > 0 ? '+' : ''
+    return `${sign}${value.toFixed(digits)}`
+}
+
+function buildOpsSuggestion(alertCount: number, avgUtilization: number, solverStatus: 'converged' | 'max_iter' | 'error'): string {
+    if (solverStatus === 'error') return '本次求解失败，先检查场景参数和边界条件，再重跑主仿真。'
+    if (solverStatus === 'max_iter') return '本次达到迭代上限，建议先缩小扰动幅度并核对基线快照。'
+    if (alertCount >= 5) return '告警偏多，优先排查主干高负荷段和压气站上下游压差。'
+    if (avgUtilization >= 0.82) return '利用率偏高，建议先做限流场景对比并准备调峰策略。'
+    return '运行状态平稳，可将当前结果作为下一轮异常场景对比基线。'
+}
+
+function safeSetMarkerContent(marker: any, content: string): void {
+    try {
+        marker?.setContent?.(content)
+    } catch (error) {
+        console.warn('[MapTopologyView] marker.setContent failed', error)
+    }
+}
+
+function safeSetPolylineOptions(polyline: any, options: Record<string, unknown>): void {
+    try {
+        polyline?.setOptions?.(options)
+    } catch (error) {
+        console.warn('[MapTopologyView] polyline.setOptions failed', error)
+    }
+}
+
+const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
+    converged: '已收敛',
+    max_iter: '达到迭代上限',
+    error: '求解失败',
+}
+
+const FAILURE_LAYER_LABELS: Record<'frontend-consumption' | 'mapping-source-ids' | 'overlay-contract' | 'rendering-style', string> = {
+    'frontend-consumption': '先查前端消费层（MapTopologyView / 面板）',
+    'mapping-source-ids': '再查 source IDs 到 overlay IDs 的映射',
+    'overlay-contract': '再查 simulation-overlay 契约',
+    'rendering-style': '最后再查地图样式和渲染对象',
+}
+
+const MAINLINE_SCENARIO_PLAYBOOK: Record<string, {
+    focus: string
+    success: string
+    risk: string
+    talk: string
+}> = {
+    steady_base: {
+        focus: '先看主干压力和流量是不是平顺，确认第一张图能稳定跑通。',
+        success: '总供给、总需求、平均利用率都能正常落出来，告警数不要突然升高。',
+        risk: '如果常规稳态都没有结果，后面的异常场景先别讲，先把正式仿真跑通。',
+        talk: '先用常规稳态把主链打通，证明拓扑、稳态求解和页面都已经连上。',
+    },
+    zhongwei_compressor_offline: {
+        focus: '重点看中卫压气站停运后，上下游压力有没有明显掉落。',
+        success: '基线对比里能看出节点压差，命中节点和告警数会比常规稳态更明显。',
+        risk: '如果没选基线快照，这个场景可能看到当前值，看不出停运前后差异。',
+        talk: '这一幕主要讲压气站异常后，主干压力是怎么往上下游传递的。',
+    },
+    zhongwei_trunk_break: {
+        focus: '重点看中卫附近主干中断后，连线流量和下游供给怎么变化。',
+        success: '基线对比里的连线流量变化会很突出，下游命中点线和告警会一起抬头。',
+        risk: '如果映射覆盖摘要里命中不足，这个场景会看不清楚断点影响先传到哪。',
+        talk: '这一幕讲主干故障传播，最适合拿来演示第一张图的核心价值。',
+    },
+    yanchi_jingbian_limited: {
+        focus: '重点看盐池到靖边限流后，利用率和关键段负载有没有抬升。',
+        success: '运行结果摘要里平均利用率会变化，连线详情里的利用率差值能看出来。',
+        risk: '如果当前场景没留快照，只靠一次运行结果，不适合拿来做稳定验收。',
+        talk: '这一幕讲限流，不是断辟，而是主干还能跑但运行边界开始变紧。',
+    },
+}
+
+const COVERAGE_RECOMMENDATION_ORDER = [
+    'zhongwei_trunk_break',
+    'zhongwei_compressor_offline',
+    'yanchi_jingbian_limited',
+    'steady_base',
+]
 
 function resolveFocusTarget(nodes: TopoNode[], focusNodeId: string): TopoNode | null {
     const directNode = nodes.find(node => node.id === focusNodeId)
@@ -131,6 +251,10 @@ const JUNCTION_MODE_LABELS: Record<string, string> = {
 
 const LINE_COLOR = '#34d399'
 const LINE_WEIGHT = 2
+const TOPO_RENDER_BUDGET = {
+    full: { maxNodes: 520, maxEdges: 760 },
+    lite: { maxNodes: 260, maxEdges: 360 },
+}
 
 /** 从 PipelineNode.type (NodeType 枚举值，均为小写) 映射到编辑器 PointType */
 const TYPE_MAP: Record<string, PointType> = {
