@@ -7,6 +7,7 @@
 export interface SimNodeResult {
   id: string
   pressure_mpa: number
+  pressure_in_mpa?: number
   temperature_c?: number
   demand_served: number
   supply_actual: number
@@ -149,11 +150,13 @@ export interface SimulationInitialInput {
   node_overrides?: Array<{
     node_id: string
     target_pressure_mpa?: number
+    min_pressure_mpa?: number
     temperature_c?: number
   }>
   edge_overrides?: Array<{
     edge_id: string
     flow_rate?: number
+    length_km?: number
   }>
   default_pressure_mpa?: number
   default_temperature_c?: number

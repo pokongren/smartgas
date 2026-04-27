@@ -29,9 +29,10 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────
 
 # 摩擦阻力简化公式系数（Weymouth 近似，适合高压天然气）
-# ΔP² = K * L * Q² / D^5.333
-# K 是综合系数，已折算到 MPa / (10^4 Nm³/d)² 单位
-_WEYMOUTH_K = 0.00453
+# ΔP² = K * f * L * Q² / D^5.333
+# K 是综合系数，已折算到 MPa / m / (10^4 Nm³/d)² 单位
+# 管径单位: m, 长度: km, 流量: 万方/天, 压力: MPa
+_WEYMOUTH_K = 4.8e-7
 
 # 压力颜色阈值（利用率）
 _COLOR_GREEN = "#22c55e"   # 利用率 < 0.7
@@ -52,7 +53,8 @@ _ALERT_HIGH_UTIL = 0.92           # 利用率超过 92% 触发告警
 class NodeState:
     """节点运行状态"""
     node_id: str
-    pressure_mpa: float
+    pressure_mpa: float           # 出站压力（增压后）
+    pressure_in_mpa: float = 0.0  # 进站压力（压降后、增压前）
     demand_served: float = 0.0
     supply_actual: float = 0.0
     alert_level: str = "normal"  # normal / warning / critical
@@ -91,6 +93,7 @@ class SolverResult:
                 {
                     "id": n.node_id,
                     "pressure_mpa": round(n.pressure_mpa, 4),
+                    "pressure_in_mpa": round(n.pressure_in_mpa, 4),
                     "demand_served": round(n.demand_served, 2),
                     "supply_actual": round(n.supply_actual, 2),
                     "alert_level": n.alert_level,
@@ -476,7 +479,9 @@ def _calc_pressure_drop(
     if p_upstream_mpa <= 0 or flow_rate <= 0:
         return 0.0
 
-    d5 = (diameter_mm ** 5.333)
+    # 管径从 mm 转为 m（Weymouth 公式要求 SI 单位）
+    d_m = diameter_mm / 1000.0
+    d5 = (d_m ** 5.333)
     if d5 <= 0:
         return 0.0
 
@@ -655,11 +660,84 @@ class SteadyStateSolver:
             summary=summary,
         )
 
+    def _build_station_segments(
+        self,
+        nodes: Dict[str, Dict],
+        edges: Dict[str, Dict],
+    ) -> List[Dict[str, Any]]:
+        """
+        构建站间区段列表。
+        把连续管段按相邻的站场节点分组，每个区段包含上下游站场和管段列表。
+        """
+        station_ids = sorted(nodes.keys(), key=_id_num_key)
+        if len(station_ids) < 2:
+            return []
+
+        all_edge_ids = sorted(edges.keys(), key=_id_num_key)
+
+        def edge_num(eid: str) -> int:
+            _, suffix = _split_id_suffix(eid)
+            return int(suffix) if suffix is not None else 0
+
+        def node_num(nid: str) -> int:
+            _, suffix = _split_id_suffix(nid)
+            return int(suffix) if suffix is not None else 0
+
+        segments = []
+        for i in range(len(station_ids) - 1):
+            up_id = station_ids[i]
+            down_id = station_ids[i + 1]
+            up_n = node_num(up_id)
+            down_n = node_num(down_id)
+
+            seg_edges = [eid for eid in all_edge_ids if up_n <= edge_num(eid) < down_n]
+            if not seg_edges:
+                continue
+
+            sample_edge = edges.get(seg_edges[0], {})
+            per_edge_len = float(
+                sample_edge.get("length_km",
+                    sample_edge.get("length_km_default", 10.0))
+            )
+            total_len = per_edge_len * len(seg_edges)
+            diameter = float(
+                sample_edge.get("diameter_mm",
+                    sample_edge.get("diameter_mm_default", 1016.0))
+            )
+            roughness = float(
+                sample_edge.get("roughness_mm",
+                    sample_edge.get("roughness_mm_default", 0.03))
+            )
+
+            statuses = [edges.get(eid, {}).get("status", "open") for eid in seg_edges]
+            if "closed" in statuses:
+                seg_status = "closed"
+            elif "limited" in statuses:
+                seg_status = "limited"
+            else:
+                seg_status = "open"
+
+            max_flows = [float(edges.get(eid, {}).get("max_flow", 150.0)) for eid in seg_edges]
+            seg_max_flow = min(max_flows) if max_flows else 150.0
+
+            segments.append({
+                "upstream_id": up_id,
+                "downstream_id": down_id,
+                "edge_ids": seg_edges,
+                "total_length_km": total_len,
+                "diameter_mm": diameter,
+                "roughness_mm": roughness,
+                "status": seg_status,
+                "max_flow": seg_max_flow,
+            })
+
+        return segments
+
     def solve(self, scenario_id: str = "steady_base") -> SolverResult:
         """
         执行稳态求解，返回 SolverResult。
+        基于站间区段计算 Weymouth 压降，区分进站/出站压力。
         """
-        # 找场景
         scenario = next(
             (s for s in self._scenarios if s["id"] == scenario_id),
             None,
@@ -668,106 +746,110 @@ class SteadyStateSolver:
             logger.warning(f"未找到场景 {scenario_id}，使用基线场景")
             scenario = {"id": scenario_id, "node_overrides": [], "edge_overrides": [], "compressor_overrides": []}
 
-        # 应用场景覆盖
         nodes, edges, valves = _apply_scenario(
             self._base_nodes, self._base_edges, self._base_valves, scenario
         )
 
-        # 初始化节点压力
-        pressure: Dict[str, float] = {}
-        for nid, ndata in nodes.items():
-            if ndata.get("role") == "source":
-                pressure[nid] = float(ndata.get("target_pressure_mpa", 9.5))
-            else:
-                pressure[nid] = float(ndata.get("target_pressure_mpa", 8.0))
+        segments = self._build_station_segments(nodes, edges)
+        logger.info(f"场景 {scenario_id}: 构建了 {len(segments)} 个站间区段")
 
-        # 迭代求解
+        # 估算主干流量
+        total_supply = sum(
+            float(n.get("supply_max", 0.0))
+            for n in nodes.values()
+            if n.get("role") == "source"
+        )
+        total_demand = sum(
+            float(n.get("demand_nominal", 0.0))
+            for n in nodes.values()
+            if n.get("role") == "sink"
+        )
+        trunk_flow = min(total_supply, total_demand * 1.5) if total_demand > 0 else total_supply * 0.85
+
+        # 初始化
+        pressure: Dict[str, float] = {}
+        pressure_in: Dict[str, float] = {}
+        for nid, ndata in nodes.items():
+            p_target = float(ndata.get("target_pressure_mpa", 8.0))
+            pressure[nid] = p_target
+            pressure_in[nid] = p_target
+
         iterations = 0
         solver_status = "converged"
-        estimated_flows = _estimate_edge_flows(
-            nodes,
-            edges,
-            self._sorted_node_ids,
-            self._sorted_edge_ids,
-        )
 
         for iteration in range(self.MAX_ITER):
             new_pressure = dict(pressure)
+            new_pressure_in = dict(pressure_in)
 
-            # 沿排序好的管段正向传播压力
-            for eid in self._sorted_edge_ids:
-                edata = edges.get(eid, {})
-                status = edata.get("status", "open")
-                if status == "closed":
+            for nid, ndata in nodes.items():
+                if ndata.get("role") == "source":
+                    new_pressure[nid] = float(ndata.get("target_pressure_mpa", 9.5))
+                    new_pressure_in[nid] = new_pressure[nid]
+
+            for seg in segments:
+                up_id = seg["upstream_id"]
+                down_id = seg["downstream_id"]
+                seg_status = seg["status"]
+                p_up_out = new_pressure.get(up_id, 8.0)
+
+                if seg_status == "closed":
+                    down_node = nodes.get(down_id, {})
+                    min_p = float(down_node.get("min_pressure_mpa", 0.0))
+                    new_pressure_in[down_id] = min_p
+                    new_pressure[down_id] = min_p
                     continue
 
-                # 推断上下游节点（按管段 ID 数字顺序找相邻节点）
-                upstream, downstream = _infer_edge_endpoints(eid, edata, self._sorted_node_ids)
-                if upstream is None or downstream is None:
+                if p_up_out <= 0:
+                    new_pressure_in[down_id] = 0.0
+                    new_pressure[down_id] = 0.0
                     continue
 
-                p_up = new_pressure.get(upstream, 8.0)
-                if p_up <= 0:
-                    new_pressure[downstream] = 0.0
-                    continue
+                flow = trunk_flow
+                if seg_status == "limited":
+                    flow = min(flow, seg["max_flow"])
 
-                # 这轮先用场景级流量估算表，保证负荷变化和限流场景能反映到结果上。
-                flow = float(estimated_flows.get(eid, 0.0))
+                delta_p = _calc_pressure_drop(
+                    p_up_out, flow,
+                    seg["total_length_km"],
+                    seg["diameter_mm"],
+                    seg["roughness_mm"],
+                )
 
-                # 限流（阀门或 limited 状态）
-                if status == "limited":
-                    max_flow = float(edata.get("max_flow", 150.0))
-                    flow = min(flow, max_flow)
+                p_arrive = max(0.0, p_up_out - delta_p)
+                new_pressure_in[down_id] = p_arrive
 
-                # 计算压降
-                length_km = float(edata.get("length_km", edata.get("length_km_default", 100.0)))
-                diameter_mm = float(edata.get("diameter_mm", edata.get("diameter_mm_default", 1016.0)))
-                roughness_mm = float(edata.get("roughness_mm", edata.get("roughness_mm_default", 0.03)))
-
-                delta_p = _calc_pressure_drop(p_up, flow, length_km, diameter_mm, roughness_mm)
-                p_down = p_up - delta_p
-
-                # 下游如果是压气站且开启，抬压
-                down_node = nodes.get(downstream, {})
+                down_node = nodes.get(down_id, {})
                 if down_node.get("role") == "source":
-                    # source 节点是边界条件，不允许被上游 transit 节点反向覆盖。
-                    target = float(down_node.get("target_pressure_mpa", new_pressure.get(downstream, p_up)))
-                    new_pressure[downstream] = max(new_pressure.get(downstream, target), target)
-                    continue
-
-                if (
+                    new_pressure[down_id] = float(
+                        down_node.get("target_pressure_mpa", p_arrive)
+                    )
+                elif (
                     down_node.get("type") == "compressor"
                     and down_node.get("compressor_enabled", True)
-                    and down_node.get("role") != "source"
                 ):
-                    target = float(down_node.get("target_pressure_mpa", p_down))
-                    p_down = max(p_down, target)
-                elif down_node.get("type") == "compressor" and not down_node.get("compressor_enabled", True):
-                    target = float(down_node.get("target_pressure_mpa", p_down))
+                    target = float(down_node.get("target_pressure_mpa", p_arrive))
+                    new_pressure[down_id] = max(p_arrive, target)
+                elif (
+                    down_node.get("type") == "compressor"
+                    and not down_node.get("compressor_enabled", True)
+                ):
+                    target = float(down_node.get("target_pressure_mpa", p_arrive))
                     offline_cap = max(
                         float(down_node.get("min_pressure_mpa", 0.0)),
                         target - 0.4,
                     )
-                    p_down = min(p_down, offline_cap)
+                    new_pressure[down_id] = min(p_arrive, offline_cap)
+                else:
+                    min_p = float(down_node.get("min_pressure_mpa", 0.0))
+                    max_p = float(down_node.get("max_pressure_mpa", 12.0))
+                    new_pressure[down_id] = max(min_p, min(max_p, p_arrive))
 
-                # 保证压力在合理范围内
-                min_p = float(down_node.get("min_pressure_mpa", 0.0))
-                max_p = float(down_node.get("max_pressure_mpa", 12.0))
-                p_down = max(min_p, min(max_p, p_down))
-
-                new_pressure[downstream] = p_down
-
-            # 每轮迭代最后都把 source 节点重新钉回边界压力，避免后续边传播把源站压回去。
-            for nid, ndata in nodes.items():
-                if ndata.get("role") == "source":
-                    new_pressure[nid] = float(ndata.get("target_pressure_mpa", new_pressure.get(nid, 9.5)))
-
-            # 检查收敛
             max_delta = max(
                 abs(new_pressure.get(n, 0) - pressure.get(n, 0))
                 for n in pressure
             )
             pressure = new_pressure
+            pressure_in = new_pressure_in
             iterations = iteration + 1
 
             if max_delta < self.TOLERANCE:
@@ -776,9 +858,22 @@ class SteadyStateSolver:
             solver_status = "max_iter"
             logger.warning(f"场景 {scenario_id} 未在 {self.MAX_ITER} 轮内收敛，max_delta={max_delta:.4f}")
 
-        # 组装结果
-        node_states = self._build_node_states(nodes, pressure)
-        edge_states = self._build_edge_states(edges, valves, nodes, pressure, estimated_flows)
+        # 管段流量分配
+        segment_flows: Dict[str, float] = {}
+        for seg in segments:
+            flow = trunk_flow
+            if seg["status"] == "closed":
+                flow = 0.0
+            elif seg["status"] == "limited":
+                flow = min(flow, seg["max_flow"])
+            for eid in seg["edge_ids"]:
+                segment_flows[eid] = flow
+        for eid in self._sorted_edge_ids:
+            if eid not in segment_flows:
+                segment_flows[eid] = 0.0
+
+        node_states = self._build_node_states(nodes, pressure, pressure_in)
+        edge_states = self._build_edge_states(edges, valves, nodes, pressure, segment_flows)
         summary = self._build_summary(nodes, node_states, edge_states)
 
         return SolverResult(
@@ -795,17 +890,22 @@ class SteadyStateSolver:
         self,
         nodes: Dict[str, Dict],
         pressure: Dict[str, float],
+        pressure_in: Optional[Dict[str, float]] = None,
     ) -> List[NodeState]:
+        if pressure_in is None:
+            pressure_in = {}
         states = []
         for nid, ndata in nodes.items():
-            p = pressure.get(nid, 0.0)
+            p_out = pressure.get(nid, 0.0)
+            p_in = pressure_in.get(nid, p_out)
             min_p = float(ndata.get("min_pressure_mpa", 0.0))
-            design_p = float(ndata.get("target_pressure_mpa", p))
+            design_p = float(ndata.get("target_pressure_mpa", p_out))
 
+            # 告警基于进站压力（增压前的真实到达压力）判断
             alert = "normal"
-            if design_p > 0 and p < design_p * _ALERT_LOW_PRESSURE_RATIO:
+            if design_p > 0 and p_in < design_p * _ALERT_LOW_PRESSURE_RATIO:
                 alert = "warning"
-            if p < min_p:
+            if p_in < min_p:
                 alert = "critical"
 
             demand = float(ndata.get("demand_nominal", 0.0))
@@ -813,7 +913,8 @@ class SteadyStateSolver:
 
             states.append(NodeState(
                 node_id=nid,
-                pressure_mpa=p,
+                pressure_mpa=p_out,
+                pressure_in_mpa=p_in,
                 demand_served=demand if ndata.get("role") == "sink" else 0.0,
                 supply_actual=supply,
                 alert_level=alert,

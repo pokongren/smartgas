@@ -28,6 +28,7 @@ export interface DisplayNodeSimulationMatch {
   matchedInternalEdges: SimEdgeResult[]
   highestAlertLevel: AlertLevel
   averagePressureMpa: number | null
+  averagePressureInMpa: number | null
   highestInternalEdgeAlertLevel: AlertLevel
   averageInternalUtilization: number | null
   totalInternalFlowRate: number
@@ -145,6 +146,9 @@ export function buildSimulationOverlayMapping(
     const averagePressureMpa = matchedNodes.length
       ? matchedNodes.reduce((sum, item) => sum + item.pressure_mpa, 0) / matchedNodes.length
       : null
+    const averagePressureInMpa = matchedNodes.length
+      ? matchedNodes.reduce((sum, item) => sum + (item.pressure_in_mpa ?? item.pressure_mpa), 0) / matchedNodes.length
+      : null
     const highestInternalEdgeAlertLevel = matchedInternalEdges.reduce<AlertLevel>(
       (level, item) => mergeAlertLevel(level, item.alert_level),
       'normal',
@@ -167,6 +171,7 @@ export function buildSimulationOverlayMapping(
       matchedInternalEdges,
       highestAlertLevel,
       averagePressureMpa,
+      averagePressureInMpa,
       highestInternalEdgeAlertLevel,
       averageInternalUtilization,
       totalInternalFlowRate,
