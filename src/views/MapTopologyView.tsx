@@ -1308,12 +1308,15 @@ const MapTopologyView: React.FC = () => {
         for (const node of topoNodes) {
             const match = overlayMapping.nodeMatchesByDisplayId.get(node.id)
             if (!match || !node.marker || match.matchedNodes.length === 0) continue
-            const pressure = match.averagePressureMpa
+            const pressureOut = match.averagePressureMpa
+            const pressureIn = match.averagePressureInMpa
             const alert = match.highestAlertLevel
-            if (pressure == null) continue
+            if (pressureOut == null) continue
             const color = alert === 'critical' ? '#ef4444' : alert === 'warning' ? '#f97316' : TOPO_COLORS[node.type]
             const size = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
-            const label = `${node.name} ${pressure.toFixed(2)} MPa`
+            const label = pressureIn != null && Math.abs(pressureIn - pressureOut) > 0.01
+                ? `${node.name} 进${pressureIn.toFixed(2)}|出${pressureOut.toFixed(2)} MPa`
+                : `${node.name} ${pressureOut.toFixed(2)} MPa`
             const shapeStyle = node.isJunction
                 ? `width:${size}px;height:${size}px;transform:rotate(45deg);border-radius:3px;background:${color};border:2px solid #fff;box-shadow:0 0 6px ${color};pointer-events:auto;`
                 : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 6px ${color};pointer-events:auto;`
@@ -1380,7 +1383,7 @@ const MapTopologyView: React.FC = () => {
         return sim.overlay.nodes.map(n => ({
             id: n.id,
             name: topoNodes.find(tn => tn.sourceNodeIds?.includes(n.id))?.name ?? n.id,
-            operating_pressure_in: n.pressure_mpa,
+            operating_pressure_in: n.pressure_in_mpa ?? n.pressure_mpa,
             target_pressure_mpa: n.pressure_mpa,
             min_pressure_mpa: undefined as number | undefined,
         }))
@@ -1871,6 +1874,29 @@ const MapTopologyView: React.FC = () => {
                                                     <div className="text-gray-500">告警</div>
                                                     <div className={`font-bold ${sim.overlay.summary.alert_count > 0 ? 'text-amber-400' : 'text-gray-300'}`}>{sim.overlay.summary.alert_count}</div>
                                                 </div>
+                                            </div>
+                                            {/* 逐站压力对比 */}
+                                            <div className="space-y-1">
+                                                <div className="text-[9px] text-gray-500 uppercase tracking-wider">站场压力 (MPa)</div>
+                                                {sim.overlay.nodes.map(n => {
+                                                    const pIn = n.pressure_in_mpa ?? n.pressure_mpa
+                                                    const pOut = n.pressure_mpa
+                                                    const delta = pOut - pIn
+                                                    const name = topoNodes.find(tn => tn.sourceNodeIds?.includes(n.id))?.name ?? n.id
+                                                    return (
+                                                        <div key={n.id} className="flex items-center gap-1 text-[10px] bg-slate-800/40 rounded px-2 py-1">
+                                                            <span className="flex-1 text-gray-300 truncate">{name}</span>
+                                                            <span className="text-cyan-400 tabular-nums w-11 text-right">{pIn.toFixed(2)}</span>
+                                                            <span className="text-gray-600 text-[8px]">&rarr;</span>
+                                                            <span className="text-emerald-300 tabular-nums w-11 text-right">{pOut.toFixed(2)}</span>
+                                                            {Math.abs(delta) > 0.005 && (
+                                                                <span className={`text-[9px] tabular-nums w-10 text-right ${delta > 0 ? 'text-green-500' : 'text-red-400'}`}>
+                                                                    {delta > 0 ? '+' : ''}{delta.toFixed(2)}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                })}
                                             </div>
                                             <button
                                                 onClick={() => setShowSnapshotPressureOverlay(!showSnapshotPressureOverlay)}
