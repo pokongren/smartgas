@@ -1,0 +1,107 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+         clearRenderedTopology()
+         setTopoNodes([])
+         setTopoEdges([])
+         setSelectedNode(null)
+-        setSelectedMergeNodeIds([])
+@@
+                                     <div className="grid grid-cols-3 gap-1.5">
+                                         {([
+                                             { m: 'view' as EditMode, label: '浏览', icon: 'pan_tool' },
+                                             { m: 'draw-point' as EditMode, label: '添点', icon: 'add_location' },
+                                             { m: 'connect' as EditMode, label: '连线', icon: 'timeline' },
+-                                            { m: 'merge' as EditMode, label: '捏合', icon: 'hub' },
+-                                        ].filter(item => item.m !== 'merge').map(item => (
++                                        ]).map(item => (
+                                             <button key={item.m} onClick={() => setEditMode(item.m)}
+                                                 className={`py-2 rounded-lg text-[11px] transition-all flex flex-col items-center gap-0.5
+                                                     ${editMode === item.m ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20' : 'bg-gray-800/60 text-gray-400 hover:bg-gray-700'}`}>
+@@
+-                                {manualJunctionEditingEnabled && (editMode === 'merge' || selectedMergeNodeIds.length > 0) && (
+-                                    <div className="border border-purple-500/20 bg-purple-950/20 rounded-lg p-2.5 space-y-2">
+-                                        <div className="flex items-center justify-between">
+-                                            <p className="text-[10px] text-purple-300 uppercase tracking-wider">待捏合节点</p>
+-                                            <span className="text-[10px] text-purple-400">{selectedMergeNodeIds.length} 个</span>
+-                                        </div>
+-                                        <div className="max-h-28 overflow-y-auto space-y-1">
+-                                            {selectedMergeNodeIds.length === 0 && (
+-                                                <p className="text-[10px] text-gray-500">进入捏合模式后点击节点，或在浏览模式按住 Shift 进行多选。</p>
+-                                            )}
+-                                            {selectedMergeNodeIds.map(nodeId => {
+-                                                const node = baseTopoNodes.find(item => item.id === nodeId)
+-                                                    ?? topoNodes.find(item => item.id === nodeId)
+-                                                if (!node) return null
+-                                                return (
+-                                                    <div key={nodeId} className="flex items-center gap-2 text-[11px] bg-white/5 rounded px-2 py-1">
+-                                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TOPO_COLORS[node.type] }} />
+-                                                        <span className="text-gray-200 flex-1 truncate">{node.name}</span>
+-                                                        <button
+-                                                            onClick={() => toggleMergeSelection(nodeId)}
+-                                                            className="text-gray-500 hover:text-red-400 transition-colors"
+-                                                        >
+-                                                            <span className="material-symbols-outlined text-sm">close</span>
+-                                                        </button>
+-                                                    </div>
+-                                                )
+-                                            })}
+-                                        </div>
+-                                        <div className="flex gap-1.5">
+-                                            <button
+-                                                onClick={() => setSelectedMergeNodeIds([])}
+-                                                disabled={selectedMergeNodeIds.length === 0}
+-                                                className="flex-1 bg-gray-800/60 hover:bg-gray-700 text-gray-300 py-2 rounded-lg text-xs transition-colors disabled:opacity-40"
+-                                            >
+-                                                清空选择
+-                                            </button>
+-                                            <button
+-                                                onClick={() => void handleCreateJunction()}
+-                                                disabled={selectedMergeNodeIds.length < 2}
+-                                                className="flex-1 bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+-                                            >
+-                                                <span className="material-symbols-outlined text-sm">hub</span>创建枢纽
+-                                            </button>
+-                                        </div>
+-                                    </div>
+-                                )}
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                                    {manualJunctionEditingEnabled && (
+-                                        <button
+-                                            onClick={() => {
+-                                                const group = junctionGroups.find(item => item.id === selectedNode.junctionId)
+-                                                if (group) handleDeleteJunction(group)
+-                                            }}
+-                                            className="w-full bg-red-700/80 hover:bg-red-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+-                                        >
+-                                            <span className="material-symbols-outlined text-sm">device_hub</span>解除捏合
+-                                        </button>
+-                                    )}
+                                     <button
+                                         onClick={() => setHistoryChartTarget({
+                                             junctionId: selectedNode.junctionId ? `JUNCTION-${selectedNode.junctionId}` : selectedNode.id,
+@@
+                             ) : (
+                                 <div className="rounded-lg border border-gray-700/40 bg-white/5 p-3">
+-                                    {manualJunctionEditingEnabled ? (
+-                                        <button
+-                                            onClick={() => {
+-                                                setEditMode('merge')
+-                                                toggleMergeSelection(selectedNode.id)
+-                                            }}
+-                                            className="w-full bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+-                                        >
+-                                            <span className="material-symbols-outlined text-sm">hub</span>加入待捏合列表
+-                                        </button>
+-                                    ) : (
+-                                        <p className="text-xs text-gray-300 leading-5">
+-                                            这里保留站点查看和点位编辑。枢纽关系由后台按交汇规则运行时生成，不再在这个面板里手工捏合。
+-                                        </p>
+-                                    )}
++                                    <p className="text-xs text-gray-300 leading-5">
++                                        这里保留站点查看和点位编辑。枢纽关系由后台按交汇规则运行时生成，不再在这个面板里手工捏合。
++                                    </p>
+                                 </div>
+                             )}
+*** End Patch

@@ -4,6 +4,7 @@
 
 import type { CSSProperties } from 'react'
 import type { PipelineData, PipelineLayerConfig, PipelineEvent } from '@/types'
+import type { SimulationOverlay } from '@/types/simulation'
 
 /**
  * 坐标点类型
@@ -68,4 +69,6 @@ export interface MapViewProps {
     onLineClick?: (event: PipelineEvent) => void
     /** 管网设备点击回调 */
     onDeviceClick?: (event: PipelineEvent) => void
+    /** 仿真覆盖层 */
+    simulationOverlay?: SimulationOverlay | null
 }

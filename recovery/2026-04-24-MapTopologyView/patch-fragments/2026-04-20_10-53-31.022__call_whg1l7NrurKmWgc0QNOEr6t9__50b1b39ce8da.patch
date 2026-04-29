@@ -1,0 +1,22 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+                                     <div className="grid grid-cols-2 gap-2">
+                                         <button onClick={async () => { try { await runMainSteadySimulation(); setStatusMsg(`WE1 涓讳豢鐪熷凡杩愯锛?{steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 涓讳豢鐪熻繍琛屽け璐?) } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '杩愯涓?..' : '杩愯涓讳豢鐪?}</button>
+                                         <button onClick={async () => { try { await saveSteadySnapshot(); setStatusMsg(`宸蹭繚瀛樺揩鐓э細${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '淇濆瓨蹇収澶辫触') } }} disabled={!steadyOverlay || steadySnapshotLoading} className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40">{steadySnapshotLoading ? '淇濆瓨涓?..' : '淇濆瓨蹇収'}</button>
+                                         <button onClick={async () => { try { await refreshSteadySnapshots(); setStatusMsg('蹇収鍒楄〃宸插埛鏂?) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '鍒锋柊蹇収澶辫触') } }} disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40">鍒锋柊蹇収</button>
+                                         <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('宸叉竻绌哄綋鍓嶄富浠跨湡缁撴灉') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">娓呯┖涓讳豢鐪?/button>
++                                        <button
++                                            onClick={() => {
++                                                if (!steadyOverlay) {
++                                                    setStatusMsg('请先加载或运行一条快照结果，再上图显示压力')
++                                                    return
++                                                }
++                                                setShowSnapshotPressureOverlay(prev => !prev)
++                                            }}
++                                            className="col-span-2 rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs font-medium text-cyan-100"
++                                        >
++                                            {showSnapshotPressureOverlay ? '隐藏快照压力上图' : '快照压力上图'}
++                                        </button>
+                                     </div>
+*** End Patch

@@ -1,0 +1,23 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const loadJunctionGroups = useCallback(async () => {
+         try {
+             const result = await topologyEditorApi.getJunctionGroups()
+             setJunctionGroups(result.junctions)
+             setManualJunctionEditingEnabled(result.manual_editing_enabled)
+@@
+             return []
+         }
+     }, [])
++
++    const isRuntimeReadonlyGroup = useCallback((group: JunctionGroup) => {
++        return group.source_table === 'junction_groups_rebuilt'
++    }, [])
++
++    const manualEditableJunctionGroups = useMemo(() => {
++        return junctionGroups.filter(group => !isRuntimeReadonlyGroup(group))
++    }, [junctionGroups, isRuntimeReadonlyGroup])
++
++    const selectedMergeNodeSet = useMemo(() => new Set(selectedMergeNodeIds), [selectedMergeNodeIds])
+*** End Patch

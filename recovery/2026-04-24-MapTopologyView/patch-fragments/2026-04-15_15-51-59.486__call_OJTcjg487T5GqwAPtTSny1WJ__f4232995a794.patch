@@ -1,0 +1,45 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-import { MAINLINE_SCENARIOS } from '@/types/simulation'
++import type { SimulationInitialInput } from '@/types/simulation'
++import { MAINLINE_SCENARIOS } from '@/types/simulation'
+@@
+     const [lineFlowPhase, setLineFlowPhase] = useState(0)
+     const [damageFlashVisible, setDamageFlashVisible] = useState(false)
+     const [isMapInteracting, setIsMapInteracting] = useState(false)
+     const [renderSafetyMode, setRenderSafetyMode] = useState<'full' | 'lite'>('full')
++    const [preSimInputEnabled, setPreSimInputEnabled] = useState(true)
++    const [preSimDefaultPressureMpa, setPreSimDefaultPressureMpa] = useState(8.8)
++    const [preSimDefaultTemperatureC, setPreSimDefaultTemperatureC] = useState(28)
++    const [preSimDefaultFlowRate, setPreSimDefaultFlowRate] = useState(120)
++    const [preSimApplyToSources, setPreSimApplyToSources] = useState(false)
+     const isLargeGraphMode = renderSafetyMode === 'lite' || topoNodes.length > 320 || topoEdges.length > 480
++
++    const buildPreSimulationInput = useCallback((): SimulationInitialInput | undefined => {
++        if (!preSimInputEnabled) return undefined
++
++        const pressure = Number.isFinite(preSimDefaultPressureMpa) ? preSimDefaultPressureMpa : 8.8
++        const temperature = Number.isFinite(preSimDefaultTemperatureC) ? preSimDefaultTemperatureC : estimateTemperatureByPressure(pressure)
++        const flowRate = Number.isFinite(preSimDefaultFlowRate) ? preSimDefaultFlowRate : 120
++
++        return {
++            default_pressure_mpa: pressure,
++            default_temperature_c: temperature,
++            default_flow_rate: flowRate,
++            apply_to_sources: preSimApplyToSources,
++        }
++    }, [
++        preSimApplyToSources,
++        preSimDefaultFlowRate,
++        preSimDefaultPressureMpa,
++        preSimDefaultTemperatureC,
++        preSimInputEnabled,
++    ])
++
++    const runSteadySimulationWithPreset = useCallback(async () => {
++        await runSteadySimulation({
++            initialInput: buildPreSimulationInput(),
++        })
++    }, [buildPreSimulationInput, runSteadySimulation])
+*** End Patch

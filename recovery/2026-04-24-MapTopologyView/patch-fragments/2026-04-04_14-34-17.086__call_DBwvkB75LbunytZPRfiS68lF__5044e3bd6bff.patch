@@ -1,0 +1,150 @@
+*** Begin Patch
+*** Add File: docs/2026-04-04-项目心跳巡检总结_人话版.md
++# 2026-04-04 项目心跳巡检总结
++
++## 这次先说结论
++
++这轮不是 worktree/path blockage。
++
++主目录已经落到 `F:\smartgas-grid`，`git rev-parse --show-toplevel` 也是 `F:\smartgas-grid`。这次能确认的是：仓库里同时存在代码变化、数据库变化、AI 模块链路变化，还有一批本地实验痕迹。
++
++最值得记住的 4 件事：
++
++1. 全国地图这条线，LOD 阈值已经往统一口径收了，但地图页和拓扑页还不是完全共用一套渲染逻辑。
++2. 枢纽这条线，运行时已经优先吃 `junction_groups_rebuilt`，手工 merge/create/delete 默认被降成只读口径。
++3. 数据库这条线，`we3 / sj2 / sj3` 现在都已经进主库，旧 memory 里“we3 还没落库”的判断过期了。
++4. AI 助手这条线，不只是 UI 调整，已经接上了页面上下文、orchestrator、validator、fix router 和错误兜底，但工作区里也确实混着本地实验文件。
++
++## 这轮为什么不用截图
++
++这次没有启动前后端去跑页面，也没有做交互回归，所以不适合硬贴 UI 前后截图。下面用 mermaid 和对比表替代，把仓库落点、主线变化和风险点讲清楚。
++
++## 当前仓库位置和变化图
++
++```mermaid
++flowchart TD
++    A["初始 cwd\nC:\\Users\\Administrator\\.codex\\worktrees\\01d3\\smartgas-grid"] --> B["切换后 cwd\nF:\\smartgas-grid"]
++    B --> C["git 根目录\nF:\\smartgas-grid"]
++    C --> D["主目录事实来源"]
++    C --> E["地图/拓扑口径收敛\nsrc/utils/hierarchyRenderer.ts\nsrc/utils/mapRenderer.ts"]
++    C --> F["枢纽运行时只读\nbackend/app/services/junction_groups.py\nbackend/app/routers/topology_editor.py"]
++    C --> G["数据库与导入闭环\nbackend/data/smartgas.db\nbackend/check_db.py\nbackend/scripts/add_we3.py"]
++    C --> H["AI 链路扩展\nbackend/app/routers/ai_assistant.py\nsrc/components/ai-assistant/useAiAssistantChat.ts"]
++    C --> I["本地实验痕迹\n.npm-cache/\nbackend/data/*preview*.db\nbackend/scripts/verify_junctions.py"]
++```
++
++## 前后对比
++
++| 主题 | 改动前/旧认知 | 改动后/这轮实测 |
++| --- | --- | --- |
++| 仓库落点 | 容易把 detached worktree 当事实来源 | 这轮明确只以 `F:\smartgas-grid` 为准 |
++| 地图层级 | 地图缩放规则分散在多处，口径容易漂 | `hierarchyRenderer.ts` 已给出 `6/10/14/11/12` 这套阈值，`mapRenderer.ts` 已接入 |
++| 地图 vs 拓扑 | 容易被说成“已经完全统一” | 其实没有。`MapTopologyView.tsx` 主要做拓扑折叠、枢纽查看、`focusNode` 联动，不走地图那套 LOD 隐藏逻辑 |
++| 枢纽规则 | 以前更像可手工维护 | 运行时优先读 `junction_groups_rebuilt`，编辑器默认只读，除非显式打开开关 |
++| 数据库状态 | 旧 memory 里还有 `we3` 未落库的说法 | 主库现在实测 `we3 / sj2 / sj3` 都已存在 |
++| API 口径 | 容易被写成“已经统一成一套前缀” | 现在还是双轨：`/api/...` 和 `/topology/...` 并存 |
++| AI 助手 | 以前更像单一路由 + 流式回复 | 现在多了上下文注入、analysis mode、编排、校验、修复提示、限流/鉴权错误兜底 |
++
++## 这次看到了什么
++
++### 1. 地图缩放与层级显示
++
++- `src/utils/hierarchyRenderer.ts` 已经把缩放阈值收口成 `critical/high/medium = 6/10/14`，阀室 `11` 才显示，聚合点 `12` 才展开。
++- `src/utils/mapRenderer.ts` 已经用 `getNodeLODStrategy()` 和 `shouldShowNodeAtZoom()` 过滤节点，并把 `source / compressor / distribution / valve / junction / majorJunction` 这些类型统计接了进去。
++- `src/views/GlobalPipelineView.tsx` 现在会展示枢纽等级标签，还能通过 `focusNode` 跳到 `/map-topology`。
++- 但 `src/views/MapTopologyView.tsx` 还是拓扑视图自己的逻辑。它补的是 `focusNode` 联动、枢纽只读展示、点位预览/提交，不是地图那套 LOD 渲染复用。
++
++一句话版：地图口径在收拢，但不能写成“地图页和拓扑页已经完全同实现”。
++
++### 2. 起源点与枢纽规则
++
++- `backend/app/services/junction_groups.py` 新增运行时读取逻辑，优先读 `junction_groups_rebuilt`，并继续支持 `JUNCTION-x / junction-x` 展开和重叠组归并。
++- `backend/app/routers/topology_editor.py` 把手工 merge/create/delete 前面都加了 `ensure_manual_junction_edit_enabled()`。
++- `/api/topology/junctions` 现在会返回 `junctions`、`manual_editing_enabled` 和 `mode`，默认模式是 `runtime_readonly`。
++- `src/views/MapTopologyView.tsx` 前端也跟着切成“默认只读看运行时枢纽，保留查看和定位，不再把手工捏合作为主流程”。
++
++一句话版：枢纽规则已经偏向运行时只读，不再是“编辑器里手工维护为主”。
++
++### 3. 数据库口径与导入脚本
++
++- 这轮直接查了 `backend/data/smartgas.db`：
++  - `stations=1272`
++  - `pipelines=1268`
++  - `pipeline_systems=14`
++  - `junction_groups=16`
++  - `junction_groups_rebuilt=12`
++- `we3 / sj2 / sj3` 都已经落库：
++  - `WE3 stations=16 / pipelines=15`
++  - `SJ2 stations=70 / pipelines=69`
++  - `SJ3 stations=71 / pipelines=70`
++- `pipeline_systems` 字段还是 `id,name,color,sort_order,layers_config`，没有新落 `system_id` 字段。
++- `backend/scripts/add_sj2.py`、`backend/scripts/add_we3.py`、`backend/scripts/reimport_sj23.py` 都在往主库写，而且导入口径在往 `trunk/branch` 收紧。
++- 但历史数据还没完全洗干净，当前还有 `229` 条 `pipelines.category` 不在 `trunk/branch`。
++
++一句话版：主库是真变了，导入链路也真变了，但历史数据清洗还没彻底收完。
++
++### 4. AI 模块链路
++
++- 前端入口：
++  - `src/components/ai-assistant/AiAssistant.tsx` 改成复用 `useAiAssistantChat()`，弹窗和独立窗口都走同一套聊天状态。
++  - `src/components/ai-assistant/useAiAssistantChat.ts` 通过 `resolveApiPath('/api/ai-assistant/chat')` 发送请求；带页面上下文时会把 `analysis_mode` 设成 `subagents`。
++  - `src/components/ai-assistant/useAiAssistantPageContext.ts` 会按路由注入 `module/page/summary`。
++- 后端入口：
++  - `backend/app/main.py` 仍然挂着 `ai_assistant.router`。
++  - `backend/app/routers/ai_assistant.py` 现在会在 legacy 流式链路和 orchestrated 链路之间分流。
++- 服务链路：
++  - `backend/app/services/ai_analysis_orchestrator.py` 负责是否启用编排、上下文摘要、校验、修复提示。
++  - `backend/app/services/analysis_validator.py` 负责回复校验。
++  - `backend/app/services/fix_task_router.py` 负责把不合格回复变成修复提示。
++  - `backend/app/services/ai_client.py` 新增了 `AiServiceError`、429 重试、401/403/5xx 兜底，以及没配 `AI_API_KEY` 时的 fallback 文案。
++- 路由口径：
++  - AI 入口走 `/api/ai-assistant/chat`。
++  - 拓扑相关依然是双轨：`src/services/api.ts` 里普通数据接口还走 `/api/...`，拓扑纠偏和 `useTopology.ts` 里的计算链路会直连 `/topology/...`。
++  - `vite.config.ts` 已补 `/topology`、`/docs`、`/openapi.json` 到 `8080` 的代理。
++
++一句话版：AI 不是只改了一个聊天面板，已经拉出一条“入口 -> 编排 -> 校验 -> 修复 -> 错误兜底”的正式链路雏形。
++
++## 影响范围
++
++- 地图与全国总览：`src/utils/hierarchyRenderer.ts`、`src/utils/mapRenderer.ts`、`src/views/GlobalPipelineView.tsx`
++- 拓扑与枢纽：`src/views/MapTopologyView.tsx`、`backend/app/services/junction_groups.py`、`backend/app/routers/topology_editor.py`
++- 数据库与导入：`backend/data/smartgas.db`、`backend/check_db.py`、`backend/scripts/add_sj2.py`、`backend/scripts/add_we3.py`、`backend/scripts/reimport_sj23.py`
++- AI 助手：`backend/app/routers/ai_assistant.py`、`backend/app/services/ai_client.py`、`backend/app/services/ai_analysis_orchestrator.py`、`backend/app/services/analysis_validator.py`、`backend/app/services/fix_task_router.py`、`src/components/ai-assistant/useAiAssistantChat.ts`
++- docs 收口：`docs/TOPOLOGY_COMPUTATION_USAGE.md`、`docs/TOPOLOGY_SETUP_GUIDE.md`
++
++## 这次怎么验证的
++
++1. 先把工作目录切到 `F:\smartgas-grid`，再确认 `cwd` 和 `git rev-parse --show-toplevel` 都落在主目录。
++2. 看了 `git worktree list`，确认 `F:\smartgas-grid` 是主工作树，`.codex/worktrees/*` 那批是 detached。
++3. 查了 `git status --short`、`git log --oneline -5`、`git diff --stat` 和 docs diff。
++4. 直接查了 `backend/data/smartgas.db` 的表数量、系统 ID、前缀数量和 `pipeline_systems` 字段。
++5. 只按这轮点名文件看地图、枢纽、数据库、AI 四条主线，没有拿别的 worktree 结果冒充主目录事实。
++
++## 风险点
++
++- `git status` 很脏。除了四条主线，还有 `.npm-cache/`、preview DB、验证脚本、SCADA、字体、临时文件混在一起，后续很容易把“正式改动”和“本地实验”写混。
++- 地图和拓扑只是口径靠拢，不是实现完全统一。后续如果对外说“已经统一”，很容易过度表述。
++- API 还是双轨并存。docs 这轮是在补现状，不代表前后端已经彻底完成一套前缀的收口。
++- AI 新链路文件里有未跟踪文件，说明这部分还带着明显开发中状态，不能直接当成稳定交付。
++
++## 回退和后续建议
++
++- 这轮我没有改业务代码，所以不存在业务回退动作。
++- 真要继续推进，最值得优先做的是两件事：
++  1. 把本地实验文件和正式交付物切干净。
++  2. 给 AI 链路和枢纽只读链路各补一轮实际运行验证，不要只停留在代码存在。
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
++# 2026-04-04 22:32:25 +08:00
++
++- 本轮先按要求把落点纠正到 `F:\smartgas-grid`；初始 cwd 是 `C:\Users\Administrator\.codex\worktrees\01d3\smartgas-grid`，切换后 `cwd` 和 `git rev-parse --show-toplevel` 都是 `F:\smartgas-grid`。这轮不是 `automation env mismatch / worktree-path blockage`，也没有把 detached worktree 当事实来源。
++- 当前主判断要收口成“代码变化 + 数据库变化 + AI 模块链路变化，夹着少量本地实验”，不是纯 docs，也不是纯本地试验。`git worktree list` 显示主工作树就是 `F:\smartgas-grid`，detached worktree 全都停在别的提交，不能替代主目录结论。
++- 地图层级这轮仍然是“口径收拢但没完全共用实现”：`src/utils/hierarchyRenderer.ts` 明确了 `critical/high/medium = 6/10/14`、`valveMinZoom = 11`、`expandClusterZoom = 12`，`src/utils/mapRenderer.ts` 已接入 `getNodeLODStrategy()` / `shouldShowNodeAtZoom()`；但 `src/views/MapTopologyView.tsx` 主要新增的是 `focusNode` 联动、枢纽只读展示和点位预览/提交，不要写成拓扑页与地图页已经完全同一套 LOD。
++- 枢纽规则这轮要按“运行时只读 + 影子表优先”描述：`backend/app/services/junction_groups.py` 优先读 `junction_groups_rebuilt`，继续支持 `JUNCTION-x / junction-x` 展开和重叠枢纽归并；`backend/app/routers/topology_editor.py` 默认把手工 merge/create/delete 关到只读，除非显式打开 `TOPOLOGY_MANUAL_JUNCTION_EDIT`。
++- 数据库旧判断已经过期，不能再沿用 memory 里 “we3 未落库”。当前实测 `backend/data/smartgas.db` 是：`stations=1272`、`pipelines=1268`、`pipeline_systems=14`、`junction_groups=16`、`junction_groups_rebuilt=12`；`we3/sj2/sj3` 都已存在，前缀统计是 `WE3=16/15`、`SJ2=70/69`、`SJ3=71/70`。`pipeline_systems` 字段仍只有 `id,name,color,sort_order,layers_config`，另外还有 `229` 条历史 `pipelines.category` 还不在 `trunk/branch`。
++- API 口径仍是双轨，不要写成已经彻底统一：`src/services/api.ts` 里普通接口继续走 `/api/...`，拓扑纠偏走 `/topology/correct/...`；`src/hooks/useTopology.ts` 默认直连 `/topology/...`；`vite.config.ts` 已补 `/topology`、`/docs`、`/openapi.json` 到 `8080` 的代理。`docs/TOPOLOGY_COMPUTATION_USAGE.md` 和 `docs/TOPOLOGY_SETUP_GUIDE.md` 这轮是在补这个现状说明。
++- AI 模块链路这轮是真变化，不是单纯 UI 调整：`backend/app/routers/ai_assistant.py` 新增 orchestrated 路由分流，`backend/app/services/ai_analysis_orchestrator.py`、`backend/app/services/analysis_validator.py`、`backend/app/services/fix_task_router.py` 形成编排/校验/修复链；`backend/app/services/ai_client.py` 补了 `AiServiceError`、429 重试、鉴权/5xx 兜底；前端 `src/components/ai-assistant/useAiAssistantChat.ts` 会带页面上下文并在有 context 时设 `analysis_mode='subagents'`，`src/components/ai-assistant/useAiAssistantPageContext.ts` 负责路由上下文注入。
++- 本地实验痕迹依然明显，后续不要把它们全算正式交付：`.npm-cache/`、`backend/data/junction-rebuild-*.json`、`backend/data/smartgas.rebuild-preview.db`、`backend/scripts/rebuild_junctions.py`、`backend/scripts/verify_junctions.py`、`tmp_debug.txt` 等都还在工作区。
++
+ # 2026-04-04 20:27:00 +08:00
+*** End Patch

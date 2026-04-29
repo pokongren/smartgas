@@ -1,0 +1,29 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const {
+         overlay: simulationOverlay,
+         isLoading: simulationLoading,
+         error: simulationError,
+         currentScenario,
++        snapshots,
++        snapshotLoading,
++        baselineSnapshotLoading,
++        snapshotError,
++        selectedSnapshotRunId,
++        baselineSnapshotRunId,
++        comparison,
+         setScenario,
++        setSelectedSnapshotRunId,
++        setBaselineSnapshotRunId,
+         runSimulation,
++        saveSnapshot,
++        refreshSnapshots,
++        loadSelectedSnapshot,
+         clearOverlay,
+     } = useSimulation({
+-        pilotId: 'mainline_zhongwei_jingbian',
++        pilotId: WE1_PRIMARY_PILOT_ID,
+         scenarios: MAINLINE_SCENARIOS,
+     })
+*** End Patch

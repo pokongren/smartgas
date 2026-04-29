@@ -1,0 +1,78 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const exportSimulationReport = useCallback(() => {
+-        const lines = [
+-            '# WE1 绗竴寮犲浘涓讳豢鐪熷鍑烘竻鍗?,
+-            '',
+-            `瀵煎嚭鏃堕棿锛?{formatDateTimeLabel(new Date().toISOString())}`,
+-            `褰撳墠鍦烘櫙锛?{steadyScenarioOption?.label ?? steadyScenarioId}`,
+-            `褰撳墠缁撴灉锛?{steadyOverlay ? `${steadyOverlay.run_id} | ${SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}` : '杩樻病杩愯姝ｅ紡浠跨湡'}`,
+-            `鍘嗗彶蹇収鏁帮細${steadySnapshots.length}`,
+-            `鍩虹嚎蹇収锛?{selectedBaselineSnapshotSummary ? `${selectedBaselineSnapshotSummary.scenario_id} | ${formatDateTimeLabel(selectedBaselineSnapshotSummary.saved_at)}` : '鏈€夋嫨'}`,
+-            '',
+-            '## 杩愯缁撴灉鎽樿',
+-            `鎬讳緵缁欙細${steadyOverlay?.summary.total_supply?.toFixed(2) ?? '-'}`,
+-            `鎬婚渶姹傦細${steadyOverlay?.summary.total_demand?.toFixed(2) ?? '-'}`,
+-            `骞冲潎鍒╃敤鐜囷細${steadyOverlay?.summary.avg_utilization?.toFixed(3) ?? '-'}`,
+-            `鍛婅鏁帮細${steadyOverlay?.summary.alert_count ?? '-'}`,
+-            `鍛戒腑鑺傜偣锛?{simulationVisualSummary?.highlightedNodeCount ?? 0}`,
+-            `鍛戒腑杩炵嚎锛?{simulationVisualSummary?.highlightedEdgeCount ?? 0}`,
+-            '',
+-            '## 鍩虹嚎瀵规瘮',
+-            `渚涚粰宸€硷細${steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.total_supply.delta, 2) : '-'}`,
+-            `闇€姹傚樊鍊硷細${steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.total_demand.delta, 2) : '-'}`,
+-            `鍒╃敤鐜囧樊鍊硷細${steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.avg_utilization.delta, 3) : '-'}`,
+-            `鍛婅宸€硷細${steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.alert_count.delta, 0) : '-'}`,
+-            '',
+-            '## 瑕嗙洊缁撴灉娓呭崟',
+-            `褰撳墠鐣欐。锛?{coverageResultSummary.currentScenarioCovered ? `宸茬暀妗?${coverageResultSummary.currentScenarioSnapshotCount} 鏉 : '杩樻病鐣欐。'}`,
+-            `鏈€杩戣鐩栨椂闂达細${coverageResultSummary.latestCoverageTime ? formatDateTimeLabel(coverageResultSummary.latestCoverageTime) : '鏆傛棤'}`,
+-            `褰撳墠鍛戒腑鑺傜偣锛?{coverageResultSummary.matchedNodeText}`,
+-            `褰撳墠鍛戒腑杩炵嚎锛?{coverageResultSummary.matchedEdgeText}`,
+-            `寤鸿婕旂ず锛?{recommendedCoverageScenario?.label ?? '鏆傛棤'}`,
+-            `褰撳墠鍒ゆ柇锛?{coverageResultSummary.riskSummary}`,
+-            '',
+-            '## 鍦烘櫙娓呭崟',
+-            ...coverageChecklistItems.flatMap(item => [
+-                `- ${item.label} | ${item.covered ? '宸茬暀妗? : '寰呰ˉ璺?}`,
+-                `  鍏虫敞鐐癸細${item.focus}`,
+-                `  閫氳繃鎬庝箞鐪嬶細${item.success}`,
+-                `  鐜板満椋庨櫓锛?{item.risk}`,
+-            ]),
+-            '',
+-            '## 鍥哄畾婕旂ず鍙ｅ緞',
+-            ...demoGuideSteps,
+-            `澶辫触鍏堟煡鍝眰锛?{failureInvestigationLayerLabel}`,
+-        ]
+-        const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+-        const url = URL.createObjectURL(blob)
+-        const a = document.createElement('a')
+-        a.href = url
+-        a.download = `we1_main_sim_report_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.md`
+-        a.click()
+-        URL.revokeObjectURL(url)
+-        setStatusMsg('涓讳豢鐪熷鍑烘竻鍗曞凡鐢熸垚')
+-    }, [
+-        coverageChecklistItems,
+-        coverageResultSummary.currentScenarioCovered,
+-        coverageResultSummary.currentScenarioSnapshotCount,
+-        coverageResultSummary.latestCoverageTime,
+-        coverageResultSummary.matchedEdgeText,
+-        coverageResultSummary.matchedNodeText,
+-        coverageResultSummary.riskSummary,
+-        demoGuideSteps,
+-        failureInvestigationLayerLabel,
+-        recommendedCoverageScenario?.label,
+-        selectedBaselineSnapshotSummary,
+-        simulationVisualSummary?.highlightedEdgeCount,
+-        simulationVisualSummary?.highlightedNodeCount,
+-        steadyComparison,
+-        steadyOverlay,
+-        steadyScenarioId,
+-        steadyScenarioOption?.label,
+-        steadySnapshots.length,
+-    ])
+-
+     const clearAll = () => {
+*** End Patch

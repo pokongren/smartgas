@@ -1,0 +1,28 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    // 鍚堝缓绔欙細鍚堝苟妯″紡鐘舵€?    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+-    // 宸查珮浜殑 marker 鍘熷 content锛岀敤浜庢仮澶?    const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
++    const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
+@@
+-        else if (editMode === 'connect') { setStatusMsg('杩炵嚎锛氱偣鍑昏捣鐐硅妭鐐?); setConnectFrom(null) }
+-        else if (editMode === 'merge') {
+-            setConnectFrom(null)
+-            if (manualJunctionEditingEnabled) setStatusMsg('鎹忓悎锛氱偣鍑昏妭鐐硅繘琛屽閫夛紝鍐嶇偣鍑汇€屽垱寤烘灑绾姐€?')
+-            else setStatusMsg(JUNCTION_READONLY_HINT)
+-        }
++        else if (editMode === 'connect') { setStatusMsg('杩炵嚎锛氱偣鍑昏捣鐐硅妭鐐?); setConnectFrom(null) }
+         else setStatusMsg('娴忚妯″紡')
+-    }, [editMode, manualJunctionEditingEnabled, pointType, mapInstance])
+-
+-    useEffect(() => {
+-        if (manualJunctionEditingEnabled) return
+-        if (editMode === 'merge') {
+-            setEditMode('view')
+-        }
+-        if (selectedMergeNodeIds.length > 0) {
+-            setSelectedMergeNodeIds([])
+-        }
+-    }, [editMode, manualJunctionEditingEnabled, selectedMergeNodeIds.length])
++    }, [editMode, pointType, mapInstance])
+*** End Patch

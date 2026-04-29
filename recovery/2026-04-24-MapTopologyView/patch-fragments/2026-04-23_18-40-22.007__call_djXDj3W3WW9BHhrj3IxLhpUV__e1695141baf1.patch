@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-    const [statusMsg, setStatusMsg] = useState('闂備胶绮崝妤呭箠閹捐鍚规い鏇楀亾濠碘€愁嚟娴狅妇绮电€ｎ亝顔撻梻浣侯焾缁诲牓宕曢懠顑藉亾濮橆剚鍠樻鐐茬Ч楠炲鈻庣仦鎴掑閻庡箍鍎遍幊搴綖閿濆绾ч柣鎰煐椤ュ鏌涢幋顖滅瘈鐎殿喖鐏氬鍕暆婵犲倹鍊庣紓?)
++    const [statusMsg, setStatusMsg] = useState('点击“导入拓扑”加载数据，或在仿真页直接运行场景。')
+*** End Patch

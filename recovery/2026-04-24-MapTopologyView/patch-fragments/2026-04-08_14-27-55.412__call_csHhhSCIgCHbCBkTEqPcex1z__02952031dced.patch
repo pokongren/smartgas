@@ -1,0 +1,112 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/backend/scripts/verify_we1_map_phase5.py
+@@
+ def _read_text(path: Path) -> str:
+     return path.read_text(encoding="utf-8")
+ 
+ 
++def _normalize_source(text: str) -> str:
++    return " ".join(text.split())
++
++
+ def _verify_overlay_contract(session: Session) -> Dict[str, Any]:
+@@
+ def _verify_frontend_phase5_contract() -> Dict[str, Any]:
+     map_path = REPO_ROOT / "src" / "views" / "MapTopologyView.tsx"
+     hook_path = REPO_ROOT / "src" / "hooks" / "useSimulation.ts"
+     map_text = _read_text(map_path)
+     hook_text = _read_text(hook_path)
++    normalized_map_text = _normalize_source(map_text)
+ 
+     checks = [
+         {
+             "id": "useSimulation_baseline_comparison",
+             "passed": all(
+@@
+         },
+         {
+-            "id": "map_phase5_coverage_summary",
++            "id": "map_phase5_primary_operation_panel_contract",
+             "passed": all(
+-                token in map_text
++                token in normalized_map_text
+                 for token in [
+-                    "trialCoverageSummary",
+-                    "coverageResultSummary",
+-                    "coverageChecklistItems",
+-                    "recommendedCoverageScenario",
++                    "Simulation Live",
++                    "steadyMetricCards",
++                    "runSteadySimulation",
++                    "saveSteadySnapshot",
++                    "refreshSteadySnapshots",
++                    "clearSteadyOverlay",
++                    "exportSimulationReport",
++                    "运行主仿真",
++                    "保存快照",
++                    "刷新快照",
++                    "清空主仿真",
++                    "导出演示清单",
+                 ]
+             ),
+             "file": str(map_path),
+         },
+         {
+-            "id": "map_phase5_demo_playbook",
++            "id": "map_phase5_demo_context_guard",
+             "passed": all(
+                 token in map_text
+                 for token in [
+                     "demoGuideSteps",
+                     "failureInvestigationLayerLabel",
+@@
+ def main() -> int:
++    output: Dict[str, Any]
+     try:
+-        print("=== WE1 第一张图第5阶段验收开始 ===")
+-
+         with Session(engine) as session:
+             overlay_contract = _verify_overlay_contract(session)
+             snapshot_archive = _verify_snapshot_archive(session)
+ 
+         frontend_contract = _verify_frontend_phase5_contract()
+ 
+         output = {
+             "status": "passed",
++            "mode": "phase5_acceptance",
+             "overlay_contract": overlay_contract,
+             "snapshot_archive": snapshot_archive,
+             "frontend_contract": frontend_contract["checks"],
+             "triage_order": [
+                 "主入口状态层",
+@@
+                 "求解主链层",
+             ],
+             "next_mode": "maintenance",
+         }
+-
+-        print("WE1 第一张图第5阶段验收通过")
+-        print(json.dumps(output, ensure_ascii=False, indent=2))
+-        return 0
+     except Exception as exc:
+-        print("WE1 第一张图第5阶段验收失败")
+-        print(str(exc))
+-        return 1
++        output = {
++            "status": "failed",
++            "mode": "phase5_acceptance",
++            "error": str(exc),
++            "triage_order": [
++                "主入口状态层",
++                "映射层 source IDs / overlay IDs",
++                "overlay 与快照归档层",
++                "基线对比与覆盖结果清单层",
++                "求解主链层",
++            ],
++            "next_mode": "maintenance",
++        }
++
++    sys.stdout.buffer.write(b"=== WE1 map phase5 verification start ===\n")
++    sys.stdout.buffer.write((json.dumps(output, ensure_ascii=False, indent=2) + "\n").encode("utf-8", errors="replace"))
++    return 0 if output.get("status") == "passed" else 1
+*** End Patch

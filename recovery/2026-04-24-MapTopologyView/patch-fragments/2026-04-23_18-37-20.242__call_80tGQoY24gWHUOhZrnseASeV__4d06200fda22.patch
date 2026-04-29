@@ -1,0 +1,55 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
++/*const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
+@@
+-const COVERAGE_RECOMMENDATION_ORDER = [
++*/
++const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
++    converged: '收敛完成',
++    max_iter: '达到迭代上限',
++    error: '求解失败',
++}
++
++const FAILURE_LAYER_LABELS: Record<'frontend-consumption' | 'mapping-source-ids' | 'overlay-contract' | 'rendering-style', string> = {
++    'frontend-consumption': '前端消费层',
++    'mapping-source-ids': 'ID 映射层',
++    'overlay-contract': '数据契约层',
++    'rendering-style': '渲染样式层',
++}
++
++const MAINLINE_SCENARIO_PLAYBOOK: Record<string, {
++    focus: string
++    success: string
++    risk: string
++    talk: string
++}> = {
++    steady_base: {
++        focus: '稳态基线工况',
++        success: '主干压力连续、供需平衡',
++        risk: '基线偏移会影响后续场景对比',
++        talk: '先把基线站稳，再拿它做对照尺子。',
++    },
++    zhongwei_compressor_offline: {
++        focus: '中卫压气站离线场景',
++        success: '主干连续供气且关键告警可控',
++        risk: '局部压降过快可能触发联动告警',
++        talk: '先盯主干压差，再看下游补偿能力。',
++    },
++    zhongwei_trunk_break: {
++        focus: '中卫主干截断场景',
++        success: '快速识别受影响区和可绕行区',
++        risk: '连线错误会放大影响范围',
++        talk: '先圈定影响半径，再给调度动作。',
++    },
++    yanchi_jingbian_limited: {
++        focus: '盐池至靖边限流场景',
++        success: '关键用户稳定供气',
++        risk: '限流过硬导致末端波动放大',
++        talk: '限流要分层，先保主干后保重点。',
++    },
++}
++
++const COVERAGE_RECOMMENDATION_ORDER = [
+*** End Patch

@@ -1,0 +1,30 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    // 合建站：合并模式状态
+-    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+-    // 已高亮的 marker 原始 content，用于恢复
++    // 已高亮的 marker 原始 content，用于恢复
+     const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
+@@
+-        else if (editMode === 'connect') { setStatusMsg('连线：点击起点节点'); setConnectFrom(null) }
+-        else if (editMode === 'merge') {
+-            setConnectFrom(null)
+-            if (manualJunctionEditingEnabled) setStatusMsg('捏合：点击节点进行多选，再点击「创建枢纽」')
+-            else setStatusMsg(JUNCTION_READONLY_HINT)
+-        }
++        else if (editMode === 'connect') { setStatusMsg('连线：点击起点节点'); setConnectFrom(null) }
+         else setStatusMsg('浏览模式')
+-    }, [editMode, manualJunctionEditingEnabled, pointType, mapInstance])
+-
+-    useEffect(() => {
+-        if (manualJunctionEditingEnabled) return
+-        if (editMode === 'merge') {
+-            setEditMode('view')
+-        }
+-        if (selectedMergeNodeIds.length > 0) {
+-            setSelectedMergeNodeIds([])
+-        }
+-    }, [editMode, manualJunctionEditingEnabled, selectedMergeNodeIds.length])
++    }, [editMode, pointType, mapInstance])
+*** End Patch

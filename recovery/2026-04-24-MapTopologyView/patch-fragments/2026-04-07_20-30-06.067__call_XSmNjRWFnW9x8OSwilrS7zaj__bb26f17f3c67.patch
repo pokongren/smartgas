@@ -1,0 +1,17 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    const [isPreviewing, setIsPreviewing] = useState(false)
+-
+-    // ?????? marker ??? content????????    const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
+-
+-    // Refs ??????????????
++    const [isPreviewing, setIsPreviewing] = useState(false)
++    const [simulationHitFocus, setSimulationHitFocus] = useState(true)
++
++    // ?????? marker ??? content????????
++    const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
++    const simulationSnapshotAutoloadedRef = useRef(false)
++
++    // Refs ??????????????
+*** End Patch

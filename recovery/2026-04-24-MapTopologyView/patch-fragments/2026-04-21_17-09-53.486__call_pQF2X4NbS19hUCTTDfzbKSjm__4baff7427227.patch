@@ -1,0 +1,95 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const buildSimulationInitialInput = useCallback((): SimulationInitialInput | undefined => {
+@@
+         return {
+             node_overrides: nodeEntries.length > 0 ? nodeEntries : undefined,
+             edge_overrides: edgeEntries.length > 0 ? edgeEntries : undefined,
+             default_pressure_mpa: globalParamDefaults.default_pressure_mpa,
+             default_temperature_c: globalParamDefaults.default_temperature_c,
+             default_flow_rate: globalParamDefaults.default_flow_rate,
+             apply_to_sources: globalParamDefaults.apply_to_sources,
+         }
+     }, [edgeLengthOverrides, globalParamDefaults.apply_to_sources, globalParamDefaults.default_flow_rate, globalParamDefaults.default_pressure_mpa, globalParamDefaults.default_temperature_c, nodeParamOverrides])
++    const fetchLatestSeedNodePressureMap = useCallback(async (): Promise<Map<string, SeedNodePressure>> => {
++        const res = await seedNodeAPI.getNodePressures(WE1_PRIMARY_PILOT_ID)
++        const map = new Map<string, SeedNodePressure>()
++        for (const node of res.data.nodes ?? []) {
++            if (node?.id) {
++                map.set(node.id, node)
++            }
++        }
++        setSeedNodePressures(map)
++        return map
++    }, [])
++    const buildLivePressureInitialInput = useCallback((liveMap: Map<string, SeedNodePressure>): SimulationInitialInput | undefined => {
++        const manualInput = buildSimulationInitialInput()
++        const liveNodeOverrides = Array.from(liveMap.entries())
++            .map(([nodeId, item]) => {
++                const outPressure = typeof item.operating_pressure_out === 'number' && Number.isFinite(item.operating_pressure_out)
++                    ? item.operating_pressure_out
++                    : (typeof item.target_pressure_mpa === 'number' && Number.isFinite(item.target_pressure_mpa) ? item.target_pressure_mpa : undefined)
++                const inPressure = typeof item.operating_pressure_in === 'number' && Number.isFinite(item.operating_pressure_in)
++                    ? item.operating_pressure_in
++                    : (typeof item.min_pressure_mpa === 'number' && Number.isFinite(item.min_pressure_mpa) ? item.min_pressure_mpa : undefined)
++                const temperature = typeof item.operating_temp_out === 'number' && Number.isFinite(item.operating_temp_out)
++                    ? item.operating_temp_out
++                    : undefined
++                const override: { node_id: string; target_pressure_mpa?: number; min_pressure_mpa?: number; temperature_c?: number } = {
++                    node_id: nodeId,
++                }
++                if (outPressure != null) {
++                    override.target_pressure_mpa = outPressure
++                }
++                if (inPressure != null) {
++                    override.min_pressure_mpa = override.target_pressure_mpa != null
++                        ? Math.min(inPressure, override.target_pressure_mpa)
++                        : inPressure
++                }
++                if (temperature != null) {
++                    override.temperature_c = temperature
++                }
++                return override
++            })
++            .filter(item => item.target_pressure_mpa != null || item.min_pressure_mpa != null || item.temperature_c != null)
++
++        if (!manualInput && liveNodeOverrides.length === 0) {
++            return undefined
++        }
++
++        const mergedNodeOverrideMap = new Map<string, { node_id: string; target_pressure_mpa?: number; min_pressure_mpa?: number; temperature_c?: number }>()
++        liveNodeOverrides.forEach(item => mergedNodeOverrideMap.set(item.node_id, item))
++        ;(manualInput?.node_overrides ?? []).forEach(item => {
++            mergedNodeOverrideMap.set(item.node_id, { ...mergedNodeOverrideMap.get(item.node_id), ...item })
++        })
++
++        return {
++            ...manualInput,
++            node_overrides: mergedNodeOverrideMap.size > 0 ? Array.from(mergedNodeOverrideMap.values()) : undefined,
++        }
++    }, [buildSimulationInitialInput])
+     const runMainSteadySimulation = useCallback(async () => {
+         const error = validateSimulationParams()
+         setParamValidationError(error)
+         if (error) {
+             setStatusMsg(`鍙傛暟鏍￠獙澶辫触锛?{error}`)
+             throw new Error(error)
+         }
+         const initialInput = buildSimulationInitialInput()
+         await runSteadySimulation(initialInput ? { initialInput } : undefined)
+     }, [buildSimulationInitialInput, runSteadySimulation, validateSimulationParams])
++    const runLivePressureSteadySimulation = useCallback(async () => {
++        const error = validateSimulationParams()
++        setParamValidationError(error)
++        if (error) {
++            setStatusMsg(`参数校验失败：${error}`)
++            throw new Error(error)
++        }
++        setStatusMsg('正在读取当前压力并启动仿真...')
++        const latestSeedMap = await fetchLatestSeedNodePressureMap()
++        const initialInput = buildLivePressureInitialInput(latestSeedMap)
++        await runSteadySimulation(initialInput ? { initialInput } : undefined)
++        setStatusMsg('已按当前压力完成仿真并刷新动画结果')
++    }, [buildLivePressureInitialInput, fetchLatestSeedNodePressureMap, runSteadySimulation, validateSimulationParams])
+*** End Patch

@@ -1,0 +1,80 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\backend\app\routers\topology_editor.py
+@@
+-MANUAL_JUNCTION_EDIT_ENABLED = os.getenv("TOPOLOGY_MANUAL_JUNCTION_EDIT", "0") == "1"
++MANUAL_JUNCTION_EDIT_ENABLED = os.getenv("TOPOLOGY_MANUAL_JUNCTION_EDIT", "1") == "1"
+ MANUAL_JUNCTION_EDIT_HINT = (
+     "当前枢纽由运行时重编结果维护，手工 merge/创建/删除已降级为只读。"
+-    "如确需临时放开，请设置 TOPOLOGY_MANUAL_JUNCTION_EDIT=1 后重启后端。"
++    "如需关闭，请设置 TOPOLOGY_MANUAL_JUNCTION_EDIT=0 后重启后端。"
+ )
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-const MANUAL_JUNCTION_EDIT_ENABLED_BY_DEFAULT =
+-    String(import.meta.env.VITE_TOPOLOGY_MANUAL_JUNCTION_EDIT ?? '').trim() === '1'
++const MANUAL_JUNCTION_EDIT_ENABLED_BY_DEFAULT =
++    String(import.meta.env.VITE_TOPOLOGY_MANUAL_JUNCTION_EDIT ?? '1').trim() !== '0'
+*** Add File: F:\smartgas-grid\docs\2026-04-04-阶段5-手动捏合默认打开总结_人话版.md
++# 阶段 5 干了什么：手动捏合枢纽改成默认打开
++
++## 改动目标
++
++把手动捏合枢纽从“默认关闭，需要手动放开”改成“默认打开，需要时再手动关闭”。
++
++## 这次具体做了什么
++
++改了两个默认值：
++
++- `F:\smartgas-grid\backend\app\routers\topology_editor.py`
++  - `TOPOLOGY_MANUAL_JUNCTION_EDIT` 的默认值从 `0` 改成了 `1`
++- `F:\smartgas-grid\src\views\MapTopologyView.tsx`
++  - 前端在接口返回前，也按“默认开启”处理
++
++同时把提示文案改成了更符合现在策略的话：
++
++- 现在是默认可用
++- 如果要关，再显式设置 `TOPOLOGY_MANUAL_JUNCTION_EDIT=0`
++
++## 改动后的结果
++
++现在不额外配环境变量时：
++
++- 后端会默认允许手动捏合/创建/拆分枢纽
++- 前端会默认显示对应能力
++
++如果后面你又想切回只读：
++
++- 设置 `TOPOLOGY_MANUAL_JUNCTION_EDIT=0`
++- 重启后端
++
++## 影响范围
++
++- `F:\smartgas-grid\backend\app\routers\topology_editor.py`
++- `F:\smartgas-grid\src\views\MapTopologyView.tsx`
++
++## 验证方式
++
++1. Python 语法检查
++2. 前端构建
++3. 搜索默认值是否已切到开启口径
++
++## 前后对比
++
++这一步不适合放图。
++
++原因：
++
++- 改的是默认开关，不是页面布局
++
++所以用表格替代：
++
++| 对比项 | 改前 | 改后 |
++| --- | --- | --- |
++| 后端默认值 | `TOPOLOGY_MANUAL_JUNCTION_EDIT=0` | `TOPOLOGY_MANUAL_JUNCTION_EDIT=1` |
++| 前端默认感知 | 默认偏只读 | 默认偏可编辑 |
++| 关闭方式 | 默认就关 | 显式设 `0` 再关闭 |
++
++## 一句话总结
++
++现在手动捏合枢纽已经改成默认打开了，只有你明确要关的时候，才需要再配 `TOPOLOGY_MANUAL_JUNCTION_EDIT=0`。
+*** End Patch

@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                    for (const next of adj.get(curr) || []) {
+-                        if (!visited.has(next)) queue.push(next)
++                    for (const next of adj.get(curr.nodeId) || []) {
++                        if (!visited.has(next.nodeId)) {
++                            queue.push({
++                                nodeId: next.nodeId,
++                                sourceEdgeIds: [...curr.sourceEdgeIds, next.edgeId],
++                            })
++                        }
+                     }
+                 } else {
+*** End Patch

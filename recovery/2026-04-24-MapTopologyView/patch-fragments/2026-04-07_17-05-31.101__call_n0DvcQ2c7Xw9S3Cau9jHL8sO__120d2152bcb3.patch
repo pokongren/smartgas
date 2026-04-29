@@ -1,0 +1,137 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\docs\2026-04-08-WE1第一张图主仿真入口五阶段收口方案.md
++# WE1 第一张图主仿真入口五阶段收口方案
++
++## 1. 主目标
++
++这次的主目标只收一件事：把 WE1 正式仿真入口从第二张图 `TopologyView` 收回第一张图 `MapTopologyView`。以后业务上默认认第一张图，第二张图只保留成研发调试页，不再承担正式仿真入口。
++
++## 2. 上下文与已知信息
++
++1. 当前正式 WE1 主链已经存在，前端主链主要在 [src/views/TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)、[src/hooks/useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)、[src/components/topology/SimPanel.tsx](/F:/smartgas-grid/src/components/topology/SimPanel.tsx)，后端主链主要在 [backend/app/routers/topology_simulation.py](/F:/smartgas-grid/backend/app/routers/topology_simulation.py)、[backend/app/services/topology_simulation.py](/F:/smartgas-grid/backend/app/services/topology_simulation.py)、[backend/app/services/we1_solver_input_service.py](/F:/smartgas-grid/backend/app/services/we1_solver_input_service.py)。
++2. 第一张图现在还挂着旧链路，页面在 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)，旧接口语义还和 `emergency simulate-failure` 一套逻辑缠在一起，所以它现在不是“已经接上新主链但没打开”，而是“页面承载层还没完成迁移”。
++3. 第二张图当前能跑，是因为它直接消费了新的 `simulation-overlay` 和快照链路，但它默认是抽象全网视图，业务用户看完以后很难直观看到“哪一段主干变了、哪一站压力掉了、哪一段故障断开了”。
++4. 当前最硬的技术约束不是按钮放哪里，而是 ID 不一致。地图页里有不少节点、边、聚合边、枢纽边是前端现拼的显示 ID，尤其边 ID 还带 `ce-*` 这类展示态 ID，而仿真 overlay 返回的是求解器原始节点和原始边 ID。如果先不做映射层，第一张图接了面板也看不准结果。
++5. 当前 WE1 场景基础已经够用，至少包括 `steady_base`、`zhongwei_compressor_offline`、`zhongwei_trunk_break`、`yanchi_jingbian_limited`。这次不优先扩场景，不优先重做求解器，只优先完成入口迁移和显示收口。
++
++## 3. 主代理与子代理分工
++
++### 3.1 主代理
++
++1. 主代理先冻结唯一口径：正式仿真以后只认 `useSimulation -> simulation-overlay/snapshots` 这一条主链，主承载页是 `MapTopologyView`，`TopologyView` 只保留调试职责。
++2. 主代理负责把 5 个阶段拆成真正能执行的顺序，不让团队一上来就搬面板、改样式，结果绕开最关键的 ID 映射硬约束。
++3. 主代理负责收侦察证据后只选一个实施方向，不允许地图页和抽象页同时各改一半。
++4. 主代理负责每阶段放行，判断是进入下一阶段，还是退回补映射、补验证、补回退点。
++
++### 3.2 侦察代理 A
++
++1. 侦察代理 A 只看第一张图现状，也就是 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 及其地图渲染和交互链。
++2. 侦察代理 A 只回答 3 件事：第一张图现在到底走哪条链，现有显示节点和显示边如何生成，哪些交互会和仿真覆盖层打架。
++3. 侦察代理 A 不改代码，只产出事实、文件、调用链和风险点。
++
++### 3.3 侦察代理 B
++
++1. 侦察代理 B 只看正式 WE1 仿真主链，也就是 [src/hooks/useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)、[src/views/TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)、[backend/app/routers/topology_simulation.py](/F:/smartgas-grid/backend/app/routers/topology_simulation.py)、[backend/app/services/we1_result_snapshot_service.py](/F:/smartgas-grid/backend/app/services/we1_result_snapshot_service.py) 这组文件。
++2. 侦察代理 B 只回答 3 件事：正式主链哪些必须原样复用，哪些 UI 能迁到地图页，哪些能力必须留在第二张图当调试工具。
++3. 侦察代理 B 不改地图页，不扩新功能，只给主代理收口依据。
++
++### 3.4 实施代理
++
++1. 同一轮只允许一个实施代理持有地图仿真主链相关文件，避免 `MapTopologyView`、仿真控制区、overlay 适配和路由语义被多人同时改散。
++2. 实施代理先做链路统一和 ID 映射，再做地图页接管，不允许倒顺序。
++3. 每完成一个阶段，都补一份人话版 Markdown 总结，讲清楚做了什么、为什么这么做、影响范围、怎么验证、失败先查哪层。
++
++### 3.5 验证代理
++
++1. 验证代理独立检查 5 类东西：入口是否统一、ID 映射是否可解释、地图结果是否看得懂、快照是否可用、第二张图是否成功降级成调试页。
++2. 验证失败时固定按这个顺序排：主入口状态 -> ID 映射层 -> overlay 落图 -> 快照与对比 -> 后端求解链。
++3. 验证代理不因为脚本通过就判定完成，地图页“业务上能看懂”也是硬验收条件。
++
++## 4. 修改逻辑
++
++1. 先统一链路，不统一链路就会长期存在“两套入口、两套口径、两套状态”。
++2. 先补映射层，不补映射层就会出现“仿真结果是对的，但地图点不上、线落不准、告警漂错位置”。
++3. 再让第一张图接管正式仿真。也就是说，场景选择、运行、快照、基线对比、节点详情都要在地图页完成。
++4. 再把第二张图降级成调试页。研发还需要它看 raw graph、overlay 命中率、节点边原始结果，所以不能删，但要去掉业务主入口语义。
++5. 这次明确不做 3 件事。第 1 件是不重写求解器，第 2 件是不扩更多试点线路，第 3 件是不再新造第三套仿真页面。
++
++## 5. 执行顺序
++
++### 5.1 第 1 阶段第 1 轮到第 2 轮：统一仿真主链路
++
++1. 这一阶段的人话目标是先把“以后到底认哪条链”定死，不让旧链路再混进来。
++2. 主代理冻结规则：正式 WE1 仿真以后只认 `useSimulation -> simulation-overlay/snapshots` 主链，地图页是主承载，Canvas 页是调试承载。
++3. 实施代理收掉第一张图对旧 `/api/emergency/simulate-failure` 语义的依赖，至少先把状态管理和正式仿真状态分离开，不再混用。
++4. 这一阶段重点改 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)、[src/hooks/useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)、[src/services/api.ts](/F:/smartgas-grid/src/services/api.ts)、[backend/app/routers/topology_simulation.py](/F:/smartgas-grid/backend/app/routers/topology_simulation.py)。
++5. 这一阶段完成标准有 3 个。第 1 个是正式 WE1 场景在代码里只有一条主链。第 2 个是地图页不再从旧故障推演接口拿正式仿真结果。第 3 个是前端类型和后端返回字段一一对齐。
++
++### 5.2 第 2 阶段第 1 轮到第 3 轮：补地图拓扑的仿真映射层
++
++1. 这一阶段的人话目标是先解决“结果怎么准地落到第一张图上”，这是这次方案里最关键的一层。
++2. 实施代理新增一层 mapper，把 overlay 原始节点 ID、原始边 ID、可能的一对多节点关系、聚合枢纽关系、显示边关系和地图显示对象串起来。
++3. 地图页里的显示节点以后至少要能回溯到 1 个或多个 overlay 节点，显示边以后至少要能回溯到真实 source edge IDs，而不是只剩展示态 `ce-*`。
++4. 这一阶段最好新增独立辅助文件来承载映射逻辑，不要把复杂映射全塞回 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 里。
++5. 这一阶段要先定 3 个口径。第 1 个是聚合节点压力怎么取值。第 2 个是多条原始边合到一条显示边时，流量和告警怎么汇总。第 3 个是未命中的节点和边怎么提示。
++6. 这一阶段完成标准有 4 个。第 1 个是节点命中关系可解释。第 2 个是边命中关系可解释。第 3 个是未命中节点数和边数可统计。第 4 个是映射结果能支撑后面地图页做稳定渲染。
++
++### 5.3 第 3 阶段第 1 轮到第 4 轮：第一张图接管仿真 UI 与覆盖层
++
++1. 这一阶段的人话目标是让第一张图不仅能点，还真能看懂。
++2. 实施代理把场景选择、运行仿真、保存快照、加载快照、基线对比、清除覆盖层这组正式动作迁入地图页，不再要求用户切到第二张图才能完成一次完整仿真。
++3. 地图页新增仿真覆盖层，但坚持“新增独立 overlay 图层”的做法，不直接污染旧图层规则。
++4. 地图页至少要把这些东西显示出来：节点压力或关键状态、边颜色变化、边粗细变化、边流量或方向、主干异常提示。
++5. 地图页默认要支持自动聚焦到 WE1 主样板范围，并提供“只看仿真命中段”或同类开关，不然全网太大，业务用户还是看不出来。
++6. 这一阶段重点改 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)、[src/components/topology/SimPanel.tsx](/F:/smartgas-grid/src/components/topology/SimPanel.tsx)、[src/hooks/useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)、[src/types/simulation.ts](/F:/smartgas-grid/src/types/simulation.ts)。
++7. 这一阶段完成标准有 4 个。第 1 个是 `steady_base` 在地图上能看出主流向和主干压力。第 2 个是 `zhongwei_compressor_offline` 能看出中卫附近变化。第 3 个是 `zhongwei_trunk_break` 能看出断点上下游差异。第 4 个是普通站点和枢纽详情都能看到仿真信息。
++
++### 5.4 第 4 阶段第 1 轮到第 3 轮：TopologyView 降级成调试页
++
++1. 这一阶段的人话目标是把第二张图的角色说清楚，别再让用户把它当主入口。
++2. 实施代理保留第二张图对 raw graph、overlay 原始数据、命中率、调试比对的支持，但去掉正式业务入口语义。
++3. 路由、按钮文案、页面标题、导航说明都要同步调整，明确 `/map-topology` 是正式仿真页，`/topology` 是调试页。
++4. 如果第二张图里还有已经迁到地图页的业务按钮，这一阶段要删除、隐藏或改成跳转提示，避免双入口状态不一致。
++5. 这一阶段重点改 [src/views/TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)、[src/App.tsx](/F:/smartgas-grid/src/App.tsx)、[src/components/ai-assistant/useAiAssistantPageContext.ts](/F:/smartgas-grid/src/components/ai-assistant/useAiAssistantPageContext.ts) 和相关样式文件。
++6. 这一阶段完成标准有 3 个。第 1 个是用户默认不会再把第二张图当正式仿真入口。第 2 个是研发还能用它排查 raw graph 和 overlay。第 3 个是两页对同一场景口径一致。
++
++### 5.5 第 5 阶段第 1 轮到第 4 轮：联调收口、回退准备与封板
++
++1. 这一阶段的人话目标是把“能跑”收成“能稳定交付”。
++2. 验证代理独立跑正式主链脚本，继续以现有 WE1 核心验证脚本为主，同时补地图页回归清单。
++3. 地图页要完整跑通这条链：选场景 -> 运行 -> 自动聚焦 -> 看 overlay -> 保存快照 -> 加载快照 -> 基线对比 -> 清除 overlay。
++4. 这一阶段要补异常兜底和回退点，包括 WE1 之外场景的提示、无映射数据时的提示、overlay 清除失败时的处理、旧入口回退开关。
++5. 这一阶段必须落 2 类文档。第 1 类是阶段总结。第 2 类是总收口说明，明确新旧链路对照、失败先查哪层、怎么回退。
++6. 这一阶段完成标准有 4 个。第 1 个是第一张图已经成为正式主入口。第 2 个是第二张图成功降级成调试页。第 3 个是回归验证通过。第 4 个是即便需要回退，也有明确入口和开关，不会临场乱改。
++
++## 6. 验证方式
++
++1. 第 1 类验证是链路验证，要确认正式仿真以后只走统一主链，不再混旧的故障推演接口。
++2. 第 2 类验证是映射验证，要确认地图页每个显示节点和显示边都能解释自己对应了哪些 overlay 原始对象，未命中数量可统计、可解释。
++3. 第 3 类验证是业务可视验证，要确认 4 个核心 WE1 场景在第一张图上都有明显差异，不再只是左侧数字在变。
++4. 第 4 类验证是快照验证，要确认保存、加载、基线对比和历史回放在地图页都可用。
++5. 第 5 类验证是调试页验证，要确认第二张图降级以后，研发排障能力没丢。
++6. 第 6 类验证是后端主链验证，要继续跑现有 WE1 核心脚本。失败时先查前端消费，再查映射层，再查接口，再查求解器。
++
++## 7. 风险与回退点
++
++1. 风险 1 是 ID 映射没定就开始搬 UI，结果页面看起来接上了，但线条、节点、告警全落不准。回退点是严格按阶段推进，没做完第 2 阶段就不进第 3 阶段。
++2. 风险 2 是地图页图层太多，仿真 overlay 直接改旧图层会把层级显示、搜索高亮、截断推演、枢纽详情、拖拽改点位一起打坏。回退点是始终新增独立 overlay 图层，可单独开关。
++3. 风险 3 是全网地图和 WE1 局部仿真天然错位。回退点是地图页默认聚焦 WE1 主样板，并提供命中过滤视图。
++4. 风险 4 是第二张图语义不改，用户继续跑去那里找正式仿真。回退点是第 4 阶段强制调整路由文案、标题和按钮语义。
++5. 风险 5 是旧新 API 语义继续混用，一个是故障时间帧，一个是稳态覆盖层，前端状态迟早会继续乱。回退点是正式仿真状态以后只认 overlay/snapshot 这一组对象。
++6. 风险 6 是地图页采用 AMap DOM 渲染，场景切换时全量销毁重建容易闪烁和卡顿。回退点是尽量做增量 overlay 更新，不做每次全图重建。
++
++## 8. 最终交付物
++
++1. 一份正式方案文档，也就是这份 [2026-04-08-WE1第一张图主仿真入口五阶段收口方案.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图主仿真入口五阶段收口方案.md)。
++2. 一份新旧链路对照说明，明确正式主链、旧链待退场链、调试页保留链各自是什么。
++3. 一套地图页仿真映射层设计和实现结果，明确节点、枢纽、显示边如何对齐 overlay 原始对象。
++4. 一套地图页正式仿真能力，包括场景切换、运行、overlay、快照、基线对比、清除和自动聚焦。
++5. 一套第二张图降级后的调试页边界说明。
++6. 一组阶段总结和总收口文档，方便后续继续接手，不用重新猜链路。
++
++## 9. 当前结论
++
++1. 之前那版方案方向是对的，但还不够硬，最大问题是把“地图页接主仿真”说成了 UI 迁移，实际上它首先是链路统一和 ID 映射问题。
++2. 这次优化以后，顺序已经改成“统一主链路 -> 补映射层 -> 地图接管 -> Canvas 降级 -> 联调封板”，这样更符合真实研发落地顺序。
++3. 后面真开工时，如果跳过第 2 阶段，基本一定会返工，因为第一张图不是简单换个按钮位置就能成为正式仿真页。
+*** End Patch

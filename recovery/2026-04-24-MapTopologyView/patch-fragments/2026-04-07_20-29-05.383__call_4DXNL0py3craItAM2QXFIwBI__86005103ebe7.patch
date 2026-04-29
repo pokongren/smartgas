@@ -1,0 +1,133 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const stats = useMemo(() => ({
+         nodes: topoNodes.length,
+         edges: topoEdges.length,
+         isolated: topoNodes.length > 0
+             ? findIsolatedNodes(
+@@
+             ).length
+             : 0,
+     }), [topoNodes, topoEdges])
++    const simulationMapping = useMemo(() => {
++        return buildSimulationOverlayMapping(topoNodes, topoEdges, steadyOverlay)
++    }, [steadyOverlay, topoEdges, topoNodes])
++    const mappingSummary = simulationMapping?.summary ?? null
++    const simulationVisualSummary = useMemo(() => {
++        if (!simulationMapping) return null
++        const highlightedNodeCount = topoNodes.filter(node => {
++            const match = simulationMapping.nodeMatchesByDisplayId.get(node.id)
++            return Boolean(match && (match.matchedNodeIds.length > 0 || match.matchedInternalEdgeIds.length > 0))
++        }).length
++        const highlightedEdgeCount = topoEdges.filter(edge => {
++            const match = simulationMapping.edgeMatchesByDisplayId.get(edge.id)
++            return Boolean(match && match.matchedEdgeIds.length > 0)
++        }).length
++        return {
++            highlightedNodeCount,
++            highlightedEdgeCount,
++        }
++    }, [simulationMapping, topoEdges, topoNodes])
++    const steadyScenarioOption = useMemo(() => {
++        return MAINLINE_SCENARIOS.find(item => item.id === steadyScenarioId) ?? null
++    }, [steadyScenarioId])
++    const selectedSnapshotSummary = useMemo(() => {
++        if (!steadySelectedSnapshotRunId) return null
++        return steadySnapshots.find(item => item.run_id === steadySelectedSnapshotRunId) ?? null
++    }, [steadySelectedSnapshotRunId, steadySnapshots])
++    const selectedBaselineSnapshotSummary = useMemo(() => {
++        if (!steadyBaselineSnapshotRunId) return null
++        return steadySnapshots.find(item => item.run_id === steadyBaselineSnapshotRunId) ?? null
++    }, [steadyBaselineSnapshotRunId, steadySnapshots])
++    const trialCoverageSummary = useMemo(() => {
++        const coveredCount = steadyTrialRunItems.filter(item => item.covered).length
++        return {
++            coveredCount,
++            pendingCount: steadyTrialRunItems.length - coveredCount,
++        }
++    }, [steadyTrialRunItems])
++    const latestCoveredTrialItem = useMemo(() => {
++        return [...steadyTrialRunItems]
++            .filter(item => item.covered && item.last_saved_at)
++            .sort((left, right) => (right.last_saved_at ?? '').localeCompare(left.last_saved_at ?? ''))[0] ?? null
++    }, [steadyTrialRunItems])
++    const recommendedCoverageScenario = useMemo(() => {
++        const itemMap = new Map(steadyTrialRunItems.map(item => [item.scenario_id, item]))
++        for (const scenarioId of [steadyScenarioId, ...COVERAGE_RECOMMENDATION_ORDER]) {
++            const matched = itemMap.get(scenarioId)
++            if (matched?.covered) {
++                return matched
++            }
++        }
++        return steadyTrialRunItems.find(item => item.covered) ?? steadyTrialRunItems[0] ?? null
++    }, [steadyScenarioId, steadyTrialRunItems])
++    const coverageResultSummary = useMemo(() => {
++        const currentScenarioItem = steadyTrialRunItems.find(item => item.scenario_id === steadyScenarioId) ?? null
++        const readinessLabel = trialCoverageSummary.pendingCount === 0
++            ? '可完整演示'
++            : trialCoverageSummary.coveredCount > 0
++                ? '可局部演示'
++                : '还不能演示'
++        const riskSummary = trialCoverageSummary.pendingCount > 0
++            ? `还有 ${trialCoverageSummary.pendingCount} 个典型场景没留快照，验收前先补齐。`
++            : (mappingSummary && (mappingSummary.unmatchedOverlayNodeIds.length > 0 || mappingSummary.unmatchedOverlayEdgeIds.length > 0))
++                ? '场景覆盖已经补齐，但当前结果还有点线没命中显示层，讲解时要同步看映射覆盖摘要。'
++                : '场景覆盖和当前命中都够用，可以直接进入固定演示口径。'
++        return {
++            readinessLabel,
++            currentScenarioCovered: Boolean(currentScenarioItem?.covered),
++            currentScenarioSnapshotCount: currentScenarioItem?.snapshot_count ?? 0,
++            latestCoverageTime: latestCoveredTrialItem?.last_saved_at ?? '',
++            matchedNodeText: simulationMapping ? `${mappingSummary?.displayNodesWithMatchedOverlay ?? 0} / ${mappingSummary?.displayNodeCount ?? 0}` : '-',
++            matchedEdgeText: simulationMapping ? `${mappingSummary?.matchedOverlayEdgeCount ?? 0} / ${steadyOverlay?.edges.length ?? 0}` : '-',
++            riskSummary,
++        }
++    }, [
++        latestCoveredTrialItem?.last_saved_at,
++        mappingSummary,
++        simulationMapping,
++        steadyOverlay?.edges.length,
++        steadyScenarioId,
++        steadyTrialRunItems,
++        trialCoverageSummary.coveredCount,
++        trialCoverageSummary.pendingCount,
++    ])
++    const coverageChecklistItems = useMemo(() => {
++        return steadyTrialRunItems.map(item => {
++            const playbook = MAINLINE_SCENARIO_PLAYBOOK[item.scenario_id] ?? {
++                focus: '先看当前场景对应的压力、流量和告警有没有合理变化。',
++                success: '至少要能跑出正式结果，并能留下一条可回看的快照。',
++                risk: '如果当前场景没有历史快照，验收时只能看即时结果。',
++                talk: '按当前场景解释主干状态变化。',
++            }
++            return {
++                ...item,
++                focus: playbook.focus,
++                success: playbook.success,
++                risk: playbook.risk,
++                talk: playbook.talk,
++                isCurrent: item.scenario_id === steadyScenarioId,
++                isRecommended: item.scenario_id === recommendedCoverageScenario?.scenario_id,
++            }
++        })
++    }, [recommendedCoverageScenario?.scenario_id, steadyScenarioId, steadyTrialRunItems])
++    const failureInvestigationLayerLabel = mappingSummary
++        ? FAILURE_LAYER_LABELS[mappingSummary.failureInvestigationLayer]
++        : FAILURE_LAYER_LABELS['frontend-consumption']
++    const steadyOverlayStatusText = steadyOverlay
++        ? `主仿真 ${steadyScenarioOption?.label ?? steadyOverlay.scenario_id} · ${SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}`
++        : '主仿真还没运行'
++    const simulationEntryHint = steadyOverlay
++        ? '第一张图已经接上当前主仿真结果，先看场景摘要，再看覆盖结果清单。'
++        : '先切场景并运行正式仿真，等结果出来后再做快照、对比和覆盖补跑。'
++    const demoGuideSteps = useMemo(() => {
++        return [
++            `1. 先在场景下拉里选 ${recommendedCoverageScenario?.label ?? '常规稳态'}。`,
++            '2. 点“运行正式仿真”，确认运行结果摘要里出现 run_id、生成时间和求解状态。',
++            '3. 点“保存快照”，把这次结果留档；如果要讲异常，记得先选一条基线快照。',
++            '4. 看“基线对比”和“覆盖结果清单”，确认差值、覆盖状态和最近留档时间。',
++            `5. 如果现场出问题，先按“${failureInvestigationLayerLabel}”这条线往下查。`,
++        ]
++    }, [failureInvestigationLayerLabel, recommendedCoverageScenario?.label])
+*** End Patch

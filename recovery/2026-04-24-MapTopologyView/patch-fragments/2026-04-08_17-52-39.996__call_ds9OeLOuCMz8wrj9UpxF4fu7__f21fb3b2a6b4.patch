@@ -1,0 +1,19 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    }, [steadySimError])
++    }, [steadySimError])
++    useEffect(() => {
++        writeSimulationShowcaseSyncContext({
++            source: 'map-topology',
++            pilotId: WE1_PRIMARY_PILOT_ID,
++            scenarioId: steadyOverlay?.scenario_id ?? steadyScenarioId,
++            selectedSnapshotRunId: steadySelectedSnapshotRunId,
++            baselineSnapshotRunId: steadyBaselineSnapshotRunId,
++            overlay: steadyOverlay,
++            updatedAt: new Date().toISOString(),
++        })
++    }, [steadyBaselineSnapshotRunId, steadyOverlay, steadyScenarioId, steadySelectedSnapshotRunId])
+ 
+     // ================== 鏀堕泦鍏ㄩ儴绠＄嚎鍘熷鏁版嵁锛堜笉浼犵粰 MapView锛屼粎渚涘鍏ョ敤锛?==================
+*** End Patch

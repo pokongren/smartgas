@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
++## 2026-04-05 04:23:01 +08:00
++
++- 本轮先按入口规则落到主目录执行：初始 `cwd=C:\Users\Administrator\.codex\worktrees\d0db\smartgas-grid`，切换后 `cwd=F:\smartgas-grid`，`git rev-parse --show-toplevel=F:/smartgas-grid`，结论只基于 `F:\smartgas-grid`，没有沿用 detached worktree 做实体判断。
++- 入口通过，不是 `automation env mismatch / worktree-path blockage`，也不是空壳仓库。主目录下有 `src/`、`backend/`、`docs/` 和本轮要求检查的关键文件；`git worktree list` 显示主目录 `F:/smartgas-grid` 在分支头 `eaf6ac4`，大量 `.codex/worktrees/*` 仍停在 `6410a10` detached，只能当背景。
++- 本轮主要是主目录里的未提交代码变化 + 数据库内容变化 + 本地实验残留混合，不是单一 docs 变更。`git status --short` 同时覆盖地图层级、枢纽 runtime 规则、数据库/导入脚本、AI 助手链路、docs 收口，并混有 `.npm-cache`、shadow db/json、临时脚本等本地噪音。
++- 地图层级线：`src/utils/hierarchyRenderer.ts` 新增统一 LOD 阈值 `critical/high/medium=6/10/14`，并加了 `valveMinZoom=11`、`expandClusterZoom=12`；`src/utils/mapRenderer.ts` 已接 `getNodeLODStrategy()` / `shouldShowNodeAtZoom()` 和 source/junction/major_junction 聚合标记。判断：全国地图这条线已基本收口，但 `src/views/MapTopologyView.tsx` 仍保留自己的 `TOPO_SIZES`、merge/edit 面板和拓扑表达，不等于和地图渲染完全同一套 zoom 口径。
++- 枢纽与数据库线：`backend/app/services/junction_groups.py` 已形成“`junction_groups_rebuilt` 优先、`junction_groups` 兼容兜底、manual overlay 单独覆盖层”的 runtime 口径；`backend/app/routers/topology_editor.py` 的 `/api/topology/junctions` 已返回 `manual_editing_enabled` 和 `mode=runtime_readonly|legacy_editable`。实库快照是 `stations=1272`、`pipelines=1268`、`pipeline_systems=14`、`junction_groups=18`、`junction_groups_backup_20260404=16`、`junction_groups_rebuilt=7`，`WE3/SJ2/SJ3` 前缀站/段分别是 `16/15`、`70/69`、`71/70`；`pipeline_systems.layers_config` 还是字段，不是单独表。判断：不只是代码在改，主库事实也在变，而且 runtime rebuilt 还处在双轨并存阶段。
++- 导入脚本线：`backend/scripts/add_we3.py`、`backend/scripts/add_sj2.py`、`backend/scripts/reimport_sj23.py` 都改成直接落 `backend/data/smartgas.db`，并把新增管段 `category` 收口到 `trunk/branch`，同时加强了 system/prefix 验收输出；`backend/check_db.py` 也升级成带 `WE3/SJ2/SJ3 + junction shadow` 校验的验收脚本。另有 `backend/scripts/rebuild_junctions.py`、`rebuild_sj3_from_excel.py`、`verify_junctions.py` 以及 `backend/data/junction-rebuild-*.json`、`smartgas.rebuild-preview.db` 等影子产物。判断：主链路补数/重导在推进，但旁边也混着本地重编实验，不能一口气都算正式基线。
++- AI 链路线：前端新增 `src/components/ai-assistant/useAiAssistantChat.ts`、`useAiAssistantPageContext.ts`，会把页面上下文和 `analysis_mode=subagents` 一起带到 `resolveApiPath('/api/ai-assistant/chat')`；后端 `backend/app/routers/ai_assistant.py` 已分 legacy 流和 orchestrated 流，串上 `backend/app/services/ai_analysis_orchestrator.py`、`analysis_validator.py`、`fix_task_router.py`。`backend/app/services/ai_client.py` 仍默认 `AI_BASE_URL=https://api.openai.com/v1`、`AI_DEFAULT_MODEL=gpt-3.5-turbo`，缺 key 时有 fallback，但 `useAiAssistantChat.ts`、`ai_analysis_orchestrator.py`、`fix_task_router.py` 里还能看到乱码残留。判断：AI 新链路在主目录未提交改动里是接起来的，但现在更像半接线中的本地能力，不适合对外说成正式入基线。
++- docs 线：`docs/TOPOLOGY_COMPUTATION_USAGE.md`、`docs/TOPOLOGY_SETUP_GUIDE.md` 明确把本地开发口径收口到 `8080`，并把 `/api/topology/...` 和 `/topology/...` 双路由现实写出来。判断：docs 不是装饰性更新，是在追当前前后端真实口径。
++- 本轮运行时间：`2026-04-05T04:23:01.9380722+08:00`
+*** End Patch

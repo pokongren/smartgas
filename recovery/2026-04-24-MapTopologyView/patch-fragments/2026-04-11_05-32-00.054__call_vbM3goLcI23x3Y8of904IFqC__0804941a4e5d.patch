@@ -1,0 +1,26 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const [isPreviewing, setIsPreviewing] = useState(false)
++    const [lineFlowPhase, setLineFlowPhase] = useState(0)
++    const [damageFlashVisible, setDamageFlashVisible] = useState(false)
+@@
+     useEffect(() => {
+         if (steadySimError) {
+             setStatusMsg(`姝ｅ紡浠跨湡澶辫触锛?{steadySimError}`)
+         }
+     }, [steadySimError])
++    useEffect(() => {
++        if (!steadyOverlay?.run_id) return
++        setDamageFlashVisible(true)
++        const timer = window.setTimeout(() => setDamageFlashVisible(false), 4500)
++        return () => window.clearTimeout(timer)
++    }, [steadyOverlay?.run_id])
++    useEffect(() => {
++        if (!steadyOverlay) return
++        const timer = window.setInterval(() => {
++            setLineFlowPhase(prev => (prev + 2) % 1000)
++        }, 120)
++        return () => window.clearInterval(timer)
++    }, [steadyOverlay?.run_id])
+*** End Patch

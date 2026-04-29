@@ -1,0 +1,311 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\docs\2026-04-04-统一整改方案_枢纽重编版.md
++# 统一整改方案：枢纽重编 + 渲染链路收口
++
++编制时间：2026-04-04
++
++## 1. 主目标
++
++这次整改不是补几个小 bug。
++
++主目标只有一个：把“枢纽”的定义、数据库、编辑器、全国地图和导入脚本全部收成一套口径，别再出现前端一套、后端一套、库里又一套的情况。
++
++这次新的总口径按你刚定的来：
++
++- 两条不同管线在同一站点或同一交叉点汇交，就认定为枢纽。
++- 三条及以上不同管线汇交，认定为大枢纽。
++- “两个站点合并才叫枢纽”这条旧规则，废弃。
++
++一句话说，就是从“按站点捏合定义枢纽”，改成“按管线交叉事实定义枢纽”。
++
++## 2. 上下文与已知信息
++
++当前确认下来的问题有四条：
++
++1. 全国地图渲染链路 [`src/utils/hierarchyRenderer.ts`](/F:/smartgas-grid/src/utils/hierarchyRenderer.ts) -> [`src/utils/mapRenderer.ts`](/F:/smartgas-grid/src/utils/mapRenderer.ts) -> [`src/views/GlobalPipelineView.tsx`](/F:/smartgas-grid/src/views/GlobalPipelineView.tsx) 里，阀室配置写的是 11 级，但实际显示更接近 14 级。
++2. 拓扑编辑器链路 [`src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx) -> [`backend/app/routers/topology_editor.py`](/F:/smartgas-grid/backend/app/routers/topology_editor.py) 还保留旧的“捏合成枢纽”思路，`junction` 语义没有彻底独立出来。
++3. live DB [`backend/data/smartgas.db`](/F:/smartgas-grid/backend/data/smartgas.db) 里还留着 nested junction 和 single-station junction 这类旧口径脏数据。
++4. 导入脚本 [`backend/scripts/add_sj2.py`](/F:/smartgas-grid/backend/scripts/add_sj2.py)、[`backend/scripts/add_we3.py`](/F:/smartgas-grid/backend/scripts/add_we3.py)、[`backend/scripts/reimport_sj23.py`](/F:/smartgas-grid/backend/scripts/reimport_sj23.py) 有变更，但 `WE3` 还没有被 live DB 证明真正落库。
++
++这次最重要的变化，是枢纽定义变了。
++
++所以这轮不能只修显示，也不能只清库。要按“先改定义和库，再改生成链路，再改前端消费，最后补脚本验收”的顺序收口。
++
++### 当前 vs 目标
++
++这次不适合放前后对比图。
++
++原因很简单：现在要编的是整改方案，不是单一页面视觉改版。这里更关键的是“规则和数据结构怎么变”，不是截图前后长什么样。
++
++所以这里用前后对比表替代：
++
++| 项目 | 当前口径 | 目标口径 |
++| --- | --- | --- |
++| 枢纽定义 | 多站捏合才算枢纽 | 两条不同管线交叉即枢纽，3 条及以上是大枢纽 |
++| 枢纽来源 | 前端交互产生为主 | 后端按管线交叉规则统一编制为主 |
++| junction_groups | 混有 nested / single-station 旧数据 | 重编成真实交叉关系，不再保留旧脏数据 |
++| 编辑器 | `junction` 仍部分按 `station` 处理 | `junction` / `major_junction` 语义独立 |
++| 全国地图 | 阀室规则内部打架 | 缩放阈值、重要性、显示结果一致 |
++| 导入脚本 | 脚本改动和 DB 事实脱节 | 脚本执行结果必须能被 DB 和校验脚本证明 |
++
++## 3. 子代理拆分
++
++这次按“并行侦察 + 单点实施 + 独立验证”的模式组织，具体拆成四块。
++
++### 3.1 侦察代理 A：枢纽规则与数据库模型
++
++负责范围：
++
++- [`backend/app/models.py`](/F:/smartgas-grid/backend/app/models.py)
++- [`backend/app/services/junction_groups.py`](/F:/smartgas-grid/backend/app/services/junction_groups.py)
++- [`backend/app/services/topology.py`](/F:/smartgas-grid/backend/app/services/topology.py)
++- [`backend/data/smartgas.db`](/F:/smartgas-grid/backend/data/smartgas.db)
++
++要查清的事：
++
++- 旧 `junction_groups` 结构现在到底承载了哪些“捏合型枢纽”遗留。
++- 新“按管线交叉定义枢纽”需要什么字段。
++- 大枢纽是不是单独建等级字段，还是单独建类型字段。
++- 现有 nested / single-station 记录怎么迁移。
++
++### 3.2 侦察代理 B：编辑器链路
++
++负责范围：
++
++- [`src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx)
++- [`src/services/topologyEditorApi.ts`](/F:/smartgas-grid/src/services/topologyEditorApi.ts)
++- [`backend/app/routers/topology_editor.py`](/F:/smartgas-grid/backend/app/routers/topology_editor.py)
++
++要查清的事：
++
++- 现在哪些交互仍然建立在“多站捏合”这套旧定义上。
++- `junction` 在前端状态、接口请求、后端入库这三段里哪里还被降格成 `station`。
++- 编辑器里哪些功能要保留，哪些功能要改成“查看系统识别出的枢纽”，而不是“手工创造枢纽”。
++
++### 3.3 侦察代理 C：全国地图与导入脚本
++
++负责范围：
++
++- [`src/utils/hierarchyRenderer.ts`](/F:/smartgas-grid/src/utils/hierarchyRenderer.ts)
++- [`src/utils/mapRenderer.ts`](/F:/smartgas-grid/src/utils/mapRenderer.ts)
++- [`src/views/GlobalPipelineView.tsx`](/F:/smartgas-grid/src/views/GlobalPipelineView.tsx)
++- [`backend/scripts/add_sj2.py`](/F:/smartgas-grid/backend/scripts/add_sj2.py)
++- [`backend/scripts/add_we3.py`](/F:/smartgas-grid/backend/scripts/add_we3.py)
++- [`backend/scripts/reimport_sj23.py`](/F:/smartgas-grid/backend/scripts/reimport_sj23.py)
++- [`backend/check_db.py`](/F:/smartgas-grid/backend/check_db.py)
++
++要查清的事：
++
++- 新枢纽定义落地后，全国地图要新增哪些显示层级。
++- 大枢纽和普通枢纽在 marker、聚合、缩放阈值上怎么区分。
++- 导入脚本怎样在入库后直接产出可核验的交叉关系。
++- `WE3` 这类脚本改动怎样闭环到 DB 验收。
++
++### 3.4 实施代理
++
++这次真正落代码建议只用一个实施代理负责主干改动。
++
++原因很现实：这轮会同时动数据库定义、后端服务和前端消费口径，多个实施代理一起改，很容易把口径改散。
++
++实施代理负责的边界：
++
++- 数据库重编脚本 / 迁移脚本
++- 后端枢纽计算与输出
++- 前端编辑器和全国地图消费层收口
++- 导入脚本校验闭环
++
++### 3.5 验证代理
++
++独立负责这几件事：
++
++- 重新编制后的库里，不能再有 nested junction 和 single-station junction。
++- 全国地图上，阀室缩放阈值要和规则一致。
++- 编辑器链路不再把 `junction` 当 `station` 走。
++- `WE3` 如果宣称落库，DB 必须查得到。
++
++## 4. 执行顺序
++
++这次我建议按 4 个阶段做，不要跳。
++
++### 阶段一：先重编枢纽库
++
++这是第一优先级。
++
++因为枢纽定义已经变了，旧库本身就不再可靠。继续拿旧 `junction_groups` 修修补补，后面只会越来越乱。
++
++这一步要做的事：
++
++1. 定义新的枢纽判定规则。
++   - 两条不同管线交叉：`junction`
++   - 三条及以上不同管线交叉：`major_junction`
++2. 写一套“重编枢纽库”脚本。
++   - 读取 `stations`、`pipelines`、`pipeline_systems`
++   - 识别同坐标交叉、同站多系统交叉、必要时加容差归并
++   - 生成新的枢纽结果集
++3. 清理旧 `junction_groups` 的 nested / single-station 脏数据。
++4. 产出重编结果校验表。
++
++建议新增产物：
++
++- `backend/scripts/rebuild_junctions.py`
++- `backend/scripts/verify_junctions.py`
++- 必要时新增 `junction_level` / `junction_kind` 字段，或者新增派生表
++
++### 阶段二：收后端口径
++
++先让后端成为唯一事实来源。
++
++这一步要做的事：
++
++1. 改 [`backend/app/services/junction_groups.py`](/F:/smartgas-grid/backend/app/services/junction_groups.py)
++   - 不再以“用户捏合关系”作为主事实
++   - 改成以“重编后的枢纽结果”作为主事实
++2. 改 [`backend/app/services/topology.py`](/F:/smartgas-grid/backend/app/services/topology.py)
++   - 输出普通枢纽 / 大枢纽的明确类型
++3. 改 [`backend/app/routers/topology_editor.py`](/F:/smartgas-grid/backend/app/routers/topology_editor.py)
++   - 去掉或降级旧的“合并成枢纽即写库”逻辑
++   - 编辑器如果还保留人工干预，应该变成“标记 / 修正 / 例外覆盖”，不是重新定义枢纽本身
++4. 保证 SCADA / topology / pipeline package 这些读取枢纽的地方都走同一份结果
++
++### 阶段三：收前端两条链
++
++这一步才轮到前端。
++
++#### 3.1 全国地图链
++
++改动范围：
++
++- [`src/utils/hierarchyRenderer.ts`](/F:/smartgas-grid/src/utils/hierarchyRenderer.ts)
++- [`src/utils/mapRenderer.ts`](/F:/smartgas-grid/src/utils/mapRenderer.ts)
++- [`src/views/GlobalPipelineView.tsx`](/F:/smartgas-grid/src/views/GlobalPipelineView.tsx)
++
++目标：
++
++- 统一阀室缩放规则，不再出现“配置 11，实际 14”。
++- 普通枢纽和大枢纽有清楚的显示分层。
++- 所有节点显示规则只认一套 hierarchy 规则，不再各写各的。
++
++#### 3.2 编辑器链
++
++改动范围：
++
++- [`src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx)
++- [`src/services/topologyEditorApi.ts`](/F:/smartgas-grid/src/services/topologyEditorApi.ts)
++
++目标：
++
++- `junction` 不再映回 `station`
++- 编辑器里看到的枢纽，与后端重编结果一致
++- 如果保留人工操作，动作名称和语义要改
++  - 不再叫“把几个站捏合成枢纽”
++  - 改成“确认交叉点”“标记大枢纽”“拆分错误归并”这类动作
++
++### 阶段四：补导入脚本闭环
++
++这一步收尾，但必须做。
++
++改动范围：
++
++- [`backend/scripts/add_sj2.py`](/F:/smartgas-grid/backend/scripts/add_sj2.py)
++- [`backend/scripts/add_we3.py`](/F:/smartgas-grid/backend/scripts/add_we3.py)
++- [`backend/scripts/reimport_sj23.py`](/F:/smartgas-grid/backend/scripts/reimport_sj23.py)
++- [`backend/check_db.py`](/F:/smartgas-grid/backend/check_db.py)
++
++目标：
++
++- 每个导入脚本跑完，都能被 DB 事实证明。
++- `WE3` 不能再停留在“脚本写了，但库里没证据”的状态。
++- 校验脚本要能直接输出：
++  - 新增了哪些 system
++  - 新增了哪些 station / pipeline
++  - 产生了哪些 junction / major_junction
++
++## 5. 验证方式
++
++验证不要只跑构建。
++
++这次至少要做 5 类验证。
++
++### 5.1 数据库验证
++
++- `junction_groups` 或新枢纽表里不再存在 nested junction
++- 不再存在 single-station junction
++- 每个枢纽至少关联 2 条不同管线
++- 每个大枢纽至少关联 3 条不同管线
++
++### 5.2 后端接口验证
++
++- topology 相关接口返回的枢纽类型一致
++- SCADA 查枢纽历史时，能拿到正确的底层站点集合
++- 编辑器接口不再把 `junction` 当 `station` 存
++
++### 5.3 前端渲染验证
++
++- 阀室在约定 zoom 出现，不再出现“写 11、显 14”
++- 普通枢纽 / 大枢纽在全国地图上的显示分层正确
++- 编辑器和全国地图里，同一个枢纽的类型和名称一致
++
++### 5.4 脚本验收验证
++
++- `add_sj2.py` 跑完后，`SJ2` 相关记录数符合预期
++- `add_we3.py` 跑完后，DB 能查到 `WE3` 和 `we3`
++- `reimport_sj23.py` 跑完后，SJ2 / SJ3 相关枢纽重新计算正确
++
++### 5.5 回归验证
++
++- 不影响现有非枢纽站点渲染
++- 不影响 topology 基础图构建
++- 不影响已有历史查询页面基本可用性
++
++## 6. 风险与回退点
++
++### 主要风险
++
++1. 新枢纽定义会直接推翻旧 `junction_groups` 的业务含义，历史接口和编辑器都可能受影响。
++2. “按管线交叉识别枢纽”如果容差没定好，可能会误把邻近站点当成交叉点。
++3. 大枢纽一旦入模，前端 marker、聚合、筛选规则会一起跟着变。
++4. 如果先改前端再改后端，会出现短期更乱的状态。
++
++### 回退点
++
++1. 先保留旧 `junction_groups` 备份表或导出文件，再执行重编。
++2. 新枢纽编制结果先灰度到新表 / 新字段，验证通过后再切主读取口径。
++3. 前端先兼容 `junction` / `major_junction` 双口径，再删旧逻辑。
++4. `WE3` 相关导入如果校验不过，直接回到“脚本存在但不宣称落库”的状态，不强行对外认领。
++
++## 7. 最终交付物
++
++这次统一整改建议最终交付这些东西：
++
++1. 一份新的枢纽规则说明文档
++   - 明确“什么叫枢纽，什么叫大枢纽”
++2. 一套重编库脚本
++   - 重建枢纽
++   - 清理旧脏数据
++   - 生成校验结果
++3. 一套后端统一服务
++   - 统一输出普通枢纽 / 大枢纽
++4. 一套前端收口结果
++   - 全国地图一套规则
++   - 编辑器一套语义
++5. 一套脚本验收机制
++   - `WE3` 之类的入库结果可核验
++6. 一份人话版实施总结
++   - 讲清楚做了什么、为什么这么做、影响范围、验证结果
++   - 如果那时适合截图，就补前后对比图
++   - 如果不适合截图，就继续用前后对比表
++
++## 推荐落地顺序
++
++如果现在就开工，我建议严格按这个顺序推进：
++
++1. 重编枢纽库，废掉旧“多站捏合即枢纽”的主定义
++2. 收后端读取和写入口径，让后端先统一
++3. 收全国地图链路，统一阀室和枢纽显示规则
++4. 收编辑器链路，把 `junction` 语义扶正
++5. 补导入脚本闭环，重点把 `WE3` 落库证据补齐
++
++一句话总结：
++
++先改“定义和库”，再改“服务和前端”，最后补“脚本和验收”。
+*** End Patch

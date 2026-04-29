@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                        <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">导出演示清单</button>
++                                        <button onClick={copySimulationStructuredBrief} className="col-span-2 rounded-lg border border-violet-400/30 bg-violet-950/30 px-3 py-2 text-xs font-medium text-violet-100">复制结构化简报（给AI）</button>
++                                        <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">导出演示清单</button>
+*** End Patch

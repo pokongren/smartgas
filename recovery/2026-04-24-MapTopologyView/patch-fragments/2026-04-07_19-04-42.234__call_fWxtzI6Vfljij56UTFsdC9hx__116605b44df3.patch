@@ -1,0 +1,99 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
++import {
++    buildSimulationOverlayMapping,
++    type DisplayEdgeSimulationMatch,
++    type DisplayNodeSimulationMatch,
++} from '@/utils/simulationOverlayMapping'
+@@
+ const LINE_COLOR = '#34d399'
+ const LINE_WEIGHT = 2
++const SIMULATION_DIM_EDGE_COLOR = 'rgba(148, 163, 184, 0.35)'
++const SIMULATION_DIM_NODE_COLOR = '#475569'
+@@
+ function createTopoMarkerContent(type: PointType, name: string = '', isHighlight = false, isJunction = false): string {
+@@
+     return `
+         <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+             <div style="${shapeStyle}"></div>
+             ${name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10;">${name}</div>` : ''}
+         </div>
+     `
+ }
++
++function getAlertAccent(level: 'normal' | 'warning' | 'critical', fallback: string): string {
++    if (level === 'critical') return '#ef4444'
++    if (level === 'warning') return '#f59e0b'
++    return fallback
++}
++
++function createSimulationMarkerContent(
++    node: TopoNode,
++    match: DisplayNodeSimulationMatch | null,
++    isHighlight = false,
++): string {
++    if (!match) {
++        return createTopoMarkerContent(node.type, node.name, isHighlight, !!node.isJunction)
++    }
++
++    const fallbackColor = node.isJunction ? TOPO_COLORS.junction : TOPO_COLORS[node.type]
++    const color = match.matchedNodeIds.length > 0
++        ? getAlertAccent(match.highestAlertLevel, fallbackColor)
++        : SIMULATION_DIM_NODE_COLOR
++    const pressureLabel = match.averagePressureMpa === null ? '未命中' : `${match.averagePressureMpa.toFixed(3)} MPa`
++    const subtitle = match.matchedNodeIds.length > 0
++        ? `节点 ${match.matchedNodeIds.length}/${match.sourceNodeIds.length}`
++        : `未命中 ${match.missingSourceNodeIds.length}`
++    const size = node.isJunction ? TOPO_SIZES.station + 6 : TOPO_SIZES[node.type] + (match.matchedNodeIds.length > 0 ? 3 : 1)
++    const border = isHighlight ? '2px solid #fff' : '1px solid rgba(255,255,255,0.7)'
++    const shadow = match.matchedNodeIds.length > 0
++        ? `0 0 10px ${color}`
++        : '0 0 6px rgba(71,85,105,0.55)'
++    const shapeStyle = node.isJunction
++        ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 3px;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
++        : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
++
++    return `
++        <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
++            <div style="${shapeStyle}"></div>
++            <div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: #fff; font-weight: 600; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10;">${node.name}</div>
++            <div style="position: absolute; top: ${size + 18}px; white-space: nowrap; font-size: 10px; color: ${match.matchedNodeIds.length > 0 ? '#bbf7d0' : '#fca5a5'}; text-shadow: 0 0 2px #000, 0 0 2px #000; z-index: 10;">${pressureLabel}</div>
++            <div style="position: absolute; top: ${size + 31}px; white-space: nowrap; font-size: 9px; color: #cbd5e1; text-shadow: 0 0 2px #000, 0 0 2px #000; z-index: 10;">${subtitle}</div>
++        </div>
++    `
++}
++
++function getSimulationEdgeStyle(match: DisplayEdgeSimulationMatch | null, hasOverlay: boolean) {
++    if (!hasOverlay) {
++        return {
++            strokeColor: LINE_COLOR,
++            strokeWeight: LINE_WEIGHT,
++            strokeOpacity: 0.9,
++            strokeStyle: 'solid' as const,
++            zIndex: 100,
++        }
++    }
++
++    if (!match || match.matchedEdges.length === 0) {
++        return {
++            strokeColor: SIMULATION_DIM_EDGE_COLOR,
++            strokeWeight: 1,
++            strokeOpacity: 0.55,
++            strokeStyle: 'dashed' as const,
++            zIndex: 80,
++        }
++    }
++
++    const accent = getAlertAccent(match.highestAlertLevel, match.matchedEdges[0]?.color ?? LINE_COLOR)
++    const width = Math.max(LINE_WEIGHT + 1, Math.min(8, LINE_WEIGHT + Math.round((match.averageUtilization ?? 0) * 5)))
++    return {
++        strokeColor: accent,
++        strokeWeight: width,
++        strokeOpacity: 0.95,
++        strokeStyle: 'solid' as const,
++        zIndex: 130,
++    }
++}
+*** End Patch

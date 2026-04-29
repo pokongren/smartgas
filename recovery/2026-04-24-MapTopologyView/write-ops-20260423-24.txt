@@ -1,0 +1,542 @@
+[2026-04-23T09:19:25.485Z] [call_BqschgpU9jE8TWuNlPMgFEJS]
+@'
+from pathlib import Path
+path = Path(r'F:\smartgas-grid\src\views\MapTopologyView.tsx')
+text = path.read_text(encoding='utf-8')
+old = " | 鍩烘俯${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}掳C"
+old2 = " | 濞?${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}掳C"
+text = text.replace(old, "")
+text = text.replace(old2, "")
+path.write_text(text, encoding='utf-8')
+'@ | python -
+C:\Users\Administrator\.codex\sessions\2026\04\23\rollout-2026-04-23T16-57-43-019db98f-335b-7190-b7c4-6c43126d59ed.jsonl
+---
+[2026-04-23T09:20:03.015Z] [call_NgsELGUHDIATEFRFtfGhJAuN]
+@'
+from pathlib import Path
+path = Path(r'F:\smartgas-grid\src\views\MapTopologyView.tsx')
+lines = path.read_text(encoding='utf-8').splitlines()
+replacements = {
+    2052: '                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">基进${_baselineInPressure!.toFixed(2)} | 基出${_baselineOutPressure.toFixed(2)} MPa</div>`',
+    2060: '                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">基进${_baselineInPressure!.toFixed(2)} | 基出${_baselineOutPressure.toFixed(2)} MPa</div>`',
+    2068: '                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">基进${_baselineInPressure!.toFixed(2)} | 基出${_baselineOutPressure.toFixed(2)} MPa</div>`',
+    2079: '                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">基进${_baselineInPressure!.toFixed(2)} | 基出${_baselineOutPressure.toFixed(2)} MPa</div>`',
+    2090: '                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">基进${_baselineInPressure!.toFixed(2)} | 基出${_baselineOutPressure.toFixed(2)} MPa</div>`',
+}
+for line_no, value in replacements.items():
+    lines[line_no - 1] = value
+path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+'@ | python -
+C:\Users\Administrator\.codex\sessions\2026\04\23\rollout-2026-04-23T16-57-43-019db98f-335b-7190-b7c4-6c43126d59ed.jsonl
+---
+[2026-04-23T09:20:31.167Z] [call_sCW2cA2Lq5UpPIJDDfUlwzhV]
+@'
+from pathlib import Path
+path = Path(r'F:\smartgas-grid\src\views\MapTopologyView.tsx')
+lines = path.read_text(encoding='utf-8').splitlines()
+value = '                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">\\u57fa\\u8fdb${_baselineInPressure!.toFixed(2)} | \\u57fa\\u51fa${_baselineOutPressure.toFixed(2)} MPa</div>`'
+for line_no in (2052, 2060, 2068, 2079, 2090):
+    lines[line_no - 1] = value
+path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+'@ | python -
+C:\Users\Administrator\.codex\sessions\2026\04\23\rollout-2026-04-23T16-57-43-019db98f-335b-7190-b7c4-6c43126d59ed.jsonl
+---
+[2026-04-23T16:55:42.522Z] [call_up3ez7YWA6WYx4BzdZQqEspn]
+$path='F:/smartgas-grid/src/views/MapTopologyView.tsx'; $content=Get-Content -LiteralPath $path -Raw; $replacement=@'
+function CustomSelect({ value, options, onChange, placeholder, icon }: { value: string, options: { value: string, label: string }[], onChange: (v: string) => void, placeholder: string, icon: string }) {
+    const [isOpen, setIsOpen] = useState(false)
+    const ref = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false)
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    const selectedOption = options.find(o => o.value === value)
+    return (
+        <div className="relative w-full" ref={ref}>
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between bg-[#0a1520]/80 border border-cyan-500/30 rounded-md px-2.5 py-1.5 text-xs text-cyan-50 hover:bg-cyan-950/40 hover:border-cyan-400/50 transition-all text-left shadow-inner"
+            >
+                <div className="flex items-center gap-1.5 overflow-hidden">
+                    {icon && <span className="material-symbols-outlined text-[14px] text-cyan-500 shrink-0">{icon}</span>}
+                    <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
+                </div>
+                <span className={`material-symbols-outlined text-[16px] text-cyan-600/70 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>expand_more</span>
+            </button>
+            {isOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-[#060c13] border border-cyan-500/40 rounded-md shadow-[0_8px_30px_rgba(0,0,0,0.8)] max-h-56 overflow-y-auto py-1 backdrop-blur-md">
+                    {options.map(opt => (
+                        <button
+                            key={opt.value}
+                            onClick={() => { onChange(opt.value); setIsOpen(false) }}
+                            className={`w-full text-left px-3 py-1.5 text-[11px] transition-colors flex items-center gap-2 ${value === opt.value ? 'text-cyan-200 bg-cyan-900/30' : 'text-slate-300 hover:bg-cyan-950/50 hover:text-cyan-100'}`}
+                        >
+                            <span className={`w-1 h-1 rounded-full shrink-0 ${value === opt.value ? 'bg-cyan-400' : 'bg-transparent'}`}></span>
+                            <span className="truncate">{opt.label}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+'@; $pattern='function CustomSelect[\s\S]*?\r?\n\}\r?\n\r?\n\r?\n// =================='; $new=[regex]::Replace($content,$pattern,"$replacement`r`n// ==================",1); Set-Content -LiteralPath $path -Value $new -Encoding UTF8;
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-23T18:31:27.454Z] [call_DEOlKitlHuGXLkNvuRDi7Kyh]
+git show 1ab72ed:src/views/MapTopologyView.tsx | Select-Object -First 80
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-23T18:31:27.454Z] [call_x9QtyCG3pveWOMZjGUzDL1cA]
+git show ced7d5c:src/views/MapTopologyView.tsx | Select-Object -First 80
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-23T18:34:53.216Z] [call_V5DLnCnbTDymgx36mwLuRUdZ]
+git show ced7d5c:src/views/MapTopologyView.tsx | rg -n "id: 'simulation'|icon: 'science'|SOLVER_STATUS_LABELS|仿真控制台|INPUT DATA|SOLVER ENGINE|OUTPUT VIEW"
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-23T18:35:01.443Z] [call_j0lrCC4PaLQNyfP7CpwZId2f]
+$content = git show ced7d5c:src/views/MapTopologyView.tsx; $lines=$content -split "`n"; for($i=1;$i -le $lines.Length;$i++){ if($lines[$i-1] -match "PanelTab|simulation|sim-params|cutoff|science|tune|SOLVER_STATUS_LABELS") { '{0,5}: {1}' -f $i,$lines[$i-1] } }
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-23T18:46:18.955Z] [call_iBOaJsPfMk584LtlDXdq7bsg]
+$dir='F:/smartgas-grid/recovery/2026-04-24-MapTopologyView'; New-Item -ItemType Directory -Path $dir -Force | Out-Null; Copy-Item 'F:/smartgas-grid/src/views/MapTopologyView.tsx' "$dir/MapTopologyView.current.tsx" -Force; Copy-Item 'F:/smartgas-grid/src/views/MapTopologyView.tsx.backup-1649lines' "$dir/MapTopologyView.backup-1649lines.tsx" -Force; Get-FileHash "$dir/MapTopologyView.current.tsx","$dir/MapTopologyView.backup-1649lines.tsx" | Select-Object Path,Algorithm,Hash
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-23T18:47:26.310Z] [call_aAsl0fdH1Wgqy4hVxHGvB57B]
+$commits = git rev-list --all -- src/views/MapTopologyView.tsx; foreach($c in $commits){ $txt = git show "$c:src/views/MapTopologyView.tsx" 2>$null; if($LASTEXITCODE -ne 0){continue}; if($txt -match '仿真控制台|按压力快照运行|场景参数仿真|INPUT DATA|SOLVER ENGINE|OUTPUT VIEW'){ Write-Output $c } }
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-23T18:59:22.736Z] [call_cBXHprfZdofDLzBCLmN88WsI]
+@'
+import re
+from pathlib import Path
+p = Path(r'F:\smartgas-grid\src\views\MapTopologyView.tsx')
+text = p.read_text(encoding='utf-8')
+# find first few label literals
+for m in re.finditer(r"label:\s*'([^']*)'", text):
+    s=m.group(1)
+    if len(s)<=8:
+        print('orig', s.encode('unicode_escape').decode())
+        for enc in ['gbk','cp936','latin1','utf-8']:
+            try:
+                t=s.encode(enc).decode('utf-8')
+                print(enc, t.encode('unicode_escape').decode())
+            except Exception:
+                print(enc,'ERR')
+        print('---')
+    if m.start()>140000:
+        break
+print('expected 编辑', '\u7f16\u8f91')
+print('expected 验证', '\u9a8c\u8bc1')
+print('expected 搜索', '\u641c\u7d22')
+print('expected 枢纽', '\u67a2\u7ebd')
+print('expected 截断', '\u622a\u65ad')
+print('expected 仿真', '\u4eff\u771f')
+'@ | python -
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-24T05:01:59.477Z] [call_BcXRLwoBIdU54imU27hpfJnU]
+@'
+import json
+from pathlib import Path
+from datetime import datetime
+
+sessions_root = Path(r"C:\Users\Administrator\.codex\sessions")
+out_dir = Path(r"F:\smartgas-grid\recovery\2026-04-24-MapTopologyView\from-conversations")
+out_dir.mkdir(parents=True, exist_ok=True)
+
+# collect function_call metadata keyed by call_id
+calls = {}
+
+for f in sessions_root.rglob("*.jsonl"):
+    try:
+        with f.open('r', encoding='utf-8') as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                if obj.get('type') != 'response_item':
+                    continue
+                payload = obj.get('payload') or {}
+                if payload.get('type') != 'function_call':
+                    continue
+                if payload.get('name') != 'shell_command':
+                    continue
+                args = payload.get('arguments') or ''
+                if 'Get-Content' not in args:
+                    continue
+                if 'MapTopologyView.tsx' not in args.replace('\\\\','\\') and 'MapTopologyView.tsx' not in args:
+                    continue
+                # skip line-range reads
+                if 'Select-Object' in args or '-TotalCount' in args or '$i=' in args:
+                    continue
+                call_id = payload.get('call_id')
+                if not call_id:
+                    continue
+                calls[call_id] = {
+                    'timestamp': obj.get('timestamp',''),
+                    'session_file': str(f),
+                    'arguments': args,
+                }
+    except Exception:
+        pass
+
+saved = []
+
+# match outputs
+for f in sessions_root.rglob("*.jsonl"):
+    try:
+        with f.open('r', encoding='utf-8') as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except Exception:
+                    continue
+                if obj.get('type') != 'response_item':
+                    continue
+                payload = obj.get('payload') or {}
+                if payload.get('type') != 'function_call_output':
+                    continue
+                call_id = payload.get('call_id')
+                if call_id not in calls:
+                    continue
+                output = payload.get('output') or ''
+                if '/**' not in output or 'export default MapTopologyView' not in output:
+                    # likely not full code content
+                    continue
+                meta = calls[call_id]
+                ts = meta['timestamp'].replace(':','-').replace('T','_').replace('Z','')
+                safe_call = ''.join(ch for ch in call_id if ch.isalnum() or ch in ('_','-'))
+                out_path = out_dir / f"{ts}__{safe_call}.txt"
+                out_path.write_text(output, encoding='utf-8')
+                code_start = output.find('/**')
+                code = output[code_start:]
+                code_path = out_dir / f"{ts}__{safe_call}.tsx"
+                code_path.write_text(code, encoding='utf-8')
+                saved.append({
+                    'call_id': call_id,
+                    'timestamp': meta['timestamp'],
+                    'from_session': meta['session_file'],
+                    'command': meta['arguments'],
+                    'txt_path': str(out_path),
+                    'tsx_path': str(code_path),
+                    'line_count': code.count('\n') + 1,
+                    'size': len(code),
+                })
+    except Exception:
+        pass
+
+# deduplicate by exact content hash
+import hashlib
+by_hash = {}
+for item in saved:
+    p = Path(item['tsx_path'])
+    h = hashlib.sha256(p.read_bytes()).hexdigest()
+    item['sha256'] = h
+    by_hash.setdefault(h, []).append(item)
+
+summary = []
+for h, items in by_hash.items():
+    items_sorted = sorted(items, key=lambda x: x['timestamp'])
+    one = items_sorted[0]
+    summary.append({
+        'sha256': h,
+        'count': len(items),
+        'first_timestamp': items_sorted[0]['timestamp'],
+        'last_timestamp': items_sorted[-1]['timestamp'],
+        'sample_tsx': one['tsx_path'],
+        'sample_lines': one['line_count'],
+        'sample_size': one['size'],
+    })
+
+summary_path = out_dir / 'summary.json'
+summary_path.write_text(json.dumps({
+    'total_calls': len(calls),
+    'saved_snapshots': len(saved),
+    'unique_snapshots': len(summary),
+    'snapshots': summary,
+    'raw_items': saved,
+}, ensure_ascii=False, indent=2), encoding='utf-8')
+
+print('total_calls', len(calls))
+print('saved_snapshots', len(saved))
+print('unique_snapshots', len(summary))
+print('summary', summary_path)
+for s in sorted(summary, key=lambda x: x['first_timestamp']):
+    print(s['first_timestamp'], s['sample_lines'], s['sample_tsx'])
+'@ | python -
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-24T05:09:16.236Z] [call_gfwAfcS0YqfoT32fZXKMNHZg]
+@'
+import json, re
+from pathlib import Path
+sessions_root = Path(r"C:\Users\Administrator\.codex\sessions")
+pat = re.compile(r'^\s*Get-Content\b', re.I)
+clean_calls=[]
+for f in sessions_root.rglob('*.jsonl'):
+    with f.open('r', encoding='utf-8', errors='ignore') as fh:
+        for line in fh:
+            line=line.strip()
+            if not line: continue
+            try: obj=json.loads(line)
+            except: continue
+            if obj.get('type')!='response_item': continue
+            p=obj.get('payload') or {}
+            if p.get('type')!='function_call' or p.get('name')!='shell_command': continue
+            args_raw=p.get('arguments')
+            if not isinstance(args_raw,str): continue
+            try:
+                args=json.loads(args_raw)
+            except:
+                continue
+            cmd=args.get('command','')
+            if not isinstance(cmd,str): continue
+            if not pat.search(cmd): continue
+            if 'MapTopologyView.tsx' not in cmd and 'MapTopologyView.tsx' not in cmd.replace('\\','/'):
+                continue
+            if ';' in cmd: continue
+            if '|' in cmd: continue
+            if '$' in cmd: continue
+            clean_calls.append((obj.get('timestamp',''), p.get('call_id',''), cmd, str(f)))
+
+clean_calls.sort()
+print('count',len(clean_calls))
+for ts,cid,cmd,f in clean_calls[:200]:
+    print(ts,cid,cmd,'|',f)
+'@ | python -
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-24T05:09:51.800Z] [call_d3rY3OOTh5mTixXXoUNe3qkP]
+@'
+import json,re,hashlib
+from pathlib import Path
+sessions_root = Path(r"C:\Users\Administrator\.codex\sessions")
+out_dir = Path(r"F:\smartgas-grid\recovery\2026-04-24-MapTopologyView\from-conversations-clean")
+out_dir.mkdir(parents=True, exist_ok=True)
+
+calls={}
+for f in sessions_root.rglob('*.jsonl'):
+    with f.open('r',encoding='utf-8',errors='ignore') as fh:
+        for line in fh:
+            line=line.strip()
+            if not line: continue
+            try: obj=json.loads(line)
+            except: continue
+            if obj.get('type')!='response_item': continue
+            p=obj.get('payload') or {}
+            if p.get('type')!='function_call' or p.get('name')!='shell_command': continue
+            args_raw=p.get('arguments')
+            if not isinstance(args_raw,str): continue
+            try:
+                args=json.loads(args_raw)
+            except:
+                continue
+            cmd=args.get('command','')
+            if not isinstance(cmd,str): continue
+            c = cmd.replace('\\\\','\\')
+            if not re.match(r'^\s*Get-Content\b', c, re.I):
+                continue
+            if 'MapTopologyView.tsx' not in c:
+                continue
+            bad_tokens = ['-TotalCount','-First','-Tail','|',';','$i=','tmp_head_MapTopologyView']
+            if any(t in c for t in bad_tokens):
+                continue
+            call_id = p.get('call_id')
+            if not call_id: continue
+            calls[call_id] = {
+                'timestamp': obj.get('timestamp',''),
+                'session_file': str(f),
+                'command': c,
+            }
+
+items=[]
+for f in sessions_root.rglob('*.jsonl'):
+    with f.open('r',encoding='utf-8',errors='ignore') as fh:
+        for line in fh:
+            line=line.strip()
+            if not line: continue
+            try: obj=json.loads(line)
+            except: continue
+            if obj.get('type')!='response_item': continue
+            p=obj.get('payload') or {}
+            if p.get('type')!='function_call_output': continue
+            call_id=p.get('call_id')
+            if call_id not in calls: continue
+            out=p.get('output') or ''
+            if '/**' not in out or 'export default MapTopologyView' not in out:
+                continue
+            start=out.find('/**')
+            code=out[start:]
+            ts=calls[call_id]['timestamp'].replace(':','-').replace('T','_').replace('Z','')
+            name=f"{ts}__{call_id}"
+            txt=out_dir / f"{name}.txt"
+            tsx=out_dir / f"{name}.tsx"
+            txt.write_text(out,encoding='utf-8')
+            tsx.write_text(code,encoding='utf-8')
+            items.append({
+                'name':name,
+                'call_id':call_id,
+                'timestamp':calls[call_id]['timestamp'],
+                'session_file':calls[call_id]['session_file'],
+                'command':calls[call_id]['command'],
+                'tsx_path':str(tsx),
+                'line_count':code.count('\n')+1,
+                'size':len(code),
+                'contains_tokens_truncated':('tokens truncated' in code),
+                'contains_simulation':("'simulation'" in code),
+                'contains_sim_params':("'sim-params'" in code),
+                'contains_simparam_editor':('SimParamEditor' in code),
+                'contains_simpanel':('SimPanel' in code),
+                'contains_console':('仿真控制台' in code or 'INPUT DATA' in code),
+                'sha256':hashlib.sha256(code.encode('utf-8')).hexdigest(),
+            })
+
+# dedupe
+uniq={}
+for it in items:
+    uniq.setdefault(it['sha256'],it)
+summary={
+    'call_candidates':len(calls),
+    'saved_items':len(items),
+    'unique_items':len(uniq),
+    'items':sorted(items,key=lambda x:x['timestamp']),
+    'unique':sorted(uniq.values(),key=lambda x:x['timestamp']),
+}
+sp=out_dir/'summary.json'
+sp.write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding='utf-8')
+print('call_candidates',len(calls))
+print('saved_items',len(items))
+print('unique_items',len(uniq))
+print('summary',sp)
+for u in summary['unique']:
+    print(u['timestamp'],u['line_count'],u['contains_tokens_truncated'],u['contains_simulation'],u['contains_sim_params'],u['tsx_path'])
+'@ | python -
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-24T05:10:31.202Z] [call_0FNeT1EKyRlCL0wqmhr9bEdU]
+@'
+import json, hashlib
+from pathlib import Path
+
+sessions_root = Path(r"C:\Users\Administrator\.codex\sessions")
+out_dir = Path(r"F:\smartgas-grid\recovery\2026-04-24-MapTopologyView\patch-fragments")
+out_dir.mkdir(parents=True, exist_ok=True)
+
+items=[]
+for f in sessions_root.rglob('*.jsonl'):
+    with f.open('r',encoding='utf-8',errors='ignore') as fh:
+        for line in fh:
+            line=line.strip()
+            if not line: continue
+            try: obj=json.loads(line)
+            except: continue
+            if obj.get('type')!='response_item':
+                continue
+            p=obj.get('payload') or {}
+            if p.get('type')!='custom_tool_call' or p.get('name')!='apply_patch':
+                continue
+            patch = p.get('input') or ''
+            if 'MapTopologyView.tsx' not in patch:
+                continue
+            ts=(obj.get('timestamp') or '').replace(':','-').replace('T','_').replace('Z','')
+            cid=p.get('call_id','no_callid')
+            h=hashlib.sha256(patch.encode('utf-8')).hexdigest()[:12]
+            name=f"{ts}__{cid}__{h}.patch"
+            path=out_dir/name
+            path.write_text(patch,encoding='utf-8')
+            items.append({
+                'timestamp': obj.get('timestamp',''),
+                'call_id': cid,
+                'session_file': str(f),
+                'path': str(path),
+                'size': len(patch),
+                'sha256': hashlib.sha256(patch.encode('utf-8')).hexdigest(),
+            })
+
+# dedupe by sha
+uniq={}
+for it in items:
+    uniq.setdefault(it['sha256'], it)
+summary={
+    'total_patches': len(items),
+    'unique_patches': len(uniq),
+    'patches': sorted(items, key=lambda x: x['timestamp']),
+    'unique': sorted(uniq.values(), key=lambda x: x['timestamp']),
+}
+sp=out_dir/'summary.json'
+sp.write_text(json.dumps(summary,ensure_ascii=False,indent=2),encoding='utf-8')
+print('total_patches',len(items))
+print('unique_patches',len(uniq))
+print('summary',sp)
+for it in summary['unique'][-15:]:
+    print(it['timestamp'], it['path'])
+'@ | python -
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---
+[2026-04-24T05:12:46.906Z] [call_L5jJIhtmFF3VffEsg9NePPjy]
+@'
+import json,re
+from pathlib import Path
+sessions_root = Path(r"C:\Users\Administrator\.codex\sessions")
+pat_date = re.compile(r'^2026-04-2[34]T')
+rows=[]
+for f in sessions_root.rglob('*.jsonl'):
+    with f.open('r',encoding='utf-8',errors='ignore') as fh:
+        for line in fh:
+            line=line.strip()
+            if not line: continue
+            try: obj=json.loads(line)
+            except: continue
+            ts=obj.get('timestamp','')
+            if not pat_date.match(ts):
+                continue
+            if obj.get('type')!='response_item':
+                continue
+            p=obj.get('payload') or {}
+            if p.get('type')!='function_call' or p.get('name')!='shell_command':
+                continue
+            args_raw=p.get('arguments')
+            if not isinstance(args_raw,str):
+                continue
+            try:
+                args=json.loads(args_raw)
+            except:
+                continue
+            cmd=args.get('command','')
+            if 'MapTopologyView.tsx' not in cmd and 'MapTopologyView.tsx.backup-1649lines' not in cmd:
+                continue
+            lower=cmd.lower()
+            is_write = any(k in lower for k in [
+                'set-content','copy-item','move-item','out-file','add-content',
+                'writealltext','git show','python -','apply_patch','rename-item'
+            ]) or ' > ' in cmd or '>>' in cmd
+            if not is_write:
+                continue
+            rows.append((ts, p.get('call_id',''), cmd, str(f)))
+
+rows.sort()
+out=Path(r'F:\smartgas-grid\recovery\2026-04-24-MapTopologyView\write-ops-20260423-24.txt')
+with out.open('w',encoding='utf-8') as fh:
+    for ts,cid,cmd,f in rows:
+        fh.write(f"[{ts}] [{cid}]\n{cmd}\n{f}\n---\n")
+print('count',len(rows))
+print('out',out)
+for r in rows[-60:]:
+    print(r[0], r[1])
+'@ | python -
+C:\Users\Administrator\.codex\sessions\2026\04\05\rollout-2026-04-05T12-46-45-019d5bf6-f943-7752-9f6f-714e13a9ef68.jsonl
+---

@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                <span className="material-symbols-outlined text-sm">{tab.icon}</span>{tab.label}
++                                <span className="material-symbols-outlined text-sm">{tab.icon}</span>{tab.id === 'simulation' ? 'MainSim' : tab.label}
+*** End Patch

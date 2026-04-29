@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                            if (!steadyOverlay) {
++                                            if (!steadyOverlay && seedNodePressures.size === 0) {
+*** End Patch

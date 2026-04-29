@@ -1,0 +1,11 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    // 闂傚倷绶氶埀顒佺☉鐎氬酣鏌涙繝鍐疄鐎殿喓鍔戞慨鈧柕鍫濇噹閸?    type UndoAction =
++    // 撤销栈动作定义
++    type UndoAction =
+         | { type: 'add-node'; nodeId: string }
+         | { type: 'add-edge'; edgeId: string }
+         | { type: 'create-junction'; junctionId: number; name: string }
+         | { type: 'delete-junction'; group: JunctionGroup }
+*** End Patch

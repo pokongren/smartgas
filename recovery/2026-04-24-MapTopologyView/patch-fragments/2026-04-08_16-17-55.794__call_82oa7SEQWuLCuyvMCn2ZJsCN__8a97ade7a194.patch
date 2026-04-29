@@ -1,0 +1,65 @@
+*** Begin Patch
+*** Add File: docs/2026-04-09-WE1第三张图仿真展示专页第1阶段第1轮侦察总结_人话版.md
++# WE1 第三张图仿真展示专页第1阶段第1轮侦察总结
++
++## 1. 这一轮结论
++
++这轮没有改代码，只把第三张图到底是谁、现在是什么定位、后面怎么接仿真展示这三件事查清楚了。结论很明确：第三张图最合适的落点是 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)，但它现在还是“拓扑调试页”，不是正式仿真页。
++
++## 2. 第三张图现在对应哪里
++
++1. 路由入口在 [App.tsx](/F:/smartgas-grid/src/App.tsx)。
++2. `/map-topology` 对应第一张图主仿真页，也就是 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)。
++3. `/topology` 对应 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)。
++4. 右下角浮动按钮里也已经把 `/map-topology` 叫成“第一张图主仿真入口”，把 `/topology?debugActions=1` 叫成 “TopologyView 调试页”。
++
++## 3. 为什么判断第三张图就是它
++
++1. [App.tsx](/F:/smartgas-grid/src/App.tsx) 已经把 `TopologyView` 单独挂成一张完整页面。
++2. [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx) 页面自己直接写了“TopologyView 调试页”。
++3. 页面里还明确写着“正式仿真运行、快照和基线对比请回第一张图主入口”，并且给了“返回第一张图主仿真入口”的按钮。
++4. 这说明它现在的职责不是正式仿真操作，而是拓扑排障和调试辅助页。
++
++## 4. 现在适不适合拿来做仿真展示专页
++
++适合，但前提是改定位，不是直接拿现状开做。
++
++1. 适合的原因：它已经是独立页面，不挤在第一张图操作台里，空间更适合做状态展示、流动感和动画效果。
++2. 不适合直接用现状开做的原因：它当前语义还是调试页，文案、入口、行为都在往“排障”方向走。
++3. 所以后面要做的是“在 TopologyView 上重构成仿真展示专页”，不是简单往当前调试页里乱塞动画。
++
++## 5. 第三张图最适合复用第一张图哪些正式状态
++
++这些字段已经在 [useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts) 定义清楚，也已经在 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 里跑通。
++
++1. `overlay`：正式仿真当前结果，是第三张图展示状态、指标和流动感的核心。
++2. `isLoading`：用来区分未运行、运行中、运行结束。
++3. `error`：用来显示失败状态。
++4. `currentScenario`：用来显示当前场景。
++5. `snapshots`：用来显示历史快照和最近留档。
++6. `baselineSnapshotRunId`：后面如果第三张图要做对比展示，这个要复用。
++7. `comparison`：后面如果第三张图要做差值或变化高亮，这个可以直接复用。
++
++## 6. 最重要的文件证据
++
++1. 路由挂载：[App.tsx](/F:/smartgas-grid/src/App.tsx)
++2. 第一张图正式仿真入口：[MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)
++3. 第三张图当前页面：[TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)
++4. 正式仿真状态来源：[useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)
++
++## 7. 这一轮主代理与子代理做了什么
++
++1. 主代理：确定这轮只做侦察，不碰代码，避免边看边改。
++2. 侦察代理A：确认第三张图最可能对应 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)，并给出路由与页面定位证据。
++3. 主代理本地补充：把第一张图主仿真状态链和 [useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts) 的正式复用字段补查完整。
++
++## 8. 风险和边界
++
++1. 当前 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx) 还是调试页，下一轮不能一上来就做全量联动。
++2. 第2轮更合适先搭“仿真展示骨架”，只接状态头、场景、run_id、生成时间、核心指标，不先碰复杂联动。
++3. 第一张图仍然保持主操作入口，第三张图先做展示，不抢主入口职责。
++
++## 9. 下一轮怎么做
++
++下一轮就是第1阶段第2轮：在 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx) 上搭第三张图仿真展示骨架，先把“仿真身份感”立起来，再进入后面的动画和联动阶段。
+*** End Patch

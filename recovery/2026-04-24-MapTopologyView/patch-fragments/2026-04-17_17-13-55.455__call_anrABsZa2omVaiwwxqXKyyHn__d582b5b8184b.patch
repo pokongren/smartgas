@@ -1,0 +1,41 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+     const selectedNodeDefaultPressure = useMemo(() => {
+         if (!selectedNodeSeedData) return null
+         return selectedNodeSeedData.operating_pressure_out
+             ?? selectedNodeSeedData.target_pressure_mpa
+             ?? null
+     }, [selectedNodeSeedData])
++    const paramEditorSeedNodes = useMemo(() => {
++        return Array.from(seedNodePressures.values())
++    }, [seedNodePressures])
++    const paramEditorEdges = useMemo(() => {
++        return topoEdges.map(edge => ({ id: edge.id, name: edge.name }))
++    }, [topoEdges])
++    const buildSimulationInitialInput = useCallback((): SimulationInitialInput | undefined => {
++        const nodeEntries = Object.entries(nodeParamOverrides)
++            .map(([nodeId, value]) => ({
++                node_id: nodeId,
++                target_pressure_mpa: value.target_pressure_mpa,
++                temperature_c: value.temperature_c,
++            }))
++            .filter(item => item.target_pressure_mpa != null || item.temperature_c != null)
++        const edgeEntries = Object.entries(edgeLengthOverrides)
++            .map(([edgeId, length]) => ({ edge_id: edgeId, length_km: length }))
++            .filter(item => Number.isFinite(item.length_km))
++        if (nodeEntries.length === 0 && edgeEntries.length === 0) {
++            return undefined
++        }
++        return {
++            node_overrides: nodeEntries.length > 0 ? nodeEntries : undefined,
++            edge_overrides: edgeEntries.length > 0 ? edgeEntries : undefined,
++        }
++    }, [edgeLengthOverrides, nodeParamOverrides])
++    const runMainSteadySimulation = useCallback(async () => {
++        const initialInput = buildSimulationInitialInput()
++        await runSteadySimulation(initialInput ? { initialInput } : undefined)
++    }, [buildSimulationInitialInput, runSteadySimulation])
+ 
+     const mappingSummary = simulationMapping?.summary ?? null
+*** End Patch

@@ -9,7 +9,6 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import MapView from '@/components/map-view/MapView'
 import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
-import { SimPanel } from '@/components/topology/SimPanel'
 import SimParamEditor from '@/components/topology/SimParamEditor'
 import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
 import type { PipelinePackage } from '@/data/pipelines/types'
@@ -143,6 +142,48 @@ function safeSetPolylineOptions(polyline: any, options: Record<string, unknown>)
     } catch (error) {
         console.warn('[MapTopologyView] polyline.setOptions failed', error)
     }
+}
+
+function forEachEdgePolyline(edge: TopoEdge, callback: (polyline: any) => void): void {
+    const polylines = Array.isArray(edge.poly)
+        ? edge.poly
+        : edge.poly
+            ? [edge.poly]
+            : []
+    polylines.forEach(callback)
+}
+
+function buildParallelEdgePath(
+    start: [number, number],
+    end: [number, number],
+    index: number,
+    total: number
+): [number, number][] {
+    if (total <= 1) {
+        return [start, end]
+    }
+
+    const centerIndex = (total - 1) / 2
+    const offsetStep = total === 2 ? 0.0024 : 0.0015
+    const offset = (index - centerIndex) * offsetStep
+    const midLat = ((start[1] + end[1]) / 2) * Math.PI / 180
+    const dx = (end[0] - start[0]) * Math.cos(midLat)
+    const dy = end[1] - start[1]
+    const length = Math.hypot(dx, dy) || 1
+    const perpX = -dy / length
+    const perpY = dx / length
+    const lngScale = Math.cos(midLat) || 1
+
+    const offsetStart: [number, number] = [
+        start[0] + (perpX * offset) / lngScale,
+        start[1] + perpY * offset,
+    ]
+    const offsetEnd: [number, number] = [
+        end[0] + (perpX * offset) / lngScale,
+        end[1] + perpY * offset,
+    ]
+
+    return [offsetStart, offsetEnd]
 }
 
 const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
@@ -351,7 +392,7 @@ const MapTopologyView: React.FC = () => {
     const activeTabRef = useRef<PanelTab>(activeTab)
 
     // ================== 稳态仿真 (useSimulation) ==================
-    const PILOT_ID = 'we1'
+    const PILOT_ID = WE1_PRIMARY_PILOT_ID
     const sim = useSimulation({ pilotId: PILOT_ID, scenarios: MAINLINE_SCENARIOS })
 
     // SimParamEditor 状态
@@ -409,7 +450,7 @@ const MapTopologyView: React.FC = () => {
 
     const clearRenderedTopology = useCallback(() => {
         nodesRef.current.forEach(node => node.marker?.setMap(null))
-        edgesRef.current.forEach(edge => edge.poly?.setMap(null))
+        edgesRef.current.forEach(edge => forEachEdgePolyline(edge, polyline => polyline?.setMap(null)))
         highlightedMarkersRef.current.clear()
     }, [])
 
@@ -558,52 +599,71 @@ const MapTopologyView: React.FC = () => {
         const AMap = (window as any).AMap
         if (!AMap) return
 
-        clearRenderedTopology()
+        try {
+            clearRenderedTopology()
 
-        const renderedNodes: TopoNode[] = graphNodes.map(node => {
-            const size = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
-            const marker = new AMap.Marker({
-                position: new AMap.LngLat(node.position[0], node.position[1]),
-                content: createTopoMarkerContent(node.type, node.name, false, !!node.isJunction),
-                offset: new AMap.Pixel(-size / 2, -size / 2),
-                draggable: !node.isJunction,
-                cursor: node.isJunction ? 'pointer' : 'move',
-                zIndex: node.isJunction ? 260 : 200,
+            const renderedNodes: TopoNode[] = graphNodes.map(node => {
+                try {
+                    const size = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
+                    const marker = new AMap.Marker({
+                        position: new AMap.LngLat(node.position[0], node.position[1]),
+                        content: createTopoMarkerContent(node.type, node.name, false, !!node.isJunction),
+                        offset: new AMap.Pixel(-size / 2, -size / 2),
+                        draggable: !node.isJunction,
+                        cursor: node.isJunction ? 'pointer' : 'move',
+                        zIndex: node.isJunction ? 260 : 200,
+                    })
+                    marker.setMap(mapInstance)
+
+                    const nodeId = node.id
+                    if (!node.isJunction) {
+                        marker.on('dragend', (event: any) => {
+                            const nextPosition: [number, number] = [event.lnglat.getLng(), event.lnglat.getLat()]
+                            setBaseTopoNodes(prev => prev.map(item => item.id === nodeId ? { ...item, position: nextPosition } : item))
+                            setDirtyPositions(prev => new Map(prev).set(nodeId, nextPosition))
+                        })
+                    }
+                    marker.on('click', () => doNodeClick(nodeId))
+
+                    return { ...node, marker }
+                } catch (error) {
+                    console.warn('[MapTopologyView] render node failed', node.id, error)
+                    return node
+                }
             })
-            marker.setMap(mapInstance)
 
-            const nodeId = node.id
-            if (!node.isJunction) {
-                marker.on('dragend', (event: any) => {
-                    const nextPosition: [number, number] = [event.lnglat.getLng(), event.lnglat.getLat()]
-                    setBaseTopoNodes(prev => prev.map(item => item.id === nodeId ? { ...item, position: nextPosition } : item))
-                    setDirtyPositions(prev => new Map(prev).set(nodeId, nextPosition))
-                })
-            }
-            marker.on('click', () => doNodeClick(nodeId))
+            const renderedNodeMap = new Map(renderedNodes.map(node => [node.id, node]))
+            const renderedEdges: TopoEdge[] = graphEdges.map(edge => {
+                try {
+                    const startNode = renderedNodeMap.get(edge.startNodeId)
+                    const endNode = renderedNodeMap.get(edge.endNodeId)
+                    if (!startNode || !endNode) return edge
 
-            return { ...node, marker }
-        })
-
-        const renderedNodeMap = new Map(renderedNodes.map(node => [node.id, node]))
-        const renderedEdges: TopoEdge[] = graphEdges.map(edge => {
-            const startNode = renderedNodeMap.get(edge.startNodeId)
-            const endNode = renderedNodeMap.get(edge.endNodeId)
-            if (!startNode || !endNode) return edge
-
-            const poly = new AMap.Polyline({
-                path: [startNode.position, endNode.position],
-                strokeColor: LINE_COLOR,
-                strokeWeight: LINE_WEIGHT,
-                strokeStyle: 'solid',
-                zIndex: 100,
+                    const parallelCount = Math.max(1, edge.sourceEdgeIds?.length ?? 1)
+                    const polylines = Array.from({ length: parallelCount }, (_, index) => {
+                        const path = buildParallelEdgePath(startNode.position, endNode.position, index, parallelCount)
+                        const polyline = new AMap.Polyline({
+                            path,
+                            strokeColor: parallelCount > 1 && index % 2 === 1 ? '#22d3ee' : LINE_COLOR,
+                            strokeWeight: parallelCount > 1 ? LINE_WEIGHT + 1 : LINE_WEIGHT,
+                            strokeStyle: 'solid',
+                            zIndex: 100 + index,
+                        })
+                        polyline.setMap(mapInstance)
+                        return polyline
+                    })
+                    return { ...edge, poly: parallelCount === 1 ? polylines[0] : polylines }
+                } catch (error) {
+                    console.warn('[MapTopologyView] render edge failed', edge.id, error)
+                    return edge
+                }
             })
-            poly.setMap(mapInstance)
-            return { ...edge, poly }
-        })
 
-        setTopoNodes(renderedNodes)
-        setTopoEdges(renderedEdges)
+            setTopoNodes(renderedNodes)
+            setTopoEdges(renderedEdges)
+        } catch (error) {
+            console.warn('[MapTopologyView] renderCollapsedGraph failed', error)
+        }
     }, [clearRenderedTopology, mapInstance])
 
     useEffect(() => {
@@ -626,7 +686,7 @@ const MapTopologyView: React.FC = () => {
         return () => {
             mapInstance.off('click', onClick)
             nodesRef.current.forEach(n => n.marker?.setMap(null))
-            edgesRef.current.forEach(e => e.poly?.setMap(null))
+            edgesRef.current.forEach(e => forEachEdgePolyline(e, polyline => polyline?.setMap(null)))
         }
     }, [mapInstance])
 
@@ -814,102 +874,109 @@ const MapTopologyView: React.FC = () => {
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [doUndo])
     const importTopology = useCallback((silent = false) => {
-        if (!mapInstance) return
-        const { nodes: srcN, lines: srcL } = rawPipelineData
-        if (srcN.length === 0) {
-            if (!silent) setStatusMsg('无可导入的管线数据')
-            return
-        }
-
-        clearRenderedTopology()
-        setTopoNodes([])
-        setTopoEdges([])
-        setSelectedNode(null)
-
-        // ------- 阀室链路合并算法 -------
-        // 1. 归类：哪些是阀室、哪些是站场
-        const nodeTypeMap = new Map<string, PointType>()
-        const valveIds = new Set<string>()
-        for (const sn of srcN) {
-            const mt: PointType = TYPE_MAP[sn.type] || 'station'
-            nodeTypeMap.set(sn.id, mt)
-            if (mt === 'valve') valveIds.add(sn.id)
-        }
-
-        // 2. 构建全量邻接表（包含阀室）
-        const adj = new Map<string, Set<string>>()
-        for (const sn of srcN) {
-            adj.set(sn.id, new Set())
-        }
-        for (const sl of srcL) {
-            if (adj.has(sl.startNodeId) && adj.has(sl.endNodeId)) {
-                adj.get(sl.startNodeId)!.add(sl.endNodeId)
-                adj.get(sl.endNodeId)!.add(sl.startNodeId)
+        try {
+            if (!mapInstance) return
+            const { nodes: srcN, lines: srcL } = rawPipelineData
+            if (srcN.length === 0) {
+                if (!silent) setStatusMsg('无可导入的管线数据')
+                return
             }
-        }
 
-        // 3. BFS：从每个非阀室节点出发，穿越阀室链，找到所有可达的非阀室邻居
-        //    A → V1 → V2 → B  合并为  A → B
-        const collapsedEdges = new Set<string>()  // "minId_maxId" 去重
-        const edgePairs: Array<[string, string]> = []
+            clearRenderedTopology()
+            setTopoNodes([])
+            setTopoEdges([])
+            setSelectedNode(null)
 
-        for (const sn of srcN) {
-            if (valveIds.has(sn.id)) continue  // 起点必须是非阀室
+            // ------- 阀室链路合并算法 -------
+            // 1. 归类：哪些是阀室、哪些是站场
+            const nodeTypeMap = new Map<string, PointType>()
+            const valveIds = new Set<string>()
+            for (const sn of srcN) {
+                const mt: PointType = TYPE_MAP[sn.type] || 'station'
+                nodeTypeMap.set(sn.id, mt)
+                if (mt === 'valve') valveIds.add(sn.id)
+            }
 
-            const queue = [...(adj.get(sn.id) || [])]
-            const visited = new Set<string>([sn.id])
+            // 2. 构建全量邻接表（包含阀室）
+            const adj = new Map<string, Set<string>>()
+            for (const sn of srcN) {
+                adj.set(sn.id, new Set())
+            }
+            for (const sl of srcL) {
+                if (adj.has(sl.startNodeId) && adj.has(sl.endNodeId)) {
+                    adj.get(sl.startNodeId)!.add(sl.endNodeId)
+                    adj.get(sl.endNodeId)!.add(sl.startNodeId)
+                }
+            }
 
-            while (queue.length > 0) {
-                const curr = queue.shift()!
-                if (visited.has(curr)) continue
-                visited.add(curr)
+            // 3. BFS：从每个非阀室节点出发，穿越阀室链，找到所有可达的非阀室邻居
+            //    A → V1 → V2 → B  合并为  A → B
+            const collapsedEdges = new Set<string>()  // "minId_maxId" 去重
+            const edgePairs: Array<[string, string]> = []
 
-                if (valveIds.has(curr)) {
-                    // 当前是阀室 → 继续穿越
-                    for (const next of adj.get(curr) || []) {
-                        if (!visited.has(next)) queue.push(next)
-                    }
-                } else {
-                    // 找到了另一个非阀室节点 → 生成合并边
-                    const ids = [sn.id, curr].sort()
-                    const key = `${ids[0]}_${ids[1]}`
-                    if (!collapsedEdges.has(key)) {
-                        collapsedEdges.add(key)
-                        edgePairs.push([sn.id, curr])
+            for (const sn of srcN) {
+                if (valveIds.has(sn.id)) continue  // 起点必须是非阀室
+
+                const queue = [...(adj.get(sn.id) || [])]
+                const visited = new Set<string>([sn.id])
+
+                while (queue.length > 0) {
+                    const curr = queue.shift()!
+                    if (visited.has(curr)) continue
+                    visited.add(curr)
+
+                    if (valveIds.has(curr)) {
+                        // 当前是阀室 → 继续穿越
+                        for (const next of adj.get(curr) || []) {
+                            if (!visited.has(next)) queue.push(next)
+                        }
+                    } else {
+                        // 找到了另一个非阀室节点 → 生成合并边
+                        const ids = [sn.id, curr].sort()
+                        const key = `${ids[0]}_${ids[1]}`
+                        if (!collapsedEdges.has(key)) {
+                            collapsedEdges.add(key)
+                            edgePairs.push([sn.id, curr])
+                        }
                     }
                 }
             }
-        }
 
-        // 4. 构造非阀室基础节点
-        const imported: BaseTopoNode[] = []
-        for (const sn of srcN) {
-            if (valveIds.has(sn.id)) continue
+            // 4. 构造非阀室基础节点
+            const imported: BaseTopoNode[] = []
+            for (const sn of srcN) {
+                if (valveIds.has(sn.id)) continue
 
-            const pos: [number, number] = [sn.coordinate.longitude, sn.coordinate.latitude]
-            const type = nodeTypeMap.get(sn.id) || 'station'
-            imported.push({ id: sn.id, type, name: sn.name, position: pos })
-        }
+                const pos: [number, number] = [sn.coordinate.longitude, sn.coordinate.latitude]
+                const type = nodeTypeMap.get(sn.id) || 'station'
+                imported.push({ id: sn.id, type, name: sn.name, position: pos })
+            }
 
-        // 5. 构造基础连线
-        const importedEdges: BaseTopoEdge[] = []
-        const importedMap = new Map(imported.map(node => [node.id, node]))
+            // 5. 构造基础连线
+            const importedEdges: BaseTopoEdge[] = []
+            const importedMap = new Map(imported.map(node => [node.id, node]))
 
-        for (const [startId, endId] of edgePairs) {
-            const sNode = importedMap.get(startId)
-            const eNode = importedMap.get(endId)
-            if (!sNode || !eNode) continue
-            const edgeId = `ce-${startId.slice(-4)}-${endId.slice(-4)}`
-            importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} → ${eNode.name}` })
-        }
+            for (const [startId, endId] of edgePairs) {
+                const sNode = importedMap.get(startId)
+                const eNode = importedMap.get(endId)
+                if (!sNode || !eNode) continue
+                const edgeId = `ce-${startId.slice(-4)}-${endId.slice(-4)}`
+                importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} → ${eNode.name}` })
+            }
 
-        setBaseTopoNodes(imported)
-        setBaseTopoEdges(importedEdges)
-        setDirtyPositions(new Map())
-        setPositionPreview(null)
+            setBaseTopoNodes(imported)
+            setBaseTopoEdges(importedEdges)
+            setDirtyPositions(new Map())
+            setPositionPreview(null)
 
-        if (!silent) {
-            setStatusMsg(`已导入 ${imported.length} 节点, ${importedEdges.length} 条连线（阀室链路已合并）`)
+            if (!silent) {
+                setStatusMsg(`已导入 ${imported.length} 节点, ${importedEdges.length} 条连线（阀室链路已合并）`)
+            }
+        } catch (error) {
+            console.warn('[MapTopologyView] importTopology failed', error)
+            if (!silent) {
+                setStatusMsg(error instanceof Error ? `拓扑导入失败：${error.message}` : '拓扑导入失败')
+            }
         }
     }, [clearRenderedTopology, mapInstance, rawPipelineData])
 
@@ -924,6 +991,43 @@ const MapTopologyView: React.FC = () => {
         const nextSelected = topoNodes.find(node => node.id === selectedNode.id) || null
         setSelectedNode(nextSelected)
     }, [selectedNode?.id, topoNodes])
+
+    useEffect(() => {
+        if (!selectedNode) return
+        const sourceNodeIds = selectedNode.sourceNodeIds?.length ? selectedNode.sourceNodeIds : [selectedNode.id]
+        const connectedEdges = topoEdges
+            .filter(edge => edge.startNodeId === selectedNode.id || edge.endNodeId === selectedNode.id)
+            .map(edge => ({
+                id: edge.id,
+                name: edge.name,
+                startNodeId: edge.startNodeId,
+                endNodeId: edge.endNodeId,
+                sourceEdgeIds: edge.sourceEdgeIds || [],
+                defaultLengthKm: edge.defaultLengthKm,
+            }))
+        const simulationNodes = sim.overlay?.nodes
+            ?.filter(node => sourceNodeIds.includes(node.id))
+            .map(node => ({
+                id: node.id,
+                pressure_mpa: node.pressure_mpa,
+                pressure_in_mpa: node.pressure_in_mpa,
+                alert_level: node.alert_level,
+            })) || []
+
+        setAssistantRuntimeContext({
+            selection: {
+                selectedTopologyNode: {
+                    id: selectedNode.id,
+                    name: selectedNode.name,
+                    type: selectedNode.type,
+                    isJunction: !!selectedNode.isJunction,
+                    sourceNodeIds,
+                },
+                selectedTopologyConnectedEdges: connectedEdges,
+                selectedSimulationNodes: simulationNodes,
+            },
+        })
+    }, [selectedNode, topoEdges, sim.overlay])
 
     const flyTo = useCallback((node: TopoNode) => {
         if (!mapInstance) return
@@ -1302,45 +1406,126 @@ const MapTopologyView: React.FC = () => {
         return buildSimulationOverlayMapping(displayNodes, displayEdges, sim.overlay)
     }, [sim.overlay, topoNodes, topoEdges])
 
+    useEffect(() => {
+        if (!sim.overlay) {
+            setLineFlowPhase(0)
+            setDamageFlashVisible(false)
+            return
+        }
+
+        const isFailureScenario = /offline|break/.test(sim.currentScenario)
+        const flowTimer = window.setInterval(() => {
+            setLineFlowPhase(prev => (prev + 1) % 6)
+        }, 240)
+
+        let flashTimer: number | null = null
+        if (isFailureScenario) {
+            setDamageFlashVisible(true)
+            flashTimer = window.setTimeout(() => {
+                setDamageFlashVisible(false)
+            }, 900)
+        } else {
+            setDamageFlashVisible(false)
+        }
+
+        return () => {
+            window.clearInterval(flowTimer)
+            if (flashTimer != null) {
+                window.clearTimeout(flashTimer)
+            }
+        }
+    }, [sim.overlay, sim.currentScenario])
+
     // 仿真覆盖层渲染到地图标记上
     useEffect(() => {
         if (!overlayMapping || topoNodes.length === 0) return
         for (const node of topoNodes) {
-            const match = overlayMapping.nodeMatchesByDisplayId.get(node.id)
-            if (!match || !node.marker || match.matchedNodes.length === 0) continue
-            const pressureOut = match.averagePressureMpa
-            const pressureIn = match.averagePressureInMpa
-            const alert = match.highestAlertLevel
-            if (pressureOut == null) continue
-            const color = alert === 'critical' ? '#ef4444' : alert === 'warning' ? '#f97316' : TOPO_COLORS[node.type]
-            const size = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
-            const label = pressureIn != null && Math.abs(pressureIn - pressureOut) > 0.01
-                ? `${node.name} 进${pressureIn.toFixed(2)}|出${pressureOut.toFixed(2)} MPa`
-                : `${node.name} ${pressureOut.toFixed(2)} MPa`
-            const shapeStyle = node.isJunction
-                ? `width:${size}px;height:${size}px;transform:rotate(45deg);border-radius:3px;background:${color};border:2px solid #fff;box-shadow:0 0 6px ${color};pointer-events:auto;`
-                : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 6px ${color};pointer-events:auto;`
-            node.marker.setContent(`
-                <div style="position:relative;display:flex;flex-direction:column;align-items:center;pointer-events:none;">
-                    <div style="${shapeStyle}"></div>
-                    <div style="position:absolute;top:${size + 4}px;white-space:nowrap;font-size:10px;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000;z-index:10;">${label}</div>
-                </div>
-            `)
+            try {
+                const match = overlayMapping.nodeMatchesByDisplayId.get(node.id)
+                if (!match || !node.marker || match.matchedNodes.length === 0) continue
+                const pressureOut = match.averagePressureMpa
+                const pressureIn = match.averagePressureInMpa
+                const alert = match.highestAlertLevel
+                if (pressureOut == null) continue
+
+                // Animation logic
+                let displayPressure = pressureOut
+                let displayDeltaHtml = ''
+                const isAnimating = sim.animatingState?.active
+                const prevOverlay = sim.animatingState?.prevOverlay
+                if (isAnimating && prevOverlay) {
+                    const prevNode = prevOverlay.nodes.find(n => match.matchedNodes.some(mn => mn.id === n.id))
+                    if (prevNode) {
+                        const pPrev = prevNode.pressure_mpa
+                        const ratio = sim.animatingState.iteration / sim.animatingState.total
+                        displayPressure = pPrev + (pressureOut - pPrev) * ratio
+
+                        const diffTime = pressureOut - pPrev
+                        if (Math.abs(diffTime) > 0.05) {
+                            const sign = diffTime > 0 ? '+' : ''
+                            const colorClass = diffTime > 0 ? '#4ade80' : '#f87171'
+                            const translateY = -20 * ratio
+                            const opacity = ratio < 0.8 ? 1 : (1 - ratio) * 5
+                            displayDeltaHtml = `<div style="position:absolute;bottom:calc(100% + 5px);font-weight:bold;color:${colorClass};font-size:13px;text-shadow:0 0 4px rgba(0,0,0,0.8); transform: translateY(${translateY}px); opacity: ${opacity}; white-space:nowrap; z-index:20;">${sign}${diffTime.toFixed(2)}</div>`
+                        }
+                    }
+                }
+
+                const color = alert === 'critical' ? '#ef4444' : alert === 'warning' ? '#f97316' : TOPO_COLORS[node.type]
+                const size = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
+                const flashGlow = damageFlashVisible && (alert === 'critical' || alert === 'warning')
+
+                const isCompressor = node.name.includes('压气')
+                const showInOut = pressureIn != null && (isCompressor || Math.abs(pressureIn - pressureOut) > 0.01)
+
+                const labelHtml = showInOut
+                    ? `${node.name} <span style="color:#94a3b8;margin-right:2px;">进${pressureIn.toFixed(2)}</span><span style="color:#475569;margin-right:2px;">|</span><span style="color:#38bdf8;font-weight:600;">出${displayPressure.toFixed(2)}</span> <span style="color:#cbd5e1;font-size:9px;">MPa</span>`
+                    : `<span style="font-weight:500;">${node.name}</span> <span style="color:#38bdf8;font-weight:600;">${displayPressure.toFixed(2)}</span> <span style="color:#cbd5e1;font-size:9px;">MPa</span>`
+
+                const baseShapeCss = `width:${size}px;height:${size}px;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9) 0%, ${color} 40%, rgba(0,0,0,0.6) 100%);border:1px solid rgba(255,255,255,0.6);box-shadow:${flashGlow ? `0 0 18px rgba(248,113,113,0.85), 0 0 36px rgba(248,113,113,0.35),` : ''}0 4px 8px rgba(0,0,0,0.5), inset 0 -2px 4px rgba(0,0,0,0.4), 0 0 10px ${color};pointer-events:auto;transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1);`
+
+                const shapeStyle = node.isJunction
+                    ? `${baseShapeCss}transform:rotate(45deg);border-radius:4px;`
+                    : `${baseShapeCss}border-radius:50%;`
+
+                const labelContainerStyle = `position:absolute;top:${size + 8}px;white-space:nowrap;font-size:11px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.8);z-index:10;background:linear-gradient(135deg, rgba(15,23,42,0.85) 0%, rgba(30,41,59,0.9) 100%);padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);box-shadow:${flashGlow ? '0 0 12px rgba(248,113,113,0.5),' : ''}0 4px 12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);backdrop-filter:blur(4px);transition:all 0.3s ease;`
+
+                node.marker.setContent(`
+                    <div style="position:relative;display:flex;flex-direction:column;align-items:center;pointer-events:none;">
+                        ${displayDeltaHtml}
+                        <div style="${shapeStyle}"></div>
+                        <div style="${labelContainerStyle}">${flashGlow ? '<span style="color:#fca5a5;font-size:9px;margin-right:4px;">故障演示</span>' : ''}${labelHtml}</div>
+                    </div>
+                `)
+            } catch (error) {
+                console.warn('[MapTopologyView] update node label failed', node.id, error)
+            }
         }
-    }, [overlayMapping, topoNodes])
+    }, [overlayMapping, topoNodes, sim.animatingState, lineFlowPhase, damageFlashVisible, sim.currentScenario])
 
     // 仿真管段利用率着色
     useEffect(() => {
         if (!overlayMapping || topoEdges.length === 0) return
         for (const edge of topoEdges) {
-            const match = overlayMapping.edgeMatchesByDisplayId.get(edge.id)
-            if (!match || !edge.poly || match.matchedEdges.length === 0) continue
-            const util = match.averageUtilization ?? 0
-            const color = util < 0.7 ? '#22c55e' : util < 0.85 ? '#eab308' : util < 0.95 ? '#f97316' : '#ef4444'
-            const weight = Math.max(2, Math.min(6, 2 + util * 4))
-            edge.poly.setOptions({ strokeColor: color, strokeWeight: weight })
+            try {
+                const match = overlayMapping.edgeMatchesByDisplayId.get(edge.id)
+                if (!match || match.matchedEdges.length === 0) continue
+                const util = match.averageUtilization ?? 0
+                const color = util < 0.7 ? '#22c55e' : util < 0.85 ? '#eab308' : util < 0.95 ? '#f97316' : '#ef4444'
+                const weight = Math.max(2, Math.min(6, 2 + util * 4))
+                const dashArray = lineFlowPhase % 2 === 0 ? [14, 8] : [8, 14]
+                forEachEdgePolyline(edge, polyline => {
+                    polyline?.setOptions({
+                        strokeColor: damageFlashVisible && util >= 0.95 ? '#f43f5e' : color,
+                        strokeWeight: damageFlashVisible && util >= 0.95 ? weight + 1 : weight,
+                        strokeDasharray: util > 0 ? dashArray : [4, 8],
+                    })
+                })
+            } catch (error) {
+                console.warn('[MapTopologyView] update edge style failed', edge.id, error)
+            }
         }
-    }, [overlayMapping, topoEdges])
+    }, [overlayMapping, topoEdges, lineFlowPhase, damageFlashVisible])
 
     // 仿真状态同步到展示页 & AI 助手上下文
     useEffect(() => {
@@ -1358,7 +1543,10 @@ const MapTopologyView: React.FC = () => {
             selection: {
                 simulationScenario: sim.currentScenario,
                 simulationRunId: sim.overlay.run_id,
+                selectedSnapshotRunId: sim.selectedSnapshotRunId,
+                baselineSnapshotRunId: sim.baselineSnapshotRunId,
                 solverStatus: sim.overlay.solver_status,
+                simulationSummary: sim.overlay.summary,
                 alertCount: sim.overlay.summary.alert_count,
             },
         })
@@ -1429,35 +1617,6 @@ const MapTopologyView: React.FC = () => {
 
             {/* 纯底图 —— 不传 pipelineData，不渲染任何站场/阀室 */}
             <MapView onLoad={handleMapLoad} />
-
-            {/* 稳态仿真面板（左侧滑出抽屉） */}
-            <SimPanel
-                scenarioId={sim.currentScenario}
-                scenarios={MAINLINE_SCENARIOS}
-                isLoading={sim.isLoading}
-                snapshotLoading={sim.snapshotLoading}
-                baselineSnapshotLoading={sim.baselineSnapshotLoading}
-                error={sim.error}
-                snapshotError={sim.snapshotError}
-                overlay={sim.overlay}
-                snapshots={sim.snapshots}
-                selectedSnapshotRunId={sim.selectedSnapshotRunId}
-                baselineSnapshotRunId={sim.baselineSnapshotRunId}
-                trialRunScenarioId={sim.trialRunScenarioId}
-                bulkTrialRunActive={sim.bulkTrialRunActive}
-                comparison={sim.comparison}
-                trialRunItems={sim.trialRunItems}
-                onScenarioChange={sim.setScenario}
-                onSnapshotSelect={sim.setSelectedSnapshotRunId}
-                onBaselineSnapshotSelect={sim.setBaselineSnapshotRunId}
-                onRun={handleRunSimulation}
-                onSaveSnapshot={sim.saveSnapshot}
-                onRefreshSnapshots={sim.refreshSnapshots}
-                onLoadSnapshot={sim.loadSelectedSnapshot}
-                onRunTrialScenario={sim.runTrialScenario}
-                onRunMissingTrialScenarios={sim.runMissingTrialScenarios}
-                onClear={sim.clearOverlay}
-            />
 
             {/* 左侧面板 */}
             <div className="absolute top-[68px] left-4 bottom-4 z-20 w-72 flex flex-col">
@@ -1754,9 +1913,11 @@ const MapTopologyView: React.FC = () => {
                             <div className="space-y-3">
                                 {/* 标题栏 */}
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-lg text-indigo-400">tune</span>
-                                        <span className="font-bold text-sm text-white">仿真控台</span>
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-[0_0_12px_rgba(99,102,241,0.5)] border border-indigo-300/30">
+                                            <span className="material-symbols-outlined text-[16px] text-white">tune</span>
+                                        </div>
+                                        <span className="font-bold text-sm text-white tracking-wide">仿真控台</span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                         <span className={`w-2 h-2 rounded-full ${sim.overlay ? 'bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.6)]' : sim.isLoading ? 'bg-amber-400 animate-pulse' : 'bg-gray-500'}`} />
@@ -1767,46 +1928,51 @@ const MapTopologyView: React.FC = () => {
                                 </div>
 
                                 {/* INPUT DATA */}
-                                <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/5 p-2.5 space-y-2">
-                                    <div className="text-[10px] uppercase tracking-widest text-cyan-300/80 font-semibold">INPUT DATA</div>
+                                <div className="rounded-xl border border-cyan-500/20 bg-gradient-to-b from-cyan-950/40 to-transparent p-3 space-y-3 shadow-inner shadow-cyan-500/5">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <div className="w-1 h-3 rounded-full bg-cyan-400"></div>
+                                        <div className="text-[10px] uppercase tracking-widest text-cyan-300 font-bold">INPUT DATA</div>
+                                    </div>
                                     {/* 场景选择 */}
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-sm text-cyan-300">schema</span>
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-md bg-cyan-900/40 border border-cyan-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(6,182,212,0.15)]">
+                                            <span className="material-symbols-outlined text-[15px] text-cyan-300">schema</span>
+                                        </div>
                                         <select
                                             value={sim.currentScenario}
                                             onChange={e => sim.setScenario(e.target.value)}
-                                            className="flex-1 bg-slate-800/80 border border-indigo-500/25 rounded-lg text-[11px] text-slate-200 px-2 py-1.5 outline-none"
+                                            className="flex-1 bg-slate-800/80 border border-indigo-500/25 rounded-lg text-[11px] text-slate-200 px-2.5 py-1.5 outline-none hover:border-cyan-500/50 transition-colors"
                                         >
                                             {MAINLINE_SCENARIOS.map(s => (
                                                 <option key={s.id} value={s.id}>{s.label}</option>
                                             ))}
                                         </select>
-                                        <span className="text-cyan-400">▾</span>
                                     </div>
                                     {/* 历史快照 */}
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-sm text-cyan-300">history</span>
-                                        <span className="text-[11px] text-slate-300">选择历史结果</span>
-                                        <span className="text-cyan-400">▾</span>
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-md bg-cyan-900/40 border border-cyan-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(6,182,212,0.15)]">
+                                            <span className="material-symbols-outlined text-[15px] text-cyan-300">history</span>
+                                        </div>
                                         <select
                                             value={sim.selectedSnapshotRunId}
                                             onChange={e => sim.setSelectedSnapshotRunId(e.target.value)}
-                                            className="flex-1 bg-slate-800/80 border border-indigo-500/25 rounded-lg text-[11px] text-slate-200 px-2 py-1 outline-none"
+                                            className="flex-1 bg-slate-800/80 border border-indigo-500/25 rounded-lg text-[11px] text-slate-200 px-2.5 py-1.5 outline-none hover:border-cyan-500/50 transition-colors"
                                         >
-                                            <option value="">← 选择快照</option>
+                                            <option value="">← 选择历史快照</option>
                                             {sim.snapshots.map(s => (
                                                 <option key={s.run_id} value={s.run_id}>{s.scenario_id} | {s.run_id.slice(0, 12)}</option>
                                             ))}
                                         </select>
-                                        <span className="text-cyan-400">▾</span>
                                     </div>
                                     {/* 精细化参数 */}
                                     <button
                                         onClick={() => setShowSimParamEditor(!showSimParamEditor)}
-                                        className="w-full flex items-center gap-2 text-left py-1"
+                                        className="w-full flex items-center gap-2.5 text-left py-1 hover:opacity-80 transition-opacity"
                                     >
-                                        <span className="material-symbols-outlined text-sm text-cyan-300">code</span>
-                                        <span className="text-[11px] text-emerald-300">编辑精细化参数 (压力/流量)</span>
+                                        <div className="w-7 h-7 rounded-md bg-emerald-900/40 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(16,185,129,0.15)]">
+                                            <span className="material-symbols-outlined text-[15px] text-emerald-400">code</span>
+                                        </div>
+                                        <span className="text-[11px] text-emerald-300 font-medium">编辑精细化参数 (压力/流量)</span>
                                         <span className="text-cyan-400 ml-auto">{showSimParamEditor ? '▴' : '▾'}</span>
                                     </button>
                                     {showSimParamEditor && (
@@ -1815,88 +1981,104 @@ const MapTopologyView: React.FC = () => {
                                             edges={edgesForEditor}
                                             nodeOverrides={nodeOverrides}
                                             edgeLengthOverrides={edgeLengthOverrides}
+                                            edgeFlowOverrides={edgeFlowOverrides}
                                             globalDefaults={globalDefaults}
                                             validationError={paramValidationError}
                                             onNodeOverridesChange={setNodeOverrides}
                                             onEdgeLengthOverridesChange={setEdgeLengthOverrides}
+                                            onEdgeFlowOverridesChange={setEdgeFlowOverrides}
                                             onGlobalDefaultsChange={setGlobalDefaults}
                                         />
                                     )}
                                 </div>
 
                                 {/* SOLVER ENGINE */}
-                                <div className="rounded-lg border border-emerald-500/15 bg-emerald-500/5 p-2.5 space-y-2">
-                                    <div className="text-[10px] uppercase tracking-widest text-emerald-300/80 font-semibold">SOLVER ENGINE</div>
-                                    <div className="flex gap-2">
+                                <div className="rounded-xl border border-emerald-500/20 bg-gradient-to-b from-emerald-950/40 to-transparent p-3 space-y-3 shadow-inner shadow-emerald-500/5">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <div className="w-1 h-3 rounded-full bg-emerald-400"></div>
+                                        <div className="text-[10px] uppercase tracking-widest text-emerald-300 font-bold">SOLVER ENGINE</div>
+                                    </div>
+                                    <div className="flex gap-2.5">
                                         <button
                                             onClick={() => { if (sim.selectedSnapshotRunId) sim.loadSelectedSnapshot() }}
                                             disabled={sim.snapshotLoading || !sim.selectedSnapshotRunId}
-                                            className="flex-1 py-2.5 rounded-lg border border-emerald-500/25 bg-emerald-900/20 text-emerald-200 text-[11px] font-semibold flex flex-col items-center gap-1 transition-all hover:bg-emerald-900/40 disabled:opacity-30"
+                                            className="group flex-1 py-3 rounded-xl border border-emerald-500/30 bg-emerald-900/20 text-emerald-200 text-[11px] font-bold flex flex-col items-center gap-1.5 transition-all hover:bg-emerald-800/40 hover:border-emerald-400/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] disabled:opacity-30 disabled:hover:shadow-none"
                                         >
-                                            <span className="material-symbols-outlined text-lg text-emerald-400">edit_note</span>
+                                            <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors shadow-inner">
+                                                <span className="material-symbols-outlined text-[20px] text-emerald-400">edit_note</span>
+                                            </div>
                                             按压力快照运行
                                         </button>
                                         <button
                                             onClick={handleRunSimulation}
-                                            disabled={sim.isLoading}
-                                            className="flex-1 py-2.5 rounded-lg border border-cyan-500/25 bg-cyan-900/20 text-cyan-200 text-[11px] font-semibold flex flex-col items-center gap-1 transition-all hover:bg-cyan-900/40 disabled:opacity-30"
+                                            disabled={sim.isLoading || !!sim.animatingState?.active}
+                                            className="group flex-1 py-3 rounded-xl border border-cyan-500/30 bg-cyan-900/20 text-cyan-200 text-[11px] font-bold flex flex-col items-center gap-1.5 transition-all hover:bg-cyan-800/40 hover:border-cyan-400/50 hover:shadow-[0_0_15px_rgba(6,182,212,0.2)] disabled:opacity-30 disabled:hover:shadow-none"
                                         >
-                                            <span className="material-symbols-outlined text-lg text-cyan-400">{sim.isLoading ? 'hourglass_top' : 'play_circle'}</span>
-                                            {sim.isLoading ? '运行中...' : '场景参数仿真'}
+                                            <div className="w-8 h-8 rounded-full bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors shadow-inner">
+                                                <span className="material-symbols-outlined text-[20px] text-cyan-400">{sim.isLoading || sim.animatingState?.active ? 'hourglass_top' : 'play_circle'}</span>
+                                            </div>
+                                            {sim.isLoading ? '求解中...' : sim.animatingState?.active ? `迭代中 (${sim.animatingState.iteration}/${sim.animatingState.total})` : '场景参数仿真'}
                                         </button>
                                     </div>
                                     {/* 运行状态 */}
                                     <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
                                         <span className="material-symbols-outlined text-sm">terminal</span>
-                                        {sim.isLoading ? '正在求解...' : sim.overlay ? `已完成 (${SOLVER_STATUS_LABELS[sim.overlay.solver_status] || sim.overlay.solver_status})` : '未运行'}
+                                        {sim.isLoading ? '正在求解...' : sim.animatingState?.active ? '正在渲染演化过程...' : sim.overlay ? `已完成 (${SOLVER_STATUS_LABELS[sim.overlay.solver_status] || sim.overlay.solver_status})` : '未运行'}
                                     </div>
                                 </div>
 
                                 {/* OUTPUT VIEW */}
-                                <div className="rounded-lg border border-indigo-500/15 bg-indigo-500/5 p-2.5 space-y-2">
-                                    <div className="text-[10px] uppercase tracking-widest text-indigo-300/80 font-semibold">OUTPUT VIEW</div>
+                                <div className="rounded-xl border border-indigo-500/20 bg-gradient-to-b from-indigo-950/40 to-transparent p-3 space-y-3 shadow-inner shadow-indigo-500/5">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <div className="w-1 h-3 rounded-full bg-indigo-400"></div>
+                                        <div className="text-[10px] uppercase tracking-widest text-indigo-300 font-bold">OUTPUT VIEW</div>
+                                    </div>
                                     {sim.overlay ? (
                                         <>
-                                            <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                                                <div className="bg-slate-800/50 rounded px-2 py-1.5">
-                                                    <div className="text-gray-500">总供气</div>
-                                                    <div className="text-emerald-300 font-bold">{sim.overlay.summary.total_supply.toFixed(1)} <span className="text-[9px] text-gray-500">万方/天</span></div>
+                                            <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                                <div className="bg-slate-800/40 border border-white/5 rounded-lg px-2.5 py-2">
+                                                    <div className="text-gray-500 mb-0.5">总供气</div>
+                                                    <div className="text-emerald-300 font-bold text-sm">{sim.overlay.summary.total_supply.toFixed(1)} <span className="text-[9px] text-gray-500 font-normal">万方/天</span></div>
                                                 </div>
-                                                <div className="bg-slate-800/50 rounded px-2 py-1.5">
-                                                    <div className="text-gray-500">未满足</div>
-                                                    <div className={`font-bold ${sim.overlay.summary.unserved_demand > 0 ? 'text-red-400' : 'text-green-400'}`}>{sim.overlay.summary.unserved_demand.toFixed(1)} <span className="text-[9px] text-gray-500">万方/天</span></div>
+                                                <div className="bg-slate-800/40 border border-white/5 rounded-lg px-2.5 py-2">
+                                                    <div className="text-gray-500 mb-0.5">未满足</div>
+                                                    <div className={`font-bold text-sm ${sim.overlay.summary.unserved_demand > 0 ? 'text-red-400' : 'text-green-400'}`}>{sim.overlay.summary.unserved_demand.toFixed(1)} <span className="text-[9px] text-gray-500 font-normal">万方/天</span></div>
                                                 </div>
-                                                <div className="bg-slate-800/50 rounded px-2 py-1.5">
-                                                    <div className="text-gray-500">利用率</div>
-                                                    <div className="text-cyan-300 font-bold">{(sim.overlay.summary.avg_utilization * 100).toFixed(1)}%</div>
+                                                <div className="bg-slate-800/40 border border-white/5 rounded-lg px-2.5 py-2">
+                                                    <div className="text-gray-500 mb-0.5">利用率</div>
+                                                    <div className="text-cyan-300 font-bold text-sm">{(sim.overlay.summary.avg_utilization * 100).toFixed(1)}%</div>
                                                 </div>
-                                                <div className="bg-slate-800/50 rounded px-2 py-1.5">
-                                                    <div className="text-gray-500">告警</div>
-                                                    <div className={`font-bold ${sim.overlay.summary.alert_count > 0 ? 'text-amber-400' : 'text-gray-300'}`}>{sim.overlay.summary.alert_count}</div>
+                                                <div className="bg-slate-800/40 border border-white/5 rounded-lg px-2.5 py-2">
+                                                    <div className="text-gray-500 mb-0.5">告警</div>
+                                                    <div className={`font-bold text-sm ${sim.overlay.summary.alert_count > 0 ? 'text-amber-400' : 'text-gray-400'}`}>{sim.overlay.summary.alert_count}</div>
                                                 </div>
                                             </div>
                                             {/* 逐站压力对比 */}
-                                            <div className="space-y-1">
-                                                <div className="text-[9px] text-gray-500 uppercase tracking-wider">站场压力 (MPa)</div>
+                                            <div className="space-y-1.5 mt-2">
+                                                <div className="flex items-center text-[9px] text-indigo-300/70 uppercase tracking-widest px-1">
+                                                    <span className="flex-1">站场名称</span>
+                                                    <span className="w-12 text-right">进站</span>
+                                                    <span className="w-12 text-right">出站</span>
+                                                    <span className="w-11 text-right">压差</span>
+                                                </div>
+                                                <div className="space-y-1 max-h-56 overflow-y-auto pr-1">
                                                 {sim.overlay.nodes.map(n => {
                                                     const pIn = n.pressure_in_mpa ?? n.pressure_mpa
                                                     const pOut = n.pressure_mpa
                                                     const delta = pOut - pIn
                                                     const name = topoNodes.find(tn => tn.sourceNodeIds?.includes(n.id))?.name ?? n.id
                                                     return (
-                                                        <div key={n.id} className="flex items-center gap-1 text-[10px] bg-slate-800/40 rounded px-2 py-1">
-                                                            <span className="flex-1 text-gray-300 truncate">{name}</span>
-                                                            <span className="text-cyan-400 tabular-nums w-11 text-right">{pIn.toFixed(2)}</span>
-                                                            <span className="text-gray-600 text-[8px]">&rarr;</span>
-                                                            <span className="text-emerald-300 tabular-nums w-11 text-right">{pOut.toFixed(2)}</span>
-                                                            {Math.abs(delta) > 0.005 && (
-                                                                <span className={`text-[9px] tabular-nums w-10 text-right ${delta > 0 ? 'text-green-500' : 'text-red-400'}`}>
-                                                                    {delta > 0 ? '+' : ''}{delta.toFixed(2)}
-                                                                </span>
-                                                            )}
+                                                        <div key={n.id} className="flex items-center gap-1.5 text-[10px] bg-slate-800/40 hover:bg-slate-700/60 transition-colors rounded-lg px-2 py-1.5 border border-white/5">
+                                                            <span className="flex-1 text-gray-200 truncate font-medium">{name}</span>
+                                                            <span className="text-gray-400 tabular-nums w-12 text-right font-mono bg-black/20 rounded px-1">{pIn.toFixed(2)}</span>
+                                                            <span className="text-cyan-400 tabular-nums w-12 text-right font-mono bg-cyan-950/30 rounded px-1 border border-cyan-500/10">{pOut.toFixed(2)}</span>
+                                                            <span className={`text-[10px] tabular-nums w-11 text-right font-mono font-bold ${Math.abs(delta) > 0.005 ? (delta > 0 ? 'text-emerald-400' : 'text-red-400') : 'text-gray-600'}`}>
+                                                                {Math.abs(delta) > 0.005 ? (delta > 0 ? `+${delta.toFixed(2)}` : delta.toFixed(2)) : '—'}
+                                                            </span>
                                                         </div>
                                                     )
                                                 })}
+                                                </div>
                                             </div>
                                             <button
                                                 onClick={() => setShowSnapshotPressureOverlay(!showSnapshotPressureOverlay)}

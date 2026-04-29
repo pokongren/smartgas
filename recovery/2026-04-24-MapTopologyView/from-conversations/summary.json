@@ -1,0 +1,764 @@
+{
+  "total_calls": 197,
+  "saved_snapshots": 49,
+  "unique_snapshots": 24,
+  "snapshots": [
+    {
+      "sha256": "93c1eaa14a4e4e570690402f94395969d4d077c522d5a0155ccce2964e4951e5",
+      "count": 1,
+      "first_timestamp": "2026-03-30T08:00:10.986Z",
+      "last_timestamp": "2026-03-30T08:00:10.986Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-03-30_08-00-10.986__call_UvZLm2tM8NWZ0FVwfzIiETlk.tsx",
+      "sample_lines": 714,
+      "sample_size": 38246
+    },
+    {
+      "sha256": "a9fada9790da1e957caec9949608569e844ba7acec45a42b7e36a45dcfe5a868",
+      "count": 4,
+      "first_timestamp": "2026-04-03T05:05:39.646Z",
+      "last_timestamp": "2026-04-03T05:05:39.646Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_05-05-39.646__call_xPfm1MJFQUDrLAqN7uCXzGcs.tsx",
+      "sample_lines": 713,
+      "sample_size": 38246
+    },
+    {
+      "sha256": "fce61b915724de891d225c7f17275d01d20cc9ef7efd6f75abd566a24987773e",
+      "count": 4,
+      "first_timestamp": "2026-04-03T22:23:41.244Z",
+      "last_timestamp": "2026-04-03T22:23:41.244Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-23-41.244__call_hQbSP34VNxgFwmWldYJAyOXX.tsx",
+      "sample_lines": 744,
+      "sample_size": 38907
+    },
+    {
+      "sha256": "eaf7b283b247d8d69b267bac9c590a4f196300bac20311ae674a71fd809a552a",
+      "count": 1,
+      "first_timestamp": "2026-04-03T22:32:07.095Z",
+      "last_timestamp": "2026-04-03T22:32:07.095Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-32-07.095__call_bdC5cLCklAHW1U4bCLIUuVS7.tsx",
+      "sample_lines": 722,
+      "sample_size": 38509
+    },
+    {
+      "sha256": "61b0835450e0aca1458184e8c86123ae72ae4e029afc878feda01f5a7e6f6ffc",
+      "count": 1,
+      "first_timestamp": "2026-04-03T13:58:12.316Z",
+      "last_timestamp": "2026-04-03T13:58:12.316Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_13-58-12.316__call_k8cNnn9cmOHGW8vJ5SHgOAGS.tsx",
+      "sample_lines": 746,
+      "sample_size": 38907
+    },
+    {
+      "sha256": "95eb467156f2042391b16b3c1d4b84631fb08d14d2ca82cd5218780b542e3ef5",
+      "count": 5,
+      "first_timestamp": "2026-04-03T22:04:39.900Z",
+      "last_timestamp": "2026-04-03T22:04:39.900Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-04-39.900__call_iMMllcr43u179e6yKNqTyqWk.tsx",
+      "sample_lines": 725,
+      "sample_size": 38417
+    },
+    {
+      "sha256": "0f9b29664e6b12e71779564915965cf1faa79b72fe1f03db9ac4a2f921a27fe6",
+      "count": 2,
+      "first_timestamp": "2026-04-04T02:22:14.286Z",
+      "last_timestamp": "2026-04-04T08:22:50.083Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_02-22-14.286__call_O9tHvzR25xniLptD1yBwe7Td.tsx",
+      "sample_lines": 710,
+      "sample_size": 38221
+    },
+    {
+      "sha256": "7a631a5067bde55dbe2a577438272e23eca3eb9e2a018256374c380851909ff4",
+      "count": 2,
+      "first_timestamp": "2026-04-04T11:39:41.490Z",
+      "last_timestamp": "2026-04-04T11:39:41.490Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_11-39-41.490__call_JfkxlVVwH44OzdL7kLv56bqB.tsx",
+      "sample_lines": 719,
+      "sample_size": 38427
+    },
+    {
+      "sha256": "13d4f7d5c121d4cded77bd6e378d596567c0e8da1946ee05a0d544a2f70f824c",
+      "count": 1,
+      "first_timestamp": "2026-04-04T12:35:17.530Z",
+      "last_timestamp": "2026-04-04T12:35:17.530Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_12-35-17.530__call_W2ZxwDhy4kZsOeXJG9NjfUyW.tsx",
+      "sample_lines": 739,
+      "sample_size": 38693
+    },
+    {
+      "sha256": "01eabee480be6a0fcb56862aa963396f5ebeefaed99e6de0d0400b51645f0b58",
+      "count": 3,
+      "first_timestamp": "2026-04-04T14:54:44.457Z",
+      "last_timestamp": "2026-04-04T14:54:44.457Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_14-54-44.457__call_cocLTw56LrSGkiNsTpSxIVpJ.tsx",
+      "sample_lines": 716,
+      "sample_size": 38158
+    },
+    {
+      "sha256": "4c3b1d8701cf0006b3080d96b212f2738d2728db8407e9508935097a0f9115fa",
+      "count": 1,
+      "first_timestamp": "2026-04-04T22:21:23.074Z",
+      "last_timestamp": "2026-04-04T22:21:23.074Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_22-21-23.074__call_3jQBjFhr1zWNa23SoCWr0ajd.tsx",
+      "sample_lines": 696,
+      "sample_size": 37938
+    },
+    {
+      "sha256": "b16678b91852276e51ce330ab8be47cb0958310012b50d4c03786feffef54b5b",
+      "count": 4,
+      "first_timestamp": "2026-04-13T10:00:13.359Z",
+      "last_timestamp": "2026-04-13T10:00:13.359Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-13_10-00-13.359__call_II8r7U2ZHmFqqdxb9Ul6V2hx.tsx",
+      "sample_lines": 664,
+      "sample_size": 37636
+    },
+    {
+      "sha256": "b42f095c4e53fe6b8d409c9c725a7d2e029924144e27906d024dbbee46915026",
+      "count": 3,
+      "first_timestamp": "2026-04-05T06:21:55.307Z",
+      "last_timestamp": "2026-04-05T12:22:20.808Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-05_06-21-55.307__call_IgMy68kV3x4T1hVuNX2aJKqh.tsx",
+      "sample_lines": 689,
+      "sample_size": 37938
+    },
+    {
+      "sha256": "0afd93a7f5c4fa6822a542e282c0a22608a2d2335fc5ca3030390288b6d65fd2",
+      "count": 1,
+      "first_timestamp": "2026-04-17T17:08:59.379Z",
+      "last_timestamp": "2026-04-17T17:08:59.379Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-17_17-08-59.379__call_I4abMaGXKIfL3l5d2wHhYBBm.tsx",
+      "sample_lines": 646,
+      "sample_size": 36304
+    },
+    {
+      "sha256": "f080fdb2545885c1fec47f841adbe5c0ec851b677a2833485f10eed42f1d10de",
+      "count": 1,
+      "first_timestamp": "2026-04-22T20:54:56.719Z",
+      "last_timestamp": "2026-04-22T20:54:56.719Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-22_20-54-56.719__call_QeCLKZdATa0EZuarAGru5VeS.tsx",
+      "sample_lines": 671,
+      "sample_size": 36308
+    },
+    {
+      "sha256": "29e69c48fa899b30845ba5e290d9e00fe5563f6d9f04f9d55ca11b9e75e89f06",
+      "count": 1,
+      "first_timestamp": "2026-04-22T20:57:13.973Z",
+      "last_timestamp": "2026-04-22T20:57:13.973Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-22_20-57-13.973__call_NufTceZEe1gtf6fbFeHWVwkH.tsx",
+      "sample_lines": 669,
+      "sample_size": 36308
+    },
+    {
+      "sha256": "74dd19f066a447dae46905bff466cf8b8be3f09ed4fe77c9c4bcc39f5a560878",
+      "count": 1,
+      "first_timestamp": "2026-04-07T15:40:50.625Z",
+      "last_timestamp": "2026-04-07T15:40:50.625Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_15-40-50.625__call_JGK96HF6yPZiEeYmmCgFDPjY.tsx",
+      "sample_lines": 714,
+      "sample_size": 38186
+    },
+    {
+      "sha256": "8fddcdfc179bcbd9cdbc8f67d4a25ae567af6fe5c9d2d8757572d1716331db28",
+      "count": 2,
+      "first_timestamp": "2026-04-07T18:51:28.719Z",
+      "last_timestamp": "2026-04-07T18:53:47.194Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_18-51-28.719__call_2llQOlG1bndyv4kSQdKyyEBf.tsx",
+      "sample_lines": 715,
+      "sample_size": 38682
+    },
+    {
+      "sha256": "1c193b209478459f7ad2d9ed2f307559952d717275894f14f3f8130a733277ca",
+      "count": 1,
+      "first_timestamp": "2026-04-07T21:00:45.168Z",
+      "last_timestamp": "2026-04-07T21:00:45.168Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_21-00-45.168__call_AWPdlyf1TJgjJTCg7HV2z7v6.tsx",
+      "sample_lines": 555,
+      "sample_size": 36439
+    },
+    {
+      "sha256": "86636d016fc0519edd48dda4e849bcf07f9c05db2319f79625697a3bbfdffba0",
+      "count": 5,
+      "first_timestamp": "2026-04-07T22:00:24.860Z",
+      "last_timestamp": "2026-04-08T06:05:11.388Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_22-00-24.860__call_8CNpycLRljN1KfxtguZdW6Fq.tsx",
+      "sample_lines": 554,
+      "sample_size": 35263
+    },
+    {
+      "sha256": "4eceef097ff151a1d724c66a22ffad2eb8ef95b8a669121df8e91d10c69605f2",
+      "count": 1,
+      "first_timestamp": "2026-04-08T05:01:42.137Z",
+      "last_timestamp": "2026-04-08T05:01:42.137Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_05-01-42.137__call_13Lk02nLFAQssb7gZxImIW9e.tsx",
+      "sample_lines": 691,
+      "sample_size": 36301
+    },
+    {
+      "sha256": "eda5708af4afec85f5d4a0fcc557d691d7f274c19169749bcd2f17e4e8f90871",
+      "count": 1,
+      "first_timestamp": "2026-04-08T07:02:15.209Z",
+      "last_timestamp": "2026-04-08T07:02:15.209Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_07-02-15.209__call_H2OndH7u4P3UrXdD39UAeiIg.tsx",
+      "sample_lines": 631,
+      "sample_size": 37140
+    },
+    {
+      "sha256": "75aea709676769b2109be9f71d8d649b7872b25e5197b8f45afc8ebab57dbb3f",
+      "count": 2,
+      "first_timestamp": "2026-04-08T14:14:39.309Z",
+      "last_timestamp": "2026-04-08T14:24:06.792Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_14-14-39.309__call_bGfGt4ZvHnmbfNyazTXm445Q.tsx",
+      "sample_lines": 602,
+      "sample_size": 35887
+    },
+    {
+      "sha256": "f3671b63eb80171b2ee5b81cf91cdcf60c32acba35ed38d362312b16a7d4756b",
+      "count": 1,
+      "first_timestamp": "2026-04-14T18:16:56.484Z",
+      "last_timestamp": "2026-04-14T18:16:56.484Z",
+      "sample_tsx": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-14_18-16-56.484__call_JswihoQT6Yww9joQGl8ngGZ7.tsx",
+      "sample_lines": 649,
+      "sample_size": 36100
+    }
+  ],
+  "raw_items": [
+    {
+      "call_id": "call_UvZLm2tM8NWZ0FVwfzIiETlk",
+      "timestamp": "2026-03-30T08:00:10.986Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\03\\30\\rollout-2026-03-30T15-58-35-019d3dc0-7144-7121-b5ed-a545d43dd156.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw src/views/MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-03-30_08-00-10.986__call_UvZLm2tM8NWZ0FVwfzIiETlk.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-03-30_08-00-10.986__call_UvZLm2tM8NWZ0FVwfzIiETlk.tsx",
+      "line_count": 714,
+      "size": 38246,
+      "sha256": "93c1eaa14a4e4e570690402f94395969d4d077c522d5a0155ccce2964e4951e5"
+    },
+    {
+      "call_id": "call_xPfm1MJFQUDrLAqN7uCXzGcs",
+      "timestamp": "2026-04-03T05:05:39.646Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\03\\rollout-2026-04-03T13-05-32-019d51bb-737d-71f2-8790-b19e932a647b.jsonl",
+      "command": "{\"command\":\"Get-Content src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":20000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_05-05-39.646__call_xPfm1MJFQUDrLAqN7uCXzGcs.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_05-05-39.646__call_xPfm1MJFQUDrLAqN7uCXzGcs.tsx",
+      "line_count": 713,
+      "size": 38246,
+      "sha256": "a9fada9790da1e957caec9949608569e844ba7acec45a42b7e36a45dcfe5a868"
+    },
+    {
+      "call_id": "call_xPfm1MJFQUDrLAqN7uCXzGcs",
+      "timestamp": "2026-04-03T05:05:39.646Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\03\\rollout-2026-04-03T13-05-32-019d51bb-737d-71f2-8790-b19e932a647b.jsonl",
+      "command": "{\"command\":\"Get-Content src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":20000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_05-05-39.646__call_xPfm1MJFQUDrLAqN7uCXzGcs.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_05-05-39.646__call_xPfm1MJFQUDrLAqN7uCXzGcs.tsx",
+      "line_count": 713,
+      "size": 38246,
+      "sha256": "a9fada9790da1e957caec9949608569e844ba7acec45a42b7e36a45dcfe5a868"
+    },
+    {
+      "call_id": "call_xPfm1MJFQUDrLAqN7uCXzGcs",
+      "timestamp": "2026-04-03T05:05:39.646Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\03\\rollout-2026-04-03T13-05-32-019d51bb-737d-71f2-8790-b19e932a647b.jsonl",
+      "command": "{\"command\":\"Get-Content src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":20000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_05-05-39.646__call_xPfm1MJFQUDrLAqN7uCXzGcs.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_05-05-39.646__call_xPfm1MJFQUDrLAqN7uCXzGcs.tsx",
+      "line_count": 713,
+      "size": 38246,
+      "sha256": "a9fada9790da1e957caec9949608569e844ba7acec45a42b7e36a45dcfe5a868"
+    },
+    {
+      "call_id": "call_xPfm1MJFQUDrLAqN7uCXzGcs",
+      "timestamp": "2026-04-03T05:05:39.646Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\03\\rollout-2026-04-03T13-05-32-019d51bb-737d-71f2-8790-b19e932a647b.jsonl",
+      "command": "{\"command\":\"Get-Content src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":20000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_05-05-39.646__call_xPfm1MJFQUDrLAqN7uCXzGcs.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_05-05-39.646__call_xPfm1MJFQUDrLAqN7uCXzGcs.tsx",
+      "line_count": 713,
+      "size": 38246,
+      "sha256": "a9fada9790da1e957caec9949608569e844ba7acec45a42b7e36a45dcfe5a868"
+    },
+    {
+      "call_id": "call_hQbSP34VNxgFwmWldYJAyOXX",
+      "timestamp": "2026-04-03T22:23:41.244Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T06-23-36-019d5571-d319-7be0-a415-baeb18fa9e3b.jsonl",
+      "command": "{\"command\":\"Get-Content -Encoding utf8 -Raw src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-23-41.244__call_hQbSP34VNxgFwmWldYJAyOXX.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-23-41.244__call_hQbSP34VNxgFwmWldYJAyOXX.tsx",
+      "line_count": 744,
+      "size": 38907,
+      "sha256": "fce61b915724de891d225c7f17275d01d20cc9ef7efd6f75abd566a24987773e"
+    },
+    {
+      "call_id": "call_bdC5cLCklAHW1U4bCLIUuVS7",
+      "timestamp": "2026-04-03T22:32:07.095Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\03\\rollout-2026-04-03T21-41-57-019d5394-3ca5-7fb1-8edf-6ccd09dc6e43.jsonl",
+      "command": "{\"command\":\"Get-Content -Path 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":120000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-32-07.095__call_bdC5cLCklAHW1U4bCLIUuVS7.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-32-07.095__call_bdC5cLCklAHW1U4bCLIUuVS7.tsx",
+      "line_count": 722,
+      "size": 38509,
+      "sha256": "eaf7b283b247d8d69b267bac9c590a4f196300bac20311ae674a71fd809a552a"
+    },
+    {
+      "call_id": "call_k8cNnn9cmOHGW8vJ5SHgOAGS",
+      "timestamp": "2026-04-03T13:58:12.316Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\03\\rollout-2026-04-03T21-55-57-019d53a1-0e24-7ef2-9f03-c5eb021538e9.jsonl",
+      "command": "{\"command\":\"Get-Content -Encoding utf8 -Raw src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_13-58-12.316__call_k8cNnn9cmOHGW8vJ5SHgOAGS.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_13-58-12.316__call_k8cNnn9cmOHGW8vJ5SHgOAGS.tsx",
+      "line_count": 746,
+      "size": 38907,
+      "sha256": "61b0835450e0aca1458184e8c86123ae72ae4e029afc878feda01f5a7e6f6ffc"
+    },
+    {
+      "call_id": "call_iMMllcr43u179e6yKNqTyqWk",
+      "timestamp": "2026-04-03T22:04:39.900Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T06-04-34-019d5560-68b6-7f70-9753-4cc0c82af2a9.jsonl",
+      "command": "{\"command\":\"Get-Content -LiteralPath src\\\\views\\\\MapTopologyView.tsx -Raw\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-04-39.900__call_iMMllcr43u179e6yKNqTyqWk.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-04-39.900__call_iMMllcr43u179e6yKNqTyqWk.tsx",
+      "line_count": 725,
+      "size": 38417,
+      "sha256": "95eb467156f2042391b16b3c1d4b84631fb08d14d2ca82cd5218780b542e3ef5"
+    },
+    {
+      "call_id": "call_iMMllcr43u179e6yKNqTyqWk",
+      "timestamp": "2026-04-03T22:04:39.900Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T06-04-34-019d5560-68b6-7f70-9753-4cc0c82af2a9.jsonl",
+      "command": "{\"command\":\"Get-Content -LiteralPath src\\\\views\\\\MapTopologyView.tsx -Raw\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-04-39.900__call_iMMllcr43u179e6yKNqTyqWk.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-04-39.900__call_iMMllcr43u179e6yKNqTyqWk.tsx",
+      "line_count": 725,
+      "size": 38417,
+      "sha256": "95eb467156f2042391b16b3c1d4b84631fb08d14d2ca82cd5218780b542e3ef5"
+    },
+    {
+      "call_id": "call_iMMllcr43u179e6yKNqTyqWk",
+      "timestamp": "2026-04-03T22:04:39.900Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T06-04-34-019d5560-68b6-7f70-9753-4cc0c82af2a9.jsonl",
+      "command": "{\"command\":\"Get-Content -LiteralPath src\\\\views\\\\MapTopologyView.tsx -Raw\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-04-39.900__call_iMMllcr43u179e6yKNqTyqWk.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-04-39.900__call_iMMllcr43u179e6yKNqTyqWk.tsx",
+      "line_count": 725,
+      "size": 38417,
+      "sha256": "95eb467156f2042391b16b3c1d4b84631fb08d14d2ca82cd5218780b542e3ef5"
+    },
+    {
+      "call_id": "call_iMMllcr43u179e6yKNqTyqWk",
+      "timestamp": "2026-04-03T22:04:39.900Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T06-04-34-019d5560-68b6-7f70-9753-4cc0c82af2a9.jsonl",
+      "command": "{\"command\":\"Get-Content -LiteralPath src\\\\views\\\\MapTopologyView.tsx -Raw\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-04-39.900__call_iMMllcr43u179e6yKNqTyqWk.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-04-39.900__call_iMMllcr43u179e6yKNqTyqWk.tsx",
+      "line_count": 725,
+      "size": 38417,
+      "sha256": "95eb467156f2042391b16b3c1d4b84631fb08d14d2ca82cd5218780b542e3ef5"
+    },
+    {
+      "call_id": "call_iMMllcr43u179e6yKNqTyqWk",
+      "timestamp": "2026-04-03T22:04:39.900Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T06-04-34-019d5560-68b6-7f70-9753-4cc0c82af2a9.jsonl",
+      "command": "{\"command\":\"Get-Content -LiteralPath src\\\\views\\\\MapTopologyView.tsx -Raw\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-04-39.900__call_iMMllcr43u179e6yKNqTyqWk.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-04-39.900__call_iMMllcr43u179e6yKNqTyqWk.tsx",
+      "line_count": 725,
+      "size": 38417,
+      "sha256": "95eb467156f2042391b16b3c1d4b84631fb08d14d2ca82cd5218780b542e3ef5"
+    },
+    {
+      "call_id": "call_hQbSP34VNxgFwmWldYJAyOXX",
+      "timestamp": "2026-04-03T22:23:41.244Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T06-23-36-019d5571-d319-7be0-a415-baeb18fa9e3b.jsonl",
+      "command": "{\"command\":\"Get-Content -Encoding utf8 -Raw src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-23-41.244__call_hQbSP34VNxgFwmWldYJAyOXX.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-23-41.244__call_hQbSP34VNxgFwmWldYJAyOXX.tsx",
+      "line_count": 744,
+      "size": 38907,
+      "sha256": "fce61b915724de891d225c7f17275d01d20cc9ef7efd6f75abd566a24987773e"
+    },
+    {
+      "call_id": "call_hQbSP34VNxgFwmWldYJAyOXX",
+      "timestamp": "2026-04-03T22:23:41.244Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T06-23-36-019d5571-d319-7be0-a415-baeb18fa9e3b.jsonl",
+      "command": "{\"command\":\"Get-Content -Encoding utf8 -Raw src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-23-41.244__call_hQbSP34VNxgFwmWldYJAyOXX.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-23-41.244__call_hQbSP34VNxgFwmWldYJAyOXX.tsx",
+      "line_count": 744,
+      "size": 38907,
+      "sha256": "fce61b915724de891d225c7f17275d01d20cc9ef7efd6f75abd566a24987773e"
+    },
+    {
+      "call_id": "call_hQbSP34VNxgFwmWldYJAyOXX",
+      "timestamp": "2026-04-03T22:23:41.244Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T06-23-36-019d5571-d319-7be0-a415-baeb18fa9e3b.jsonl",
+      "command": "{\"command\":\"Get-Content -Encoding utf8 -Raw src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-23-41.244__call_hQbSP34VNxgFwmWldYJAyOXX.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-03_22-23-41.244__call_hQbSP34VNxgFwmWldYJAyOXX.tsx",
+      "line_count": 744,
+      "size": 38907,
+      "sha256": "fce61b915724de891d225c7f17275d01d20cc9ef7efd6f75abd566a24987773e"
+    },
+    {
+      "call_id": "call_O9tHvzR25xniLptD1yBwe7Td",
+      "timestamp": "2026-04-04T02:22:14.286Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T10-20-50-019d564b-05c8-70e0-a3de-a89e419d4ecc.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw 'src/views/MapTopologyView.tsx'\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_02-22-14.286__call_O9tHvzR25xniLptD1yBwe7Td.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_02-22-14.286__call_O9tHvzR25xniLptD1yBwe7Td.tsx",
+      "line_count": 710,
+      "size": 38221,
+      "sha256": "0f9b29664e6b12e71779564915965cf1faa79b72fe1f03db9ac4a2f921a27fe6"
+    },
+    {
+      "call_id": "call_egkXQQKQbdXyIVFWgDwY6uBm",
+      "timestamp": "2026-04-04T08:22:50.083Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T16-22-05-019d5795-c1b7-7b91-8a4e-09a6f3549383.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw \\\"F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx\\\"\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_08-22-50.083__call_egkXQQKQbdXyIVFWgDwY6uBm.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_08-22-50.083__call_egkXQQKQbdXyIVFWgDwY6uBm.tsx",
+      "line_count": 710,
+      "size": 38221,
+      "sha256": "0f9b29664e6b12e71779564915965cf1faa79b72fe1f03db9ac4a2f921a27fe6"
+    },
+    {
+      "call_id": "call_JfkxlVVwH44OzdL7kLv56bqB",
+      "timestamp": "2026-04-04T11:39:41.490Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T19-39-36-019d584a-9692-76f2-80ea-f2b5e8c4ed64.jsonl",
+      "command": "{\"command\":\"Get-Content -Path 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":20000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_11-39-41.490__call_JfkxlVVwH44OzdL7kLv56bqB.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_11-39-41.490__call_JfkxlVVwH44OzdL7kLv56bqB.tsx",
+      "line_count": 719,
+      "size": 38427,
+      "sha256": "7a631a5067bde55dbe2a577438272e23eca3eb9e2a018256374c380851909ff4"
+    },
+    {
+      "call_id": "call_W2ZxwDhy4kZsOeXJG9NjfUyW",
+      "timestamp": "2026-04-04T12:35:17.530Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T17-49-25-019d57e5-b5f9-7871-9962-2a4d3811897e.jsonl",
+      "command": "{\"command\":\"Get-Content -Encoding utf8 -Path 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":20000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_12-35-17.530__call_W2ZxwDhy4kZsOeXJG9NjfUyW.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_12-35-17.530__call_W2ZxwDhy4kZsOeXJG9NjfUyW.tsx",
+      "line_count": 739,
+      "size": 38693,
+      "sha256": "13d4f7d5c121d4cded77bd6e378d596567c0e8da1946ee05a0d544a2f70f824c"
+    },
+    {
+      "call_id": "call_JfkxlVVwH44OzdL7kLv56bqB",
+      "timestamp": "2026-04-04T11:39:41.490Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T19-39-36-019d584a-9692-76f2-80ea-f2b5e8c4ed64.jsonl",
+      "command": "{\"command\":\"Get-Content -Path 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":20000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_11-39-41.490__call_JfkxlVVwH44OzdL7kLv56bqB.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_11-39-41.490__call_JfkxlVVwH44OzdL7kLv56bqB.tsx",
+      "line_count": 719,
+      "size": 38427,
+      "sha256": "7a631a5067bde55dbe2a577438272e23eca3eb9e2a018256374c380851909ff4"
+    },
+    {
+      "call_id": "call_cocLTw56LrSGkiNsTpSxIVpJ",
+      "timestamp": "2026-04-04T14:54:44.457Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T22-54-39-019d58fd-2930-7fb3-8a5e-48c58f7646a5.jsonl",
+      "command": "{\"command\":\"Get-Content src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":20000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_14-54-44.457__call_cocLTw56LrSGkiNsTpSxIVpJ.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_14-54-44.457__call_cocLTw56LrSGkiNsTpSxIVpJ.tsx",
+      "line_count": 716,
+      "size": 38158,
+      "sha256": "01eabee480be6a0fcb56862aa963396f5ebeefaed99e6de0d0400b51645f0b58"
+    },
+    {
+      "call_id": "call_cocLTw56LrSGkiNsTpSxIVpJ",
+      "timestamp": "2026-04-04T14:54:44.457Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T22-54-39-019d58fd-2930-7fb3-8a5e-48c58f7646a5.jsonl",
+      "command": "{\"command\":\"Get-Content src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":20000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_14-54-44.457__call_cocLTw56LrSGkiNsTpSxIVpJ.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_14-54-44.457__call_cocLTw56LrSGkiNsTpSxIVpJ.tsx",
+      "line_count": 716,
+      "size": 38158,
+      "sha256": "01eabee480be6a0fcb56862aa963396f5ebeefaed99e6de0d0400b51645f0b58"
+    },
+    {
+      "call_id": "call_cocLTw56LrSGkiNsTpSxIVpJ",
+      "timestamp": "2026-04-04T14:54:44.457Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\04\\rollout-2026-04-04T22-54-39-019d58fd-2930-7fb3-8a5e-48c58f7646a5.jsonl",
+      "command": "{\"command\":\"Get-Content src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":20000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_14-54-44.457__call_cocLTw56LrSGkiNsTpSxIVpJ.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_14-54-44.457__call_cocLTw56LrSGkiNsTpSxIVpJ.tsx",
+      "line_count": 716,
+      "size": 38158,
+      "sha256": "01eabee480be6a0fcb56862aa963396f5ebeefaed99e6de0d0400b51645f0b58"
+    },
+    {
+      "call_id": "call_3jQBjFhr1zWNa23SoCWr0ajd",
+      "timestamp": "2026-04-04T22:21:23.074Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\05\\rollout-2026-04-05T06-21-06-019d5a95-e6a0-7e13-8714-0b8ddc9fe77e.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_22-21-23.074__call_3jQBjFhr1zWNa23SoCWr0ajd.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-04_22-21-23.074__call_3jQBjFhr1zWNa23SoCWr0ajd.tsx",
+      "line_count": 696,
+      "size": 37938,
+      "sha256": "4c3b1d8701cf0006b3080d96b212f2738d2728db8407e9508935097a0f9115fa"
+    },
+    {
+      "call_id": "call_II8r7U2ZHmFqqdxb9Ul6V2hx",
+      "timestamp": "2026-04-13T10:00:13.359Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\13\\rollout-2026-04-13T18-00-08-019d8648-c166-7622-82e5-df8a059334fc.jsonl",
+      "command": "{\"command\":\"Get-Content -Path src/views/MapTopologyView.tsx -Encoding utf8\",\"workdir\":\"F:\\\\smartgas-grid\"}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-13_10-00-13.359__call_II8r7U2ZHmFqqdxb9Ul6V2hx.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-13_10-00-13.359__call_II8r7U2ZHmFqqdxb9Ul6V2hx.tsx",
+      "line_count": 664,
+      "size": 37636,
+      "sha256": "b16678b91852276e51ce330ab8be47cb0958310012b50d4c03786feffef54b5b"
+    },
+    {
+      "call_id": "call_IgMy68kV3x4T1hVuNX2aJKqh",
+      "timestamp": "2026-04-05T06:21:55.307Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\05\\rollout-2026-04-05T14-21-27-019d5c4d-ad56-7ca3-925a-a4f5426ba2cc.jsonl",
+      "command": "{\"command\":\"Get-Content -Path 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-05_06-21-55.307__call_IgMy68kV3x4T1hVuNX2aJKqh.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-05_06-21-55.307__call_IgMy68kV3x4T1hVuNX2aJKqh.tsx",
+      "line_count": 689,
+      "size": 37938,
+      "sha256": "b42f095c4e53fe6b8d409c9c725a7d2e029924144e27906d024dbbee46915026"
+    },
+    {
+      "call_id": "call_ImRIyg8yw6fMq0Nse2HkJkYI",
+      "timestamp": "2026-04-05T10:21:51.710Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\05\\rollout-2026-04-05T18-21-35-019d5d29-85e1-7951-b4f6-f13d8800c660.jsonl",
+      "command": "{\"command\":\"Get-Content -Path 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-05_10-21-51.710__call_ImRIyg8yw6fMq0Nse2HkJkYI.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-05_10-21-51.710__call_ImRIyg8yw6fMq0Nse2HkJkYI.tsx",
+      "line_count": 689,
+      "size": 37938,
+      "sha256": "b42f095c4e53fe6b8d409c9c725a7d2e029924144e27906d024dbbee46915026"
+    },
+    {
+      "call_id": "call_I4abMaGXKIfL3l5d2wHhYBBm",
+      "timestamp": "2026-04-17T17:08:59.379Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\05\\rollout-2026-04-05T19-23-39-019d5d62-59a5-75f2-89ff-f1148b4581fe.jsonl",
+      "command": "{\"command\":\"Get-Content src/views/MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\"}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-17_17-08-59.379__call_I4abMaGXKIfL3l5d2wHhYBBm.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-17_17-08-59.379__call_I4abMaGXKIfL3l5d2wHhYBBm.tsx",
+      "line_count": 646,
+      "size": 36304,
+      "sha256": "0afd93a7f5c4fa6822a542e282c0a22608a2d2335fc5ca3030390288b6d65fd2"
+    },
+    {
+      "call_id": "call_QeCLKZdATa0EZuarAGru5VeS",
+      "timestamp": "2026-04-22T20:54:56.719Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\05\\rollout-2026-04-05T19-23-39-019d5d62-59a5-75f2-89ff-f1148b4581fe.jsonl",
+      "command": "{\"command\":\"Get-Content -Path F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx -Raw\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":120000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-22_20-54-56.719__call_QeCLKZdATa0EZuarAGru5VeS.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-22_20-54-56.719__call_QeCLKZdATa0EZuarAGru5VeS.tsx",
+      "line_count": 671,
+      "size": 36308,
+      "sha256": "f080fdb2545885c1fec47f841adbe5c0ec851b677a2833485f10eed42f1d10de"
+    },
+    {
+      "call_id": "call_NufTceZEe1gtf6fbFeHWVwkH",
+      "timestamp": "2026-04-22T20:57:13.973Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\05\\rollout-2026-04-05T19-23-39-019d5d62-59a5-75f2-89ff-f1148b4581fe.jsonl",
+      "command": "{\"command\":\"Get-Content -Path 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-22_20-57-13.973__call_NufTceZEe1gtf6fbFeHWVwkH.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-22_20-57-13.973__call_NufTceZEe1gtf6fbFeHWVwkH.tsx",
+      "line_count": 669,
+      "size": 36308,
+      "sha256": "29e69c48fa899b30845ba5e290d9e00fe5563f6d9f04f9d55ca11b9e75e89f06"
+    },
+    {
+      "call_id": "call_vN5M3CO7uLO1XYo1fnIjVgo1",
+      "timestamp": "2026-04-05T12:22:20.808Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\05\\rollout-2026-04-05T20-21-44-019d5d97-85d0-7431-a9bd-ead83f4342d5.jsonl",
+      "command": "{\"command\":\"Get-Content -Path 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-05_12-22-20.808__call_vN5M3CO7uLO1XYo1fnIjVgo1.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-05_12-22-20.808__call_vN5M3CO7uLO1XYo1fnIjVgo1.tsx",
+      "line_count": 689,
+      "size": 37938,
+      "sha256": "b42f095c4e53fe6b8d409c9c725a7d2e029924144e27906d024dbbee46915026"
+    },
+    {
+      "call_id": "call_JGK96HF6yPZiEeYmmCgFDPjY",
+      "timestamp": "2026-04-07T15:40:50.625Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\07\\rollout-2026-04-07T23-40-13-019d6899-f69b-7e33-b119-34d075718b3c.jsonl",
+      "command": "{\"command\":\"Get-Content -Path 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_15-40-50.625__call_JGK96HF6yPZiEeYmmCgFDPjY.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_15-40-50.625__call_JGK96HF6yPZiEeYmmCgFDPjY.tsx",
+      "line_count": 714,
+      "size": 38186,
+      "sha256": "74dd19f066a447dae46905bff466cf8b8be3f09ed4fe77c9c4bcc39f5a560878"
+    },
+    {
+      "call_id": "call_2llQOlG1bndyv4kSQdKyyEBf",
+      "timestamp": "2026-04-07T18:51:28.719Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T01-35-52-019d6903-d675-7070-a272-0fafbf13d81b.jsonl",
+      "command": "{\"command\":\"Get-Content F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_18-51-28.719__call_2llQOlG1bndyv4kSQdKyyEBf.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_18-51-28.719__call_2llQOlG1bndyv4kSQdKyyEBf.tsx",
+      "line_count": 715,
+      "size": 38682,
+      "sha256": "8fddcdfc179bcbd9cdbc8f67d4a25ae567af6fe5c9d2d8757572d1716331db28"
+    },
+    {
+      "call_id": "call_ExPcmdswy45FQCSFW67g4QuU",
+      "timestamp": "2026-04-07T18:53:47.194Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T02-53-19-019d694a-c0f3-7891-be44-3f747ff3fc7e.jsonl",
+      "command": "{\"command\":\"Get-Content -Path 'F:/smartgas-grid/src/views/MapTopologyView.tsx'\",\"workdir\":\"F:/smartgas-grid\",\"timeout_ms\":120000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_18-53-47.194__call_ExPcmdswy45FQCSFW67g4QuU.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_18-53-47.194__call_ExPcmdswy45FQCSFW67g4QuU.tsx",
+      "line_count": 715,
+      "size": 38682,
+      "sha256": "8fddcdfc179bcbd9cdbc8f67d4a25ae567af6fe5c9d2d8757572d1716331db28"
+    },
+    {
+      "call_id": "call_AWPdlyf1TJgjJTCg7HV2z7v6",
+      "timestamp": "2026-04-07T21:00:45.168Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T05-00-26-019d69bf-2187-7e40-8489-40b4afa9915c.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw \\\"F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx\\\"\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_21-00-45.168__call_AWPdlyf1TJgjJTCg7HV2z7v6.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_21-00-45.168__call_AWPdlyf1TJgjJTCg7HV2z7v6.tsx",
+      "line_count": 555,
+      "size": 36439,
+      "sha256": "1c193b209478459f7ad2d9ed2f307559952d717275894f14f3f8130a733277ca"
+    },
+    {
+      "call_id": "call_8CNpycLRljN1KfxtguZdW6Fq",
+      "timestamp": "2026-04-07T22:00:24.860Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T06-00-00-019d69f5-a786-7e72-9cb4-37a04c4d0693.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw \\\"F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx\\\"\",\"workdir\":\"C:\\\\Users\\\\Administrator\\\\.codex\\\\worktrees\\\\e5c3\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_22-00-24.860__call_8CNpycLRljN1KfxtguZdW6Fq.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_22-00-24.860__call_8CNpycLRljN1KfxtguZdW6Fq.tsx",
+      "line_count": 554,
+      "size": 35263,
+      "sha256": "86636d016fc0519edd48dda4e849bcf07f9c05db2319f79625697a3bbfdffba0"
+    },
+    {
+      "call_id": "call_zvSqAPdllo54dlt5bQnWX2zf",
+      "timestamp": "2026-04-07T22:07:16.531Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T06-07-11-019d69fc-3c92-7a92-a936-664e10cafdab.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw \\\"F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx\\\"\",\"workdir\":\"C:\\\\Users\\\\Administrator\\\\.codex\\\\worktrees\\\\e5c3\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_22-07-16.531__call_zvSqAPdllo54dlt5bQnWX2zf.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_22-07-16.531__call_zvSqAPdllo54dlt5bQnWX2zf.tsx",
+      "line_count": 554,
+      "size": 35263,
+      "sha256": "86636d016fc0519edd48dda4e849bcf07f9c05db2319f79625697a3bbfdffba0"
+    },
+    {
+      "call_id": "call_dpjllTK3PPkstQya3ROmxWO6",
+      "timestamp": "2026-04-07T23:00:27.949Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T07-00-12-019d6a2c-c52f-7021-8495-7edd11a6eac7.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw src/views/MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_23-00-27.949__call_dpjllTK3PPkstQya3ROmxWO6.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-07_23-00-27.949__call_dpjllTK3PPkstQya3ROmxWO6.tsx",
+      "line_count": 554,
+      "size": 35263,
+      "sha256": "86636d016fc0519edd48dda4e849bcf07f9c05db2319f79625697a3bbfdffba0"
+    },
+    {
+      "call_id": "call_rsNIkUWvcawL9pnqC6SXIeeP",
+      "timestamp": "2026-04-08T04:00:45.350Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T12-00-25-019d6b3f-a30b-7a71-be46-24ff02c545c4.jsonl",
+      "command": "{\"command\":\"Get-Content -LiteralPath 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx' -Raw\",\"timeout_ms\":20000,\"workdir\":\"C:\\\\Users\\\\Administrator\\\\.codex\\\\worktrees\\\\50fb\\\\smartgas-grid\"}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_04-00-45.350__call_rsNIkUWvcawL9pnqC6SXIeeP.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_04-00-45.350__call_rsNIkUWvcawL9pnqC6SXIeeP.tsx",
+      "line_count": 554,
+      "size": 35263,
+      "sha256": "86636d016fc0519edd48dda4e849bcf07f9c05db2319f79625697a3bbfdffba0"
+    },
+    {
+      "call_id": "call_13Lk02nLFAQssb7gZxImIW9e",
+      "timestamp": "2026-04-08T05:01:42.137Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T13-00-52-019d6b76-faa9-70a0-ad89-3b36b3769ba1.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw -Encoding UTF8 F:/smartgas-grid/src/App.tsx; Write-Output \\\"`n=====FILE=====`n\\\"; Get-Content -Raw -Encoding UTF8 F:/smartgas-grid/src/views/MapTopologyView.tsx; Write-Output \\\"`n=====FILE=====`n\\\"; Get-Content -Raw -Encoding UTF8 F:/smartgas-grid/src/views/TopologyView.tsx; Write-Output \\\"`n=====FILE=====`n\\\"; Get-Content -Raw -Encoding UTF8 F:/smartgas-grid/src/components/ai-assistant/useAiAssistantPageContext.ts; Write-Output \\\"`n=====SEARCH=====`n\\\"; rg -n \\\"正式主仿真页|调试页|主仿真入口|topology-canvas|simulationEntryHint|runSteadySimulation|saveSteadySnapshot|loadSteadySelectedSnapshot|runSteadyMissingTrialScenarios|view-switcher|MapTopologyView|TopologyView\\\" F:/smartgas-grid/src\"}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_05-01-42.137__call_13Lk02nLFAQssb7gZxImIW9e.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_05-01-42.137__call_13Lk02nLFAQssb7gZxImIW9e.tsx",
+      "line_count": 691,
+      "size": 36301,
+      "sha256": "4eceef097ff151a1d724c66a22ffad2eb8ef95b8a669121df8e91d10c69605f2"
+    },
+    {
+      "call_id": "call_E5UfHfR6iLVJE0viHBzzhJKx",
+      "timestamp": "2026-04-08T06:05:11.388Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T14-02-54-019d6baf-c378-7490-9553-8829117abfd1.jsonl",
+      "command": "{\"command\":\"Get-Content -LiteralPath 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx' -Raw\",\"workdir\":\"C:\\\\Users\\\\Administrator\\\\.codex\\\\worktrees\\\\b72e\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_06-05-11.388__call_E5UfHfR6iLVJE0viHBzzhJKx.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_06-05-11.388__call_E5UfHfR6iLVJE0viHBzzhJKx.tsx",
+      "line_count": 554,
+      "size": 35263,
+      "sha256": "86636d016fc0519edd48dda4e849bcf07f9c05db2319f79625697a3bbfdffba0"
+    },
+    {
+      "call_id": "call_H2OndH7u4P3UrXdD39UAeiIg",
+      "timestamp": "2026-04-08T07:02:15.209Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T15-01-48-019d6be5-b33d-72b0-9355-2c9eaebb5475.jsonl",
+      "command": "{\"command\":\"Get-Content -LiteralPath 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx' -Encoding utf8 -Raw\",\"workdir\":\"F:\\\\smartgas-grid\",\"timeout_ms\":10000}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_07-02-15.209__call_H2OndH7u4P3UrXdD39UAeiIg.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_07-02-15.209__call_H2OndH7u4P3UrXdD39UAeiIg.tsx",
+      "line_count": 631,
+      "size": 37140,
+      "sha256": "eda5708af4afec85f5d4a0fcc557d691d7f274c19169749bcd2f17e4e8f90871"
+    },
+    {
+      "call_id": "call_bGfGt4ZvHnmbfNyazTXm445Q",
+      "timestamp": "2026-04-08T14:14:39.309Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T22-14-09-019d6d71-86c2-7621-ad2b-754c77340e9a.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"C:\\\\Users\\\\Administrator\\\\.codex\\\\worktrees\\\\de73\\\\smartgas-grid\",\"timeout_ms\":10000,\"login\":false}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_14-14-39.309__call_bGfGt4ZvHnmbfNyazTXm445Q.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_14-14-39.309__call_bGfGt4ZvHnmbfNyazTXm445Q.tsx",
+      "line_count": 602,
+      "size": 35887,
+      "sha256": "75aea709676769b2109be9f71d8d649b7872b25e5197b8f45afc8ebab57dbb3f"
+    },
+    {
+      "call_id": "call_Whzk7QiTz0PehcJyD9gCHZz6",
+      "timestamp": "2026-04-08T14:24:06.792Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\08\\rollout-2026-04-08T22-24-01-019d6d7a-8ef4-7923-812a-d3767267ae4f.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw 'F:\\\\smartgas-grid\\\\src\\\\views\\\\MapTopologyView.tsx'\",\"workdir\":\"C:\\\\Users\\\\Administrator\\\\.codex\\\\worktrees\\\\de73\\\\smartgas-grid\",\"timeout_ms\":10000,\"login\":false}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_14-24-06.792__call_Whzk7QiTz0PehcJyD9gCHZz6.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-08_14-24-06.792__call_Whzk7QiTz0PehcJyD9gCHZz6.tsx",
+      "line_count": 602,
+      "size": 35887,
+      "sha256": "75aea709676769b2109be9f71d8d649b7872b25e5197b8f45afc8ebab57dbb3f"
+    },
+    {
+      "call_id": "call_JswihoQT6Yww9joQGl8ngGZ7",
+      "timestamp": "2026-04-14T18:16:56.484Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\13\\rollout-2026-04-13T16-08-19-019d85e2-6210-7ad1-a627-b58a3f52e784.jsonl",
+      "command": "{\"command\":\"Get-Content -Raw src\\\\views\\\\MapTopologyView.tsx\",\"workdir\":\"F:\\\\smartgas-grid\"}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-14_18-16-56.484__call_JswihoQT6Yww9joQGl8ngGZ7.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-14_18-16-56.484__call_JswihoQT6Yww9joQGl8ngGZ7.tsx",
+      "line_count": 649,
+      "size": 36100,
+      "sha256": "f3671b63eb80171b2ee5b81cf91cdcf60c32acba35ed38d362312b16a7d4756b"
+    },
+    {
+      "call_id": "call_II8r7U2ZHmFqqdxb9Ul6V2hx",
+      "timestamp": "2026-04-13T10:00:13.359Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\13\\rollout-2026-04-13T18-00-08-019d8648-c166-7622-82e5-df8a059334fc.jsonl",
+      "command": "{\"command\":\"Get-Content -Path src/views/MapTopologyView.tsx -Encoding utf8\",\"workdir\":\"F:\\\\smartgas-grid\"}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-13_10-00-13.359__call_II8r7U2ZHmFqqdxb9Ul6V2hx.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-13_10-00-13.359__call_II8r7U2ZHmFqqdxb9Ul6V2hx.tsx",
+      "line_count": 664,
+      "size": 37636,
+      "sha256": "b16678b91852276e51ce330ab8be47cb0958310012b50d4c03786feffef54b5b"
+    },
+    {
+      "call_id": "call_II8r7U2ZHmFqqdxb9Ul6V2hx",
+      "timestamp": "2026-04-13T10:00:13.359Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\13\\rollout-2026-04-13T18-00-08-019d8648-c166-7622-82e5-df8a059334fc.jsonl",
+      "command": "{\"command\":\"Get-Content -Path src/views/MapTopologyView.tsx -Encoding utf8\",\"workdir\":\"F:\\\\smartgas-grid\"}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-13_10-00-13.359__call_II8r7U2ZHmFqqdxb9Ul6V2hx.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-13_10-00-13.359__call_II8r7U2ZHmFqqdxb9Ul6V2hx.tsx",
+      "line_count": 664,
+      "size": 37636,
+      "sha256": "b16678b91852276e51ce330ab8be47cb0958310012b50d4c03786feffef54b5b"
+    },
+    {
+      "call_id": "call_II8r7U2ZHmFqqdxb9Ul6V2hx",
+      "timestamp": "2026-04-13T10:00:13.359Z",
+      "from_session": "C:\\Users\\Administrator\\.codex\\sessions\\2026\\04\\13\\rollout-2026-04-13T18-00-08-019d8648-c166-7622-82e5-df8a059334fc.jsonl",
+      "command": "{\"command\":\"Get-Content -Path src/views/MapTopologyView.tsx -Encoding utf8\",\"workdir\":\"F:\\\\smartgas-grid\"}",
+      "txt_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-13_10-00-13.359__call_II8r7U2ZHmFqqdxb9Ul6V2hx.txt",
+      "tsx_path": "F:\\smartgas-grid\\recovery\\2026-04-24-MapTopologyView\\from-conversations\\2026-04-13_10-00-13.359__call_II8r7U2ZHmFqqdxb9Ul6V2hx.tsx",
+      "line_count": 664,
+      "size": 37636,
+      "sha256": "b16678b91852276e51ce330ab8be47cb0958310012b50d4c03786feffef54b5b"
+    }
+  ]
+}

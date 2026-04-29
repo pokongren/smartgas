@@ -240,6 +240,7 @@ def _stable_token(value: str) -> List[Any]:
 def build_pilot_package(system_package: Dict[str, Any], pilot: Dict[str, Any]) -> Dict[str, Any]:
     allowed_station_ids = set(pilot["station_ids"])
     allowed_prefixes = set(pilot["layer_prefixes"])
+    force_visible = pilot["id"] == "mainline_zhongwei_jingbian"
 
     filtered_layers: List[Dict[str, Any]] = []
     for layer in system_package.get("layers", []):
@@ -261,7 +262,12 @@ def build_pilot_package(system_package: Dict[str, Any], pilot: Dict[str, Any]) -
         for node in layer.get("nodes", []):
             node_id = str(node.get("id") or "")
             if node_id in used_node_ids or node_id in allowed_station_ids:
-                nodes.append(deepcopy(node))
+                payload = deepcopy(node)
+                if force_visible:
+                    properties = dict(payload.get("properties") or {})
+                    properties["forceVisible"] = True
+                    payload["properties"] = properties
+                nodes.append(payload)
 
         nodes.sort(key=lambda item: _stable_token(str(item.get("id") or "")))
         lines.sort(key=lambda item: _stable_token(str(item.get("id") or "")))

@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                         {([
+                             { id: 'edit' as PanelTab, label: '编辑', icon: 'edit' },
+                             { id: 'validate' as PanelTab, label: '验证', icon: 'verified' },
+                             { id: 'search' as PanelTab, label: '搜索', icon: 'search' },
++                            { id: 'simulation' as PanelTab, label: '仿真', icon: 'science' },
+                             { id: 'centrality' as PanelTab, label: '枢纽', icon: 'stars' },
+                             { id: 'cutoff' as PanelTab, label: '截断', icon: 'cut' },
+                         ]).map(tab => (
+*** End Patch

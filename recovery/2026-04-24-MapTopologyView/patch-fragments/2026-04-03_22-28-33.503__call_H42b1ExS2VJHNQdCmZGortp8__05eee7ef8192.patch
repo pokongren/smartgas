@@ -1,0 +1,45 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+ import MapView from '@/components/map-view/MapView'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
++import { useLocation } from 'react-router-dom'
+ import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+@@
+ const MapTopologyView: React.FC = () => {
++    const location = useLocation()
+     const [mapInstance, setMapInstance] = useState<any>(null)
+     const handleMapLoad = useCallback((map: any) => setMapInstance(map), [])
+@@
+     const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+     // 已高亮的 marker 原始 content，用于恢复
+     const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
++    const focusedNodeIdRef = useRef<string | null>(null)
+@@
+     useEffect(() => { nodesRef.current = topoNodes; edgesRef.current = topoEdges }, [topoNodes, topoEdges])
+     useEffect(() => { modeRef.current = editMode; ptRef.current = pointType }, [editMode, pointType])
+     useEffect(() => { cfRef.current = connectFrom }, [connectFrom])
++    useEffect(() => {
++        focusedNodeIdRef.current = new URLSearchParams(location.search).get('focus')
++    }, [location.search])
+@@
+     useEffect(() => {
+         if (!selectedNode) return
+         const nextSelected = topoNodes.find(node => node.id === selectedNode.id) || null
+         setSelectedNode(nextSelected)
+     }, [selectedNode?.id, topoNodes])
++
++    useEffect(() => {
++        const focusNodeId = focusedNodeIdRef.current
++        if (!focusNodeId || topoNodes.length === 0 || !mapInstance) return
++
++        const targetNode = topoNodes.find(node => node.id === focusNodeId)
++        if (!targetNode) return
++
++        setSelectedNode(targetNode)
++        mapInstance.setZoomAndCenter(12, targetNode.position)
++        focusedNodeIdRef.current = null
++        setStatusMsg(`已从全国视图定位到节点：${targetNode.name}`)
++    }, [mapInstance, topoNodes])
+*** End Patch

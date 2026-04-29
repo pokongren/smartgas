@@ -1,0 +1,54 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    // 浠跨湡鐘舵€?(Sim Status)
+-    const [simDrawerVisible, setSimDrawerVisible] = useState(false)
+-    const [isSimulating, setIsSimulating] = useState(false)
+-    const [simResults, setSimResults] = useState<SimulationResult[]>([])
+-    const [currentSimStep, setCurrentSimStep] = useState(0)
+     const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
+     const [historyChartTarget, setHistoryChartTarget] = useState<null | {
+         stationName?: string
+         junctionId?: string
+         displayName?: string
+@@
+     // 鎴柇浠跨湡鐘舵€?    const [cutoffNodeId, setCutoffNodeId] = useState<string | null>(null)
+     const [cutoffResult, setCutoffResult] = useState<CutoffResult | null>(null)
+     const [cutoffSearch, setCutoffSearch] = useState('')
+     // 淇濆瓨鏈哄埗锛氳窡韪嫋鎷界淮鏀圭殑鍧愭爣
+     const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
+     const [isSaving, setIsSaving] = useState(false)
++    const {
++        overlay: steadyOverlay,
++        baselineOverlay: steadyBaselineOverlay,
++        isLoading: steadySimLoading,
++        error: steadySimError,
++        currentScenario: steadyScenarioId,
++        snapshots: steadySnapshots,
++        snapshotLoading: steadySnapshotLoading,
++        baselineSnapshotLoading: steadyBaselineSnapshotLoading,
++        snapshotError: steadySnapshotError,
++        selectedSnapshotRunId: steadySelectedSnapshotRunId,
++        baselineSnapshotRunId: steadyBaselineSnapshotRunId,
++        trialRunScenarioId: steadyTrialRunScenarioId,
++        bulkTrialRunActive: steadyBulkTrialRunActive,
++        comparison: steadyComparison,
++        trialRunItems: steadyTrialRunItems,
++        setScenario: setSteadyScenario,
++        setSelectedSnapshotRunId: setSteadySelectedSnapshotRunId,
++        setBaselineSnapshotRunId: setSteadyBaselineSnapshotRunId,
++        runSimulation: runSteadySimulation,
++        saveSnapshot: saveSteadySnapshot,
++        refreshSnapshots: refreshSteadySnapshots,
++        loadSelectedSnapshot: loadSteadySelectedSnapshot,
++        runTrialScenario: runSteadyTrialScenario,
++        runMissingTrialScenarios: runSteadyMissingTrialScenarios,
++        clearOverlay: clearSteadyOverlay,
++    } = useSimulation({
++        pilotId: WE1_PRIMARY_PILOT_ID,
++        scenarios: MAINLINE_SCENARIOS,
++    })
+     const [cascadeValves, setCascadeValves] = useState(true)
+     const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
+     const [isPreviewing, setIsPreviewing] = useState(false)
+*** End Patch

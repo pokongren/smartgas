@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                    clearSteadyOverlay()
++                                    clearSteadyOverlay()
++                                    clearSimulationShowcaseSyncContext()
+*** End Patch

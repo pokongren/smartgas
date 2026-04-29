@@ -1,0 +1,37 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-const TOPO_LABELS: Record<PointType, string> = {
++/*const TOPO_LABELS: Record<PointType, string> = {
+@@
+-const LINE_COLOR = '#34d399'
++*/
++const TOPO_LABELS: Record<PointType, string> = {
++    compressor: '压气站',
++    distribution: '分输站',
++    junction: '交汇点',
++    station: '站场',
++    valve: '阀室',
++}
++
++const TOPO_SIZES: Record<PointType, number> = {
++    compressor: 10,
++    distribution: 8,
++    junction: 9,
++    station: 8,
++    valve: 5,
++}
++
++const MANUAL_JUNCTION_EDIT_ENABLED_BY_DEFAULT =
++    String(import.meta.env.VITE_TOPOLOGY_MANUAL_JUNCTION_EDIT ?? '1').trim() !== '0'
++
++const JUNCTION_READONLY_HINT =
++    '当前为运行态交汇点，只读不可拖动；如需人工合并，请切到手工编辑模式。'
++
++const JUNCTION_MODE_LABELS: Record<string, string> = {
++    runtime_readonly: '运行态只读',
++    legacy_editable: '手工编辑兼容',
++}
++
++const LINE_COLOR = '#34d399'
+*** End Patch

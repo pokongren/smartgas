@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const [searchText, setSearchText] = useState('')
+     const [report, setReport] = useState<ValidationReport | null>(null)
+     const [centralityData, setCentralityData] = useState<Array<{ id: string; name: string; value: number }>>([])
+     const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
++    const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+     const [historyChartTarget, setHistoryChartTarget] = useState<null | {
+         stationName?: string
+         junctionId?: string
+         displayName?: string
+     }>(null)
+*** End Patch

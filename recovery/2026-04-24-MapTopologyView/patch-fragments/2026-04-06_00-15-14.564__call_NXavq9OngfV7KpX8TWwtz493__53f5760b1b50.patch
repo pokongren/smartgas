@@ -1,0 +1,19 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ ## 2026-04-06 05:11:28 +08:00
+@@
+ - docs æ–¹å‘æœ¬è½®ç»§ç»­æˆç«‹ï¼šä¸¤ä»½æ‹“æ‰‘æ–‡æ¡£éƒ½åœ¨æŠŠåŽç«¯ç«¯å£æ”¶å£åˆ?`8080`ï¼Œå¹¶æ˜Žç¡® `/api/topology/...` ä¸?`/topology/...` å¹¶å­˜ï¼Œä¸å†æ²¿ç”¨æ—§çš„å•ä¸€è·¯å¾„å£å¾„ã€?- æœ¬è½®æ–°å¢žè½ç›˜ï¼š`F:\smartgas-grid\docs\automation\project-heartbeat-2026-04-06-051128.md`ã€‚æœ¬è½®è¿è¡Œæ—¶é—´ï¼š`2026-04-06 05:11 +08:00`
++
++## 2026-04-06 08:13:06 +08:00
++
++- 本轮严格落在 `F:\smartgas-grid` 主目录执行；`git rev-parse --show-toplevel` 返回 `F:/smartgas-grid`，`.git` 仍是实体目录，不是 worktree 指针文件。
++- `git worktree list --porcelain` 继续显示主目录 `HEAD=eaf6ac4` 挂分支，其余大量 `C:\Users\Administrator\.codex\worktrees\...\smartgas-grid` 仍是 `6410a10` 的 detached worktree；后续巡检继续只认主仓事实。
++- 主仓未提交改动仍然很大，`git diff --stat` 约为 `47 files changed, 5434 insertions(+), 2761 deletions(-)`；docs 变化继续集中在 `docs/TOPOLOGY_SETUP_GUIDE.md` 和 `docs/TOPOLOGY_COMPUTATION_USAGE.md`。
++- 地图缩放/层级主链未变：`src/views/GlobalPipelineView.tsx -> src/components/map-view/MapView.tsx -> src/utils/mapRenderer.ts -> src/utils/hierarchyRenderer.ts`；统一阈值仍是 `critical/high/medium=6/10/14`、`valveMinZoom=11`、`expandClusterZoom=12`。`MapTopologyView.tsx` 仍是独立口径，没有接到这条地图主渲染链。
++- 枢纽运行时入口未变：`backend/app/services/topology.py` 通过 `load_runtime_junction_groups()` 注入 super junction；`backend/app/services/junction_groups.py` 仍是“优先 `junction_groups_rebuilt`，缺失时回退 `junction_groups`，再叠加 manual overlay”。
++- 本轮数据库口径继续以 `python backend/check_db.py` 为准：`pipeline_systems=13`，`we3` 缺失，`SJ2=70/69`，`SJ3=71/70`，`junction_groups=25`，`junction_groups_rebuilt=7`，`issue_count=0`，最新生成时间 `2026-04-04T17:17:43.361829+00:00`。
++- 导入脚本边界继续拆开写：`backend/scripts/reimport_sj23.py` 是离线重导工具，`backend/scripts/rebuild_junctions.py` 是影子表重建工具，`backend/scripts/add_we3.py` / `backend/scripts/add_sj2.py` 更像局部补写脚本，不能写成主库已正式落成。
++- AI 链路本轮收紧为“双轨并存”口径：前端 `src/components/ai-assistant/useAiAssistantChat.ts` 固定发 `/api/ai-assistant/chat`，有页面上下文时带 `analysis_mode=subagents`；后端 `backend/app/routers/ai_assistant.py` 仍先尝试 direct reply，再在 orchestrated 和 legacy 之间分流，所以不能写成单一路径正式替换完成。
++- 本轮新增落盘：`F:\smartgas-grid\docs\automation\project-heartbeat-2026-04-06-081306.md`。本轮运行时间：`2026-04-06 08:13 +08:00`
+*** End Patch

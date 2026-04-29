@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                                        ].filter(item => manualJunctionEditingEnabled || item.m !== 'merge')).map(item => (
++                                        ]).map(item => (
+*** End Patch

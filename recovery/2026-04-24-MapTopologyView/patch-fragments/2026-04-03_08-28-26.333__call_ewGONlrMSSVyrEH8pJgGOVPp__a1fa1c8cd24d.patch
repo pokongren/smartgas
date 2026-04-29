@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Add File: C:\Users\Administrator\.codex\automations\automation\automation.toml
++version = 1
++id = "automation"
++kind = "cron"
++name = "项目心跳"
++prompt = "巡检 smartgas-grid，默认以 automation.toml 里的 cwds[0] 作为真实仓库启动目录，不使用 detached worktree 作为事实来源。先读取 automation memory，避免重复输出同一类阻塞结论；再检查最近 git log、git status、未提交 diff、git worktree list、.git 指向和 docs 变化。\n\n先做环境与入口判定：\n1. 如果本次运行时的 cwd 不等于 cwds[0]，或者 git 根目录不等于 cwds[0]，先明确归类为“automation env mismatch / worktree-path blockage”，说明当前执行环境没有落在真实仓库目录，不要假装完成三条主线的实体核查。\n2. 如果当前 git 根目录下缺少 src、backend、docs 或本次要求核查的关键文件，或者 git log 只显示最小初始提交、仓库树只有 README.md 一类极小快照，就把本轮明确归类为“worktree/path sync blockage”，不要假装完成三条主线的实体核查。\n3. 只有在当前 git 根目录下确实存在目标文件和数据库时，才继续做下面三条主线的深查。\n\n若入口通过，再按三条主线核查：\n1. 全国地图缩放与层级显示：重点看 src/utils/mapRenderer.ts、src/utils/hierarchyRenderer.ts、src/views/MapTopologyView.tsx、src/views/GlobalPipelineView.tsx，确认气源、压气站、分输站、阀室、枢纽在不同 zoom 下的显示阈值、隐藏规则、节点重要性分层是否一致，是否存在阈值散落、命名规则冲突，或地图与拓扑视图口径不一致。\n2. 起源点与枢纽规则：重点看 backend/app/models.py、backend/app/services/junction_groups.py、backend/app/routers/topology_editor.py、src/utils/mapRenderer.ts，确认 source、junction、JUNCTION-x 引用展开、重叠枢纽合并、起终点/连接点渲染与命名口径是否一致。\n3. 数据库口径与导入脚本：重点看 backend/data/smartgas.db、backend/check_db.py、backend/scripts/add_sj2.py、backend/scripts/add_we3.py、backend/scripts/reimport_sj23.py、src/services/api.ts、src/hooks/useTopology.ts，确认 stations、pipelines、pipeline_systems、junction_groups 的数量、ID 前缀、system id、layers_config、API 端口与前后端字段口径是否一致，并区分这是结构变更、导入脚本变更、数据库内容变更，还是本地实验数据。\n\n输出要求：\n1. 先给“当前进展摘要”，第一句必须直接说明本轮主要是代码变化、数据库变化、本地实验，还是 worktree/path sync blockage。\n2. 再给 1 条简明 inbox 更新，严格使用“变化 / 风险 / 下一步”三段结构，每段 1-3 句，必须点名涉及文件、模块或目录。\n3. 如果当前 git 根目录是空壳 worktree，要明确写出阻塞原因，例如：当前根目录只有 README.md 和 .git、目标模块缺失、git worktree list 显示真实开发分支在别处；并注明“本轮已按当前 git 根目录判断，没有沿用旧 memory 路径做实体结论”。\n4. 如果当前运行目录没有落在 cwds[0]，要明确写出“automation env mismatch / worktree-path blockage”，并点名当前 cwd、当前 git 根目录、配置目标目录三者分别是什么。\n5. 如果没有明显变化，也不能只写“无变化”；要明确当前待确认项、阻塞点，或为什么这次无法得出业务层面的结论。\n6. 不修改业务代码；只允许更新 automation memory，必要时补充自动化说明文档。"
++status = "ACTIVE"
++rrule = "FREQ=HOURLY;INTERVAL=2"
++model = "gpt-5.4"
++reasoning_effort = "medium"
++cwds = ["F:\\smartgas-grid"]
++created_at = 1775004724195
++updated_at = 1775204820000
+*** End Patch

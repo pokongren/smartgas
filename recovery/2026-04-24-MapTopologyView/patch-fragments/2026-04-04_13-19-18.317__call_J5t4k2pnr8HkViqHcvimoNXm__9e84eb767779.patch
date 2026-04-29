@@ -1,0 +1,71 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\docs\2026-04-04-地图拓扑乱码修复总结.md
++# 地图拓扑页乱码修复总结
++
++## 改动目标
++
++修掉地图拓扑管理页左侧编辑面板里那条紫色按钮的乱码文案，让页面直接显示正常中文。
++
++## 改动前的问题
++
++- 页面位置：地图拓扑管理页 `编辑` 面板里的紫色按钮
++- 现象：按钮文本显示成 `鍏煎鎵嬪伐鎹忓悎锛堥潪涓绘祦锛?`
++- 实际影响：用户能点，但看不懂按钮含义，页面观感也会被直接拉低
++
++## 做了什么
++
++- 把 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx#L962) 里的历史错编码文案改成正常中文：`兼容手工捏合（非主流）`
++- 没改交互逻辑、接口调用、样式类名，只修这条显示文案
++
++## 为什么这么做
++
++这不是运行时转码问题，也不是 Vite 构建把中文弄坏了。
++
++证据很直接：
++
++- 乱码文本直接写在源码里，[MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx#L962)
++- `vite.config.ts` 和 `src/main.tsx` 没有做额外字符编码转换
++- 修完源码后，前端构建正常通过，说明问题就是历史 mojibake 文本被提交进来了
++
++## 影响范围
++
++- 直接影响：地图拓扑管理页左侧编辑面板的紫色按钮文案
++- 不影响：拓扑导入、连线、枢纽逻辑、点位保存、构建流程
++
++## 验证结果
++
++- 已执行：`npm run build`
++- 结果：构建通过，`vite build` 成功产出 `dist`
++- 额外检查：前端代码里这类同模式乱码在业务 UI 代码里本次只定位到这一处
++
++## 前后对比
++
++### 前图
++
++![乱码前截图](/C:/Users/Administrator/AppData/Local/Packages/MicrosoftWindows.Client.CBS_cw5n1h2txyewy/TempState/ScreenClip/{6F6F0320-1F95-4C4C-B2FD-6D4657104241}.png)
++
++### 后图说明
++
++这轮没有直接启动浏览器并回拍页面，所以没有新的“改后截图”。
++
++这里用可读对比表替代：
++
++| 项目 | 修改前 | 修改后 |
++| --- | --- | --- |
++| 紫色按钮文案 | `鍏煎鎵嬪伐鎹忓悎锛堥潪涓绘祦锛?` | `兼容手工捏合（非主流）` |
++| 页面可读性 | 基本不可读 | 可直接理解 |
++| 功能行为 | 未改 | 未改 |
++
++## 关键文件
++
++- [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx#L962)
++
++## 风险点
++
++- 当前仓库历史上存在不少其他错编码内容，但大多不在这次用户截图对应的前端 UI 路径里
++- 如果后面还看到别的中文乱码，建议单独做一轮“前端可见文案巡检”，不要一次性盲改全仓，避免误伤真实数据
++
++## 回退方式
++
++- 只需要回退 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx#L962) 这一行文案即可
+*** End Patch

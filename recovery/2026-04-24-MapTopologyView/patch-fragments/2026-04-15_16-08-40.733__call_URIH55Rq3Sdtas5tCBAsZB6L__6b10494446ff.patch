@@ -1,0 +1,17 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                         <label className="flex items-center gap-2 text-[11px] text-gray-300">
+                                             <input type="checkbox" checked={preSimApplyToSources} onChange={event => setPreSimApplyToSources(event.target.checked)} disabled={!preSimInputEnabled} className="h-3.5 w-3.5 accent-emerald-400 disabled:opacity-40" />
+                                             <span>同时覆盖源站压力</span>
+                                         </label>
++                                        <button
++                                            type="button"
++                                            onClick={clearPreSimulationCustomOverrides}
++                                            className="rounded border border-emerald-500/30 bg-black/20 px-2 py-1 text-[10px] text-emerald-100 hover:bg-emerald-900/20"
++                                        >
++                                            清空节点/管段定制值
++                                        </button>
+                                         <div className="text-[10px] text-gray-400">关闭开关时，系统自动使用后端默认压力与温度估算。</div>
+                                     </div>
+*** End Patch

@@ -1,0 +1,36 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const rawPipelineData = useMemo(() => {
+         const nodes: PipelineNode[] = []
+         const lines: PipelineLine[] = []
+         for (const pkg of pipelines) {
+             for (const layer of pkg.layers) {
+@@
+         }
+         return { nodes, lines }
+     }, [pipelines])
++
++    const persistedTopologyNodeIds = useMemo(
++        () => new Set(rawPipelineData.nodes.map(node => node.id)),
++        [rawPipelineData.nodes]
++    )
+@@
+     const loadJunctionGroups = useCallback(async () => {
+         try {
+-            const res = await fetch(resolveApiPath('/api/topology/junctions'))
+-            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+-            const data = await res.json()
+-            setJunctionGroups(Array.isArray(data.junctions) ? data.junctions : [])
+-            return Array.isArray(data.junctions) ? data.junctions as JunctionGroup[] : []
++            const groups = await topologyEditorApi.getJunctionGroups()
++            setJunctionGroups(groups)
++            return groups
+         } catch (error) {
+             console.error('[MapTopologyView] 枢纽组加载失败:', error)
+-            setStatusMsg('加载枢纽组失败')
++            setStatusMsg(error instanceof Error ? `加载枢纽组失败：${error.message}` : '加载枢纽组失败')
+             return []
+         }
+     }, [])
+*** End Patch

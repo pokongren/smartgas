@@ -1,0 +1,17 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ ÎÞ·¨ÉèÖÃÊôÐÔ¡£´ËÓïÑÔÄ£Ê½½öÖ§³ÖºËÐÄÀàÐÍµÄÊôÐÔÉèÖÃ¡£
+ ËùÔÚÎ»ÖÃ ÐÐ:1 ×Ö·û: 1
+ + [Console]::OutputEncoding=[System.Text.Encoding]::UTF8;
+ + ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     + CategoryInfo          : InvalidOperation: (:) []£¬RuntimeException
+     + FullyQualifiedErrorId : PropertySetterNotSupportedInConstrainedLanguage
+  
++## 2026-04-05 10:24:16 +08:00
++
++- 这轮先按入口规则落到 `F:\smartgas-grid`，`cwd=F:\smartgas-grid`，`git rev-parse --show-toplevel=F:/smartgas-grid`，入口通过；结论没有拿 detached worktree 代替主目录。
++- 这轮停在“独立复核准备”阶段，没有再继续写完整巡检总结。已确认主目录不是空壳，`.git` 是隐藏目录，`git worktree list` 里主目录在 `eaf6ac4`，大量 `.codex/worktrees/*` 仍停在 `6410a10` detached，只能当背景噪音。
++- 当前最容易说过头的 3 件事先记住：1) `src/views/MapTopologyView.tsx` 还没并入统一 LOD，不能说地图和拓扑视图已经完全统一；2) `backend/data/smartgas.db` 当前实测是 `junction_groups=24`、`junction_groups_rebuilt=7`，不能沿用旧 memory 里的老数字；3) AI 编排链虽然能从 `src/components/ai-assistant/useAiAssistantChat.ts` 接到 `backend/app/routers/ai_assistant.py`，但 `backend/app/services/ai_analysis_orchestrator.py`、`analysis_validator.py`、`fix_task_router.py` 和前端两个 hook 仍是未跟踪文件，只能叫“主目录里的本地未提交链路”，不能叫正式基线。
++- 这轮运行时间：`2026-04-05 10:24:16 +08:00`
+*** End Patch

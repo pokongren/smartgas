@@ -1,0 +1,151 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                                     </div>
+                                     <div>
+-                                        <div className="mb-1 text-[11px] text-gray-400">????</div>
++                                        <div className="mb-1 text-[11px] text-gray-400">基线快照</div>
+                                         <select
+                                             value={steadyBaselineSnapshotRunId}
+                                             onChange={event => setSteadyBaselineSnapshotRunId(event.target.value)}
+                                             className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-white outline-none transition-all focus:border-cyan-500"
+                                         >
+-                                            <option value="">???????</option>
++                                            <option value="">请选择基线快照</option>
+                                             {steadySnapshots.map(item => (
+                                                 <option key={`baseline-${item.run_id}`} value={item.run_id}>
+                                                     {formatSnapshotOption(item.run_id, item.scenario_id, item.saved_at)}
+                                                 </option>
+                                             ))}
+@@
+                                     <div className="rounded-lg bg-black/15 px-3 py-2 text-[11px] leading-5 text-gray-300">
+                                         <div>当前场景：{steadyScenarioOption?.label ?? steadyScenarioId}</div>
+                                         <div>历史快照：{steadySnapshots.length} 条{selectedSnapshotSummary ? `，当前已选 ${formatDateTimeLabel(selectedSnapshotSummary.saved_at)}` : ''}</div>
+                                         <div>基线快照：{selectedBaselineSnapshotSummary ? `${selectedBaselineSnapshotSummary.scenario_id} | ${formatDateTimeLabel(selectedBaselineSnapshotSummary.saved_at)}` : '未选择'}</div>
+-                                        <div>当前这页已经会把仿真命中结果落到第一张图上，下一轮继续补点线联动解释。</div>
++                                        <div>这一轮收的是“当前快照 vs 基线快照”，先让第一张图能稳定看出差异，再继续做场景覆盖。</div>
+                                     </div>
+                                     <div className="rounded-lg border border-sky-500/20 bg-sky-950/15 p-3 text-[11px] text-gray-300">
+                                         <div className="flex items-center justify-between gap-3">
+                                             <div>
+-                                                <div className="text-[10px] uppercase tracking-wider text-sky-200">????</div>
+-                                                <div className="mt-1 text-gray-400">???????????????????????????????????</div>
++                                                <div className="text-[10px] uppercase tracking-wider text-sky-200">命中聚焦</div>
++                                                <div className="mt-1 text-gray-400">打开后只强调被当前仿真命中的点线，没命中的对象会压暗。</div>
+                                             </div>
+                                             <button
+                                                 onClick={() => setSimulationHitFocus(prev => !prev)}
+                                                 className={`rounded-full px-3 py-1 text-[10px] font-semibold transition ${simulationHitFocus ? 'border border-sky-400/30 bg-sky-500/20 text-sky-100' : 'border border-white/10 bg-white/5 text-gray-300'}`}
+                                             >
+-                                                {simulationHitFocus ? '?????' : '?????'}
++                                                {simulationHitFocus ? '聚焦开启' : '聚焦关闭'}
+                                             </button>
+                                         </div>
+                                         <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                             <div className="rounded-lg bg-black/15 px-3 py-2">
+-                                                <div className="text-[10px] text-gray-500">????</div>
++                                                <div className="text-[10px] text-gray-500">命中节点</div>
+                                                 <div className="mt-1 font-semibold text-white">{simulationVisualSummary?.highlightedNodeCount ?? 0}</div>
+                                             </div>
+                                             <div className="rounded-lg bg-black/15 px-3 py-2">
+-                                                <div className="text-[10px] text-gray-500">????</div>
++                                                <div className="text-[10px] text-gray-500">命中连线</div>
+                                                 <div className="mt-1 font-semibold text-white">{simulationVisualSummary?.highlightedEdgeCount ?? 0}</div>
+                                             </div>
+                                             <div className="rounded-lg bg-black/15 px-3 py-2">
+-                                                <div className="text-[10px] text-gray-500">????</div>
++                                                <div className="text-[10px] text-gray-500">严重节点</div>
+                                                 <div className="mt-1 font-semibold text-rose-300">{simulationVisualSummary?.criticalNodeCount ?? 0}</div>
+                                             </div>
+                                             <div className="rounded-lg bg-black/15 px-3 py-2">
+-                                                <div className="text-[10px] text-gray-500">????</div>
++                                                <div className="text-[10px] text-gray-500">告警连线</div>
+                                                 <div className="mt-1 font-semibold text-amber-300">{simulationVisualSummary?.warningEdgeCount ?? 0}</div>
+                                             </div>
+                                         </div>
+                                     </div>
++                                    <div className="rounded-lg border border-violet-500/20 bg-violet-950/10 p-3 space-y-3 text-[11px] text-gray-300">
++                                        <div className="flex items-center justify-between gap-3">
++                                            <div>
++                                                <div className="text-[10px] uppercase tracking-wider text-violet-200">基线对比</div>
++                                                <div className="mt-1 text-gray-400">同一套第一张图主链里，看当前快照和基线快照差多少。</div>
++                                            </div>
++                                            {steadyBaselineSnapshotLoading && (
++                                                <div className="text-[10px] text-violet-200">加载基线中...</div>
++                                            )}
++                                        </div>
++                                        {!steadyBaselineSnapshotRunId && (
++                                            <div className="rounded-lg bg-black/15 px-3 py-2 leading-5 text-gray-400">
++                                                先选择一条基线快照，再看当前结果和基线的差异。
++                                            </div>
++                                        )}
++                                        {steadyBaselineSnapshotRunId && !steadyComparison && (
++                                            <div className="rounded-lg bg-black/15 px-3 py-2 leading-5 text-gray-400">
++                                                当前快照或基线快照还没准备好，先运行或加载当前结果，再观察对比摘要。
++                                            </div>
++                                        )}
++                                        {steadyComparison && (
++                                            <>
++                                                <div className="rounded-lg bg-black/15 px-3 py-2 leading-5">
++                                                    <div>当前快照：{steadyComparison.current_scenario_id} | {steadyComparison.current_run_id.slice(0, 12)}</div>
++                                                    <div>基线快照：{steadyComparison.baseline_scenario_id} | {steadyComparison.baseline_run_id.slice(0, 12)}</div>
++                                                </div>
++                                                <div className="grid grid-cols-2 gap-2 text-xs">
++                                                    <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                        <div className="text-[10px] text-gray-500">供给差值</div>
++                                                        <div className={`mt-1 font-semibold ${steadyComparison.summary_delta.total_supply.delta >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
++                                                            {formatSignedNumber(steadyComparison.summary_delta.total_supply.delta, 2)}
++                                                        </div>
++                                                    </div>
++                                                    <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                        <div className="text-[10px] text-gray-500">需求差值</div>
++                                                        <div className={`mt-1 font-semibold ${steadyComparison.summary_delta.total_demand.delta >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
++                                                            {formatSignedNumber(steadyComparison.summary_delta.total_demand.delta, 2)}
++                                                        </div>
++                                                    </div>
++                                                    <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                        <div className="text-[10px] text-gray-500">利用率差值</div>
++                                                        <div className={`mt-1 font-semibold ${steadyComparison.summary_delta.avg_utilization.delta > 0 ? 'text-amber-300' : 'text-cyan-200'}`}>
++                                                            {formatSignedNumber(steadyComparison.summary_delta.avg_utilization.delta, 3)}
++                                                        </div>
++                                                    </div>
++                                                    <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                        <div className="text-[10px] text-gray-500">告警差值</div>
++                                                        <div className={`mt-1 font-semibold ${steadyComparison.summary_delta.alert_count.delta > 0 ? 'text-red-300' : 'text-emerald-300'}`}>
++                                                            {formatSignedNumber(steadyComparison.summary_delta.alert_count.delta, 0)}
++                                                        </div>
++                                                    </div>
++                                                </div>
++                                                <div className="grid grid-cols-1 gap-2">
++                                                    <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                        <div className="mb-1 text-[10px] uppercase tracking-wider text-gray-500">节点压差 Top</div>
++                                                        {steadyComparison.top_node_pressure_changes.length > 0 ? steadyComparison.top_node_pressure_changes.map(item => (
++                                                            <div key={`node-delta-${item.id}`} className="flex items-center justify-between gap-2 py-1">
++                                                                <span className="truncate text-gray-200">{resolveFocusTarget(topoNodes, item.id)?.name ?? item.id}</span>
++                                                                <span className={item.delta_pressure_mpa >= 0 ? 'text-emerald-300' : 'text-red-300'}>
++                                                                    {formatSignedNumber(item.delta_pressure_mpa, 3)} MPa
++                                                                </span>
++                                                            </div>
++                                                        )) : (
++                                                            <div className="text-gray-500">当前没有可比较的节点压差。</div>
++                                                        )}
++                                                    </div>
++                                                    <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                        <div className="mb-1 text-[10px] uppercase tracking-wider text-gray-500">连线流量 Top</div>
++                                                        {steadyComparison.top_edge_flow_changes.length > 0 ? steadyComparison.top_edge_flow_changes.map(item => (
++                                                            <div key={`edge-delta-${item.id}`} className="flex items-center justify-between gap-2 py-1">
++                                                                <span className="truncate text-gray-200">{resolveComparisonEdgeLabel(item.id)}</span>
++                                                                <span className={item.delta_flow_rate >= 0 ? 'text-amber-300' : 'text-cyan-200'}>
++                                                                    {formatSignedNumber(item.delta_flow_rate, 2)}
++                                                                </span>
++                                                            </div>
++                                                        )) : (
++                                                            <div className="text-gray-500">当前没有可比较的连线流量差。</div>
++                                                        )}
++                                                    </div>
++                                                </div>
++                                            </>
++                                        )}
++                                    </div>
+                                 </div>
+*** End Patch

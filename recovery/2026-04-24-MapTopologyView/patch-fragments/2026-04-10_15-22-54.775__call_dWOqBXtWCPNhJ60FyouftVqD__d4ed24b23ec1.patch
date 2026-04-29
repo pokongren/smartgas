@@ -1,0 +1,16 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ function formatSignedNumber(value: number, digits = 2): string {
+     const sign = value > 0 ? '+' : ''
+     return `${sign}${value.toFixed(digits)}`
+ }
++
++function buildOpsSuggestion(alertCount: number, avgUtilization: number, solverStatus: 'converged' | 'max_iter' | 'error'): string {
++    if (solverStatus === 'error') return '本次求解失败，先检查场景参数和边界条件，再重跑主仿真。'
++    if (solverStatus === 'max_iter') return '本次达到迭代上限，建议先缩小扰动幅度并核对基线快照。'
++    if (alertCount >= 5) return '告警偏多，优先排查主干高负荷段和压气站上下游压差。'
++    if (avgUtilization >= 0.82) return '利用率偏高，建议先做限流场景对比并准备调峰策略。'
++    return '运行状态平稳，可将当前结果作为下一轮异常场景对比基线。'
++}
+*** End Patch

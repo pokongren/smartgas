@@ -1,0 +1,20 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+             selection: {
+                 we1_simulation_narrative: simulationNarrative,
++                we1_simulation_narrative_plain: simulationNarrativePlain,
++                we1_simulation_structured_brief: simulationStructuredBrief,
+                 we1_scenario_id: steadyScenarioId,
+                 we1_run_id: steadyOverlay?.run_id ?? '',
+                 we1_solver_status: steadyOverlay?.solver_status ?? 'idle',
+                 ...cutoffContext
+             },
+@@
+     }, [
+         simulationNarrative,
++        simulationNarrativePlain,
++        simulationStructuredBrief,
+         steadyBaselineSnapshotRunId,
+         steadyOverlay?.run_id,
+*** End Patch

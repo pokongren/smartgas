@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
++# 2026-04-04 20:27:18 +08:00
++
++- 本轮已按要求先从 `C:\Users\Administrator\.codex\worktrees\868b\smartgas-grid` 切到 `F:\smartgas-grid`，并再次确认 `cwd` 与 `git rev-parse --show-toplevel` 都落在 `F:\smartgas-grid`；不要再把 detached worktree 当主目录事实来源。
++- 入口核验通过：`F:\smartgas-grid` 根下存在 `src`、`backend`、`docs` 和本轮点名文件，`.git` 是实体目录，`git worktree list` 显示主工作树就是 `F:\smartgas-grid`，所以这轮不是 `automation env mismatch / worktree-path blockage`。
++- 当前主判断是“代码变化 + 数据库变化 + 少量本地实验并存”，不是纯 docs，也不是纯脚本试验。工作树很脏，除三条主线外还有 AI assistant、SCADA、字体和脚本等并行改动；巡检结论只收口到本轮要求的地图层级、枢纽规则、数据库/导入脚本和 docs。
++- 地图缩放与层级：`src/utils/hierarchyRenderer.ts` 已把 LOD 阈值统一到 `critical/high/medium = 6/10/14`、`valveMinZoom = 11`、`expandClusterZoom = 12`；`src/utils/mapRenderer.ts` 已改为按 `rawType + hierarchyRenderer` 决定 source/compressor/distribution/valve/junction 的显示与聚合标记。`src/views/GlobalPipelineView.tsx` 会展示 junction kind 并能联动到拓扑页，但不要写成“全国地图和拓扑页已经完全共用一套实现”，目前更准确的是“口径在靠拢，展示侧已对齐关键阈值和枢纽标签”。
++- 枢纽规则：`backend/app/services/junction_groups.py` 现在优先读 `junction_groups_rebuilt`，不存在时才回退 `junction_groups`；旧表仍支持 `JUNCTION-x / junction-x` 展开和重叠组归并。`backend/app/routers/topology_editor.py` 把手工 merge/create/delete 枢纽默认降级为只读，`/api/topology/junctions` 返回 `manual_editing_enabled` 和 `mode`。`src/views/MapTopologyView.tsx` 已跟着切到运行时只读口径，保留展示和定位，不再把手工捏合作为主流程。
++- 数据库现状以本轮实测为准：`stations=1272`、`pipelines=1268`、`pipeline_systems=14`、`junction_groups=16`，并且 `junction_groups_rebuilt=12`、`junction_groups_backup_20260404=16`。`backend/check_db.py --require-system we3 --require-system sj2 --require-system sj3 --require-prefix WE3 --require-prefix SJ2 --require-prefix SJ3` 已通过，影子枢纽统计为 `junction=10`、`major_junction=2`、`issue_count=0`，最新 `generated_at=2026-04-04T11:09:08.312826+00:00`。注意这里已经推翻上一轮 memory 里“we3 未落库、counts=1256/1253/13/16”的旧判断。
++- 导入脚本变化是真的，不要再按“we3 还没落库”复述：`backend/scripts/add_we3.py`、`backend/scripts/add_sj2.py`、`backend/scripts/reimport_sj23.py` 已统一写入 `backend/data/smartgas.db`，并把新导入管段 `category` 改成 `trunk`，同时补了导入后验收打印。当前 DB 已存在 `we3/sj2/sj3`，其中 `WE3=16 站/15 段`、`SJ2=70 站/69 段`、`SJ3=71 站/70 段`。但全库仍有 `229` 条 `pipelines.category` 不在 `trunk/branch`，说明这是“新导入口径正在收紧”，不是“历史数据已完全清洗完”。
++- API 口径仍是双轨并存，不要写成已经彻底统一：`src/services/api.ts` 还保留 `/api/topology/graph`、`/api/topology/stats`，但纠偏接口已经走 `BACKEND_BASE_URL + /topology/correct/...`；`src/hooks/useTopology.ts` 默认直接拼 `BACKEND_BASE_URL + /topology/...`；`src/services/apiBase.ts` 用 `VITE_API_BASE_URL` 同时导出 `API_BASE_URL` 和 `BACKEND_BASE_URL`。`vite.config.ts` 与 `backend/run.py` 都已指向 `8080`，docs 本轮也在补这件事。
++- docs 变化是实打实的收口：`docs/TOPOLOGY_COMPUTATION_USAGE.md` 与 `docs/TOPOLOGY_SETUP_GUIDE.md` 明确写了 `8080` 端口、`/api/topology/...` 与 `/topology/...` 双轨现状，以及 `apiBase.ts / useTopology.ts / topologyEditorApi.ts / vite.config.ts` 的真实调用关系。可以把这两份文档当成“现状说明”，但不要把 docs 文案本身当成业务已经全部统一的证明。
+*** End Patch

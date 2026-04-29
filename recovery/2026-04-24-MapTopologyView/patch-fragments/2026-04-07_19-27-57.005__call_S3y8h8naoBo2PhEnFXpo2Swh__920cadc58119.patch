@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                                    <div className="mt-1 text-cyan-50/90">
+-                                        褰撳墠椤靛凡缁忓垏鍒?WE1 steady overlay 姝ｅ紡涓婚摼锛屼笉鍐嶈皟鐢ㄦ棫鐨?
+-                                        <span className="mx-1 font-mono text-[10px]">/api/emergency/simulate-failure</span>
+-                                        浣滀负姝ｅ紡浠跨湡鍏ュ彛銆傝繖涓€杞彧缁熶竴涓婚摼鍜岀粨鏋滄憳瑕侊紝涓嶅湪鍦板浘涓婄洿鎺ュ彔鍔犵粨鏋溿€?
+-                                    </div>
++                                    <div className="mt-1 text-cyan-50/90">
++                                        当前页已经切到 WE1 steady overlay 正式主链，不再展示旧故障仿真入口。
++                                        这一轮只统一主链和结果摘要，不在地图上直接叠加结果。
++                                    </div>
+*** End Patch

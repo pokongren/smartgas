@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-type EditMode = 'view' | 'draw-point' | 'connect'
++type EditMode = 'view' | 'draw-point' | 'connect' | 'merge'
+*** End Patch

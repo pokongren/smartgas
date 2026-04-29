@@ -33,6 +33,7 @@ interface SimPanelProps {
   onRunTrialScenario: (scenarioId: string) => void
   onRunMissingTrialScenarios: () => void
   onClear: () => void
+  dockSide?: 'left' | 'right'
 }
 
 function formatDateTime(value?: string): string {
@@ -104,6 +105,7 @@ export const SimPanel: React.FC<SimPanelProps> = ({
   onRunTrialScenario,
   onRunMissingTrialScenarios,
   onClear,
+  dockSide = 'left',
 }) => {
   const [expanded, setExpanded] = useState(false)
   const summary = overlay?.summary
@@ -115,7 +117,8 @@ export const SimPanel: React.FC<SimPanelProps> = ({
   const panelStyle: React.CSSProperties = {
     position: 'fixed',
     top: '50%',
-    left: expanded ? '0' : '-298px',
+    left: dockSide === 'left' ? (expanded ? '0' : '-298px') : 'auto',
+    right: dockSide === 'right' ? (expanded ? '0' : '-298px') : 'auto',
     transform: 'translateY(-50%)',
     zIndex: 200,
     width: '272px',
@@ -124,8 +127,9 @@ export const SimPanel: React.FC<SimPanelProps> = ({
     background: 'rgba(15, 23, 42, 0.96)',
     backdropFilter: 'blur(14px)',
     border: '1px solid rgba(99, 102, 241, 0.35)',
-    borderLeft: 'none',
-    borderRadius: '0 14px 14px 0',
+    borderLeft: dockSide === 'left' ? 'none' : '1px solid rgba(99, 102, 241, 0.35)',
+    borderRight: dockSide === 'right' ? 'none' : '1px solid rgba(99, 102, 241, 0.35)',
+    borderRadius: dockSide === 'left' ? '0 14px 14px 0' : '14px 0 0 14px',
     padding: '14px 14px 16px',
     boxShadow: '4px 0 32px rgba(0, 0, 0, 0.45)',
     color: '#e2e8f0',
@@ -136,15 +140,17 @@ export const SimPanel: React.FC<SimPanelProps> = ({
   const toggleBtnStyle: React.CSSProperties = {
     position: 'fixed',
     top: '50%',
-    left: expanded ? '272px' : '0',
+    left: dockSide === 'left' ? (expanded ? '272px' : '0') : 'auto',
+    right: dockSide === 'right' ? (expanded ? '272px' : '0') : 'auto',
     transform: 'translateY(-50%)',
     zIndex: 201,
     width: '24px',
     height: '56px',
     background: 'rgba(99, 102, 241, 0.86)',
     border: '1px solid rgba(99, 102, 241, 0.6)',
-    borderLeft: 'none',
-    borderRadius: '0 6px 6px 0',
+    borderLeft: dockSide === 'left' ? 'none' : '1px solid rgba(99, 102, 241, 0.6)',
+    borderRight: dockSide === 'right' ? 'none' : '1px solid rgba(99, 102, 241, 0.6)',
+    borderRadius: dockSide === 'left' ? '0 6px 6px 0' : '6px 0 0 6px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',

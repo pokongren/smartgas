@@ -1,0 +1,21 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    const rawPipelineData = useMemo(() => {
++    useEffect(() => {
++        writeSimulationShowcaseSyncContext({
++            source: 'map-topology',
++            pilotId: WE1_PRIMARY_PILOT_ID,
++            scenarioId: steadyOverlay?.scenario_id ?? steadyScenarioId,
++            selectedSnapshotRunId: steadySelectedSnapshotRunId,
++            baselineSnapshotRunId: steadyBaselineSnapshotRunId,
++            overlay: steadyOverlay,
++            updatedAt: new Date().toISOString(),
++        })
++    }, [steadyBaselineSnapshotRunId, steadyOverlay, steadyScenarioId, steadySelectedSnapshotRunId])
++
++    const rawPipelineData = useMemo(() => {
+         const { nodes, lines } = buildPipelineDataFromPackages(pipelines)
+         return { nodes, lines }
+     }, [pipelines])
+*** End Patch

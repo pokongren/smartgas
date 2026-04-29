@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ const LINE_COLOR = '#34d399'
+ const LINE_WEIGHT = 2
+ const TOPO_RENDER_BUDGET = {
+-    full: { maxNodes: 900, maxEdges: 1400 },
+-    lite: { maxNodes: 500, maxEdges: 800 },
++    full: { maxNodes: 520, maxEdges: 760 },
++    lite: { maxNodes: 260, maxEdges: 360 },
+ }
+*** End Patch

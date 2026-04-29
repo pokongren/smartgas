@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+                                     <SimParamEditor
+                                         seedNodes={paramEditorSeedNodes}
+                                         edges={paramEditorEdges}
+                                         nodeOverrides={nodeParamOverrides}
+                                         edgeLengthOverrides={edgeLengthOverrides}
++                                        globalDefaults={globalParamDefaults}
++                                        validationError={paramValidationError}
+                                         onNodeOverridesChange={setNodeParamOverrides}
+                                         onEdgeLengthOverridesChange={setEdgeLengthOverrides}
++                                        onGlobalDefaultsChange={setGlobalParamDefaults}
+                                     />
+*** End Patch

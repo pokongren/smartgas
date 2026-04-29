@@ -1,0 +1,19 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ const FAILURE_LAYER_LABELS: Record<'frontend-consumption' | 'mapping-source-ids' | 'overlay-contract' | 'rendering-style', string> = {
+-    'frontend-consumption': '??????MapTopologyView ?????',
+-    'mapping-source-ids': '????source IDs -> overlay IDs?',
+-    'overlay-contract': '??????simulation-overlay ?????',
+-    'rendering-style': '????????/???',
++    'frontend-consumption': '先查前端消费层（MapTopologyView / 面板）',
++    'mapping-source-ids': '再查 source IDs 到 overlay IDs 的映射',
++    'overlay-contract': '最后查 simulation-overlay 契约',
++    'rendering-style': '最后再查样式渲染和地图对象',
+ }
++
++function formatSignedNumber(value: number, digits = 2): string {
++    const sign = value > 0 ? '+' : ''
++    return `${sign}${value.toFixed(digits)}`
++}
+*** End Patch

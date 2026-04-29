@@ -1,0 +1,26 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ interface BaseTopoEdge {
+     id: string
+     startNodeId: string
+     endNodeId: string
+     name?: string
+ }
++
++const WE1_PRIMARY_PILOT_ID = 'mainline_zhongwei_jingbian'
++
++function formatSimulationDateTime(value?: string): string {
++    if (!value) return '-'
++    return value.replace('T', ' ').slice(0, 19)
++}
++
++function formatSimulationDelta(value: number, digits = 2, suffix = ''): string {
++    const sign = value > 0 ? '+' : ''
++    return `${sign}${value.toFixed(digits)}${suffix}`
++}
++
++function formatSnapshotOption(runId: string, scenarioId: string, savedAt: string): string {
++    return `${scenarioId} | ${runId.slice(0, 12)} | ${savedAt.slice(11, 19)}`
++}
+*** End Patch

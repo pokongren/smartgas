@@ -1,0 +1,84 @@
+*** Begin Patch
+*** Delete File: C:\Users\Administrator\.codex\automations\automation\memory.md
+*** Add File: C:\Users\Administrator\.codex\automations\automation\memory.md
++# 项目心跳 automation memory
++
++- 运行时间：2026-04-07 20:29:01 +08:00
++- 本轮固定在 `F:\smartgas-grid` 主目录巡检并完成主目录落点校验：`git rev-parse --show-toplevel` 返回 `F:/smartgas-grid`，`git rev-parse --git-dir` 返回 `.git`，主目录 `.git` 是真实目录；`git worktree list` 显示主目录位于分支 `拓扑设想`，大量 detached worktree 仍停在 `6410a10`，不能拿来顶替主目录结论。
++- `git log --oneline -5` 当前主目录头部是 `f75536d / 5ec5af0 / 602f715 / eaf6ac4 / b31a010`；`git status --short` 未提交改动重点仍集中在两条线：1. 甪直 AI 与上下文注入：`backend/app/routers/ai_assistant.py`、`src/components/ai-assistant/*`、`src/views/GlobalPipelineView.tsx`。2. WE1 overlay / steady 仿真：`backend/app/routers/topology_simulation.py`、`backend/app/services/topology_simulation.py`、`backend/app/services/we1_*`、`src/hooks/useSimulation.ts`、`src/views/TopologyView.tsx`、`src/views/MapTopologyView.tsx`。
++- docs 现场：当前 `git status --short -- docs` 和 `git diff --stat -- docs` 都为空；最近涉及 docs 的提交仍是 `602f715`，改了 `docs/TOPOLOGY_COMPUTATION_USAGE.md`、`docs/TOPOLOGY_SETUP_GUIDE.md`，新增 `docs/code-improvement-review.md`。
++- 地图缩放与层级显示静态复核通过：`src/utils/hierarchyRenderer.ts` 当前阈值仍是 `critical=4`、`high=9`、`medium=12`、`valveMinZoom=11`、`expandClusterZoom=12`，`src/utils/mapRenderer.ts` 继续消费这套 LOD 规则；`MapTopologyView` 不是全国地图 LOD 主链。
++- 甪直 AI 分析链路巡检通过：`/api/ai-assistant/luzhi-pilot/trace`、`/summary`、`/report` 三个接口都在 `backend/app/routers/ai_assistant.py`；前端 `src/views/GlobalPipelineView.tsx` 会加载 trace/summary 并导出 report；页面上下文经 `runtimeAssistantContext.ts -> useAiAssistantPageContext.ts -> useAiAssistantChat.ts` 注入，运行时额外写入 `pilot_enabled`、`pilot_station_name`、`luzhi_snapshot`。分支判定仍是 `direct -> luzhi pilot -> orchestrated -> legacy`，其中甪直命中条件是站点上下文命中甪直且问题像分析请求。独立验证脚本 `verify_luzhi_pilot_phase4.py`、`verify_luzhi_pilot_phase6.py`、`verify_luzhi_pilot_phase7.py` 本轮全部 PASS。trace 文件是 `F:\smartgas-grid\backend\data\ai_traces\luzhi_pilot_trace.jsonl`，最后写入时间 2026-04-07 20:14:06 +08:00。通过标准：1. trace/summary/report 三接口可达。2. 前端能注入甪直上下文。3. 命中甪直问题时先走 pilot 分支。失败时先查层次：前端 runtime context，再查 `ai_assistant.py` 分支判断，最后查 trace 文件写入。
++- 拓扑仿真功能巡检部分通过、部分保留风险：WE1 overlay 主链已明确为 `TopologyView -> useSimulation -> GET /api/pipeline-packages/simulation-overlay -> topology_simulation._build_solver_input_or_raise -> build_we1_solver_input -> solve_steady`；`verify_we1_phase34_final.py` PASS，说明主样板/辅样板 overlay 契约统一且 steady/failure 场景可收敛。`MapTopologyView` 独立仿真入口仍走 `topologyAPI.simulate() -> POST /api/emergency/simulate-failure` 的旧链，不等于 overlay 主链。通过标准：1. `simulation-overlay` 返回 overlay 契约。2. `build_we1_solver_input` 与 `solve_steady` 能跑通。3. `verify_we1_phase34_final.py` 通过。失败时先查层次：1. `TopologyView`/`useSimulation` 前端入口。2. `backend/app/routers/topology_simulation.py` router。3. `backend/app/services/we1_solver_input_service.py` solver input。4. `backend/app/services/topology_simulation.py` steady solver。
++- 枢纽规则与数据库口径复核通过：`python backend/check_db.py --db backend/data/smartgas.db` 结果仍是 `pipeline_systems.count=13`、`we3 missing`、`sj2 exists`、`sj3 exists`、`junction_groups_rebuilt.count=7`、`major_junction_count=0`、`issue_count=0`，`junction_groups_rebuilt.latest.generated_at=2026-04-04T17:17:43.361829+00:00`。当前结论仍是 rebuilt 口径健康，WE3 仍未正式落主库。
++- 导入脚本边界复核未变：`backend/scripts/add_sj2.py`、`backend/scripts/add_we3.py` 是局部补库脚本，`backend/scripts/reimport_sj23.py` 仍是离线重导工具；当前主库事实仍是 `SJ2=70/69`、`SJ3=71/70`、`WE3=0/0`，不能把脚本变化写成主库已落成。
++- AI 模块链路复核通过：前端聊天上下文主链仍是 `runtimeAssistantContext.ts -> useAiAssistantPageContext.ts -> useAiAssistantChat.ts`，后端主入口仍是 `backend/app/routers/ai_assistant.py`，排障前必须先判断命中的是 `direct`、`luzhi pilot`、`orchestrated` 还是 `legacy`。
++- 本轮只新增巡检文档 `docs/automation/project-heartbeat-2026-04-07-202901.md` 并更新本 memory，未改业务代码。
+*** Add File: F:\smartgas-grid\docs\automation\project-heartbeat-2026-04-07-202901.md
++# 项目心跳巡检总结（2026-04-07 20:29 +08:00）
++## 主目标
++固定在 `F:\smartgas-grid` 主目录做一次只认主目录事实的巡检，先校验主目录落点，再核对 git、docs、地图缩放与层级显示、甪直 AI 分析、拓扑仿真、枢纽规则与数据库口径、导入脚本、AI 模块链路；本轮只更新巡检文档和 automation memory，不改业务代码。
++
++## 上下文与已知信息
++1. 本轮只认 `F:\smartgas-grid` 主目录，不拿 detached worktree 顶结论。`git rev-parse --show-toplevel` 返回 `F:/smartgas-grid`，`git rev-parse --git-dir` 返回 `.git`，说明主目录是实际仓库根。2. `git worktree list` 显示主目录挂在分支 `拓扑设想`，同时存在大量 `C:\Users\Administrator\.codex\worktrees\*\smartgas-grid` detached worktree，统一停在 `6410a10`，它们只能当旁证。3. `git log --oneline -5` 当前主目录头部是 `f75536d`、`5ec5af0`、`602f715`、`eaf6ac4`、`b31a010`。4. `git status --short` 显示未提交改动集中在两条线：一条是甪直 AI 与上下文注入，另一条是 WE1 overlay / steady 仿真。5. docs 目录当前没有 tracked 未提交 diff；最近 docs 提交仍是 `602f715`，改了 `docs/TOPOLOGY_COMPUTATION_USAGE.md`、`docs/TOPOLOGY_SETUP_GUIDE.md`，新增 `docs/code-improvement-review.md`。
++
++## 主代理与子代理分工
++1. 主代理：锁定主目录事实、汇总侦察证据、决定唯一结论、落巡检文档和 memory。2. 侦察代理 A：核对 `git rev-parse`、`git status`、`git log`、`git worktree list`、docs 变化。3. 侦察代理 B：巡查甪直 AI 分析链路、trace 文件、页面上下文和运行时上下文注入、direct/orchestrated/legacy 命中规则。4. 侦察代理 C：巡查 overlay 主链、`MapTopologyView` 独立仿真入口、WE1 校验脚本与当前主链是否一致。5. 验证代理：独立跑 `verify_luzhi_pilot_phase4.py`、`verify_luzhi_pilot_phase6.py`、`verify_luzhi_pilot_phase7.py`、`verify_we1_phase34_final.py`、`backend/check_db.py`，只看通过条件和失败定位顺序。
++
++## 修改逻辑
++1. 本轮不改业务代码，只补一份巡检总结并刷新 automation memory。2. 文档重点不是复述代码，而是把“当前主链是什么、通过标准是什么、失败先查哪层”写死，避免下轮继续把旧链和新链混着说。3. 这次同时保留前后对比：一边是容易被旧记忆带偏的说法，一边是本轮按主目录事实确认后的口径。
++
++## 执行顺序
++1. 校验主目录落点：读取 `git rev-parse --show-toplevel`、`git rev-parse --git-dir`、`git worktree list`。2. 采集 git/docs 现场：读取 `git log --oneline -5`、`git status --short`、`git status --short -- docs`、`git diff --stat -- docs`、`git show --stat --name-only 602f715 -- docs`。3. 巡查地图缩放与层级显示：核对 `src/utils/hierarchyRenderer.ts`、`src/utils/mapRenderer.ts`。4. 巡查甪直 AI 分析：核对 `src/components/ai-assistant/runtimeAssistantContext.ts`、`src/components/ai-assistant/useAiAssistantPageContext.ts`、`src/views/GlobalPipelineView.tsx`、`backend/app/routers/ai_assistant.py`。5. 巡查拓扑仿真：核对 `src/hooks/useSimulation.ts`、`src/views/TopologyView.tsx`、`src/views/MapTopologyView.tsx`、`backend/app/routers/topology_simulation.py`、`backend/app/services/we1_solver_input_service.py`、`backend/app/services/topology_simulation.py`。6. 复核数据库口径和导入脚本：运行 `python backend/check_db.py --db backend/data/smartgas.db`，再抽读 `backend/scripts/add_sj2.py`、`backend/scripts/add_we3.py`、`backend/scripts/reimport_sj23.py`。7. 独立跑甪直和 WE1 校验脚本。8. 写本轮总结和 memory。
++
++## 当前进展摘要
++### 1. 主目录与 git 现场
++1. 主目录可信，结论以 `F:\smartgas-grid` 为准。2. 当前分支是 `拓扑设想`。3. 未提交改动重点集中在 `backend/app/routers/ai_assistant.py`、`src/components/ai-assistant/*`、`src/views/GlobalPipelineView.tsx`、`backend/app/routers/topology_simulation.py`、`backend/app/services/topology_simulation.py`、`backend/app/services/we1_*`、`src/hooks/useSimulation.ts`、`src/views/TopologyView.tsx`、`src/views/MapTopologyView.tsx`。4. docs 当前没有 tracked 未提交 diff，最近 docs 提交仍是 `602f715`。
++
++### 2. 地图缩放与层级显示
++1. 全国地图主链还是 `GlobalPipelineView -> MapView/mapRenderer -> hierarchyRenderer`。2. `src/utils/hierarchyRenderer.ts` 当前阈值没有漂：`criticalZoom=4`、`highZoom=9`、`mediumZoom=12`、`valveMinZoom=11`、`expandClusterZoom=12`、`showFlowArrows>=10`。3. `src/utils/mapRenderer.ts` 继续消费这套规则。4. `MapTopologyView` 不是全国地图 LOD 主链，不能拿它去覆盖全国地图层级结论。
++
++### 3. 甪直 AI 分析
++1. trace/summary/report 接口都在 `backend/app/routers/ai_assistant.py`：`GET /api/ai-assistant/luzhi-pilot/trace`、`GET /api/ai-assistant/luzhi-pilot/summary`、`GET /api/ai-assistant/luzhi-pilot/report`。2. 前端 `src/views/GlobalPipelineView.tsx` 会主动加载 trace 和 summary，并支持导出 report markdown。3. 页面上下文和运行时上下文注入链是 `runtimeAssistantContext.ts -> useAiAssistantPageContext.ts -> useAiAssistantChat.ts`；甪直运行时关键注入字段包括 `pilot_enabled`、`pilot_station_name`、`luzhi_snapshot`。4. 后端命中顺序是 `direct -> luzhi pilot -> orchestrated -> legacy`，甪直命中条件是页面上下文站点识别到甪直且用户问题像分析请求。5. trace 文件路径是 `F:\smartgas-grid\backend\data\ai_traces\luzhi_pilot_trace.jsonl`，最后写入时间是 2026-04-07 20:14:06 +08:00。
++
++### 4. 拓扑仿真功能
++1. overlay 主链已明确为 `TopologyView -> useSimulation -> GET /api/pipeline-packages/simulation-overlay -> topology_simulation._build_solver_input_or_raise -> build_we1_solver_input -> solve_steady`。2. `MapTopologyView` 独立仿真入口仍然调用 `topologyAPI.simulate()`，最终落到 `POST /api/emergency/simulate-failure` 的旧链。3. 结论很明确：WE1 overlay 主链和 `MapTopologyView` 仿真入口现在并没有统一，当前最大的排障风险不是 steady solver 本身，而是把两条链误写成一条。
++
++### 5. 枢纽规则与数据库口径
++1. `python backend/check_db.py --db backend/data/smartgas.db` 结果稳定：`pipeline_systems.count=13`，`pipeline_systems.ids=we2, cred, pt, zg, zm, gn, gs, ncsh, jxlz, sj4, sj2, sj3, we1`，`we3 missing`。2. rebuilt 口径仍健康：`junction_groups_rebuilt.count=7`、`major_junction_count=0`、`issue_count=0`，最新生成时间 `2026-04-04T17:17:43.361829+00:00`。3. 当前主风险不是 rebuilt 表坏掉，而是旧表还在，排障时容易被 `junction_groups` 的旧事实带偏。
++
++### 6. 导入脚本与 AI 模块链路
++1. `backend/scripts/add_sj2.py` 和 `backend/scripts/add_we3.py` 仍是局部补库脚本，`backend/scripts/reimport_sj23.py` 仍是离线重导工具，不是运行时主链。2. 当前主库事实仍是 `SJ2=70/69`、`SJ3=71/70`、`WE3=0/0`。3. AI 模块主链没有变：前端通过 `runtimeAssistantContext.ts -> useAiAssistantPageContext.ts -> useAiAssistantChat.ts` 传上下文，后端统一进 `backend/app/routers/ai_assistant.py`，先分流到 `direct`、`luzhi pilot`、`orchestrated` 或 `legacy` 再看后续行为。
++
++## 验证方式
++| 检查项 | 怎么验证 | 通过标准 | 失败时先查哪层 |
++| --- | --- | --- | --- |
++| 主目录落点 | `git rev-parse --show-toplevel`、`git rev-parse --git-dir`、`git worktree list` | `show-toplevel=F:/smartgas-grid` 且 `git-dir=.git`，主目录是唯一可信仓库根 | 先查 cwd 和主目录 `.git` |
++| docs 现场 | `git status --short -- docs`、`git diff --stat -- docs`、`git show --stat --name-only 602f715 -- docs` | 当前 tracked docs 干净，最近 docs 改动仍锁定到 `602f715` | 先区分 tracked 和 ignored |
++| 甪直接口 | 抽读 `ai_assistant.py` 和 `GlobalPipelineView.tsx` | trace/summary/report 三接口都在，前端能消费 trace/summary 并导出 report | 先查后端 router |
++| 甪直上下文 | 抽读 `runtimeAssistantContext.ts`、`useAiAssistantPageContext.ts`、`GlobalPipelineView.tsx` | `pilot_enabled`、`pilot_station_name`、`luzhi_snapshot` 能一路进入 chat context | 先查前端 runtime context |
++| 甪直分支 | 抽读 `ai_assistant.py` 中 `chat`、`try_luzhi_pilot_reply`、`should_use_orchestration` | 命中顺序明确为 `direct -> luzhi pilot -> orchestrated -> legacy` | 先查 `ai_assistant.py` |
++| 甪直实际验证 | 运行 `python backend/scripts/verify_luzhi_pilot_phase4.py`、`phase6.py`、`phase7.py` | 三个脚本全部 PASS，trace 文件仍更新 | 先查上下文注入，再查分支判断，再查 trace 文件 |
++| overlay 主链 | 抽读 `useSimulation.ts`、`topology_simulation.py`、`we1_solver_input_service.py`、`topology_simulation.py` service | `simulation-overlay -> build_we1_solver_input -> solve_steady` 主链闭合 | 先查前端入口，再查 router |
++| WE1 一致性 | 运行 `python backend/scripts/verify_we1_phase34_final.py` | 脚本 PASS，overlay 契约统一且场景收敛 | 先查 solver input，再查 steady solver |
++| `MapTopologyView` 入口 | 抽读 `MapTopologyView.tsx`、`src/services/api.ts` | 明确它仍走 `/api/emergency/simulate-failure` 旧链 | 先查前端入口 |
++| DB 口径 | 运行 `python backend/check_db.py --db backend/data/smartgas.db` | rebuilt `issue_count=0`，`we3 missing` 仍同时成立 | 先查 `smartgas.db` |
++
++## 风险与回退点
++1. 当前最大风险不是“功能不存在”，而是“链路分叉被说成统一主链”：`MapTopologyView` 旧仿真入口和 WE1 overlay 主链仍并存。2. 甪直 AI 当前最大的排障风险不是接口缺失，而是上下文没注入或注入错位，导致本该走 pilot 的请求滑到 orchestrated 或 legacy。3. `WE3` 脚本还在，但主库事实仍是 `WE3=0/0`，不能把脚本活跃度写成已落库。4. `junction_groups_rebuilt` 已健康，但旧表仍在，查错时如果直接盯旧表会把口径带偏。5. 回退点只有两处：本轮新增文档 `docs/automation/project-heartbeat-2026-04-07-202901.md` 和 automation memory，业务代码零改动。
++
++## 最终交付物
++1. 巡检文档：`docs/automation/project-heartbeat-2026-04-07-202901.md`。2. automation memory：`C:\Users\Administrator\.codex\automations\automation\memory.md`。
++
++## 前后对比
++| 项目 | 巡检前容易说偏的地方 | 本轮确认后的口径 |
++| --- | --- | --- |
++| 主目录结论 | 容易拿 detached worktree 顶结论 | 只认 `F:\smartgas-grid` 主目录 |
++| 地图层级 | 容易沿用旧阈值或把编辑页当全国地图主链 | 当前全国地图阈值仍是 `4 / 9 / 12 / 11 / 12`，`MapTopologyView` 不属于这条主链 |
++| 甪直 AI | 容易只说“有 AI 分析” | 现在必须明确 trace/summary/report、上下文注入点、以及 `direct / luzhi pilot / orchestrated / legacy` 的命中顺序 |
++| 拓扑仿真 | 容易把 overlay 主链和 `MapTopologyView` 旧链混成一条 | overlay 主链已统一到 `simulation-overlay -> build_we1_solver_input -> solve_steady`，但 `MapTopologyView` 仍走 `/api/emergency/simulate-failure` |
++| 导入脚本 | 容易把脚本改动写成主库事实 | 当前仍只是补库/重导工具，`WE3` 主库仍未落成 |
++
++## 截图说明
++本轮没有 UI 改版或页面交互验收，不适合产出前后截图；这里用命令结果、代码链路和前后对比表替代。
+*** End Patch

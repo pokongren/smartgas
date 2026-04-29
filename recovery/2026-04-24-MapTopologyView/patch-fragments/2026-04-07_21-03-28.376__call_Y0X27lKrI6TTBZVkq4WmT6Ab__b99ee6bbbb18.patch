@@ -1,0 +1,87 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const exportJSON = () => {
+         const obj = {
+             nodes: topoNodes.map(n => ({ id: n.id, name: n.name, type: n.type, lng: n.position[0], lat: n.position[1] })),
+             edges: topoEdges.map(e => ({ id: e.id, from: e.startNodeId, to: e.endNodeId, name: e.name })),
+         }
+@@
+         URL.revokeObjectURL(url)
+         setStatusMsg(`已导出 ${topoNodes.length} 节点`)
+     }
++    const exportSimulationReport = useCallback(() => {
++        const lines = [
++            '# WE1 第一张图主仿真导出清单',
++            '',
++            `导出时间：${formatDateTimeLabel(new Date().toISOString())}`,
++            `当前场景：${steadyScenarioOption?.label ?? steadyScenarioId}`,
++            `当前结果：${steadyOverlay ? `${steadyOverlay.run_id} | ${SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}` : '还没运行正式仿真'}`,
++            `历史快照数：${steadySnapshots.length}`,
++            `基线快照：${selectedBaselineSnapshotSummary ? `${selectedBaselineSnapshotSummary.scenario_id} | ${formatDateTimeLabel(selectedBaselineSnapshotSummary.saved_at)}` : '未选择'}`,
++            '',
++            '## 运行结果摘要',
++            `总供给：${steadyOverlay?.summary.total_supply?.toFixed(2) ?? '-'}`,
++            `总需求：${steadyOverlay?.summary.total_demand?.toFixed(2) ?? '-'}`,
++            `平均利用率：${steadyOverlay?.summary.avg_utilization?.toFixed(3) ?? '-'}`,
++            `告警数：${steadyOverlay?.summary.alert_count ?? '-'}`,
++            `命中节点：${simulationVisualSummary?.highlightedNodeCount ?? 0}`,
++            `命中连线：${simulationVisualSummary?.highlightedEdgeCount ?? 0}`,
++            '',
++            '## 基线对比',
++            `供给差值：${steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.total_supply.delta, 2) : '-'}`,
++            `需求差值：${steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.total_demand.delta, 2) : '-'}`,
++            `利用率差值：${steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.avg_utilization.delta, 3) : '-'}`,
++            `告警差值：${steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.alert_count.delta, 0) : '-'}`,
++            '',
++            '## 覆盖结果清单',
++            `当前留档：${coverageResultSummary.currentScenarioCovered ? `已留档 ${coverageResultSummary.currentScenarioSnapshotCount} 条` : '还没留档'}`,
++            `最近覆盖时间：${coverageResultSummary.latestCoverageTime ? formatDateTimeLabel(coverageResultSummary.latestCoverageTime) : '暂无'}`,
++            `当前命中节点：${coverageResultSummary.matchedNodeText}`,
++            `当前命中连线：${coverageResultSummary.matchedEdgeText}`,
++            `建议演示：${recommendedCoverageScenario?.label ?? '暂无'}`,
++            `当前判断：${coverageResultSummary.riskSummary}`,
++            '',
++            '## 场景清单',
++            ...coverageChecklistItems.flatMap(item => [
++                `- ${item.label} | ${item.covered ? '已留档' : '待补跑'}`,
++                `  关注点：${item.focus}`,
++                `  通过怎么看：${item.success}`,
++                `  现场风险：${item.risk}`,
++            ]),
++            '',
++            '## 固定演示口径',
++            ...demoGuideSteps,
++            `失败先查哪层：${failureInvestigationLayerLabel}`,
++        ]
++        const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
++        const url = URL.createObjectURL(blob)
++        const a = document.createElement('a')
++        a.href = url
++        a.download = `we1_main_sim_report_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.md`
++        a.click()
++        URL.revokeObjectURL(url)
++        setStatusMsg('主仿真导出清单已生成')
++    }, [
++        coverageChecklistItems,
++        coverageResultSummary.currentScenarioCovered,
++        coverageResultSummary.currentScenarioSnapshotCount,
++        coverageResultSummary.latestCoverageTime,
++        coverageResultSummary.matchedEdgeText,
++        coverageResultSummary.matchedNodeText,
++        coverageResultSummary.riskSummary,
++        demoGuideSteps,
++        failureInvestigationLayerLabel,
++        recommendedCoverageScenario?.label,
++        selectedBaselineSnapshotSummary,
++        simulationVisualSummary?.highlightedEdgeCount,
++        simulationVisualSummary?.highlightedNodeCount,
++        steadyComparison,
++        steadyOverlay,
++        steadyScenarioId,
++        steadyScenarioOption?.label,
++        steadySnapshots.length,
++    ])
+ 
+     const clearAll = () => {
+*** End Patch

@@ -1,0 +1,34 @@
+*** Begin Patch
+*** Add File: C:/Users/Administrator/.codex/automations/we1/memory.md
++# WE1 Automation Memory
++
++- Last updated: 2026-04-07 17:54:49 +08:00
++- Current round: Four-round WE1 push already completed (4/4), closeout-only mode
++- Workspace decision:
++  - Treat `F:\smartgas-grid` as the real codebase for this automation.
++  - Ignore the lightweight worktree under `C:\Users\Administrator\.codex\worktrees\f099\smartgas-grid` when judging WE1 implementation progress.
++- Evidence rechecked this run:
++  - `F:\smartgas-grid\docs\2026-04-07-WE1下一阶段-试点转产品化四步方案.md`
++  - `F:\smartgas-grid\docs\2026-04-07-WE1下一阶段第4轮-快照对比与试运行面板总结_人话版.md`
++  - `F:\smartgas-grid\docs\2026-04-07-WE1四轮推进完成收口巡检总结_人话版.md`
++  - `F:\smartgas-grid\backend\app\routers\topology_simulation.py`
++  - `F:\smartgas-grid\backend\app\services\we1_result_snapshot_service.py`
++  - `F:\smartgas-grid\src\hooks\useSimulation.ts`
++  - `F:\smartgas-grid\src\components\topology\SimPanel.tsx`
++  - `F:\smartgas-grid\src\views\TopologyView.tsx`
++  - `F:\smartgas-grid\src\views\MapTopologyView.tsx`
++- Implemented this run:
++  - Did not reopen backend or frontend business code.
++  - Rewrote `F:\smartgas-grid\docs\2026-04-07-WE1四轮推进完成收口巡检总结_人话版.md` with a fresh closeout summary for this run.
++- Verification:
++  - Ran `python F:\smartgas-grid\backend\scripts\verify_we1_phase4.py`.
++  - Result: passed, with `WE1 阶段4验收通过`.
++  - Ran `python F:\smartgas-grid\backend\scripts\verify_we1_phase34_final.py`.
++  - Result: passed, with `WE1 阶段3-4第三次联合回归通过`.
++  - Rechecked drift: `TopologyView` still uses the WE1 mainline overlay chain, while `MapTopologyView` still exposes old simulation entry points (`simulateCutoff`, `topologyAPI.simulate`, `/api/emergency/simulate-failure`).
++- Operational conclusion:
++  - Do not continue the original four-round implementation line.
++  - Future runs should only do maintenance, regression checks, or summarize newly discovered drift unless a brand-new WE1 track is explicitly requested.
++- Run note:
++  - This run finished as a closeout-only verification/update pass at 2026-04-07 17:54:49 +08:00.
+*** End Patch

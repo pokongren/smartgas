@@ -1,0 +1,79 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+             {selectedNode && (
+                 <div className="absolute top-[84px] right-4 bottom-4 z-20 w-[360px]">
+                     <div className="h-full bg-[#0c1218]/95 backdrop-blur-md rounded-xl border border-cyan-500/20 shadow-2xl overflow-hidden flex flex-col">
+@@
+                     </div>
+                 </div>
+             )}
++
++            {selectedEdge && (
++                <div className="absolute top-[84px] right-4 bottom-4 z-20 w-[360px]">
++                    <div className="h-full bg-[#0c1218]/95 backdrop-blur-md rounded-xl border border-amber-500/20 shadow-2xl overflow-hidden flex flex-col">
++                        <div className="px-4 py-3 border-b border-amber-500/20 flex items-center justify-between bg-[#0f1722]">
++                            <div>
++                                <h3 className="text-sm font-semibold text-white">{selectedEdge.name || selectedEdge.id}</h3>
++                                <p className="text-[11px] text-gray-400 mt-0.5">连线详情</p>
++                            </div>
++                            <button
++                                onClick={() => setSelectedEdgeId(null)}
++                                className="text-gray-400 hover:text-white transition-colors"
++                            >
++                                <span className="material-symbols-outlined">close</span>
++                            </button>
++                        </div>
++
++                        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
++                            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
++                                <div className="text-white font-medium">{selectedEdge.name || selectedEdge.id}</div>
++                                <p className="text-xs text-gray-400 mt-2">
++                                    起点：{topoNodes.find(node => node.id === selectedEdge.startNodeId)?.name || selectedEdge.startNodeId}
++                                </p>
++                                <p className="text-xs text-gray-400 mt-1">
++                                    终点：{topoNodes.find(node => node.id === selectedEdge.endNodeId)?.name || selectedEdge.endNodeId}
++                                </p>
++                                <p className="text-xs text-gray-400 mt-1">
++                                    显示边 ID：{selectedEdge.id}
++                                </p>
++                            </div>
++
++                            <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-3 space-y-2 text-xs">
++                                <div className="flex items-center justify-between gap-3">
++                                    <span className="text-emerald-200 uppercase tracking-wider">连线仿真映射</span>
++                                    <span className="text-gray-400">
++                                        {selectedEdgeSimulationMatch?.matchedEdgeIds.length ?? 0}/{selectedEdgeSimulationMatch?.sourceEdgeIds.length ?? 0}
++                                    </span>
++                                </div>
++                                {!steadyOverlay && (
++                                    <div className="text-gray-400">当前还没有仿真结果，先到左侧“仿真”页签运行一次。</div>
++                                )}
++                                {steadyOverlay && !selectedEdgeSimulationMatch && (
++                                    <div className="text-amber-300">这条显示连线还没有拿到映射结果，先检查拓扑导入和场景运行。</div>
++                                )}
++                                {steadyOverlay && selectedEdgeSimulationMatch && (
++                                    <div className="space-y-1 text-gray-300">
++                                        <div>来源边：{selectedEdgeSimulationMatch.sourceEdgeIds.join(', ') || '无'}</div>
++                                        <div>命中 overlay 边：{selectedEdgeSimulationMatch.matchedEdgeIds.join(', ') || '无'}</div>
++                                        <div>未命中边：{selectedEdgeSimulationMatch.missingSourceEdgeIds.join(', ') || '无'}</div>
++                                        <div>流量合计：{selectedEdgeSimulationMatch.totalFlowRate.toFixed(2)}</div>
++                                        <div>平均利用率：{selectedEdgeSimulationMatch.averageUtilization === null ? '-' : selectedEdgeSimulationMatch.averageUtilization.toFixed(3)}</div>
++                                        <div>最高告警：{ALERT_LEVEL_LABELS[selectedEdgeSimulationMatch.highestAlertLevel]}</div>
++                                    </div>
++                                )}
++                            </div>
++
++                            <div className="rounded-lg border border-gray-700/40 bg-white/5 p-3">
++                                <p className="text-xs text-gray-300 leading-5">
++                                    这块只解释“这条显示连线对应哪些真实边、当前结果为什么这样”，不额外引入第二套仿真入口。
++                                </p>
++                            </div>
++                        </div>
++                    </div>
++                </div>
++            )}
+ 
+             {historyChartTarget && (
+                 <div className="absolute inset-0 z-30 bg-black/30 backdrop-blur-[1px] flex items-center justify-center">
+*** End Patch

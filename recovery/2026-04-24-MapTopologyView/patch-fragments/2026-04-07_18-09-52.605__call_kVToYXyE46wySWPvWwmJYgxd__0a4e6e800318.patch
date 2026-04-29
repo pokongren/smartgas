@@ -1,0 +1,30 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-        const importedEdges: BaseTopoEdge[] = []
+-        const importedMap = new Map(imported.map(node => [node.id, node]))
+-
+-        for (const [startId, endId] of edgePairs) {
+-            const sNode = importedMap.get(startId)
+-            const eNode = importedMap.get(endId)
+-            if (!sNode || !eNode) continue
+-            const edgeId = `ce-${startId.slice(-4)}-${endId.slice(-4)}`
+-            importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} → ${eNode.name}` })
+-        }
++        const importedEdges: BaseTopoEdge[] = []
++        const importedMap = new Map(imported.map(node => [node.id, node]))
++
++        for (const { startNodeId, endNodeId, sourceEdgeIds } of collapsedEdges.values()) {
++            const sNode = importedMap.get(startNodeId)
++            const eNode = importedMap.get(endNodeId)
++            if (!sNode || !eNode) continue
++            const edgeId = `ce-${startNodeId.slice(-4)}-${endNodeId.slice(-4)}`
++            importedEdges.push({
++                id: edgeId,
++                startNodeId,
++                endNodeId,
++                name: `${sNode.name} → ${eNode.name}`,
++                sourceEdgeIds,
++            })
++        }
+*** End Patch

@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const [lineFlowPhase, setLineFlowPhase] = useState(0)
+     const [damageFlashVisible, setDamageFlashVisible] = useState(false)
+     const [isMapInteracting, setIsMapInteracting] = useState(false)
+     const [renderSafetyMode, setRenderSafetyMode] = useState<'full' | 'lite'>('full')
++    const isLargeGraphMode = renderSafetyMode === 'lite' || topoNodes.length > 320 || topoEdges.length > 480
+*** End Patch

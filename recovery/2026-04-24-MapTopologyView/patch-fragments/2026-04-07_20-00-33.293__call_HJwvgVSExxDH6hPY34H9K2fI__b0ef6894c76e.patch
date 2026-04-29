@@ -1,0 +1,89 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                                     <div className="rounded-lg border border-violet-500/20 bg-violet-950/10 p-3 space-y-3 text-[11px] text-gray-300">
+                                         <div className="flex items-center justify-between gap-3">
+                                             <div>
+                                                 <div className="text-[10px] uppercase tracking-wider text-violet-200">基线对比</div>
+                                                 <div className="mt-1 text-gray-400">同一套第一张图主链里，看当前快照和基线快照差多少。</div>
+@@
+                                             </>
+                                         )}
+                                     </div>
++                                    <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 p-3 space-y-3 text-[11px] text-gray-300">
++                                        <div className="flex items-center justify-between gap-3">
++                                            <div>
++                                                <div className="text-[10px] uppercase tracking-wider text-amber-200">试运行覆盖</div>
++                                                <div className="mt-1 text-gray-400">把第一张图主链的几个典型场景都跑一遍，确认能运行、能留快照、能回看。</div>
++                                            </div>
++                                            {steadyBulkTrialRunActive && (
++                                                <div className="text-[10px] text-amber-200">批量补跑中...</div>
++                                            )}
++                                        </div>
++                                        <div className="grid grid-cols-2 gap-2 text-xs">
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">已覆盖场景</div>
++                                                <div className="mt-1 font-semibold text-emerald-300">{trialCoverageSummary.coveredCount}</div>
++                                            </div>
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">待覆盖场景</div>
++                                                <div className="mt-1 font-semibold text-amber-300">{trialCoverageSummary.pendingCount}</div>
++                                            </div>
++                                        </div>
++                                        <div className="grid grid-cols-1 gap-2">
++                                            <button
++                                                onClick={async () => {
++                                                    try {
++                                                        await runSteadyMissingTrialScenarios()
++                                                        setStatusMsg('未覆盖场景已批量补跑，最后一条结果会自动切成当前场景。')
++                                                    } catch (error) {
++                                                        setStatusMsg(error instanceof Error ? error.message : '批量补跑失败')
++                                                    }
++                                                }}
++                                                disabled={steadyBulkTrialRunActive || steadyTrialRunItems.length === 0 || trialCoverageSummary.pendingCount === 0}
++                                                className="rounded-lg bg-amber-700/80 px-3 py-2 text-xs font-medium text-white transition-all hover:bg-amber-600 disabled:opacity-50"
++                                            >
++                                                {steadyBulkTrialRunActive ? '批量补跑中...' : '补齐未覆盖场景'}
++                                            </button>
++                                        </div>
++                                        <div className="space-y-2">
++                                            {steadyTrialRunItems.map(item => {
++                                                const isRunning = steadyTrialRunScenarioId === item.scenario_id
++                                                return (
++                                                    <div key={`trial-item-${item.scenario_id}`} className="rounded-lg bg-black/15 px-3 py-2">
++                                                        <div className="flex items-center justify-between gap-3">
++                                                            <div className="min-w-0">
++                                                                <div className="truncate text-gray-100">{item.label}</div>
++                                                                <div className="mt-1 text-[10px] text-gray-500">
++                                                                    {item.covered ? `已覆盖，快照 ${item.snapshot_count} 条` : '还没覆盖'}
++                                                                </div>
++                                                                <div className="mt-1 text-[10px] text-gray-500">
++                                                                    最近一次：{item.last_saved_at ? formatDateTimeLabel(item.last_saved_at) : '无'}
++                                                                </div>
++                                                            </div>
++                                                            <button
++                                                                onClick={async () => {
++                                                                    try {
++                                                                        await runSteadyTrialScenario(item.scenario_id)
++                                                                        setStatusMsg(`试运行已补跑：${item.label}`)
++                                                                    } catch (error) {
++                                                                        setStatusMsg(error instanceof Error ? error.message : '试运行补跑失败')
++                                                                    }
++                                                                }}
++                                                                disabled={isRunning || steadyBulkTrialRunActive}
++                                                                className={`rounded-lg px-3 py-1 text-[10px] font-semibold transition ${
++                                                                    item.covered
++                                                                        ? 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20'
++                                                                        : 'border border-amber-400/20 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20'
++                                                                } disabled:opacity-50`}
++                                                            >
++                                                                {isRunning ? '补跑中...' : item.covered ? '重跑' : '补跑'}
++                                                            </button>
++                                                        </div>
++                                                    </div>
++                                                )
++                                            })}
++                                        </div>
++                                    </div>
+                                 </div>
+*** End Patch

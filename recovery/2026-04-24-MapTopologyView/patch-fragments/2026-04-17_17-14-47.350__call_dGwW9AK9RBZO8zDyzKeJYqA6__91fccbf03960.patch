@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                                    {false && (<div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2 space-y-2">
++                                    <SimParamEditor
++                                        seedNodes={paramEditorSeedNodes}
++                                        edges={paramEditorEdges}
++                                        nodeOverrides={nodeParamOverrides}
++                                        edgeLengthOverrides={edgeLengthOverrides}
++                                        onNodeOverridesChange={setNodeParamOverrides}
++                                        onEdgeLengthOverridesChange={setEdgeLengthOverrides}
++                                    />
++                                    {false && (<div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2 space-y-2">
+*** End Patch

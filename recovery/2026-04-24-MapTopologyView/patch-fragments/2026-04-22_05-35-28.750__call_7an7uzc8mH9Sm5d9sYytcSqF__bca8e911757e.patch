@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                    strokeColor: hasFlow ? '#3b82f6' : LINE_COLOR, 
++                    strokeColor: hasFlow ? '#38bdf8' : LINE_COLOR, 
+@@
+-                    edgeOptions.strokeDasharray = [15, 6, 3, 6]
++                    edgeOptions.strokeDasharray = [12, 8]
+@@
+-                    edgeOptions.strokeDasharray = [15, 6, 3, 6]
++                    edgeOptions.strokeDasharray = [12, 8]
+@@
+-                    edgeOptions.strokeDasharray = [15, 6, 3, 6]
++                    edgeOptions.strokeDasharray = [12, 8]
+*** End Patch

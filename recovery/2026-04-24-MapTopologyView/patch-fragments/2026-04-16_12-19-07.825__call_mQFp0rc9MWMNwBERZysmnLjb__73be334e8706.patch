@@ -1,0 +1,45 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
+-    converged: '闂佽楠稿﹢閬嶁€﹂崼婵愬殨闁割偅娲栭弸浣烘喐閻楀牆绗掗柡?,
+-    max_iter: '闂備礁鎼ˇ顖炴偋婵犲洤纾块柟鎯版閺勩儵鎮橀悙闈涗壕濞存嚎鍊栭妵鍕箻鐎靛摜鐣甸梺杞拌閺呮盯鍩ユ径鎰缂佹稓顢婇崥顐⑩攽?,
+-    error: '濠电姵顔栭崰姘跺箠閹捐纾归柛濠勫櫏閺嗘澘鈹戦悩顔肩仾闁稿氦鍋愰崚鎺楀礈瑜庨崰?,
++    converged: '已收敛',
++    max_iter: '达到迭代上限',
++    error: '求解失败',
+ }
+ 
+ const FAILURE_LAYER_LABELS: Record<'frontend-consumption' | 'mapping-source-ids' | 'overlay-contract' | 'rendering-style', string> = {
+-    'frontend-consumption': '闂傚倷鑳堕…鍫㈡崲閹扮増鍋嬪┑鐘叉处閸嬪倿鏌ㄩ悢鍝勑㈢紒鈧崼鈶╁亾楠炲灝鍔氭繛鏉戝€圭€靛ジ宕掑☉姘鳖啎闂佺懓鐡ㄧ换鍕櫠閿濆鐓曢柕濞垮劚閳ь剛绮粋鎺楁晝閸屾氨锛滈梺鎸庢煥婢т粙藝閵曟細pTopologyView / 闂傚倸鍊搁崐鎼佹偋閸曨垰鍨傞柛婵嗗閻斿棙鎱ㄥ璇蹭壕闂?,
+-    'mapping-source-ids': '闂傚倷绀侀幉锟犲礉閺囩姷鐭撻柣銏犳啞閸?source IDs 闂?overlay IDs 闂傚倷鐒﹂惇褰掑礉瀹€鈧埀顒佸嚬閸樼厧宓勯悷婊冪箲缁?,
+-    'overlay-contract': '闂傚倷绀侀幉锟犲礉閺囩姷鐭撻柣銏犳啞閸?simulation-overlay 婵犵數濞€濞佳囧磹瑜版帒鍨傞柛锔诲幐閸?,
+-    'rendering-style': '闂傚倷绀侀幖顐︽偋閸愵喖纾婚柟鍓х帛閻撴洘鎱ㄥ鍡楀⒋妞ゅ孩顨婇弻娑㈡偄閹绘帊澹曢梻鍌欑閹碱偆鎮锕€纾块柛妤冨剳閼板潡鏌熺紒銏犳灈闁绘劕锕弻锝夊箛闂堟稑顫繝銏㈡嚀椤﹂亶鍩€椤掍緡鍟忛柛鐘崇墱閹广垽骞囬弶璺唵闂佸搫顦抽敓銉╁焵椤掍礁娴€规洩绲惧鍕沪閽樺鍔橀梻浣筋嚙濞寸兘寮幖浣碘偓浣圭節閸ャ劌鐦?,
++    'frontend-consumption': '前端消费层异常',
++    'mapping-source-ids': '映射 source_ids 不一致',
++    'overlay-contract': 'overlay 返回结构不匹配',
++    'rendering-style': '渲染样式层异常',
+ }
+@@
+ const TOPO_LABELS: Record<PointType, string> = {
+-    compressor: '闂傚倷绀侀幉锟犳晪濡炪倖鍨靛Λ婵嬪箚閸愵喗鍋ㄩ柣銏ゆ涧瀹?,
+-    distribution: '闂傚倷绀侀幉锛勬暜閹烘嚦娑橆煥閸涱噮鍋ㄥ銈嗘尵婵兘宕?,
+-    junction: '婵犵數鍋涢悺銊╁吹鎼淬劌纾归柡宥庡幗閸庢垹鎲搁悧鍫濈瑨闁告垹濞€閺屾洝绠涚€ｎ亞浼囬梺?,
+-    station: '缂傚倸鍊烽悞锕€顫忚ぐ鎺撳仭闁靛鍎弨锕傛煃?,
+-    valve: '闂傚倸鍊搁崐鎼佸疮閻樿纾婚柟鍓х帛閸?,
++    compressor: '压缩机',
++    distribution: '分输站',
++    junction: '汇接点',
++    station: '站场',
++    valve: '阀门',
+ }
+@@
+-const JUNCTION_READONLY_HINT = '闂佽崵鍠愮划搴㈡櫠濡ゅ懎绠伴柛娑橈攻濞呯娀鏌ｅΟ娆惧殭闁告垹濞€閺屾洝绠涚€ｎ亞浼囬梺绯曟櫅閹虫﹢寮婚敐澶婎潊闁挎繂娲ㄧ紙杈╃磽娴ｇ瓔鍤欑紒澶婄埣楠炲啴骞嶉缁樺媰闂佺粯鍔﹂崜锕€危椤栫偞鈷掑ù锝囨嚀缁茶崵绱掓径濠傤暢婵″弶鍔欓、鏃堝幢濞嗘埊绱查梻浣筋潐閸庢娊顢氶鐔侯洸妞ゆ牗绮庣壕钘壝归敐鍛喐闁圭晫濮撮埞鎴︻敊閸濆嫮浼堥梺杞扮缁夋挳鎮惧┑瀣劦妞ゆ帒鍊归～鏇熴亜韫囨挻鍣虹紓宥呮喘閺岀喓鈧稒顭囩粻鏍煟濠靛嫬鈧洟婀侀梺缁樏鍫曞闯濞差亝鐓涘〒姘搐濞呭秵顨ラ悙鏉戝闁瑰嘲鎳愮划娆撳箰鎼淬劍鏆橀梻浣藉吹婵潙煤閵娧冨灊妞ゆ牜鍋為崑鍌炴煥閻斿搫校闁稿孩鍨块幃妤呮晲閸涱収鏆㈢紓浣插亾濠㈣泛艌濡插牓鏌熼幆褏锛嶇€涙繈姊洪崫銉ユ毐闁稿鎸荤换娑氣偓鐢殿焾琚ㄩ梺绋块瀵爼寮茬捄渚叆闁告劖鍎抽弲鐘绘⒑闂堟侗妾х紒鐘冲灩缁牓宕掗悙瀵稿幈濠殿喗锕╅崜娑欐櫠閺冨倻纾界€广儱妫欓埛鎰磼鐎ｎ亶妲规繛纰变邯瀵墎鎹勯妸蟺鎺撶節閻㈤潧浠х紒缁樼箞閹虫宕奸弴鐐靛幒婵犻潧鍊婚…鍫ｇ箽?
++const JUNCTION_READONLY_HINT = '当前处于运行只读模式，如需编辑请切换到拓扑编辑模式。'
+ const JUNCTION_MODE_LABELS: Record<string, string> = {
+-    runtime_readonly: '闂傚倷绀侀幉锟犳偡椤栨稓顩查柨婵嗩樈閺佸鏌℃径搴殾闁绘梻鍘ч悘宕団偓瑙勬礀濞层劑銆?,
+-    legacy_editable: '闂傚倷绀侀幖顐﹀船閺屻儱绀嬫い鎾寸矊娴滄壆绱撻崒娆戭槮妞ゆ垵鎳橀、鏍川閺夋垼袝闁诲函缍嗛崗姗€宕?,
++    runtime_readonly: '运行只读',
++    legacy_editable: '可编辑',
+ }
+*** End Patch

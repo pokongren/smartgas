@@ -1,0 +1,161 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/automation/project-heartbeat-2026-04-07-081227.md
++# 项目心跳巡检总结（2026-04-07 08:12 +08:00）
++
++## 主目标
++固定在 `F:\smartgas-grid` 主目录做一次只认主仓事实的巡检，先校验落点，再核对 git/worktree/docs、地图缩放与层级显示、枢纽规则与数据库口径、导入脚本、AI 模块链路；本轮只更新巡检文档和 automation memory，不改业务代码。
++
++## 上下文与已知信息
++- 入口通过。`git rev-parse --show-toplevel` 返回 `F:/smartgas-grid`，`git rev-parse --git-dir` 返回 `.git`，说明这里是主仓实体目录，不是 worktree 指针文件。
++- `git worktree list --porcelain` 显示主仓是 `F:/smartgas-grid`，当前 `HEAD` 为 `f75536d67424e7fd48dbfc34d3d9223f986836b4`；大量 detached worktree 仍停在 `6410a10fa3d2d0b6e34691845762052a1759a399`，本轮不拿它们顶主仓结论。
++- 上次 automation 记录时间是 `2026-04-07 05:11:40 +08:00`，这次重点看主仓 git 现场有没有继续推进，以及四条业务链路的事实有没有变化。
++
++## 主代理与子代理分工
++| 角色 | 实际动作 | 结果 |
++| --- | --- | --- |
++| 主代理 | 校验主目录落点、汇总证据、落巡检文档和 memory、做最终判断 | 完成 |
++| 侦察 A | 并行核对 `.git`、`git status`、`git log`、`git worktree list`、`git diff -- docs` | 完成 |
++| 侦察 B | 并行复核地图主链、LOD 阈值、`MapTopologyView` 边界 | 完成 |
++| 侦察 C | 并行复核枢纽 runtime 规则、数据库脚本、导入脚本、仿真与 AI 链路 | 完成 |
++| 验证 | 独立复核 `check_db.py`、WE1 phase3/phase4 验证脚本，以及本轮只动文档 | 完成 |
++
++## 修改逻辑
++- 只补本轮巡检结论，不改任何业务代码或配置。
++- automation memory 直接重写为干净 UTF-8 文本，因为原文件已经有明显乱码，继续追加会污染后续基线。
++- 巡检文档把“工作区里的未提交推进”和“运行时已经稳定存在的主链”分开写，避免把试验中的未提交 diff 误写成已正式收口。
++
++## 执行顺序
++1. 校验主目录事实：`git rev-parse --show-toplevel`、`git rev-parse --git-dir`、`.git` 实体目录检查。
++2. 核对 git 现场：`git status --short --branch`、`git log --oneline -8`、`git worktree list --porcelain`、`git diff --stat`、`git diff --name-status -- docs`。
++3. 复核地图链路：[`F:\smartgas-grid\src\views\GlobalPipelineView.tsx`](F:/smartgas-grid/src/views/GlobalPipelineView.tsx)、[`F:\smartgas-grid\src\components\map-view\MapView.tsx`](F:/smartgas-grid/src/components/map-view/MapView.tsx)、[`F:\smartgas-grid\src\utils\mapRenderer.ts`](F:/smartgas-grid/src/utils/mapRenderer.ts)、[`F:\smartgas-grid\src\utils\hierarchyRenderer.ts`](F:/smartgas-grid/src/utils/hierarchyRenderer.ts)、[`F:\smartgas-grid\src\views\MapTopologyView.tsx`](F:/smartgas-grid/src/views/MapTopologyView.tsx)。
++4. 复核枢纽与数据库口径：[`F:\smartgas-grid\backend\app\services\junction_groups.py`](F:/smartgas-grid/backend/app/services/junction_groups.py)、[`F:\smartgas-grid\backend\check_db.py`](F:/smartgas-grid/backend/check_db.py)。
++5. 复核导入与仿真链路：[`F:\smartgas-grid\backend\scripts\reimport_sj23.py`](F:/smartgas-grid/backend/scripts/reimport_sj23.py)、[`F:\smartgas-grid\backend\scripts\add_sj2.py`](F:/smartgas-grid/backend/scripts/add_sj2.py)、[`F:\smartgas-grid\backend\scripts\add_we3.py`](F:/smartgas-grid/backend/scripts/add_we3.py)、[`F:\smartgas-grid\src\hooks\useSimulation.ts`](F:/smartgas-grid/src/hooks/useSimulation.ts)、[`F:\smartgas-grid\backend\app\routers\topology_simulation.py`](F:/smartgas-grid/backend/app/routers/topology_simulation.py)、[`F:\smartgas-grid\src\services\api.ts`](F:/smartgas-grid/src/services/api.ts)。
++6. 复核 AI 链路：[`F:\smartgas-grid\src\components\ai-assistant\useAiAssistantChat.ts`](F:/smartgas-grid/src/components/ai-assistant/useAiAssistantChat.ts)、[`F:\smartgas-grid\backend\app\routers\ai_assistant.py`](F:/smartgas-grid/backend/app/routers/ai_assistant.py)、[`F:\smartgas-grid\backend\app\services\ai_analysis_orchestrator.py`](F:/smartgas-grid/backend/app/services/ai_analysis_orchestrator.py)。
++7. 更新 memory 和本轮文档，再复核本轮 diff 只包含文档。
++
++## 当前进展摘要
++### 1. 主目录与 git 现场
++- 主仓当前分支相对远端 `ahead 3`，主仓 `HEAD` 是 `f75536d`。
++- 最近 8 条提交从新到旧是：`f75536d`、`5ec5af0`、`602f715`、`eaf6ac4`、`b31a010`、`d3c9d08`、`c19937f`、`3e47946`。
++- 当前未提交改动继续扩大，已经不是单纯 WE1 seed 试点：`git status --short --branch` 显示 tracked 里有 AI、拓扑仿真、地图层级三块并行推进。
++- 这轮入口前 `git diff --name-status -- docs` 为空，说明 docs 在本轮开始前没有已跟踪未提交变更。
++
++### 2. 当前未提交 diff 焦点
++| 类型 | 文件 |
++| --- | --- |
++| tracked | `backend/app/routers/ai_assistant.py` |
++| tracked | `backend/app/routers/pipeline_packages.py` |
++| tracked | `backend/app/routers/topology_simulation.py` |
++| tracked | `backend/app/services/topology_simulation.py` |
++| tracked | `backend/app/services/we1_solver_input_service.py` |
++| tracked | `backend/app/services/we1_steady_validation_service.py` |
++| tracked | `backend/scripts/verify_we1_phase3.py` |
++| tracked | `backend/scripts/verify_we1_phase4.py` |
++| tracked | `scripts/ensure-antigravity-compatible.ps1` |
++| tracked | `src/components/ai-assistant/useAiAssistantPageContext.ts` |
++| tracked | `src/utils/hierarchyRenderer.ts` |
++| tracked | `src/views/GlobalPipelineView.tsx` |
++| tracked | `src/views/MapTopologyView.tsx` |
++| untracked | `src/components/ai-assistant/runtimeAssistantContext.ts` |
++
++- `git diff --stat` 目前是 `8 files changed, 590 insertions(+), 9 deletions(-)`，主战场明确落在 AI、仿真 overlay、地图视图补充逻辑，不是 docs。
++
++### 3. 地图缩放与层级显示
++- 全国地图主链没换，仍然是 [`F:\smartgas-grid\src\views\GlobalPipelineView.tsx`](F:/smartgas-grid/src/views/GlobalPipelineView.tsx) -> [`F:\smartgas-grid\src\components\map-view\MapView.tsx`](F:/smartgas-grid/src/components/map-view/MapView.tsx) -> [`F:\smartgas-grid\src\utils\mapRenderer.ts`](F:/smartgas-grid/src/utils/mapRenderer.ts) -> [`F:\smartgas-grid\src\utils\hierarchyRenderer.ts`](F:/smartgas-grid/src/utils/hierarchyRenderer.ts)。
++- [`F:\smartgas-grid\src\utils\hierarchyRenderer.ts`](F:/smartgas-grid/src/utils/hierarchyRenderer.ts) 当前 LOD 阈值实值仍是：
++
++| 字段 | 当前值 |
++| --- | --- |
++| `criticalZoom` | `4` |
++| `highZoom` | `9` |
++| `mediumZoom` | `12` |
++| `valveMinZoom` | `11` |
++| `expandClusterZoom` | `12` |
++| `showFlowArrows` | `zoom >= 10` |
++
++- [`F:\smartgas-grid\src\components\map-view\MapView.tsx`](F:/smartgas-grid/src/components/map-view/MapView.tsx) 仍通过 `zoomend` 事件驱动地图缩放后的渲染刷新，LOD 消费入口没变。
++- [`F:\smartgas-grid\src\views\GlobalPipelineView.tsx`](F:/smartgas-grid/src/views/GlobalPipelineView.tsx) 仍把 `pipelineData` 传给 `MapView`，说明全国地图主链继续走统一渲染器。
++- [`F:\smartgas-grid\src\views\MapTopologyView.tsx`](F:/smartgas-grid/src/views/MapTopologyView.tsx) 仍明确“不传 `pipelineData` 给 `MapView`，只把 `MapView` 当底图”；它仍是独立渲染口径，不应写成已并入全国地图主链。
++
++### 4. 枢纽规则与数据库口径
++- [`F:\smartgas-grid\backend\app\services\junction_groups.py`](F:/smartgas-grid/backend/app/services/junction_groups.py) 的运行时入口没变：先读 `junction_groups_rebuilt`，没有才回退 `junction_groups`，最后叠加 `manual overlay`，并按来源和 `id` 排序。
++- `python backend/check_db.py --db backend/data/smartgas.db` 当前结果仍是：
++
++| 项目 | 当前结果 |
++| --- | --- |
++| `pipeline_systems.count` | `13` |
++| `pipeline_systems.ids` | `we2, cred, pt, zg, zm, gn, gs, ncsh, jxlz, sj4, sj2, sj3, we1` |
++| `we3` | `missing` |
++| `WE3` 快照 | `stations=0, pipelines=0` |
++| `SJ2` 快照 | `stations=70, pipelines=69` |
++| `SJ3` 快照 | `stations=71, pipelines=70` |
++| `junction_groups.count` | `25` |
++| `junction_groups_backup_20260404.count` | `16` |
++| `junction_groups_rebuilt.count` | `7` |
++| `group_count` | `7` |
++| `major_junction_count` | `0` |
++| `issue_count` | `0` |
++| `junction_groups_rebuilt.latest` | `2026-04-04T17:17:43.361829+00:00` |
++
++- 结论还是同一条：运行时口径稳定，但 rebuilt 覆盖面仍明显小于旧表，`issue_count=0` 只能说明影子表自检没爆，不等于旧表已经退出。
++
++### 5. 导入脚本与仿真链路
++- 传统导入边界没变：[`F:\smartgas-grid\backend\scripts\reimport_sj23.py`](F:/smartgas-grid/backend/scripts/reimport_sj23.py) 还是离线重导 `SJ2/SJ3`；[`F:\smartgas-grid\backend\scripts\add_sj2.py`](F:/smartgas-grid/backend/scripts/add_sj2.py) 和 [`F:\smartgas-grid\backend\scripts\add_we3.py`](F:/smartgas-grid/backend/scripts/add_we3.py) 仍是离线补数脚本，不是运行时主链。
++- 新推进重点仍在 WE1 仿真 overlay 链路：[`F:\smartgas-grid\src\hooks\useSimulation.ts`](F:/smartgas-grid/src/hooks/useSimulation.ts) 继续请求 `GET /api/pipeline-packages/simulation-overlay`；[`F:\smartgas-grid\backend\app\routers\topology_simulation.py`](F:/smartgas-grid/backend/app/routers/topology_simulation.py) 提供 `solve-steady`、`solve-failure` 和 `simulation-overlay` 三个入口，并统一走 `solve_steady(...)`。
++- [`F:\smartgas-grid\backend\app\services\we1_solver_input_service.py`](F:/smartgas-grid/backend/app/services/we1_solver_input_service.py) 继续把 `direction_mode` 等字段从 seed/package 合并成 solver input，说明 solver input 仍是当前落地重点。
++- 另一条独立入口还在：[`F:\smartgas-grid\src\views\MapTopologyView.tsx`](F:/smartgas-grid/src/views/MapTopologyView.tsx) 仍调用 [`F:\smartgas-grid\src\services\api.ts`](F:/smartgas-grid/src/services/api.ts) 里的 `topologyAPI.simulate()`，它走的是 `/api/emergency/simulate-failure`，不能和 `useSimulation -> simulation-overlay` 混写成同一条链。
++- 独立验证结果是通过的：
++  - `python backend/scripts/verify_we1_phase3.py` 通过，主样板和辅样板 seed / steady / overlay 契约可用。
++  - `python backend/scripts/verify_we1_phase4.py` 通过，主样板 steady/failure、辅样板 branch overlay、前端统一 overlay 契约都通过验收。
++
++### 6. AI 模块链路
++- 前端入口仍在 [`F:\smartgas-grid\src\components\ai-assistant\useAiAssistantChat.ts`](F:/smartgas-grid/src/components/ai-assistant/useAiAssistantChat.ts)：有页面上下文时会显式带 `analysis_mode: 'subagents'` 请求 `/api/ai-assistant/chat`。
++- 后端入口仍在 [`F:\smartgas-grid\backend\app\routers\ai_assistant.py`](F:/smartgas-grid/backend/app/routers/ai_assistant.py)，并继续保持三路分流：
++
++| 路径 | 触发条件 | 代码落点 |
++| --- | --- | --- |
++| direct | raw-excel 计数 / 列表 / 实体直答命中 | `chat()` 里 `try_raw_excel_direct_*` |
++| orchestrated | `should_use_orchestration(...)` 命中 | `_orchestrated_event_generator()` |
++| legacy | 其余流量 | `_legacy_event_generator()` |
++
++- [`F:\smartgas-grid\backend\app\services\ai_analysis_orchestrator.py`](F:/smartgas-grid/backend/app/services/ai_analysis_orchestrator.py) 仍把 `subagents/contextual` 视为需要 orchestration 的分析模式，所以当前 AI 主链不是收成单路，而是 direct / orchestrated / legacy 并存。
++
++## 验证方式
++| 验证什么 | 怎么验证 | 结果怎么看 | 失败时先查哪层 |
++| --- | --- | --- | --- |
++| 主目录落点 | `git rev-parse --show-toplevel`、`git rev-parse --git-dir` | 必须落在 `F:/smartgas-grid` 且 `.git` 为实体目录 | 先查 cwd 和 `.git` 形态 |
++| git 现场 | `git status --short --branch`、`git log --oneline -8`、`git worktree list --porcelain`、`git diff --stat` | 看主仓 `HEAD`、ahead 数、diff 焦点是否继续变化 | 先查主仓 `HEAD` |
++| docs 基线 | `git diff --name-status -- docs` | 入口前应为空，本轮结束后只出现新巡检文档 | 先区分历史 diff 与本轮新增 |
++| 数据库口径 | `python backend/check_db.py --db backend/data/smartgas.db` | 重点看 `we3`、`junction_groups_rebuilt.count`、`issue_count` | 先查 `smartgas.db`，再查 `junction_groups.py` |
++| 地图层级链路 | 复读 `GlobalPipelineView`、`MapView`、`mapRenderer`、`hierarchyRenderer`、`MapTopologyView` | 看主链是否变、独立入口是否还在 | 先查 `hierarchyRenderer.ts` 和 `MapTopologyView.tsx` |
++| 仿真链路 | `python backend/scripts/verify_we1_phase3.py`、`python backend/scripts/verify_we1_phase4.py` | 通过则说明 overlay / steady / failure 契约仍可用 | 先查 seed / solver input / router |
++| AI 链路 | 复读 `useAiAssistantChat.ts` 与 `ai_assistant.py` | 看是否仍是 `subagents` 前端入参 + 后端三路分流 | 先查 `ai_assistant.py` 的 `chat()` |
++
++## 风险与回退点
++- 风险 1：工作区未提交改动已经扩到 AI、地图层级、拓扑仿真三块，后续心跳不能把这批状态误写成“已正式发布”。
++- 风险 2：`MapTopologyView` 仍是独立渲染和独立模拟入口，后续汇报如果把它写成已经并入全国地图主链，会直接带偏判断。
++- 风险 3：`we3` 继续缺失，`junction_groups_rebuilt` 仍只有 `7` 组，数据库这条线还是要盯 coverage，不是只看 `issue_count=0`。
++- 风险 4：AI 仍是三路并存，排障时先判断命中 direct、orchestrated 还是 legacy，再决定查工具层、编排层还是模型调用层。
++- 回退点：本轮只新增 [`F:\smartgas-grid\docs\automation\project-heartbeat-2026-04-07-081227.md`](F:/smartgas-grid/docs/automation/project-heartbeat-2026-04-07-081227.md) 并重写 [`C:\Users\Administrator\.codex\automations\automation\memory.md`](C:/Users/Administrator/.codex/automations/automation/memory.md)；如果总结写偏，直接回退这两处即可。
++
++## 最终交付物
++- 巡检文档：[`F:\smartgas-grid\docs\automation\project-heartbeat-2026-04-07-081227.md`](F:/smartgas-grid/docs/automation/project-heartbeat-2026-04-07-081227.md)
++- automation memory：[`C:\Users\Administrator\.codex\automations\automation\memory.md`](C:/Users/Administrator/.codex/automations/automation/memory.md)
++
++## 前后对比
++| 项目 | 上轮基线 | 本轮确认 |
++| --- | --- | --- |
++| 主仓 `HEAD` | `f75536d` | `f75536d` |
++| 分支相对远端 | `ahead 3` | `ahead 3` |
++| docs 入口基线 | 干净 | 仍干净 |
++| 地图主链 | `GlobalPipelineView -> MapView -> mapRenderer -> hierarchyRenderer` | 未换 |
++| LOD 额外规则 | `showFlowArrows >= 10` 已出现 | 仍成立 |
++| `MapTopologyView` 定位 | 独立渲染口径 | 仍独立，且仍有独立模拟入口 |
++| 枢纽 runtime 口径 | rebuilt 优先，fallback 旧表，再叠 manual overlay | 未变 |
++| 数据库告警 | `we3` 缺失、`junction_groups_rebuilt=7` | 未变 |
++| WE1 验证脚本 | 上轮已记录通过 | 本轮重新执行仍通过 |
++| AI 链路 | direct / orchestrated / legacy 并存 | 未变，但当前有新增未提交 AI 相关改动 |
++
++## 截图说明
++本轮没有做 UI 操作或业务代码改动，不适合补前后截图，改用上面的对比表、命令结果和链路落点代替。
+*** End Patch

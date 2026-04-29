@@ -1,0 +1,66 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                             {/* OverlayNodeMappingBlockV2 */}
+                             <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-3 space-y-2 text-xs">
+                                 <div className="flex items-center justify-between gap-3">
+-                                    <span className="text-emerald-200 uppercase tracking-wider">????</span>
++                                    <span className="text-emerald-200 uppercase tracking-wider">仿真映射</span>
+                                     <span className="text-gray-400">
+                                         {selectedNodeSimulationMatch?.matchedNodeIds.length ?? 0}/{selectedNodeSimulationMatch?.sourceNodeIds.length ?? 0}
+                                     </span>
+                                 </div>
+                                 {!steadyOverlay && (
+-                                    <div className="text-gray-400">?????????????????</div>
++                                    <div className="text-gray-400">当前还没有仿真结果，先到左侧“仿真”页签运行一次。</div>
+                                 )}
+                                 {steadyOverlay && !selectedNodeSimulationMatch && (
+-                                    <div className="text-amber-300">????????????</div>
++                                    <div className="text-amber-300">这个显示节点还没有拿到映射结果，先检查拓扑导入和场景运行。</div>
+                                 )}
+                                 {steadyOverlay && selectedNodeSimulationMatch && (
+                                     <div className="space-y-1 text-gray-300">
+-                                        <div>?????{selectedNodeSimulationMatch.sourceNodeIds.join(', ') || '?'}</div>
+-                                        <div>?????{selectedNodeSimulationMatch.matchedNodeIds.join(', ') || '?'}</div>
+-                                        <div>??????{selectedNodeSimulationMatch.missingSourceNodeIds.join(', ') || '?'}</div>
+-                                        <div>?????{selectedNodeSimulationMatch.averagePressureMpa === null ? '-' : `${selectedNodeSimulationMatch.averagePressureMpa.toFixed(3)} MPa`}</div>
++                                        <div>来源节点：{selectedNodeSimulationMatch.sourceNodeIds.join(', ') || '无'}</div>
++                                        <div>命中节点：{selectedNodeSimulationMatch.matchedNodeIds.join(', ') || '无'}</div>
++                                        <div>未命中节点：{selectedNodeSimulationMatch.missingSourceNodeIds.join(', ') || '无'}</div>
++                                        <div>平均压力：{selectedNodeSimulationMatch.averagePressureMpa === null ? '-' : `${selectedNodeSimulationMatch.averagePressureMpa.toFixed(3)} MPa`}</div>
++                                        <div>最高节点告警：{ALERT_LEVEL_LABELS[selectedNodeSimulationMatch.highestAlertLevel]}</div>
+                                     </div>
+                                 )}
++                                {steadyOverlay && selectedNodeSimulationMatch && selectedNodeSimulationMatch.internalSourceEdgeIds.length > 0 && (
++                                    <div className="rounded bg-black/15 px-2 py-2 text-gray-300">
++                                        <div className="text-[10px] uppercase tracking-wider text-gray-500">枢纽内部边映射</div>
++                                        <div className="mt-1 space-y-1 text-[11px]">
++                                            <div>来源边：{selectedNodeSimulationMatch.internalSourceEdgeIds.join(', ') || '无'}</div>
++                                            <div>命中边：{selectedNodeSimulationMatch.matchedInternalEdgeIds.join(', ') || '无'}</div>
++                                            <div>未命中边：{selectedNodeSimulationMatch.missingInternalSourceEdgeIds.join(', ') || '无'}</div>
++                                            <div>累计流量：{selectedNodeSimulationMatch.totalInternalFlowRate.toFixed(2)}</div>
++                                            <div>平均利用率：{selectedNodeSimulationMatch.averageInternalUtilization === null ? '-' : selectedNodeSimulationMatch.averageInternalUtilization.toFixed(3)}</div>
++                                            <div>最高边告警：{ALERT_LEVEL_LABELS[selectedNodeSimulationMatch.highestInternalEdgeAlertLevel]}</div>
++                                        </div>
++                                    </div>
++                                )}
+                                 {steadyOverlay && selectedNodeRelatedEdgeMatches.length > 0 && (
+                                     <div className="rounded bg-black/15 px-2 py-2 text-gray-300">
+-                                        <div className="text-[10px] uppercase tracking-wider text-gray-500">?????</div>
++                                        <div className="text-[10px] uppercase tracking-wider text-gray-500">关联显示连线</div>
+                                         <div className="mt-1 space-y-1">
+                                             {selectedNodeRelatedEdgeMatches.slice(0, 4).map(({ edge, match }) => (
+                                                 <div key={edge.id} className="text-[11px]">
+                                                     <div className="text-gray-200">{edge.name || edge.id}</div>
+-                                                    <div className="text-gray-400">overlay={match?.matchedEdgeIds.join(', ') || '?'} | flow={match?.totalFlowRate.toFixed(2) ?? '-'} | util={match?.averageUtilization?.toFixed(3) ?? '-'}</div>
++                                                    <div className="text-gray-400">来源边：{edge.sourceEdgeIds?.join(', ') || '无'}</div>
++                                                    <div className="text-gray-400">命中 overlay 边：{match?.matchedEdgeIds.join(', ') || '无'}</div>
++                                                    <div className="text-gray-400">
++                                                        流量合计：{match?.totalFlowRate.toFixed(2) ?? '-'} | 平均利用率：{match?.averageUtilization?.toFixed(3) ?? '-'} | 最高告警：{match ? ALERT_LEVEL_LABELS[match.highestAlertLevel] : '-'}
++                                                    </div>
+                                                 </div>
+                                             ))}
+                                         </div>
+                                     </div>
+                                 )}
+*** End Patch

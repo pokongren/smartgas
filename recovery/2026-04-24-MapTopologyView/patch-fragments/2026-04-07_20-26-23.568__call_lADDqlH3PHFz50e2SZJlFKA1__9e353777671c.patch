@@ -1,0 +1,148 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+ import { useLocation } from 'react-router-dom'
+ import MapView from '@/components/map-view/MapView'
++import { SimPanel } from '@/components/topology/SimPanel'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
+ import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+ import type { PipelinePackage } from '@/data/pipelines/types'
++import { useSimulation } from '@/hooks/useSimulation'
+ import { topologyAPI, type SimulationResult } from '@/services/api'
+ import {
+     topologyEditorApi,
+@@
+ import type { ValidationReport } from '@/utils/topology-validator'
+ import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+ import type { CutoffResult } from '@/utils/cutoff-simulator'
++import { MAINLINE_SCENARIOS } from '@/types/simulation'
+@@
+ interface BaseTopoEdge {
+     id: string
+     startNodeId: string
+     endNodeId: string
+     name?: string
+ }
++
++const WE1_PRIMARY_PILOT_ID = 'mainline_zhongwei_jingbian'
+@@
+     const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
+     const [isSaving, setIsSaving] = useState(false)
+     const [cascadeValves, setCascadeValves] = useState(true)
+     const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
+     const [isPreviewing, setIsPreviewing] = useState(false)
++    const {
++        overlay: steadyOverlay,
++        isLoading: steadySimLoading,
++        error: steadySimError,
++        currentScenario: steadyScenarioId,
++        snapshots: steadySnapshots,
++        snapshotLoading: steadySnapshotLoading,
++        baselineSnapshotLoading: steadyBaselineSnapshotLoading,
++        snapshotError: steadySnapshotError,
++        selectedSnapshotRunId: steadySelectedSnapshotRunId,
++        baselineSnapshotRunId: steadyBaselineSnapshotRunId,
++        trialRunScenarioId: steadyTrialRunScenarioId,
++        bulkTrialRunActive: steadyBulkTrialRunActive,
++        comparison: steadyComparison,
++        trialRunItems: steadyTrialRunItems,
++        setScenario: setSteadyScenario,
++        setSelectedSnapshotRunId: setSteadySelectedSnapshotRunId,
++        setBaselineSnapshotRunId: setSteadyBaselineSnapshotRunId,
++        runSimulation: runSteadySimulation,
++        saveSnapshot: saveSteadySnapshot,
++        refreshSnapshots: refreshSteadySnapshots,
++        loadSelectedSnapshot: loadSteadySelectedSnapshot,
++        runTrialScenario: runSteadyTrialScenario,
++        runMissingTrialScenarios: runSteadyMissingTrialScenarios,
++        clearOverlay: clearSteadyOverlay,
++    } = useSimulation({
++        pilotId: WE1_PRIMARY_PILOT_ID,
++        scenarios: MAINLINE_SCENARIOS,
++    })
+@@
+     useEffect(() => {
+         setPositionPreview(null)
+     }, [cascadeValves, dirtyPositions])
++
++    useEffect(() => {
++        if (activeTab !== 'simulation') return
++        void refreshSteadySnapshots()
++    }, [activeTab, refreshSteadySnapshots])
++
++    useEffect(() => {
++        if (steadySimError) {
++            setStatusMsg(`主仿真失败：${steadySimError}`)
++        }
++    }, [steadySimError])
++
++    useEffect(() => {
++        if (steadySnapshotError) {
++            setStatusMsg(`快照操作失败：${steadySnapshotError}`)
++        }
++    }, [steadySnapshotError])
+@@
+-            marker.on('click', (event: any) => doNodeClick(nodeId, event))
++            marker.on('click', () => doNodeClick(nodeId))
+@@
+     const stats = useMemo(() => ({
+         nodes: topoNodes.length,
+         edges: topoEdges.length,
+         isolated: topoNodes.length > 0
+             ? findIsolatedNodes(
+@@
+             ).length
+             : 0,
+     }), [topoNodes, topoEdges])
++    const steadyScenarioOption = useMemo(
++        () => MAINLINE_SCENARIOS.find(item => item.id === steadyScenarioId) ?? null,
++        [steadyScenarioId],
++    )
++    const simulationVisualSummary = useMemo(
++        () => ({
++            highlightedNodeCount: steadyOverlay?.nodes.length ?? 0,
++            highlightedEdgeCount: steadyOverlay?.edges.length ?? 0,
++        }),
++        [steadyOverlay],
++    )
++    const steadyOverlayStatusText = steadyOverlay
++        ? `${steadyScenarioOption?.label ?? steadyOverlay.scenario_id} / ${steadyOverlay.solver_status}`
++        : '主仿真未运行'
++    const simulationEntryHint = steadyOverlay
++        ? '第一张图已挂上正式主仿真面板，场景、快照和对比继续走同一套正式主链。'
++        : '当前默认进入第一张图主仿真入口，先运行正式主链，再观察地图上的变化。'
+@@
+             </div>
+             {/* map base */}
+             <MapView onLoad={handleMapLoad} />
++            <SimPanel
++                scenarioId={steadyScenarioId}
++                scenarios={MAINLINE_SCENARIOS}
++                isLoading={steadySimLoading}
++                snapshotLoading={steadySnapshotLoading}
++                baselineSnapshotLoading={steadyBaselineSnapshotLoading}
++                error={steadySimError}
++                snapshotError={steadySnapshotError}
++                overlay={steadyOverlay}
++                snapshots={steadySnapshots}
++                selectedSnapshotRunId={steadySelectedSnapshotRunId}
++                baselineSnapshotRunId={steadyBaselineSnapshotRunId}
++                trialRunScenarioId={steadyTrialRunScenarioId}
++                bulkTrialRunActive={steadyBulkTrialRunActive}
++                comparison={steadyComparison}
++                trialRunItems={steadyTrialRunItems}
++                onScenarioChange={setSteadyScenario}
++                onSnapshotSelect={setSteadySelectedSnapshotRunId}
++                onBaselineSnapshotSelect={setSteadyBaselineSnapshotRunId}
++                onRun={() => void runSteadySimulation()}
++                onSaveSnapshot={() => void saveSteadySnapshot()}
++                onRefreshSnapshots={() => void refreshSteadySnapshots()}
++                onLoadSnapshot={() => void loadSteadySelectedSnapshot()}
++                onRunTrialScenario={scenarioId => void runSteadyTrialScenario(scenarioId)}
++                onRunMissingTrialScenarios={() => void runSteadyMissingTrialScenarios()}
++                onClear={clearSteadyOverlay}
++            />
+ 
+             {/* 左侧面板 */}
+*** End Patch

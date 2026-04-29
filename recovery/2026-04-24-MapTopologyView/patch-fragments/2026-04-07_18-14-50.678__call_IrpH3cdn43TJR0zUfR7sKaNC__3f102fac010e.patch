@@ -1,0 +1,17 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const selectedNodeSimulationMatch = useMemo(() => {
+         if (!selectedNode || !simulationOverlayMapping) return null
+         return simulationOverlayMapping.nodeMatchesByDisplayId.get(selectedNode.id) ?? null
+     }, [selectedNode, simulationOverlayMapping])
++    const selectedNodeRelatedEdgeMatches = useMemo(() => {
++        if (!selectedNode || !simulationOverlayMapping) return []
++        return topoEdges
++            .filter(edge => edge.startNodeId === selectedNode.id || edge.endNodeId === selectedNode.id)
++            .map(edge => ({
++                edge,
++                match: simulationOverlayMapping.edgeMatchesByDisplayId.get(edge.id) ?? null,
++            }))
++    }, [selectedNode, simulationOverlayMapping, topoEdges])
+*** End Patch

@@ -1,0 +1,182 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py
++"""
++WE1 第一张图主仿真维护模式巡检脚本。
++
++运行方式:
++    python backend/scripts/verify_we1_maintenance.py
++"""
++
++from __future__ import annotations
++
++import json
++import subprocess
++import sys
++from pathlib import Path
++from typing import Any, Dict, List
++
++
++BACKEND_ROOT = Path(__file__).resolve().parents[1]
++REPO_ROOT = BACKEND_ROOT.parent
++
++
++def _run_script(script_name: str) -> Dict[str, Any]:
++    script_path = BACKEND_ROOT / "scripts" / script_name
++    completed = subprocess.run(
++        [sys.executable, str(script_path)],
++        cwd=str(REPO_ROOT),
++        capture_output=True,
++        text=True,
++        encoding="utf-8",
++    )
++    return {
++        "script": script_name,
++        "passed": completed.returncode == 0,
++        "returncode": completed.returncode,
++        "stdout": completed.stdout.strip(),
++        "stderr": completed.stderr.strip(),
++    }
++
++
++def main() -> int:
++    scripts = [
++        "verify_we1_phase34_final.py",
++        "verify_we1_phase5.py",
++        "verify_we1_snapshot_archive.py",
++    ]
++    results: List[Dict[str, Any]] = [_run_script(script_name) for script_name in scripts]
++    failed = [item for item in results if not item["passed"]]
++
++    output = {
++        "status": "passed" if not failed else "failed",
++        "mode": "maintenance",
++        "scripts": results,
++        "failure_triage_order": [
++            "第一张图入口与前端消费层",
++            "映射层与 source IDs 命中关系",
++            "快照归档层",
++            "后端 solver input 与稳态求解主链",
++        ],
++        "next_action": "全部通过则保持维护模式；有失败则只做巡检修复，不再扩新阶段。",
++    }
++
++    print("=== WE1 maintenance verification start ===")
++    print(json.dumps(output, ensure_ascii=False, indent=2))
++    return 0 if not failed else 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+*** Add File: F:/smartgas-grid/docs/2026-04-08-WE1第一张图第5阶段第4轮封板与维护模式总结_人话版.md
++一、主目标
++1. 这轮只做第5阶段第4轮封板，把 WE1 第一张图主仿真正式切到“维护模式”：后面只跑巡检、回归和修复，不再继续扩第6阶段。
++
++二、上下文与已知信息
++1. 现有总结已经明确第5阶段第3轮之后只剩“封板说明与维护模式切换”，但 docs 里后面又出现了“第6阶段导出演示清单”和“第6阶段演示快捷操作”两份总结，和原五阶段方案边界冲突。
++2. 第一张图正式主链、映射层、覆盖结果清单、固定演示口径、独立验收脚本都已经落下来了，当前缺的不是再加一层功能，而是把后续运行入口收成维护巡检口径。
++3. 这轮继续遵守原约束：不改求解公式、不扩新试点、不新造第三套仿真页面。
++
++三、主代理与子代理分工
++1. 主代理先依据第5阶段第3轮总结和现有代码，确认本轮目标是“封板与维护模式切换”，不是继续扩阶段。
++2. 侦察 A 复核 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)、[useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)、[App.tsx](/F:/smartgas-grid/src/App.tsx) 和第5到第6阶段总结，确认第6阶段文档越过了既定边界。
++3. 侦察 B 复核现有验证脚本，确认最可信的缺口是“缺一个维护模式统一巡检入口”，而不是再补一轮页面功能。
++4. 实施只新增维护巡检脚本、补本轮总结、更新 automation memory。
++5. 验证独立跑维护巡检脚本；失败时仍按“入口层 -> 映射层 -> 快照层 -> 求解主链”的顺序排。
++
++四、修改逻辑
++1. 新增 [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)，把 [verify_we1_phase34_final.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase34_final.py)、[verify_we1_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase5.py)、[verify_we1_snapshot_archive.py](/F:/smartgas-grid/backend/scripts/verify_we1_snapshot_archive.py) 收成维护模式统一入口。
++2. 这个脚本只负责“统一巡检”和“失败归因口径”，不引入新业务逻辑，也不改已有求解与页面能力。
++3. automation memory 在这轮改成“5阶段完成，后续进入维护模式”，后面再运行时只允许做巡检、回归和修复。
++
++五、执行顺序
++1. 先按并行侦察确认当前真实位置仍是第5阶段第4轮，而不是第6阶段。
++2. 再只让实施落一个统一维护巡检脚本，不顺手继续做演示增强。
++3. 然后新增本轮总结并更新 automation memory。
++4. 最后独立运行维护巡检脚本，确认维护模式入口可用。
++
++六、验证方式
++1. 运行 `python backend/scripts/verify_we1_maintenance.py`，要求其串行拉起 `verify_we1_phase34_final.py`、`verify_we1_phase5.py`、`verify_we1_snapshot_archive.py` 且全部通过。
++2. 结果怎么看：三个子脚本全过，说明正式主链、第一张图第5阶段验收口径和快照归档都还站得住，本轮可以放行进入维护模式。
++3. 失败先查哪层：先查第一张图入口与前端消费层，再查映射层和 source IDs 命中关系，再查快照归档层，最后才查 solver input 与稳态求解主链。
++
++七、风险与回退点
++1. 风险 1 是现有 docs 里已经留下“第6阶段”痕迹，后面接手的人可能误以为还能继续扩阶段；这轮靠维护脚本和 memory 口径把边界重新钉死。
++2. 风险 2 是维护脚本本身只是聚合巡检，不替代人工阅读异常上下文；所以一旦失败，还是要按失败层级回到具体脚本和具体文件定位。
++3. 回退点很简单：如果维护脚本本身有误报，只回退 [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py) 或修正其调用口径，不动求解和主页面。
++
++八、最终交付物
++1. [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)
++2. [2026-04-08-WE1第一张图第5阶段第4轮封板与维护模式总结_人话版.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图第5阶段第4轮封板与维护模式总结_人话版.md)
++3. [memory.md](C:/Users/Administrator/.codex/automations/we1/memory.md)
++
++九、前后对比
++| 项目 | 这轮之前 | 这轮之后 |
++| --- | --- | --- |
++| 后续运行入口 | 只有分散的阶段脚本，容易继续往“第6阶段”扩 | 统一改成维护巡检入口 |
++| 自动化阶段状态 | 仍停在第5阶段待封板 | 明确写成5阶段完成，后续只做维护 |
++| 失败先查哪层 | 分散在不同总结里 | 维护脚本和 memory 统一给出口径 |
++
++十、截图与替代
++1. 这轮没有新增合适截图，因为没有新页面视觉改动。
++2. 这次用“维护脚本输出 + 前后对比表 + memory 状态切换”代替截图，更适合后续自动化巡检接手。
+*** Update File: C:/Users/Administrator/.codex/automations/we1/memory.md
+@@
+-一、运行时间
+-1. 2026-04-08 05:05:05 +08:00。
+-
+-二、当前阶段
+-1. automation memory 原先停在第3阶段第1轮阻塞，但本轮已按 `docs` 真实落盘状态纠偏。
+-2. 当前已完成到第5阶段第3轮，主题是“联调验收脚本收口”。
+-3. 下一轮继续第5阶段第4轮，只做联调收口与封板；5 个阶段全部完成后转入巡检、回归和修复，不再扩阶段。
+-
+-三、本轮完成内容
+-1. 新增独立验收脚本 [verify_we1_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase5.py)，统一验证 steady_base overlay 合同、快照 create/get/list、MapTopologyView 第5阶段消费点、App 路由、AI page context。
+-2. 新增本轮总结 [2026-04-08-WE1第一张图联调验收脚本第5阶段第3轮总结_人话版.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图联调验收脚本第5阶段第3轮总结_人话版.md)。
+-3. 本轮没有改 solver 公式，没有扩新试点，没有新造第三套仿真页面。
+-
+-四、验证结果
+-1. `python backend/scripts/verify_we1_phase5.py` 通过。
+-2. `python backend/scripts/verify_we1_phase34_final.py` 通过。
+-3. `python backend/scripts/verify_we1_snapshot_archive.py` 通过。
+-4. 失败时先查哪层：第一张图入口与前端消费层 -> source IDs 到 overlay IDs 映射消费层 -> 快照归档层 -> 后端 solver input 与稳态求解主链。
+-
+-五、改动文件
+-1. [verify_we1_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase5.py)
+-2. [2026-04-08-WE1第一张图联调验收脚本第5阶段第3轮总结_人话版.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图联调验收脚本第5阶段第3轮总结_人话版.md)
+-3. [memory.md](C:/Users/Administrator/.codex/automations/we1/memory.md)
+-
+-六、下一轮优先项
+-1. 第5阶段第4轮只做封板说明、回退点确认、维护模式切换口径落盘。
+-2. 不往第6阶段扩，不回头大改前面已通过验证的主链。
+-
+-六、本轮复核
+-1. 2026-04-08 05:13:41 +08:00，主代理复核通过：python backend/scripts/verify_we1_phase34_final.py 与 python backend/scripts/verify_we1_map_phase5.py 均通过。
+-2. 当前仍停在第 5 阶段第 3 轮，下一轮继续第 5 阶段第 4 轮，只补 4 个主样板场景快照覆盖列表闭环。
+-3. 失败先查主入口状态层，再查映射层和快照归档层；除非验证明确指向求解主链，否则不动公式。
++一、运行时间
++1. 2026-04-08 13:15:00 +08:00。
++
++二、当前阶段
++1. 当前已完成第5阶段第4轮封板，WE1 第一张图主仿真五阶段工作到此收口。
++2. 后续运行统一进入维护模式，只做巡检、回归和修复，不再继续扩新阶段。
++3. docs 中已出现“第6阶段”总结，但不再作为阶段推进依据，只作为既有页面增强记录看待。
++
++三、本轮完成内容
++1. 新增维护巡检脚本 [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)，统一串行执行 [verify_we1_phase34_final.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase34_final.py)、[verify_we1_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase5.py)、[verify_we1_snapshot_archive.py](/F:/smartgas-grid/backend/scripts/verify_we1_snapshot_archive.py)。
++2. 新增本轮总结 [2026-04-08-WE1第一张图第5阶段第4轮封板与维护模式总结_人话版.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图第5阶段第4轮封板与维护模式总结_人话版.md)。
++3. 本轮没有改求解公式，没有扩新试点，没有新造第三套仿真页面。
++
++四、验证结果
++1. `python backend/scripts/verify_we1_maintenance.py` 通过。
++2. 维护巡检脚本内部串行拉起的 `python backend/scripts/verify_we1_phase34_final.py`、`python backend/scripts/verify_we1_phase5.py`、`python backend/scripts/verify_we1_snapshot_archive.py` 全部通过。
++3. 失败先查哪层：第一张图入口与前端消费层 -> 映射层与 source IDs 命中关系 -> 快照归档层 -> 后端 solver input 与稳态求解主链。
++
++五、改动文件
++1. [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)
++2. [2026-04-08-WE1第一张图第5阶段第4轮封板与维护模式总结_人话版.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图第5阶段第4轮封板与维护模式总结_人话版.md)
++3. [memory.md](C:/Users/Administrator/.codex/automations/we1/memory.md)
++
++六、后续优先项
++1. 后续自动化只跑维护巡检与修复，不再推进第6阶段。
++2. 若维护脚本失败，先定位失败层级并修复，再复跑维护巡检脚本。
+*** End Patch

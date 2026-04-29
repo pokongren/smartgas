@@ -1,0 +1,85 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-08-WE1-map-phase3-round1-summary-human.md
++一、本轮结论
++
++第3阶段第1轮已完成，第一张图现在直接挂上正式主仿真面板，`MapTopologyView` 不用再先切到第二张图才能跑场景、做快照和看基线对比。
++
++二、本轮做了什么
++
++1. 主目标
++
++把已经存在的正式仿真控制面板直接复用到第一张图，不新造第三套状态机，也不改求解和映射口径。
++
++2. 实际改动
++
++(1) 在 `F:\smartgas-grid\src\views\MapTopologyView.tsx` 新增 `SimPanel` 复用挂载，让地图页直接消费 `useSimulation` 已有的场景、运行、快照、基线、试运行覆盖能力。
++(2) 复用的还是同一套 `steadyScenarioId`、`runSteadySimulation`、`saveSteadySnapshot`、`loadSteadySelectedSnapshot`、`runSteadyMissingTrialScenarios`，没有分叉出第二套前端状态。
++
++三、为什么这么改
++
++第3阶段第1轮要收的是“第一张图接管仿真 UI”，不是再发明一套新面板。`TopologyView` 现成的 `SimPanel` 已经把正式动作收得比较完整，这一轮直接挂到地图页，能最小改动拿到正式入口，同时把地图页原有的映射摘要、节点详情、连线详情继续保留成诊断层。
++
++四、影响范围
++
++1. 改动文件
++
++(1) `F:\smartgas-grid\src\views\MapTopologyView.tsx`
++
++2. 未改动但继续复用的链路
++
++(1) `F:\smartgas-grid\src\hooks\useSimulation.ts`
++(2) `F:\smartgas-grid\src\components\topology\SimPanel.tsx`
++(3) `F:\smartgas-grid\src\utils\simulationOverlayMapping.ts`
++
++五、前后对比
++
++1. 入口变化
++
++| 对比项 | 改前 | 改后 |
++| --- | --- | --- |
++| 第一张图正式入口 | 地图页虽已接主链，但正式控制面板不在第一张图主视野内 | 地图页直接挂出 `SimPanel` |
++| 场景运行 | 需要依赖第二张图或地图页内部分散入口 | 第一张图直接可运行 |
++| 快照与基线 | 入口不够集中 | 第一张图直接可选快照、保存快照、加载快照、做基线对比 |
++
++2. 代码对比
++
++```tsx
++// 改前：MapTopologyView 只解构 useSimulation 状态
++const { runSimulation, saveSnapshot } = useSimulation(...)
++
++// 改后：MapTopologyView 直接挂正式面板
++<SimPanel
++  scenarioId={steadyScenarioId}
++  onRun={() => void runSteadySimulation()}
++  onSaveSnapshot={() => void saveSteadySnapshot()}
++/>
++```
++
++六、验证结果
++
++1. 独立验证
++
++(1) `python F:\smartgas-grid\backend\scripts\verify_we1_phase3.py` 通过，说明正式主链和主辅样板 steady overlay 契约没有被本轮入口接管改坏。
++(2) `python F:\smartgas-grid\backend\scripts\verify_we1_map_phase2.py` 通过，说明地图映射层摘要和命中统计没有回退。
++(3) `node .\node_modules\typescript\bin\tsc --noEmit` 未通过，但失败点仍是仓库既有问题，集中在 `MapView.tsx`、`useSimulation.ts`、`GlobalPipelineView.tsx`、`TopologyDemoView.tsx`，不是本轮新增 `SimPanel` 挂载引入。
++
++2. 失败先查哪层
++
++(1) 先查地图页对 `useSimulation` 的消费层。
++(2) 再查映射层 `simulationOverlayMapping.ts`。
++(3) 最后再查后端 overlay 契约和求解链。
++
++七、风险与回退点
++
++1. 当前风险
++
++(1) 地图页现在同时存在浮出面板和原有仿真诊断区，虽然主链口径一致，但后续第3阶段下一轮最好继续收一下主入口提示，减少双入口感知。
++
++2. 回退点
++
++(1) 如果这轮入口挂载引发页面交互冲突，只需要回退 `MapTopologyView.tsx` 中新增的 `SimPanel` 挂载，不会碰到后端求解、快照数据和映射逻辑。
++
++八、下一阶段判断
++
++第3阶段第1轮可以放行，第3阶段第2轮建议继续收第一张图的主入口提示和地图层可视反馈，不进入第4阶段，不改路由语义，不改求解公式。
+*** End Patch

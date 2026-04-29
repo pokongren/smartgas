@@ -1,0 +1,40 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ interface TopoNode {
+     id: string
+     type: PointType
+     name: string
+     position: [number, number]
+     sourceNodeIds?: string[]
++    internalSourceEdgeIds?: string[]
+     junctionId?: number
+     isJunction?: boolean
+     junctionKind?: string
+     sourceTable?: string
+@@
+ function formatSnapshotOption(runId: string, scenarioId: string, savedAt: string): string {
+     return `${scenarioId} | ${runId.slice(0, 12)} | ${savedAt.slice(11, 19)}`
+ }
++
++function formatDateTimeLabel(value?: string): string {
++    if (!value) return '-'
++
++    const date = new Date(value)
++    if (Number.isNaN(date.getTime())) return value
++
++    return date.toLocaleString('zh-CN', { hour12: false })
++}
++
++const ALERT_LEVEL_LABELS: Record<'normal' | 'warning' | 'critical', string> = {
++    normal: '正常',
++    warning: '预警',
++    critical: '严重',
++}
++
++const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
++    converged: '已收敛',
++    max_iter: '达到迭代上限',
++    error: '求解失败',
++}
+*** End Patch

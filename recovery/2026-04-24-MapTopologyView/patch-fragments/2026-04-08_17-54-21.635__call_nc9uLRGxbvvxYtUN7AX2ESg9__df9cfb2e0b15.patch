@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                        <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">瀵煎嚭婕旂ず娓呭崟</button>
++                                        <button onClick={openTopologyShowcase} className="col-span-2 rounded-lg border border-cyan-500/30 bg-cyan-950/20 px-3 py-2 text-xs font-medium text-cyan-100">前往第三张图展示</button>
++                                        <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">瀵煎嚭婕旂ず娓呭崟</button>
+*** End Patch

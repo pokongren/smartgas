@@ -1,0 +1,359 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                        {/* 绋虫€佷豢鐪?*/}
+-                        {false && activeTab === 'simulation' && (
+-                            <div className="space-y-4">
+-                                <div className="text-center pb-2 border-b border-gray-700/50">
+-                                    <span className="material-symbols-outlined text-3xl text-cyan-500 mb-1">science</span>
+-                                    <h3 className="text-sm font-medium text-gray-300">鍚庣绋虫€佷豢鐪?/h3>
+-                                </div>
+-                                <div className="text-xs text-gray-400 leading-normal mb-3">
+-                                    璋冪敤鍚庣 \`/api/emergency/simulate-failure\` 鎺ュ彛璁＄畻鍏ㄥ眬鍘嬮檷涓庢柇渚涜寖鍥淬€?
+-                                </div>
+-                                <button
+-                                    onClick={async () => {
+-                                        setIsSimulating(true)
+-                                        try {
+-                                            await runSimulation()
+-                                            const result = {
+-                                                data: simulationOverlay
+-                                                    ? [{
+-                                                        step: 1,
+-                                                        affected_nodes: simulationOverlay.nodes
+-                                                            .filter(node => node.alert_level !== 'normal')
+-                                                            .map(node => node.id),
+-                                                        pressure_drops: Object.fromEntries(
+-                                                            simulationOverlay.nodes.map(node => [node.id, node.pressure_mpa])
+-                                                        ),
+-                                                        is_stable: simulationOverlay.solver_status === 'converged',
+-                                                    }]
+-                                                    : [],
+-                                            }
+-                                            if (result && result.data) {
+-                                                setSimResults(result.data)
+-                                                setStatusMsg(`浠跨湡瀹屾垚锛屽叡 ${result.data.length} 姝)
+-                                            }
+-                                        } catch (e) {
+-                                            setStatusMsg('浠跨湡澶辫触锛? + (e as Error).message)
+-                                        } finally {
+-                                            setIsSimulating(false)
+-                                        }
+-                                    }}
+-                                    disabled={isSimulating}
+-                                    className="w-full bg-cyan-700/80 hover:bg-cyan-600 text-white flex items-center justify-center py-2.5 rounded-lg text-xs shadow hover:shadow-cyan-500/20 disabled:opacity-50 transition-all font-medium"
+-                                >
+-                                    <span className="material-symbols-outlined text-sm mr-1.5">{isSimulating ? 'hourglass_empty' : 'play_arrow'}</span>
+-                                    {isSimulating ? '姝ｅ湪杩涜缃戠粶浠跨湡...' : '杩愯绋虫€佷豢鐪?}
+-                                </button>
+-
+-                                {simResults.length > 0 && (
+-                                    <div className="space-y-2 mt-4 max-h-64 overflow-y-auto pr-1">
+-                                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">浠跨湡姝ラ缁撴灉</p>
+-                                        {simResults.map((step, i) => (
+-                                            <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-2.5 hover:bg-white/10 transition-colors">
+-                                                <div className="flex justify-between items-center mb-1.5">
+-                                                    <span className="text-sky-300 text-xs font-medium">鉁?姝ラ {step.step}</span>
+-                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${step.is_stable ? 'bg-green-900/50 text-green-400 border border-green-800/50' : 'bg-red-900/50 text-red-400 border border-red-800/50'}`}>
+-                                                        {step.is_stable ? 'Stable' : 'Fluctuating'}
+-                                                    </span>
+-                                                </div>
+-                                                <div className="text-[10px] text-gray-400">
+-                                                    褰卞搷鑺傜偣: <span className="text-white ml-0.5">{step.affected_nodes?.length || 0}</span> 涓?
+-                                                </div>
+-                                            </div>
+-                                        ))}
+-                                    </div>
+-                                )}
+-                            </div>
+-                        )}
+-
+-                        {/* 鍏抽敭鏋㈢航 */}
+                         {activeTab === 'simulation' && (
+                             <div className="space-y-4">
+                                 <div className="text-center pb-2 border-b border-gray-700/50">
+                                     <span className="material-symbols-outlined text-3xl text-cyan-500 mb-1">science</span>
+-                                    <h3 className="text-sm font-medium text-gray-300">WE1 姝ｅ紡绋虫€佷豢鐪?/h3>
++                                    <h3 className="text-sm font-medium text-gray-300">WE1 正式稳态仿真</h3>
+                                 </div>
+ 
+-                                <div className="rounded-lg border border-cyan-800/40 bg-cyan-950/20 p-3 text-[11px] leading-5 text-cyan-100">
+-                                    <div className="font-medium text-cyan-200">绗?1 闃舵绗?1 杞彛寰?/div>
+-                                    <div className="mt-1 text-cyan-50/90">
+-                                        褰撳墠椤靛凡缁忓垏鍒?WE1 steady overlay 姝ｅ紡涓婚摼锛屼笉鍐嶈皟鐢ㄦ棫鐨?                                        <span className="mx-1 font-mono text-[10px]">/api/emergency/simulate-failure</span>
+-                                        浣滀负姝ｅ紡浠跨湡鍏ュ彛銆傝繖涓€杞彧缁熶竴涓婚摼鍜屽揩鐓э紝涓嶅湪鍦板浘涓婄洿鎺ュ彔鍔犵粨鏋溿€?                                    </div>
++                                <div className="rounded-lg border border-cyan-800/40 bg-cyan-950/20 p-3 text-[11px] leading-5 text-cyan-100">
++                                    <div className="font-medium text-cyan-200">第1阶段第1轮口径</div>
++                                    <div className="mt-1 text-cyan-50/90">
++                                        当前页已经切到 WE1 正式主链。这里运行的是
++                                        <span className="mx-1 font-mono text-[10px]">useSimulation -&gt; /api/pipeline-packages/simulation-overlay</span>
++                                        和快照链，不再把
++                                        <span className="mx-1 font-mono text-[10px]">/api/emergency/simulate-failure</span>
++                                        当正式稳态仿真入口。本轮只统一主链和快照，不在地图上直接落 overlay 颜色与线宽。
++                                    </div>
+                                 </div>
+ 
+                                 <div className="space-y-3">
+                                     <div>
+-                                        <div className="mb-1 text-[10px] uppercase tracking-wider text-gray-500">鍦烘櫙</div>
++                                        <div className="mb-1 text-[10px] uppercase tracking-wider text-gray-500">场景</div>
+                                         <select
+-                                            value={steadyScenarioId}
+-                                            onChange={(event) => setSteadyScenario(event.target.value)}
++                                            value={currentScenario}
++                                            onChange={(event) => setScenario(event.target.value)}
+                                             className="w-full rounded-lg border border-cyan-900/50 bg-slate-900/90 px-3 py-2 text-xs text-gray-100 outline-none"
+                                         >
+                                             {MAINLINE_SCENARIOS.map((item) => (
+@@
+                                     <div className="grid grid-cols-2 gap-2">
+                                         <button
+                                             onClick={async () => {
+                                                 try {
+-                                                    await runSteadySimulation()
+-                                                    setStatusMsg(`WE1 涓婚摼浠跨湡宸茶繍琛岋細${steadyScenarioId}`)
++                                                    await runSimulation()
++                                                    setStatusMsg(`WE1 主链仿真已运行：${currentScenario}`)
+                                                 } catch (error) {
+-                                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 涓婚摼浠跨湡杩愯澶辫触')
++                                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 主链仿真运行失败')
+                                                 }
+                                             }}
+-                                            disabled={steadySimLoading}
++                                            disabled={simulationLoading}
+                                             className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white transition-all hover:bg-cyan-600 disabled:opacity-50"
+                                         >
+-                                            {steadySimLoading ? '杩愯涓?..' : '杩愯浠跨湡'}
++                                            {simulationLoading ? '运行中...' : '运行仿真'}
+                                         </button>
+                                         <button
+                                             onClick={async () => {
+                                                 try {
+-                                                    await saveSteadySnapshot()
+-                                                    setStatusMsg(`WE1 蹇収宸蹭繚瀛橈細${steadyScenarioId}`)
++                                                    await saveSnapshot()
++                                                    setStatusMsg(`WE1 快照已保存：${currentScenario}`)
+                                                 } catch (error) {
+-                                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 蹇収淇濆瓨澶辫触')
++                                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 快照保存失败')
+                                                 }
+                                             }}
+-                                            disabled={steadySnapshotLoading}
++                                            disabled={snapshotLoading || baselineSnapshotLoading}
+                                             className="rounded-lg border border-emerald-800/50 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-200 transition-all hover:bg-emerald-900/35 disabled:opacity-50"
+                                         >
+-                                            {steadySnapshotLoading ? '淇濆瓨涓?..' : '淇濆瓨蹇収'}
++                                            {snapshotLoading ? '保存中...' : '保存快照'}
+                                         </button>
+                                         <button
+                                             onClick={async () => {
+                                                 try {
+-                                                    await refreshSteadySnapshots()
+-                                                    setStatusMsg('WE1 蹇収鍒楄〃宸插埛鏂?)
++                                                    await refreshSnapshots()
++                                                    setStatusMsg('WE1 快照列表已刷新')
+                                                 } catch (error) {
+-                                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 蹇収鍒楄〃鍒锋柊澶辫触')
++                                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 快照列表刷新失败')
+                                                 }
+                                             }}
+-                                            disabled={steadySnapshotLoading}
++                                            disabled={snapshotLoading || baselineSnapshotLoading}
+                                             className="rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 transition-all hover:bg-slate-700/80 disabled:opacity-50"
+                                         >
+-                                            鍒锋柊蹇収
++                                            刷新快照
+                                         </button>
+                                         <button
+                                             onClick={() => {
+-                                                clearSteadyOverlay()
+-                                                setStatusMsg('宸叉竻闄ゅ綋鍓?WE1 浠跨湡缁撴灉')
++                                                clearOverlay()
++                                                setStatusMsg('已清除当前 WE1 仿真结果')
+                                             }}
+                                             className="rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 transition-all hover:bg-slate-700/80"
+                                         >
+-                                            娓呴櫎缁撴灉
++                                            清除结果
+                                         </button>
+                                     </div>
+ 
+                                     <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+-                                        <div className="mb-2 text-[10px] uppercase tracking-wider text-gray-500">鍘嗗彶蹇収鍥炴斁</div>
++                                        <div className="mb-2 text-[10px] uppercase tracking-wider text-gray-500">历史快照回放</div>
+                                         <select
+-                                            value={steadySelectedSnapshotRunId}
+-                                            onChange={(event) => setSteadySelectedSnapshotRunId(event.target.value)}
++                                            value={selectedSnapshotRunId}
++                                            onChange={(event) => setSelectedSnapshotRunId(event.target.value)}
+                                             className="w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-2 text-xs text-gray-100 outline-none"
+                                         >
+-                                            <option value="">閫夋嫨鍘嗗彶蹇収</option>
+-                                            {steadySnapshots.map((item) => (
++                                            <option value="">选择历史快照</option>
++                                            {snapshots.map((item) => (
+                                                 <option key={item.run_id} value={item.run_id}>
+-                                                    {`${item.scenario_id} | ${item.run_id.slice(0, 12)} | ${item.saved_at.slice(11, 19)}`}
++                                                    {formatSnapshotOption(item.run_id, item.scenario_id, item.saved_at)}
+                                                 </option>
+                                             ))}
+                                         </select>
+                                         <button
+                                             onClick={async () => {
+                                                 try {
+-                                                    await loadSteadySelectedSnapshot()
+-                                                    setStatusMsg('宸插姞杞?WE1 鍘嗗彶蹇収')
++                                                    await loadSelectedSnapshot()
++                                                    setStatusMsg('已加载 WE1 历史快照')
+                                                 } catch (error) {
+-                                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 鍘嗗彶蹇収鍔犺浇澶辫触')
++                                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 历史快照加载失败')
+                                                 }
+                                             }}
+-                                            disabled={!steadySelectedSnapshotRunId || steadySnapshotLoading}
++                                            disabled={!selectedSnapshotRunId || snapshotLoading || baselineSnapshotLoading}
+                                             className="mt-2 w-full rounded-lg border border-sky-800/50 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-200 transition-all hover:bg-sky-900/35 disabled:opacity-50"
+                                         >
+-                                            鍔犺浇蹇収
++                                            加载快照
++                                        </button>
++                                    </div>
++
++                                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
++                                        <div className="mb-2 text-[10px] uppercase tracking-wider text-gray-500">基线快照</div>
++                                        <select
++                                            value={baselineSnapshotRunId}
++                                            onChange={(event) => setBaselineSnapshotRunId(event.target.value)}
++                                            className="w-full rounded-lg border border-slate-700 bg-slate-900/90 px-3 py-2 text-xs text-gray-100 outline-none"
++                                        >
++                                            <option value="">选择对比基线</option>
++                                            {snapshots.map((item) => (
++                                                <option key={item.run_id} value={item.run_id}>
++                                                    {formatSnapshotOption(item.run_id, item.scenario_id, item.saved_at)}
++                                                </option>
++                                            ))}
++                                        </select>
++                                        <div className="mt-2 text-[10px] text-gray-500">
++                                            {baselineSnapshotLoading ? '基线快照加载中...' : '默认建议选 steady_base 快照做对比'}
++                                        </div>
++                                    </div>
++                                </div>
++
++                                {(simulationError || snapshotError) && (
++                                    <div className="rounded-lg border border-red-900/40 bg-red-950/20 p-3 text-[11px] text-red-200">
++                                        {simulationError || snapshotError}
++                                    </div>
++                                )}
++
++                                {simulationOverlay ? (
++                                    <div className="space-y-3">
++                                        <div className="grid grid-cols-2 gap-2">
++                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
++                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">求解状态</div>
++                                                <div className="mt-1 text-sm font-semibold text-white">{simulationOverlay.solver_status}</div>
++                                                <div className="mt-1 text-[10px] text-gray-400">迭代 {simulationOverlay.iterations} 次</div>
++                                            </div>
++                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
++                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">当前场景</div>
++                                                <div className="mt-1 text-sm font-semibold text-white">{simulationOverlay.scenario_id}</div>
++                                                <div className="mt-1 text-[10px] text-gray-400">{formatSimulationDateTime(simulationOverlay.generated_at)}</div>
++                                            </div>
++                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
++                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">总供气</div>
++                                                <div className="mt-1 text-sm font-semibold text-emerald-300">{simulationOverlay.summary.total_supply.toFixed(1)}</div>
++                                            </div>
++                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
++                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">总需求</div>
++                                                <div className="mt-1 text-sm font-semibold text-sky-300">{simulationOverlay.summary.total_demand.toFixed(1)}</div>
++                                            </div>
++                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
++                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">未满足</div>
++                                                <div className={`mt-1 text-sm font-semibold ${simulationOverlay.summary.unserved_demand > 0 ? 'text-amber-300' : 'text-emerald-300'}`}>
++                                                    {simulationOverlay.summary.unserved_demand.toFixed(1)}
++                                                </div>
++                                            </div>
++                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
++                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">告警数</div>
++                                                <div className={`mt-1 text-sm font-semibold ${simulationOverlay.summary.alert_count > 0 ? 'text-red-300' : 'text-gray-100'}`}>
++                                                    {simulationOverlay.summary.alert_count}
++                                                </div>
++                                            </div>
+                                         </button>
+                                     </div>
+-                                </div>
+-
+-                                {(steadySimError || steadySnapshotError) && (
+-                                    <div className="rounded-lg border border-red-900/40 bg-red-950/20 p-3 text-[11px] text-red-200">
+-                                        {steadySimError || steadySnapshotError}
+-                                    </div>
+-                                )}
+ 
+-                                {steadyOverlay ? (
+-                                    <div className="space-y-3">
+-                                        <div className="grid grid-cols-2 gap-2">
+-                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+-                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">姹傝В鐘舵€?/div>
+-                                                <div className="mt-1 text-sm font-semibold text-white">{steadyOverlay.solver_status}</div>
+-                                                <div className="mt-1 text-[10px] text-gray-400">杩唬 {steadyOverlay.iterations} 娆?/div>
+-                                            </div>
+-                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+-                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">褰撳墠鍦烘櫙</div>
+-                                                <div className="mt-1 text-sm font-semibold text-white">{steadyOverlay.scenario_id}</div>
+-                                                <div className="mt-1 text-[10px] text-gray-400">{steadyOverlay.run_id.slice(0, 16)}</div>
+-                                            </div>
+-                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+-                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">鎬讳緵姘?/div>
+-                                                <div className="mt-1 text-sm font-semibold text-emerald-300">{steadyOverlay.summary.total_supply.toFixed(1)}</div>
+-                                            </div>
+-                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+-                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">鎬婚渶姹?/div>
+-                                                <div className="mt-1 text-sm font-semibold text-sky-300">{steadyOverlay.summary.total_demand.toFixed(1)}</div>
+-                                            </div>
+-                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+-                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">鏈弧瓒?/div>
+-                                                <div className="mt-1 text-sm font-semibold text-amber-300">{steadyOverlay.summary.unserved_demand.toFixed(1)}</div>
+-                                            </div>
+-                                            <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+-                                                <div className="text-[10px] uppercase tracking-wider text-gray-500">鍛婅鏁?/div>
+-                                                <div className="mt-1 text-sm font-semibold text-red-300">{steadyOverlay.summary.alert_count}</div>
+-                                            </div>
+-                                        </div>
+-
+                                         <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+-                                            <div className="mb-2 text-[10px] uppercase tracking-wider text-gray-500">闃舵杈圭晫璇存槑</div>
+-                                            <div className="space-y-1 text-[11px] leading-5 text-gray-300">
+-                                                <div>1. 褰撳墠椤靛凡缁忕粺涓€鍒版寮?WE1 浠跨湡涓婚摼銆?/div>
+-                                                <div>2. 杩欎竴杞彧鏀跺満鏅€佽繍琛屻€佸揩鐓у拰鎽樿锛屼笉鍋氬湴鍥捐竟绾跨潃鑹层€?/div>
+-                                                <div>3. 涓嬩竴闃舵鎵嶅鐞嗚妭鐐广€佹灑绾姐€佹樉绀鸿竟鍜?overlay 鍘熷 ID 鐨勬槧灏勩€?/div>
++                                            <div className="mb-2 text-[10px] uppercase tracking-wider text-gray-500">阶段边界说明</div>
++                                            <div className="space-y-1 text-[11px] leading-5 text-gray-300">
++                                                <div>1. 当前页已经统一到正式 WE1 仿真主链。</div>
++                                                <div>2. 这一轮只收场景、运行、快照和摘要，不做地图边线着色。</div>
++                                                <div>3. 下一阶段才处理节点、枢纽、显示边和 overlay 原始 ID 的映射。</div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 ) : (
+                                     <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.03] p-4 text-[11px] leading-5 text-gray-400">
+-                                        褰撳墠杩樻病鏈夊姞杞?WE1 姝ｅ紡绋虫€佺粨鏋溿€傚厛閫変竴涓満鏅紝鍐嶇偣鈥滆繍琛屼豢鐪熲€濓紝杩欎竴椤典細鐩存帴璧?steady overlay 涓婚摼銆?                                    </div>
++                                        当前还没有加载 WE1 正式稳态结果。先选一个场景，再点“运行仿真”，这一页会直接走 steady overlay 主链。
++                                    </div>
++                                )}
++
++                                {comparison && (
++                                    <div className="rounded-lg border border-indigo-900/40 bg-indigo-950/10 p-3">
++                                        <div className="mb-2 text-[10px] uppercase tracking-wider text-gray-500">快照对比</div>
++                                        <div className="space-y-1 text-[11px] leading-5 text-gray-300">
++                                            <div>当前场景：{comparison.current_scenario_id}</div>
++                                            <div>基线场景：{comparison.baseline_scenario_id}</div>
++                                            <div>总供气变化：{formatSimulationDelta(comparison.summary_delta.total_supply.delta, 1)}</div>
++                                            <div>总需求变化：{formatSimulationDelta(comparison.summary_delta.total_demand.delta, 1)}</div>
++                                            <div>未满足变化：{formatSimulationDelta(comparison.summary_delta.unserved_demand.delta, 1)}</div>
++                                            <div>平均利用率变化：{formatSimulationDelta(comparison.summary_delta.avg_utilization.delta * 100, 1, '%')}</div>
++                                            <div>告警数变化：{formatSimulationDelta(comparison.summary_delta.alert_count.delta, 0)}</div>
++                                        </div>
++                                    </div>
+                                 )}
+                             </div>
+                         )}
+*** End Patch

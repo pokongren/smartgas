@@ -1,0 +1,727 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/统一公式拓扑AI多Agent协同方案.md
++# SmartGas 统一公式拓扑 AI 多 Agent 协同方案
++
++> 目标：
++> 将“未来公式计算拓扑计划”和“AI 前端联动数据分析方案”合并为一份统一方案，并明确采用多 Agent 协同模式推进系统建设与持续迭代。
++>
++> 本方案强制包含三个核心角色：
++> - 主 Agent：负责调用、编排、分派、汇总
++> - 验证 Agent：负责验证公式、拓扑、仿真、前端联动结果
++> - 修 Bug Agent：负责根据验证结论修复缺陷并回交
++
++---
++
++## 1. 为什么要合并成一个总方案
++
++前面的两份方案分别解决了两个问题：
++
++1. 公式、拓扑、仿真、AI 解释之间的计算口径统一问题。
++2. AI 与前端页面、图面状态、历史曲线、拓扑结果的联动问题。
++
++但在真实系统里，这两件事本来就是同一条链路的两个面。
++
++如果只做公式拓扑，不做前端联动，会出现：
++
++- 结果能算，但用户不知道 AI 为什么这么说。
++- 结果能出，但页面不能根据结果联动变化。
++
++如果只做前端联动，不做公式统一，会出现：
++
++- AI 能感知页面，但底层计算口径不稳定。
++- 图面和 AI 说的是一套，后端算的是另一套。
++
++所以最终必须收敛为一条统一主链路：
++
++`前端上下文 -> AI 编排 -> 公式引擎 -> 拓扑计算 -> 仿真推演 -> 验证 -> 缺陷修复 -> 结果解释 -> 前端联动`
++
++---
++
++## 2. 总体目标
++
++本方案的总目标不是单纯做一个 AI 助手，而是建设一个可演进的智能分析系统。
++
++### 2.1 业务目标
++
++- 让用户在地图、拓扑、历史曲线、仿真面板中的任何分析动作，都能被 AI 接住并解释。
++- 让 AI 的结果可追溯到明确的公式、参数和版本。
++- 让 AI 的结果不仅能显示，还能驱动前端图面与面板联动。
++
++### 2.2 工程目标
++
++- 统一公式入口。
++- 统一页面上下文入口。
++- 统一 AI 编排入口。
++- 统一验证与修复闭环。
++
++### 2.3 Agent 目标
++
++- 主 Agent 不直接硬编码所有细节，而是负责组织任务。
++- 验证 Agent 不参与主业务输出，专注查错、比对、验收。
++- 修 Bug Agent 不负责解释业务目标，专注消化缺陷单并修复。
++
++---
++
++## 3. 统一架构
++
++```mermaid
++flowchart LR
++    A["前端页面层<br/>GlobalPipelineView / MapTopologyView / TopologyView"] --> B["前端上下文层<br/>AiPageContext"]
++    B --> C["主 Agent 编排层<br/>Main Agent"]
++    C --> D["分析服务层<br/>Formula Engine / Topology / Simulation / SCADA / KB"]
++    D --> E["结构化分析结果层<br/>reply + insights + actions + metadata"]
++    E --> F["前端联动执行层<br/>高亮 / 切页 / 曲线 / 面板"]
++    E --> G["验证 Agent"]
++    G --> H["缺陷清单 / 验收报告"]
++    H --> I["修 Bug Agent"]
++    I --> D
++    I --> F
++    I --> G
++```
++
++这张图里最重要的不是技术栈，而是职责边界：
++
++1. 前端只负责提供上下文和消费结果。
++2. 主 Agent 负责组织分析，不负责验证通过与否。
++3. 验证 Agent 独立于主 Agent，防止“自己说自己对”。
++4. 修 Bug Agent 只根据缺陷清单工作，避免无边界修改。
++
++---
++
++## 4. 统一主链路
++
++## 4.1 输入层
++
++输入不再只是用户一句话，而应该是四类信息的组合：
++
++1. 用户问题
++2. 聊天历史
++3. 前端页面上下文
++4. 当前分析快照
++
++建议统一请求结构：
++
++```json
++{
++  "message": "帮我分析一下这个站为什么压力异常",
++  "history": [],
++  "context": {
++    "page": "global-pipeline",
++    "selection": {
++      "stationName": "甪直分输站"
++    },
++    "chart": {
++      "chartType": "pressure-history",
++      "targetType": "station",
++      "targetName": "甪直分输站",
++      "hours": 6
++    },
++    "analysis": {
++      "analysisType": "history"
++    }
++  }
++}
++```
++
++## 4.2 编排层
++
++主 Agent 收到输入后，执行如下流程：
++
++1. 判断当前问题属于哪类分析任务。
++2. 根据页面上下文补齐隐式参数。
++3. 调用统一公式与拓扑能力。
++4. 组织结构化输出。
++5. 将结果交给验证 Agent。
++6. 若验证失败，分派给修 Bug Agent。
++7. 若验证通过，再交付前端和用户。
++
++## 4.3 计算层
++
++底层能力必须统一为同一套计算底座：
++
++- `formula_engine`
++- `formula_registry`
++- `topology_service`
++- `topology_computation`
++- `simulation_service`
++- `assistant_tools`
++
++这些能力不再各自为政，而是统一挂在主 Agent 的分析工具箱下。
++
++## 4.4 输出层
++
++统一输出不是只有 `reply`，而应包括：
++
++- `reply`
++- `insights`
++- `actions`
++- `formula_metadata`
++- `topology_metadata`
++- `validation_status`
++
++示例：
++
++```json
++{
++  "reply": "甪直分输站最近 6 小时进站压力持续缓慢下降，结合趋势预测，约 2 小时 40 分后接近安全下限。",
++  "insights": [
++    { "type": "trend", "title": "压力斜率", "value": "-0.18 MPa/6h" },
++    { "type": "risk", "title": "接近下限时间", "value": "2h 40m" }
++  ],
++  "actions": [
++    { "type": "open_history_chart", "target": { "stationName": "甪直分输站", "metricType": "pressure" } },
++    { "type": "highlight_station", "target": { "stationName": "甪直分输站" } }
++  ],
++  "formula_metadata": {
++    "formula_version": "v2.0",
++    "mode": "engineering_mode"
++  },
++  "validation_status": "pending"
++}
++```
++
++---
++
++## 5. 公式、拓扑、仿真、AI 联动的一体化分层
++
++## 5.1 参数标准化层
++
++负责统一：
++
++- 压力单位
++- 温度单位
++- 管径单位
++- 长度单位
++- 缺省值
++- 数据来源
++- 可信度评分
++
++这一层是公式引擎和 AI 解释的共同入口。
++
++## 5.2 公式引擎层
++
++公式引擎负责：
++
++- 管存计算
++- 流量计算
++- 延迟计算
++- 压降计算
++- 节点平衡
++
++公式结果必须带上：
++
++- `formula_id`
++- `formula_version`
++- `parameter_snapshot`
++- `computed_at`
++
++## 5.3 拓扑计算层
++
++拓扑层负责：
++
++- 图构建
++- 路径计算
++- 中心性分析
++- 连通性分析
++- 环路检测
++- 影响范围判断
++
++拓扑层不再自己散落计算公式，而统一依赖公式引擎。
++
++## 5.4 仿真层
++
++仿真层负责：
++
++- 故障传播
++- 截断推演
++- 绕行分析
++- 多场景对比
++
++仿真层只组合规则，不再重复定义 linepack 或 delay 公式。
++
++## 5.5 AI 编排与解释层
++
++AI 层负责：
++
++- 理解前端上下文
++- 串联工具
++- 解释结果
++- 输出前端动作建议
++
++AI 不直接发明计算结果，只消费经过统一计算和验证的结构化数据。
++
++---
++
++## 6. 多 Agent 协同方案
++
++这是本方案的核心部分。
++
++## 6.1 主 Agent
++
++### 角色定位
++
++主 Agent 是系统的总编排者，负责接收任务、理解上下文、调用工具和调度子 Agent。
++
++### 核心职责
++
++1. 接收来自前端或用户的分析请求。
++2. 读取 `AiPageContext`。
++3. 判断分析类型。
++4. 调用公式、拓扑、仿真、知识库工具。
++5. 生成结构化分析结果。
++6. 调用验证 Agent。
++7. 根据验证结果决定是否调用修 Bug Agent。
++8. 汇总最终结果给前端。
++
++### 输入
++
++- 用户消息
++- 聊天历史
++- 页面上下文
++- 当前系统状态
++- 历史验证结果
++
++### 输出
++
++- 结构化分析结果
++- 子任务分派单
++- 验证请求
++- 修复请求
++
++### 建议模型与职责边界
++
++- 建议使用能力较强的主模型。
++- 主 Agent 可以理解跨模块任务，但不应直接承担所有细节验证和 patch 执行。
++
++---
++
++## 6.2 验证 Agent
++
++### 角色定位
++
++验证 Agent 是独立裁判，不参与主业务编排，只负责验证结果是否可信、是否一致、是否能落到前端。
++
++### 核心职责
++
++1. 验证公式口径是否一致。
++2. 验证拓扑结果是否与输入数据匹配。
++3. 验证仿真结果是否满足场景逻辑。
++4. 验证 AI 输出引用的参数、公式版本是否真实存在。
++5. 验证前端动作是否可执行。
++6. 输出缺陷清单与验收报告。
++
++### 验证范围
++
++#### 公式验证
++
++- 同一条边在不同模块中的 `linepack_volume` 是否一致。
++- `delay_ticks` 是否来自统一计算入口。
++- `formula_version` 是否完整回传。
++
++#### 拓扑验证
++
++- 路径结果是否真的可达。
++- 被高亮节点是否真实存在。
++- 影响范围是否符合图结构。
++
++#### 仿真验证
++
++- 截断结果是否可回放。
++- 延迟传播是否符合边属性。
++- 场景参数是否被正确使用。
++
++#### 前端联动验证
++
++- `open_history_chart` 是否能打开正确对象。
++- `highlight_path` 是否能在当前页执行。
++- `switch_view` 是否有目标页面支持。
++
++### 输入
++
++- 主 Agent 输出结果
++- 原始上下文
++- 工具调用记录
++- 公式元数据
++- 前端动作列表
++
++### 输出
++
++```json
++{
++  "status": "failed",
++  "findings": [
++    {
++      "id": "VAL-001",
++      "severity": "high",
++      "area": "formula",
++      "summary": "linepack 结果与 topology_computation 的口径不一致"
++    },
++    {
++      "id": "VAL-002",
++      "severity": "medium",
++      "area": "frontend-action",
++      "summary": "highlight_path 在 global-pipeline 页面未定义执行器"
++    }
++  ],
++  "acceptance": {
++    "formula_consistency": false,
++    "action_executable": false
++  }
++}
++```
++
++---
++
++## 6.3 修 Bug Agent
++
++### 角色定位
++
++修 Bug Agent 是执行型角色，只接缺陷单，不重做需求分析。
++
++### 核心职责
++
++1. 接收验证 Agent 输出的缺陷清单。
++2. 锁定受影响模块。
++3. 在明确边界内修改代码、配置、提示词或契约。
++4. 回交修复说明。
++5. 请求重新验证。
++
++### 典型修复范围
++
++- 修复公式入口不一致
++- 修复上下文字段漏传
++- 修复前端动作执行器缺失
++- 修复路由切换与面板联动逻辑
++- 修复 AI 输出结构与前端消费结构不匹配
++
++### 输入
++
++- 缺陷单
++- 受影响文件路径
++- 验证报告
++
++### 输出
++
++- 修复补丁
++- 修改说明
++- 需回归验证的点
++
++### 边界约束
++
++- 不自行扩大需求。
++- 不修改未在缺陷范围内的模块。
++- 不替代验证 Agent 做最终验收。
++
++---
++
++## 7. 三个 Agent 的调用顺序
++
++## 7.1 正常分析链路
++
++```mermaid
++sequenceDiagram
++    participant U as 用户/前端
++    participant M as 主Agent
++    participant S as 分析服务
++    participant V as 验证Agent
++    participant F as 前端
++
++    U->>M: message + history + context
++    M->>S: 调用公式/拓扑/仿真/知识库
++    S-->>M: 结构化分析结果
++    M->>V: 发起验证
++    V-->>M: 验证通过
++    M-->>F: reply + actions + metadata
++```
++
++## 7.2 出现缺陷时的修复链路
++
++```mermaid
++sequenceDiagram
++    participant U as 用户/前端
++    participant M as 主Agent
++    participant V as 验证Agent
++    participant B as 修BugAgent
++
++    U->>M: 分析请求
++    M->>V: 提交结果验证
++    V-->>M: 返回缺陷清单
++    M->>B: 下发缺陷单
++    B-->>M: 回交修复结果
++    M->>V: 重新验证
++    V-->>M: 通过/继续报错
++```
++
++## 7.3 最小循环规则
++
++为了防止无限循环，建议主 Agent 采用：
++
++1. 首次分析
++2. 一次验证
++3. 最多两轮修复重试
++4. 仍不通过则返回“部分通过 + 风险提示”
++
++---
++
++## 8. 用 Subagent 方法落地的运行机制
++
++既然你明确要求“利用 subagent 的方法”，这里给出运行时方案。
++
++## 8.1 运行角色映射
++
++建议映射如下：
++
++- 主 Agent
++  - 主线程中的主模型
++  - 负责 `spawn_agent`、`send_input`、`wait_agent`
++- 验证 Agent
++  - 子代理，偏 `explorer` 风格
++  - 负责查阅结果、跑验证逻辑、出 findings
++- 修 Bug Agent
++  - 子代理，偏 `worker` 风格
++  - 负责在限定文件范围内修改代码
++
++## 8.2 典型执行模式
++
++### 模式一：先分析，后验证
++
++适用于：
++
++- 新功能联调
++- AI 前端联动开发
++- 公式口径统一改造
++
++流程：
++
++1. 主 Agent 本地完成核心实现。
++2. 主 Agent 调起验证 Agent。
++3. 如果验证 Agent 报告失败，再调起修 Bug Agent。
++4. 修复完成后再次验证。
++
++### 模式二：并行探索，主 Agent 汇总
++
++适用于：
++
++- 大方案设计
++- 代码结构重构前分析
++
++流程：
++
++1. 主 Agent 同时拉多个 explorer 子 Agent。
++2. 每个子 Agent 只负责一个横切面。
++3. 主 Agent 汇总成统一方案。
++
++### 模式三：验证驱动修复
++
++适用于：
++
++- 已知结果错但根因不清晰
++- 前端联动动作不稳定
++
++流程：
++
++1. 主 Agent 先让验证 Agent 定位问题。
++2. 验证 Agent 给出精确缺陷范围。
++3. 主 Agent 再让修 Bug Agent修复。
++
++## 8.3 建议的任务单格式
++
++### 主 Agent 发给验证 Agent
++
++```json
++{
++  "task_type": "validate_analysis_result",
++  "scope": ["formula", "topology", "frontend-actions"],
++  "input_ref": "analysis_result_2026_04_03_001"
++}
++```
++
++### 主 Agent 发给修 Bug Agent
++
++```json
++{
++  "task_type": "fix_validation_findings",
++  "findings": ["VAL-001", "VAL-002"],
++  "owned_files": [
++    "backend/app/services/topology_computation.py",
++    "src/components/ai-assistant/useAiAssistantChat.ts"
++  ]
++}
++```
++
++---
++
++## 9. 最小可落地实施版本
++
++为了避免方案过大，建议先落一个最小闭环版本。
++
++## 9.1 第一阶段
++
++### 目标
++
++先打通“前端历史曲线分析 + 主 Agent 编排 + 验证 + 修 Bug 闭环”。
++
++### 范围
++
++- 页面：`GlobalPipelineView`
++- 对象：单站压力历史曲线
++- 能力：趋势分析、相关性分析、AI 解释、动作回显
++
++### 必做项
++
++1. 前端新增 `AiPageContext`
++2. `useAiAssistantChat` 发送 `context`
++3. 后端 `ChatRequest` 支持 `context`
++4. 主 Agent 根据 `stationName + metricType + hours` 编排分析
++5. 返回结构化 `actions`
++6. 增加验证 Agent 验证：
++   - 曲线对象是否正确
++   - 动作是否可执行
++   - 结论是否引用真实参数
++7. 增加修 Bug Agent 的缺陷回路
++
++### 验收标准
++
++- 用户点开某站历史曲线后，只输入“帮我分析一下”，AI 能自动识别对象。
++- AI 返回文字结论和动作。
++- 动作能打开正确曲线或高亮正确对象。
++- 验证不通过时，能形成明确缺陷单并进入修复回路。
++
++---
++
++## 9.2 第二阶段
++
++### 目标
++
++扩展到地图拓扑分析。
++
++### 范围
++
++- 页面：`MapTopologyView`
++- 对象：选中节点、枢纽、截断仿真结果
++
++### 新增能力
++
++- 影响范围分析
++- 替代路径建议
++- 枢纽解释
++- 截断结果解释
++
++### 新增验证项
++
++- 高亮路径是否真实可达
++- 枢纽成员是否正确
++- 截断下游是否与图结构一致
++
++---
++
++## 9.3 第三阶段
++
++### 目标
++
++统一公式、拓扑、仿真、AI 的整链验证。
++
++### 范围
++
++- `formula_engine`
++- `topology_service`
++- `simulation_service`
++- `ai_assistant`
++- 前端动作执行器
++
++### 新增能力
++
++- 公式版本化输出
++- 分析卡片
++- 结果报告化
++- 多页面动作联动
++
++---
++
++## 10. 主 Agent、验证 Agent、修 Bug Agent 的验收口径
++
++## 10.1 主 Agent 验收
++
++- 能正确读取上下文
++- 能正确编排工具
++- 能输出结构化结果
++- 不把验证逻辑和修复逻辑混到自己内部
++
++## 10.2 验证 Agent 验收
++
++- 能独立判断结果对错
++- 能给出明确 findings
++- 不输出泛泛建议，必须输出可定位问题
++
++## 10.3 修 Bug Agent 验收
++
++- 能根据 findings 精准改动
++- 不越界修改
++- 修复后能给出回归点清单
++
++---
++
++## 11. 推荐文件级落地位置
++
++### 前端
++
++- `src/contexts/aiPageContext.ts`
++- `src/hooks/useAiPageContext.ts`
++- `src/services/aiActionBus.ts`
++- `src/components/ai-assistant/useAiAssistantChat.ts`
++- `src/components/ai-assistant/AiAssistant.tsx`
++- `src/views/GlobalPipelineView.tsx`
++- `src/views/MapTopologyView.tsx`
++- `src/views/TopologyView.tsx`
++
++### 后端
++
++- `backend/app/routers/ai_assistant.py`
++- `backend/app/services/assistant_tools.py`
++- `backend/app/services/ai_analysis_orchestrator.py`
++- `backend/app/services/formula_engine.py`
++- `backend/app/services/formula_registry.py`
++- `backend/app/services/topology.py`
++- `backend/app/services/topology_computation.py`
++- `backend/app/services/simulation_service.py`
++
++### 测试与验证
++
++- `backend/tests/test_formula_engine.py`
++- `backend/tests/test_ai_orchestrator.py`
++- `backend/tests/test_topology_consistency.py`
++- `src/tests/ai-action-executor.test.ts`
++
++---
++
++## 12. 结论
++
++这份统一方案把两件事合成了一件事：
++
++1. 用统一公式和拓扑能力，保证底层分析可信。
++2. 用 AI 与前端联动，把可信分析结果真正送到用户面前。
++
++同时，这件事必须通过多 Agent 协同来推进，因为：
++
++- 主 Agent 擅长组织，不适合自己证明自己正确。
++- 验证 Agent 擅长查错，能防止“分析看起来很像对的”。
++- 修 Bug Agent 擅长执行，能把问题快速落到具体文件和补丁。
++
++所以最合理的落地方式就是：
++
++`主 Agent 负责调用和编排 -> 验证 Agent 负责验收和出缺陷单 -> 修 Bug Agent 负责修复 -> 主 Agent 汇总并重新提交验证`
++
++这才是一个能持续跑起来的闭环，而不是一次性写完就散掉的方案。
++
++---
++
++## 13. 下一步建议
++
++建议下一步先落三件最小事情：
++
++1. 给 AI 聊天接口加 `context`
++2. 定义主 Agent、验证 Agent、修 Bug Agent 的任务单格式
++3. 先在 `GlobalPipelineView` 的历史曲线分析场景跑通一次完整闭环
++
++只要这三件事跑通，这套方案就不是纸面方案，而会变成可持续扩展的系统骨架。
+*** End Patch

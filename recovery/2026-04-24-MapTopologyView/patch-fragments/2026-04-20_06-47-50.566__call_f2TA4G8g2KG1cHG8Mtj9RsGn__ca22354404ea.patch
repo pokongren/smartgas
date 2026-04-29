@@ -1,0 +1,49 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const baselineSimulationMapping = useMemo(() => {
+         return buildSimulationOverlayMapping(topoNodes, topoEdges, steadyBaselineOverlay)
+     }, [steadyBaselineOverlay, topoEdges, topoNodes])
++    function buildNodeMetricsFromMatch(match: any): { pressure: number | null; temperatureC: number | null; estimated: boolean } | null {
++        if (!match || !Array.isArray(match.matchedNodes) || match.matchedNodes.length === 0) return null
++        const tempItems = match.matchedNodes
++            .map((item: any) => item.temperature_c)
++            .filter((value: unknown): value is number => typeof value === 'number' && Number.isFinite(value))
++        const realAvgTemp = tempItems.length > 0
++            ? tempItems.reduce((sum, value) => sum + value, 0) / tempItems.length
++            : null
++        const pressure = typeof match.averagePressureMpa === 'number' && Number.isFinite(match.averagePressureMpa)
++            ? match.averagePressureMpa
++            : null
++        return {
++            pressure,
++            temperatureC: realAvgTemp ?? (pressure != null ? estimateTemperatureByPressure(pressure) : null),
++            estimated: realAvgTemp == null,
++        }
++    }
+     const selectedNodeSimulationMetrics = useMemo(() => {
+         if (!selectedNode || !simulationMapping) return null
+         const match = simulationMapping.nodeMatchesByDisplayId.get(selectedNode.id)
+-        if (!match || match.matchedNodes.length === 0) return null
+-
+-        const tempItems = match.matchedNodes
+-            .map(item => item.temperature_c)
+-            .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+-        const realAvgTemp = tempItems.length > 0
+-            ? tempItems.reduce((sum, value) => sum + value, 0) / tempItems.length
+-            : null
+-        const pressure = match.averagePressureMpa
+-
+-        return {
+-            pressure,
+-            temperatureC: realAvgTemp ?? (pressure != null ? estimateTemperatureByPressure(pressure) : null),
+-            estimated: realAvgTemp == null,
+-        }
++        return buildNodeMetricsFromMatch(match)
+     }, [selectedNode, simulationMapping])
++    const selectedNodeBaselineMetrics = useMemo(() => {
++        if (!selectedNode || !baselineSimulationMapping) return null
++        const match = baselineSimulationMapping.nodeMatchesByDisplayId.get(selectedNode.id)
++        return buildNodeMetricsFromMatch(match)
++    }, [baselineSimulationMapping, selectedNode])
+*** End Patch

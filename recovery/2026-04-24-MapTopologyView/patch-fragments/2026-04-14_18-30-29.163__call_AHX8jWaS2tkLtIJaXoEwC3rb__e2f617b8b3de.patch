@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-            <MapView onLoad={handleMapLoad} />
++            <MapView
++                config={{ viewMode: '2D' }}
++                onLoad={handleMapLoad}
++            />
+*** End Patch

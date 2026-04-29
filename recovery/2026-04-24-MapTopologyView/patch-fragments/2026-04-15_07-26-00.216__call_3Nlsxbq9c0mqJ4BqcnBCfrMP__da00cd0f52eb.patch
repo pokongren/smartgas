@@ -1,0 +1,70 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const importTopology = useCallback((silent = false) => {
+@@
+         if (!silent) {
+             setStatusMsg(`已导入 ${imported.length} 节点, ${importedEdges.length} 条连线（阀室链路已合并）`)
+         }
+     }, [clearRenderedTopology, mapInstance, rawPipelineData])
++
++    const restoreSavedDraft = useCallback((silent = false) => {
++        try {
++            const raw = localStorage.getItem(TOPOLOGY_DRAFT_STORAGE_KEY)
++            if (!raw) return false
++            const parsed = JSON.parse(raw) as {
++                nodes?: Array<{ id?: string; name?: string; type?: PointType; lng?: number; lat?: number }>
++                edges?: Array<{ id?: string; from?: string; to?: string; name?: string }>
++            }
++            const draftNodes = Array.isArray(parsed.nodes)
++                ? parsed.nodes
++                    .filter(item => item && typeof item.id === 'string' && Number.isFinite(item.lng) && Number.isFinite(item.lat))
++                    .map(item => ({
++                        id: String(item.id),
++                        name: String(item.name || item.id),
++                        type: (item.type && TOPO_LABELS[item.type] ? item.type : 'station') as PointType,
++                        position: [Number(item.lng), Number(item.lat)] as [number, number],
++                    }))
++                : []
++            const nodeIdSet = new Set(draftNodes.map(item => item.id))
++            const draftEdges = Array.isArray(parsed.edges)
++                ? parsed.edges
++                    .filter(item => item && typeof item.id === 'string' && typeof item.from === 'string' && typeof item.to === 'string')
++                    .filter(item => nodeIdSet.has(String(item.from)) && nodeIdSet.has(String(item.to)))
++                    .map(item => ({
++                        id: String(item.id),
++                        startNodeId: String(item.from),
++                        endNodeId: String(item.to),
++                        name: String(item.name || '恢复管线'),
++                    }))
++                : []
++            if (draftNodes.length === 0) return false
++
++            setBaseTopoNodes(draftNodes)
++            setBaseTopoEdges(draftEdges)
++            setDirtyPositions(new Map())
++            setUnsavedEdgeIds(new Set())
++            setPositionPreview(null)
++            setHasSavedDraft(true)
++            if (!silent) {
++                setStatusMsg(`已恢复本地保存稿：${draftNodes.length} 节点 / ${draftEdges.length} 连线`)
++            }
++            return true
++        } catch (error) {
++            console.error('[MapTopologyView] restoreSavedDraft failed', error)
++            return false
++        }
++    }, [])
+ 
+     useEffect(() => {
+-        if (!mapInstance || rawPipelineData.nodes.length === 0 || importedOnceRef.current) return
++        if (!mapInstance || rawPipelineData.nodes.length === 0 || importedOnceRef.current) return
+         importedOnceRef.current = true
+-        importTopology(true)
+-    }, [importTopology, mapInstance, rawPipelineData.nodes.length])
++        const restored = restoreSavedDraft(true)
++        if (!restored) {
++            importTopology(true)
++        }
++    }, [importTopology, mapInstance, rawPipelineData.nodes.length, restoreSavedDraft])
+*** End Patch

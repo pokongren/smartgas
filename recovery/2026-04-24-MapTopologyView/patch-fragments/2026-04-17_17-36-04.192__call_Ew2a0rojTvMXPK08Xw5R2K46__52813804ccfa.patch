@@ -1,0 +1,20 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+     const runMainSteadySimulation = useCallback(async () => {
+         const error = validateSimulationParams()
+         setParamValidationError(error)
+         if (error) {
+             setStatusMsg(`参数校验失败：${error}`)
+@@
+         const initialInput = buildSimulationInitialInput()
+         await runSteadySimulation(initialInput ? { initialInput } : undefined)
+     }, [buildSimulationInitialInput, runSteadySimulation, validateSimulationParams])
++    useEffect(() => {
++        if (paramValidationError) {
++            setParamValidationError(null)
++        }
++    }, [edgeLengthOverrides, globalParamDefaults, nodeParamOverrides])
+ 
+     const mappingSummary = simulationMapping?.summary ?? null
+*** End Patch

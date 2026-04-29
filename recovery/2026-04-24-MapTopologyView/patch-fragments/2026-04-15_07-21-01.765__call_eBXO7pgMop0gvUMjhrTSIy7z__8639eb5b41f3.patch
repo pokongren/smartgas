@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ const WE1_PRIMARY_PILOT_ID = 'mainline_zhongwei_jingbian'
++const TOPOLOGY_DRAFT_STORAGE_KEY = 'smartgas-map-topology-draft-v1'
+*** End Patch

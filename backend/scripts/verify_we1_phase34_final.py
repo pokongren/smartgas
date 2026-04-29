@@ -125,6 +125,7 @@ def main() -> int:
         node_required = {
             "id",
             "pressure_mpa",
+            "pressure_in_mpa",
             "demand_served",
             "supply_actual",
             "alert_level",

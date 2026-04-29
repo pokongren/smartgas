@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                                            鍏煎鎵嬪伐鎹忓悎锛堥潪涓绘祦锛?
++                                            兼容手工捏合（非主流）
+*** End Patch

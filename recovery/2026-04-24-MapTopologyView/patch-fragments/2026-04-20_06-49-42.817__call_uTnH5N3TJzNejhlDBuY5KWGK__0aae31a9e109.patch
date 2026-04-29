@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                            : ''
+-
+-                    content = `
++                            : ''
++                    const baselineExtraLabel = _baselineOutPressure != null
++                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩?${_baselineInPressure!.toFixed(2)} | 鍑?${_baselineOutPressure.toFixed(2)} MPa | 娓?${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}°C</div>`
++                        : ''
++
++                    content = `
+*** End Patch

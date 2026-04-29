@@ -1,0 +1,33 @@
+*** Begin Patch
+*** Add File: C:/Users/Administrator/.codex/automations/we1/memory.md
++一、运行时间
++1. 2026-04-08 18:06:03 +08:00。
++
++二、当前状态
++1. WE1 第一张图五阶段主体已完成，当前处于维护模式第13轮，不进入下一阶段。
++2. 本轮未发现需要进入代码修复的唯一问题，继续保持 `MapTopologyView` 为正式主入口、`/topology` 为调试页。
++
++三、本轮动作
++1. 主代理先读五阶段方案、自动化执行方案、最近总结和现有 memory，确认本轮只允许做维护模式巡检、回归和修复。
++2. 侦察子代理A核对 `App.tsx`、`MapTopologyView.tsx`、`TopologyView.tsx`、`useSimulation.ts`、`useAiAssistantPageContext.ts`，确认第一张图正式入口语义和 `/topology` 调试页边界仍成立。
++3. 侦察子代理B核对 `verify_we1_maintenance.py`、`verify_we1_phase34_final.py`、`verify_we1_map_phase5.py`、`verify_we1_snapshot_archive.py`、`topology_simulation.py`、`src/types/simulation.ts`、`src/services/api.ts`，确认主链契约、快照归档和维护巡检口径仍一致。
++4. 实施子代理本轮不改业务代码，只新增总结 [2026-04-08-WE1-maintenance-round13-regression-patrol-summary.md](F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round13-regression-patrol-summary.md) 并更新本 memory。
++5. 验证子代理独立运行 `python F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py`，结果通过，未触发修复轮。
++
++四、改动文件
++1. [2026-04-08-WE1-maintenance-round13-regression-patrol-summary.md](F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round13-regression-patrol-summary.md)。
++2. [memory.md](C:/Users/Administrator/.codex/automations/we1/memory.md)。
++
++五、验证结果
++1. `python F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py` 通过，返回 `status=passed`、`mode=maintenance`。
++2. 维护脚本聚合结果里 `phase34_status_passed=true`、`phase5_status_passed=true`、`snapshot_archive_status_passed=true`，说明主链契约、第一张图第5阶段验收、快照归档都未回退。
++3. `entry_semantics` 中 `/map-topology` 正式入口、`/topology` 调试页、默认隐藏高级调试操作面的检查均通过。
++4. 本轮没有验证失败，因此不触发修复轮，也未进入“连续两次修复失败”阻塞。
++
++六、失败先查哪层
++1. 先查入口层和前端消费层，再查映射层和 source/overlay ID 命中关系，再查快照归档层，最后才查 backend solver input 与稳态求解主链。
++
++七、下一轮判断
++1. 不进入下一阶段，继续维护模式巡检与回归。
++2. 下一轮若失败，先查 `/map-topology` 与 `/topology` 的入口语义是否回退，再按入口层 -> 映射层 -> 快照层 -> 求解层继续排查。
+*** End Patch

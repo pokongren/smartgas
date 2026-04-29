@@ -1,0 +1,11 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                    <div className="hidden rounded-lg border border-cyan-500/20 bg-black/10 px-3 py-2">
++                                    <div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-[11px] text-slate-300">
++                                        <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] mr-2 ${steadyStatusToneClass}`}>{steadySimLoading ? '求解中' : steadyOverlay ? SOLVER_STATUS_LABELS[steadyOverlay.solver_status] : '等待运行'}</span>
++                                        <span>状态：{steadyOverlayStatusText}</span>
++                                        {steadyOverlay && <span className="ml-2 text-slate-400">run_id: {steadyOverlay.run_id.slice(0, 12)}</span>}
++                                    </div>
++                                    <div className="hidden rounded-lg border border-cyan-500/20 bg-black/10 px-3 py-2">
+*** End Patch

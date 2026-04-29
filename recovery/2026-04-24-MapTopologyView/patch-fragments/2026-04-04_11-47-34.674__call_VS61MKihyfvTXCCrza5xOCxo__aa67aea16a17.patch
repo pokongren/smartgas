@@ -1,0 +1,156 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const extractShiftPressed = (event: any) => {
+-        return Boolean(
+-            event?.originEvent?.shiftKey ??
+-            event?.originEvent?.domEvent?.shiftKey ??
+-            event?.domEvent?.shiftKey
+-        )
+-    }
+-
+-    const toggleMergeSelection = useCallback((nodeId: string) => {
+-        if (!manualJunctionEditingEnabled) {
+-            setStatusMsg(JUNCTION_READONLY_HINT)
+-            return
+-        }
+-        const clickedNode = nodesRef.current.find(node => node.id === nodeId)
+-        const targetIds = clickedNode?.isJunction && clickedNode.sourceNodeIds?.length
+-            ? clickedNode.sourceNodeIds
+-            : [nodeId]
+-
+-        setSelectedMergeNodeIds(prev => {
+-            const shouldRemove = targetIds.every(id => prev.includes(id))
+-            const next = shouldRemove
+-                ? prev.filter(id => !targetIds.includes(id))
+-                : [...prev, ...targetIds.filter(id => !prev.includes(id))]
+-            setStatusMsg(`已选择 ${next.length} 个待捏合节点`)
+-            return next
+-        })
+-    }, [manualJunctionEditingEnabled])
+-
+-    const doNodeClick = (nodeId: string, event?: any) => {
+-        const shiftPressed = extractShiftPressed(event)
+-
++    const doNodeClick = (nodeId: string) => {
+         if (modeRef.current === 'connect') {
+             const from = cfRef.current
+             if (!from) {
+@@
+             }
+             return
+         }
+-        if (manualJunctionEditingEnabled && (modeRef.current === 'merge' || shiftPressed)) {
+-            toggleMergeSelection(nodeId)
+-            return
+-        }
+ 
+         const clickedNode = nodesRef.current.find(n => n.id === nodeId) || null
+         setSelectedNode(clickedNode)
+@@
+     }
+ 
+     // ================== 导入：将 ALL_PIPELINES 数据转为纯拓扑点+线（阀室链路合并） ==================
+ 
+     // ================== 撤销操作 ==================
+-    const restoreSelectionHighlights = useCallback(() => {
+-        nodesRef.current.forEach(node => {
+-            if (!node.marker) return
+-            const isHighlighted = selectedMergeNodeIds.includes(node.id)
+-            node.marker.setContent(createTopoMarkerContent(node.type, node.name, isHighlighted, !!node.isJunction))
+-        })
+-    }, [selectedMergeNodeIds])
+-
+-    useEffect(() => {
+-        restoreSelectionHighlights()
+-    }, [restoreSelectionHighlights, topoNodes])
+-
+-    const handleCreateJunction = useCallback(async () => {
+-        if (!manualJunctionEditingEnabled) {
+-            setStatusMsg(JUNCTION_READONLY_HINT)
+-            return
+-        }
+-        const uniqueSelectedIds = [...new Set(selectedMergeNodeIds)]
+-        const selectedNodes = baseTopoNodes.filter(node => uniqueSelectedIds.includes(node.id))
+-
+-        if (selectedNodes.length < 2) {
+-            setStatusMsg('至少选择两个有效底层站点才能捏合')
+-            return
+-        }
+-
+-        if (selectedNodes.length !== uniqueSelectedIds.length) {
+-            setStatusMsg('当前选择中包含失效节点，请重新选择后再试')
+-            return
+-        }
+-
+-        const transientNodes = selectedNodes.filter(node => !persistedTopologyNodeIds.has(node.id))
+-        if (transientNodes.length > 0) {
+-            const transientNames = transientNodes.slice(0, 3).map(node => node.name).join('、')
+-            const suffix = transientNodes.length > 3 ? ' 等节点' : ''
+-            setStatusMsg(`当前选择包含临时节点：${transientNames}${suffix}，只能捏合已导入的真实站点`)
+-            return
+-        }
+-
+-        const occupiedNodeIds = new Set(junctionGroups.flatMap(group => group.station_ids))
+-        const occupiedNodes = selectedNodes.filter(node => occupiedNodeIds.has(node.id))
+-        if (occupiedNodes.length > 0) {
+-            const occupiedNames = occupiedNodes.slice(0, 3).map(node => node.name).join('、')
+-            const suffix = occupiedNodes.length > 3 ? ' 等站点' : ''
+-            setStatusMsg(`所选站点中已有枢纽成员：${occupiedNames}${suffix}，请先拆分后再重组`)
+-            return
+-        }
+-
+-        const stationIds = selectedNodes.map(node => node.id)
+-        const defaultName = selectedNodes.map(node => node.name).slice(0, 2).join('-') || `联合枢纽-${Date.now().toString().slice(-4)}`
+-        const junctionName = window.prompt('请输入枢纽名称', `${defaultName}枢纽`)
+-        if (!junctionName?.trim()) return
+-
+-        try {
+-            const data = await topologyEditorApi.createJunctionGroup({
+-                name: junctionName.trim(),
+-                station_ids: stationIds,
+-                description: 'MapTopologyView 创建',
+-            })
+-            invalidatePipelineCache()
+-            await loadJunctionGroups()
+-            setUndoStack(prev => [...prev, {
+-                type: 'create-junction',
+-                junctionId: data.id,
+-                name: junctionName.trim(),
+-                stationIds,
+-            }])
+-            setSelectedMergeNodeIds([])
+-            setEditMode('view')
+-            setStatusMsg(`已捏合 ${stationIds.length} 个节点为「${junctionName.trim()}」`)
+-        } catch (error) {
+-            console.error(error)
+-            setStatusMsg(error instanceof Error ? `创建枢纽失败：${error.message}` : '创建枢纽失败')
+-        }
+-    }, [baseTopoNodes, junctionGroups, loadJunctionGroups, manualJunctionEditingEnabled, persistedTopologyNodeIds, selectedMergeNodeIds])
+-
+-    const handleDeleteJunction = useCallback(async (group: JunctionGroup) => {
+-        if (!manualJunctionEditingEnabled) {
+-            setStatusMsg(JUNCTION_READONLY_HINT)
+-            return
+-        }
+-        if (!window.confirm(`确认拆分枢纽「${group.name}」，并恢复 ${group.station_ids.length} 个底层站点吗？`)) {
+-            return
+-        }
+-        try {
+-            const result = await topologyEditorApi.deleteJunctionGroup(group.id)
+-            invalidatePipelineCache()
+-            await loadJunctionGroups()
+-            setUndoStack(prev => [...prev, { type: 'delete-junction', group }])
+-            setSelectedNode(null)
+-            setSelectedMergeNodeIds([])
+-            setStatusMsg(result.message || `枢纽「${group.name}」已拆分`)
+-        } catch (error) {
+-            console.error(error)
+-            setStatusMsg(error instanceof Error ? `拆分枢纽失败：${error.message}` : '拆分枢纽失败')
+-        }
+-    }, [loadJunctionGroups, manualJunctionEditingEnabled])
+-
+     const doUndo = useCallback(async () => {
+         const stack = [...undoStack]
+         const action = stack.pop()
+*** End Patch

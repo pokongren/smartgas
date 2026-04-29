@@ -1,0 +1,24 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ function buildOpsSuggestion(alertCount: number, avgUtilization: number, solverStatus: 'converged' | 'max_iter' | 'error'): string {
+@@
+     return '运行状态平稳，可将当前结果作为下一轮异常场景对比基线。'
+ }
++
++function safeSetMarkerContent(marker: any, content: string): void {
++    try {
++        marker?.setContent?.(content)
++    } catch (error) {
++        console.warn('[MapTopologyView] marker.setContent failed', error)
++    }
++}
++
++function safeSetPolylineOptions(polyline: any, options: Record<string, unknown>): void {
++    try {
++        polyline?.setOptions?.(options)
++    } catch (error) {
++        console.warn('[MapTopologyView] polyline.setOptions failed', error)
++    }
++}
+*** End Patch

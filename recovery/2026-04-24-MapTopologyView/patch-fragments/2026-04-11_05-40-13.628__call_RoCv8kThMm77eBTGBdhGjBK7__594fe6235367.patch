@@ -1,0 +1,50 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+             const match = simulationMapping.nodeMatchesByDisplayId.get(node.id)
+             let color = TOPO_COLORS[node.type]
+             let glow = 'none'
+             let isAlert = false
++            let isCriticalAlert = false
++            let isWarningAlert = false
+             if (match && match.matchedNodes.length > 0) {
+                 if (match.highestAlertLevel === 'critical') {
+                     color = '#f87171' // red-400
+                     glow = '0 0 12px #f87171'
+                     isAlert = true
++                    isCriticalAlert = true
+                 } else if (match.highestAlertLevel === 'warning') {
+                     color = '#fbbf24' // amber-400
+                     glow = '0 0 10px #fbbf24'
+                     isAlert = true
++                    isWarningAlert = true
+                 } else {
+                     glow = '0 0 6px #6ee7b7' // mild green glow
+                 }
+             }
+             
+             const size = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
+             const border = isAlert ? '2px solid #fff' : '1px solid rgba(255,255,255,0.5)'
++            const shouldPulseCore = isCriticalAlert || (isBreakScenarioActive && node.id === 'WE1-76')
++            const pressureDelta = nodePressureDeltaMap.get(node.id)
++            const showDamage = damageFlashVisible && typeof pressureDelta === 'number' && pressureDelta < -0.01
++            const damageText = showDamage ? `${formatSignedNumber(pressureDelta, 2)} MPa` : ''
+             const shapeStyle = node.isJunction
+                 ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 3px;background:${color};border:${border};box-shadow:${glow}; pointer-events: auto; transition: all 0.5s;`
+                 : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${glow}; pointer-events: auto; transition: all 0.5s;`
+             
+             const extraLabel = match && match.averagePressureMpa != null ? 
+                 `<div style="font-size: 9px; color: #67e8f9; background: rgba(0,20,30,0.8); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px solid rgba(103,232,249,0.3);">${match.averagePressureMpa.toFixed(2)} MPa</div>` : ''
+ 
+             const content = `
+                 <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
++                    ${shouldPulseCore ? `<div class="we1-fault-ripple" style="--ripple-color:${isCriticalAlert ? '#f87171' : '#fb7185'}; --ripple-size:${size + 10}px;"></div>` : ''}
++                    ${showDamage ? `<div class="we1-damage-pop">${damageText}</div>` : ''}
+                     <div style="${shapeStyle}"></div>
+-                    ${node.name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: ${isAlert ? '#f87171' : '#fff'}; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10; display: flex; flex-direction: column; align-items: center;">${node.name}${extraLabel}</div>` : ''}
++                    ${node.name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: ${isCriticalAlert ? '#f87171' : isWarningAlert ? '#fbbf24' : '#fff'}; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10; display: flex; flex-direction: column; align-items: center;">${node.name}${extraLabel}</div>` : ''}
+                 </div>
+             `
+             node.marker.setContent(content)
+         })
+*** End Patch

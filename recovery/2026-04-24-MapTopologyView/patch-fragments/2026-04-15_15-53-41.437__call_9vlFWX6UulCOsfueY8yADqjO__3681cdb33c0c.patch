@@ -1,0 +1,56 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const selectedNodeSimulationMetrics = useMemo(() => {
+-        if (!selectedNode || !simulationMapping) return null
+-        const match = simulationMapping.nodeMatchesByDisplayId.get(selectedNode.id)
+-        if (!match || match.matchedNodes.length === 0) return null
+-
+-        const tempItems = match.matchedNodes
+-            .map(item => item.temperature_c)
+-            .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+-        const realAvgTemp = tempItems.length > 0
+-            ? tempItems.reduce((sum, value) => sum + value, 0) / tempItems.length
+-            : null
+-        const pressure = match.averagePressureMpa
+-
+-        return {
+-            pressure,
+-            temperatureC: realAvgTemp ?? (pressure != null ? estimateTemperatureByPressure(pressure) : null),
+-            estimated: realAvgTemp == null,
+-        }
+-    }, [selectedNode, simulationMapping])
++        if (!selectedNode) return null
++        if (simulationMapping) {
++            const match = simulationMapping.nodeMatchesByDisplayId.get(selectedNode.id)
++            if (!match || match.matchedNodes.length === 0) return null
++
++            const tempItems = match.matchedNodes
++                .map(item => item.temperature_c)
++                .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
++            const realAvgTemp = tempItems.length > 0
++                ? tempItems.reduce((sum, value) => sum + value, 0) / tempItems.length
++                : null
++            const pressure = match.averagePressureMpa
++
++            return {
++                pressure,
++                temperatureC: realAvgTemp ?? (pressure != null ? estimateTemperatureByPressure(pressure) : null),
++                estimated: realAvgTemp == null,
++                preSimulation: false,
++            }
++        }
++
++        const fallbackPressure = Number.isFinite(preSimDefaultPressureMpa) ? preSimDefaultPressureMpa : 8.8
++        const fallbackTemperature = Number.isFinite(preSimDefaultTemperatureC)
++            ? preSimDefaultTemperatureC
++            : estimateTemperatureByPressure(fallbackPressure)
++
++        return {
++            pressure: fallbackPressure,
++            temperatureC: fallbackTemperature,
++            estimated: true,
++            preSimulation: true,
++        }
++    }, [preSimDefaultPressureMpa, preSimDefaultTemperatureC, selectedNode, simulationMapping])
+*** End Patch

@@ -1,0 +1,65 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+     useEffect(() => {
+         const tooManyOverlays = topoNodes.length > TOPO_RENDER_BUDGET.full.maxNodes || topoEdges.length > TOPO_RENDER_BUDGET.full.maxEdges
+         if (!steadyOverlay || isMapInteracting || tooManyOverlays || renderSafetyMode === 'lite') return
+         const timer = window.setInterval(() => {
+             setLineFlowPhase(prev => (prev + 2) % 1000)
+         }, 180)
+         return () => window.clearInterval(timer)
+     }, [steadyOverlay?.run_id, isMapInteracting, topoEdges.length, topoNodes.length, renderSafetyMode])
++    useEffect(() => {
++        if (pressureAnimationFrameRef.current != null) {
++            window.cancelAnimationFrame(pressureAnimationFrameRef.current)
++            pressureAnimationFrameRef.current = null
++        }
++        if (!steadyOverlay || simulatedNodeOutPressureMap.size === 0) {
++            pressureAnimationTargetRef.current = new Map()
++            setAnimatedNodeOutPressure(new Map())
++            return
++        }
++
++        const fromMap = pressureAnimationTargetRef.current
++        const toMap = simulatedNodeOutPressureMap
++        const startTime = performance.now()
++        const durationMs = 600
++
++        const tick = (now: number) => {
++            const progress = Math.min(1, (now - startTime) / durationMs)
++            const frameMap = new Map<string, number>()
++            toMap.forEach((toValue, nodeId) => {
++                const fromValue = fromMap.get(nodeId) ?? toValue
++                frameMap.set(nodeId, fromValue + (toValue - fromValue) * progress)
++            })
++            setAnimatedNodeOutPressure(frameMap)
++            if (progress < 1) {
++                pressureAnimationFrameRef.current = window.requestAnimationFrame(tick)
++            } else {
++                pressureAnimationTargetRef.current = new Map(toMap)
++                pressureAnimationFrameRef.current = null
++            }
++        }
++
++        pressureAnimationFrameRef.current = window.requestAnimationFrame(tick)
++        return () => {
++            if (pressureAnimationFrameRef.current != null) {
++                window.cancelAnimationFrame(pressureAnimationFrameRef.current)
++                pressureAnimationFrameRef.current = null
++            }
++        }
++    }, [simulatedNodeOutPressureMap, steadyOverlay?.run_id])
++    useEffect(() => {
++        return () => {
++            if (pressureAnimationFrameRef.current != null) {
++                window.cancelAnimationFrame(pressureAnimationFrameRef.current)
++                pressureAnimationFrameRef.current = null
++            }
++        }
++    }, [])
+     useEffect(() => {
+         const tooManyOverlays = topoNodes.length > TOPO_RENDER_BUDGET.full.maxNodes || topoEdges.length > TOPO_RENDER_BUDGET.full.maxEdges
+         if (tooManyOverlays || isMapInteracting) {
+             if (renderSafetyMode !== 'lite') {
+                 setRenderSafetyMode('lite')
+*** End Patch

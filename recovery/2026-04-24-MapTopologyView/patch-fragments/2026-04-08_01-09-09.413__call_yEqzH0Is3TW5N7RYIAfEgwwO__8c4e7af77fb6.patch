@@ -1,0 +1,143 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py
+@@
+ import json
+ import subprocess
+ import sys
+ from pathlib import Path
+ from typing import Any, Dict, List
+ 
+ 
+ BACKEND_ROOT = Path(__file__).resolve().parents[1]
+ REPO_ROOT = BACKEND_ROOT.parent
+ 
+ 
++def _assert(condition: bool, message: str) -> None:
++    if not condition:
++        raise AssertionError(message)
++
++
++def _read_text(path: Path) -> str:
++    return path.read_text(encoding="utf-8")
++
++
+ def _run_script(script_name: str) -> Dict[str, Any]:
+     script_path = BACKEND_ROOT / "scripts" / script_name
+     completed = subprocess.run(
+         [sys.executable, str(script_path)],
+         cwd=str(REPO_ROOT),
+@@
+         "stderr": completed.stderr.decode("utf-8", errors="replace").strip(),
+     }
+ 
+ 
++def _verify_entry_semantics() -> Dict[str, Any]:
++    app_path = REPO_ROOT / "src" / "App.tsx"
++    map_path = REPO_ROOT / "src" / "views" / "MapTopologyView.tsx"
++    app_text = _read_text(app_path)
++    map_text = _read_text(map_path)
++
++    checks = [
++        {
++            "id": "map_topology_route_present",
++            "passed": '<Route path="/map-topology" element={<MapTopologyView />} />' in app_text,
++            "file": str(app_path),
++        },
++        {
++            "id": "topology_route_present",
++            "passed": '<Route path="/topology" element={<TopologyView />} />' in app_text,
++            "file": str(app_path),
++        },
++        {
++            "id": "map_topology_marked_as_primary_entry",
++            "passed": 'title="第一张图主仿真入口"' in app_text,
++            "file": str(app_path),
++        },
++        {
++            "id": "topology_marked_as_debug_page",
++            "passed": 'title="TopologyView 调试页"' in app_text,
++            "file": str(app_path),
++        },
++        {
++            "id": "map_view_exposes_primary_entry_hint",
++            "passed": "主仿真入口" in map_text and "simulationEntryHint" in map_text,
++            "file": str(map_path),
++        },
++    ]
++    _assert(all(item["passed"] for item in checks), "维护模式入口语义校验失败")
++    return {"checks": checks}
++
++
+ def main() -> int:
+-    scripts = [
+-        "verify_we1_phase34_final.py",
+-        "verify_we1_map_phase5.py",
+-        "verify_we1_snapshot_archive.py",
+-    ]
+-    results: List[Dict[str, Any]] = [_run_script(script_name) for script_name in scripts]
+-    failed = [item for item in results if not item["passed"]]
+-
+-    output = {
+-        "status": "passed" if not failed else "failed",
+-        "mode": "maintenance",
+-        "scripts": results,
+-        "failure_triage_order": [
+-            "第一张图入口与前端消费层",
+-            "映射层与 source IDs 命中关系",
+-            "快照归档层",
+-            "后端 solver input 与稳态求解主链",
+-        ],
+-        "next_action": "全部通过则保持维护模式；有失败则只做巡检修复，不再扩新阶段。",
+-    }
+-
+-    sys.stdout.buffer.write(b"=== WE1 maintenance verification start ===\n")
+-    sys.stdout.buffer.write((json.dumps(output, ensure_ascii=False, indent=2) + "\n").encode("utf-8", errors="replace"))
+-    return 0 if not failed else 1
++    try:
++        scripts = [
++            "verify_we1_phase34_final.py",
++            "verify_we1_map_phase5.py",
++            "verify_we1_snapshot_archive.py",
++        ]
++        results: List[Dict[str, Any]] = [_run_script(script_name) for script_name in scripts]
++        failed = [item for item in results if not item["passed"]]
++        entry_semantics = _verify_entry_semantics()
++
++        output = {
++            "status": "passed" if not failed else "failed",
++            "mode": "maintenance",
++            "scripts": results,
++            "entry_semantics": entry_semantics["checks"],
++            "failure_triage_order": [
++                "第一张图入口与前端消费层",
++                "映射层与 source IDs 命中关系",
++                "快照归档层",
++                "后端 solver input 与稳态求解主链",
++            ],
++            "next_action": "全部通过则保持维护模式；有失败则只做巡检修复，不再扩新阶段。",
++        }
++
++        sys.stdout.buffer.write(b"=== WE1 maintenance verification start ===\n")
++        sys.stdout.buffer.write((json.dumps(output, ensure_ascii=False, indent=2) + "\n").encode("utf-8", errors="replace"))
++        return 0 if not failed else 1
++    except Exception as exc:
++        output = {
++            "status": "failed",
++            "mode": "maintenance",
++            "error": str(exc),
++            "failure_triage_order": [
++                "第一张图入口与前端消费层",
++                "映射层与 source IDs 命中关系",
++                "快照归档层",
++                "后端 solver input 与稳态求解主链",
++            ],
++            "next_action": "先修入口语义或回归链路，再重复维护巡检。",
++        }
++        sys.stdout.buffer.write(b"=== WE1 maintenance verification start ===\n")
++        sys.stdout.buffer.write((json.dumps(output, ensure_ascii=False, indent=2) + "\n").encode("utf-8", errors="replace"))
++        return 1
+ 
+ 
+ if __name__ == "__main__":
+     raise SystemExit(main())
+*** End Patch

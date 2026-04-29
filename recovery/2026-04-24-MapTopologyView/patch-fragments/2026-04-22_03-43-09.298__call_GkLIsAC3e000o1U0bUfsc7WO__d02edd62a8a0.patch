@@ -1,0 +1,57 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                if (!content && node.id !== cutoffNodeId && !selectedMergeNodeIds.includes(node.id)) {
+-                    content = createTopoMarkerContent(node.type, isLargeGraphMode ? '' : node.name, false, !!node.isJunction)
+-                }
++                if (!content && node.id !== cutoffNodeId && !selectedMergeNodeIds.includes(node.id)) {
++                    const seedEntry = seedNodePressures.get(node.id) ?? (
++                        (node.sourceNodeIds ?? []).find(sid => seedNodePressures.has(sid))
++                            ? seedNodePressures.get((node.sourceNodeIds ?? []).find(sid => seedNodePressures.has(sid))!)
++                            : undefined
++                    )
++                    const dbOutPressure = seedEntry?.operating_pressure_out ?? null
++                    const dbInPressure = seedEntry?.operating_pressure_in ?? null
++
++                    if (showSnapshotPressureOverlay && !isLargeGraphMode && (dbOutPressure != null || dbInPressure != null)) {
++                        const size = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
++                        const color = TOPO_COLORS[node.type]
++                        const border = '1px solid rgba(255,255,255,0.5)'
++                        const shapeStyle = node.isJunction
++                            ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 3px;background:${color};border:${border};box-shadow:none; pointer-events: auto;`
++                            : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:none; pointer-events: auto;`
++                        const inPressure = dbInPressure ?? (dbOutPressure != null ? dbOutPressure * 0.95 : 0)
++                        const outPressure = dbOutPressure ?? 0
++                        const startPressureLabel = `<div style="font-size: 9px; color: #86efac; background: rgba(0,15,0,0.75); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px dashed rgba(134,239,172,0.4);">起进${inPressure.toFixed(2)} | 起出${outPressure.toFixed(2)} MPa</div>`
++                        content = `
++                            <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
++                                <div style="${shapeStyle}"></div>
++                                ${node.name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10; display: flex; flex-direction: column; align-items: center;">${node.name}${startPressureLabel}</div>` : ''}
++                            </div>
++                        `
++                    } else {
++                        content = createTopoMarkerContent(node.type, isLargeGraphMode ? '' : node.name, false, !!node.isJunction)
++                    }
++                }
+@@
+-                    const snapshotPressureLabelV2 = showSnapshotPressureOverlay
+-                        ? (_simOutPressure != null
+-                            ? `<div style="font-size: 9px; color: #67e8f9; background: rgba(0,20,30,0.82); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px solid rgba(103,232,249,0.3);">杩?{_simInPressure!.toFixed(2)} | 鍑?{_simOutPressure.toFixed(2)} MPa</div>`
+-                            : _dbOutPressure != null || _dbInPressure != null
+-                                ? `<div style="font-size: 9px; color: #86efac; background: rgba(0,15,0,0.75); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px dashed rgba(134,239,172,0.4);">杩?{(_dbInPressure ?? (_dbOutPressure != null ? _dbOutPressure * 0.95 : 0)).toFixed(2)} | 鍑?{(_dbOutPressure ?? 0).toFixed(2)} MPa</div>`
+-                                : '')
+-                        : ''
+-                    const baselinePressureLabelV2 = showSnapshotPressureOverlay && _baselineOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩鸿繘${_baselineInPressure!.toFixed(2)} | 鍩哄嚭${_baselineOutPressure.toFixed(2)} MPa | 鍩烘俯${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}掳C</div>`
+-                        : ''
++                    const snapshotPressureLabelV2 = showSnapshotPressureOverlay
++                        ? (_simOutPressure != null
++                            ? `<div style="font-size: 9px; color: #67e8f9; background: rgba(0,20,30,0.82); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px solid rgba(103,232,249,0.3);">进${_simInPressure!.toFixed(2)} | 出${_simOutPressure.toFixed(2)} MPa</div>`
++                            : _dbOutPressure != null || _dbInPressure != null
++                                ? `<div style="font-size: 9px; color: #86efac; background: rgba(0,15,0,0.75); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px dashed rgba(134,239,172,0.4);">起进${(_dbInPressure ?? (_dbOutPressure != null ? _dbOutPressure * 0.95 : 0)).toFixed(2)} | 起出${(_dbOutPressure ?? 0).toFixed(2)} MPa</div>`
++                                : '')
++                        : ''
++                    const baselinePressureLabelV2 = showSnapshotPressureOverlay && _baselineOutPressure != null
++                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">基进${_baselineInPressure!.toFixed(2)} | 基出${_baselineOutPressure.toFixed(2)} MPa | 基温${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}°C</div>`
++                        : ''
+*** End Patch

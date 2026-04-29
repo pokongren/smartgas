@@ -1,0 +1,145 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\data\pipelines\types.ts
+@@
+ export interface PipelineLayer {
++    id?: string             // 稳定层级 ID，优先用于状态管理和跨视图引用
+     name: string            // 层级名称 (如 "西二线干线", "丽江支线")
+     type: 'trunk' | 'branch'
+     nodes: PipelineNode[]
+*** Add File: F:\smartgas-grid\src\data\pipelines\transform.ts
++import type { PipelineData, PipelineLine, PipelineNode } from '@/types'
++import type { PipelineLayer, PipelinePackage } from './types'
++
++export function getPipelineLayerId(
++    pkg: Pick<PipelinePackage, 'id'>,
++    layer: Pick<PipelineLayer, 'id' | 'name' | 'type'>,
++    index: number
++): string {
++    if (layer.id && layer.id.trim()) {
++        return layer.id
++    }
++    const safeName = layer.name.trim().replace(/\s+/g, '-')
++    return `${pkg.id}:${layer.type}:${safeName || index}`
++}
++
++export function normalizePipelinePackages(packages: PipelinePackage[]): PipelinePackage[] {
++    return packages.map((pkg) => ({
++        ...pkg,
++        layers: pkg.layers.map((layer, index) => ({
++            ...layer,
++            id: getPipelineLayerId(pkg, layer, index),
++        })),
++    }))
++}
++
++export function buildInitialLayerVisibility(packages: PipelinePackage[]): Record<string, boolean> {
++    const visibility: Record<string, boolean> = {}
++
++    packages.forEach((pkg) => {
++        pkg.layers.forEach((layer, index) => {
++            visibility[getPipelineLayerId(pkg, layer, index)] = layer.visible ?? true
++        })
++    })
++
++    return visibility
++}
++
++export function buildPipelineDataFromPackages(
++    packages: PipelinePackage[],
++    visibleLayerIds?: Record<string, boolean>
++): PipelineData {
++    const nodes: PipelineNode[] = []
++    const lines: PipelineLine[] = []
++
++    packages.forEach((pkg) => {
++        pkg.layers.forEach((layer, index) => {
++            const layerId = getPipelineLayerId(pkg, layer, index)
++            if (visibleLayerIds && !visibleLayerIds[layerId]) {
++                return
++            }
++
++            nodes.push(...layer.nodes)
++            lines.push(...layer.lines)
++        })
++    })
++
++    return { nodes, lines, devices: [] }
++}
+*** Update File: F:\smartgas-grid\src\data\pipelines\index.ts
+@@
+ import { PipelinePackage } from './types'
+ import { pipelinePackageAPI } from '@/services/api'
++import { normalizePipelinePackages } from './transform'
+ 
+ export * from './types'
++export * from './transform'
+@@
+-            const packages: PipelinePackage[] = resp.data
++            const packages: PipelinePackage[] = normalizePipelinePackages(resp.data)
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-import { loadAllPipelines } from '@/data/pipelines'
++import { buildPipelineDataFromPackages, loadAllPipelines } from '@/data/pipelines'
+@@
+     // ================== 收集全部管线原始数据（不传给 MapView，仅供导入用） ==================
+     const rawPipelineData = useMemo(() => {
+-        const nodes: PipelineNode[] = []
+-        const lines: PipelineLine[] = []
+-        for (const pkg of pipelines) {
+-            for (const layer of pkg.layers) {
+-                for (const n of layer.nodes) nodes.push(n)
+-                for (const l of layer.lines) lines.push(l)
+-            }
+-        }
+-        return { nodes, lines }
++        const { nodes, lines } = buildPipelineDataFromPackages(pipelines)
++        return { nodes, lines }
+     }, [pipelines])
+*** Update File: F:\smartgas-grid\src\utils\mapRenderer.ts
+@@
+-        const name = node.name
+-        if (name.includes('压气站')) {
++        if (isCompressorNode(node)) {
+             group.typeStats.compressor++
+             group.hasImportantStation = true
+-        } else if (name.includes('分输站') || name.includes('门站')) {
++        } else if (isDistributionNode(node)) {
+             group.typeStats.distribution++
+             group.hasImportantStation = true
+-        } else if (name.includes('阀室') || name.includes('阀门')) {
++        } else if (isValveRoom(node)) {
+             group.typeStats.valve++
+         } else {
+             group.typeStats.other++
+         }
+@@
+     return groups
+ }
++
++function getRawStationType(node: PipelineNode): string {
++    const rawType = node.properties?.rawType
++    return typeof rawType === 'string' ? rawType : ''
++}
++
++function isCompressorNode(node: PipelineNode): boolean {
++    return (
++        getRawStationType(node) === 'compressor' ||
++        node.properties?.isCompressor === true ||
++        node.name.includes('压气站')
++    )
++}
++
++function isDistributionNode(node: PipelineNode): boolean {
++    return (
++        getRawStationType(node) === 'distribution' ||
++        node.type === NodeType.METERING ||
++        node.name.includes('分输站') ||
++        node.name.includes('门站')
++    )
++}
+@@
+-    const isCompressor = node.name.includes('压气站')
+-    const isDistribution = node.name.includes('分输站') || node.name.includes('门站')
++    const isCompressor = isCompressorNode(node)
++    const isDistribution = isDistributionNode(node)
+*** End Patch

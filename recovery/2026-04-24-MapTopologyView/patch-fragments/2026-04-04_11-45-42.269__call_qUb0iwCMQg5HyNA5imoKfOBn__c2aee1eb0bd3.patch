@@ -1,0 +1,20 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const [isSaving, setIsSaving] = useState(false)
+-    const [cascadeValves, setCascadeValves] = useState(true)
+-    const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
+-    const [isPreviewing, setIsPreviewing] = useState(false)
+-
+-    // 鍚堝缓绔欙細鍚堝苟妯″紡鐘舵€?    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+-    // 宸查珮浜殑 marker 鍘熷 content锛岀敤浜庢仮澶?    const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
+-
+-    // Refs 鈥?瑙ｅ喅闂寘闄堟棫寮曠敤
++    const [isSaving, setIsSaving] = useState(false)
++    const [cascadeValves, setCascadeValves] = useState(true)
++    const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
++    const [isPreviewing, setIsPreviewing] = useState(false)
++    const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
++
++    // Refs 鈥?瑙ｅ喅闂寘闄堟棫寮曠敤
+*** End Patch

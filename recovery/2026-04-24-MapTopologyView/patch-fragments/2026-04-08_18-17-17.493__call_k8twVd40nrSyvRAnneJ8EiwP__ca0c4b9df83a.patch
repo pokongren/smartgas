@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                        <button onClick={() => { clearSteadyOverlay(); setStatusMsg('已清空当前主仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空主仿真</button>
++                                        <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('已清空当前主仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空主仿真</button>
+*** End Patch

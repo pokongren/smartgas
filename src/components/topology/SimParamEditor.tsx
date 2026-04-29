@@ -5,6 +5,7 @@ interface EdgeOption {
   id: string
   name?: string
   defaultLength?: number
+  defaultFlowRate?: number
 }
 
 interface NodeOverrideInput {
@@ -14,6 +15,7 @@ interface NodeOverrideInput {
 
 interface GlobalDefaultsInput {
   default_pressure_mpa?: number
+  default_temperature_c?: number
   default_flow_rate?: number
   apply_to_sources?: boolean
 }
@@ -23,10 +25,12 @@ interface SimParamEditorProps {
   edges: EdgeOption[]
   nodeOverrides: Record<string, NodeOverrideInput>
   edgeLengthOverrides: Record<string, number>
+  edgeFlowOverrides: Record<string, number>
   globalDefaults: GlobalDefaultsInput
   validationError: string | null
   onNodeOverridesChange: (value: Record<string, NodeOverrideInput>) => void
   onEdgeLengthOverridesChange: (value: Record<string, number>) => void
+  onEdgeFlowOverridesChange: (value: Record<string, number>) => void
   onGlobalDefaultsChange: (value: GlobalDefaultsInput) => void
 }
 
@@ -46,7 +50,7 @@ function toNumberOrUndefined(raw: string): number | undefined {
 }
 
 function formatDisplayNumber(value: number | undefined | null, digits: number): string {
-  if (value == null || !Number.isFinite(value)) return '--'
+  if (value == null || !Number.isFinite(value)) return ''
   return Number(value.toFixed(digits)).toString()
 }
 
@@ -57,16 +61,25 @@ function updateNodeOverride(
 ): Record<string, NodeOverrideInput> {
   const nextMap = { ...nodeOverrides }
   const merged = { ...(nextMap[nodeId] ?? {}), ...patch }
-
-  if (
-    merged.target_pressure_mpa == null &&
-    merged.min_pressure_mpa == null
-  ) {
+  if (merged.target_pressure_mpa == null && merged.min_pressure_mpa == null) {
     delete nextMap[nodeId]
   } else {
     nextMap[nodeId] = merged
   }
+  return nextMap
+}
 
+function updateEdgeLengthOverride(
+  overrides: Record<string, number>,
+  edgeId: string,
+  value: number | undefined,
+): Record<string, number> {
+  const nextMap = { ...overrides }
+  if (value == null) {
+    delete nextMap[edgeId]
+    return nextMap
+  }
+  nextMap[edgeId] = value
   return nextMap
 }
 
@@ -102,10 +115,12 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
   edges,
   nodeOverrides,
   edgeLengthOverrides,
+  edgeFlowOverrides,
   globalDefaults,
   validationError,
   onNodeOverridesChange,
-  onEdgeLengthOverridesChange: _onEdgeLengthOverridesChange,
+  onEdgeLengthOverridesChange,
+  onEdgeFlowOverridesChange,
   onGlobalDefaultsChange,
 }) => {
   const displayNodes = useMemo(() => {
@@ -113,7 +128,6 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
       const name = item.name ?? ''
       return RECOMMENDED_NODE_KEYS.some((key) => name.includes(key))
     })
-
     if (filtered.length > 0) return filtered.slice(0, 8)
     return seedNodes.slice(0, 8)
   }, [seedNodes])
@@ -136,9 +150,9 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <div className="text-[10px] text-slate-300">全网默认值</div>
-          <div className="text-[10px] text-slate-500">没有单独设置的站场会走这里</div>
+          <div className="text-[10px] text-slate-500">没有单独设置的站场会使用这里的参数</div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <input
             type="number"
             step="0.01"
@@ -148,6 +162,19 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
               onGlobalDefaultsChange({
                 ...globalDefaults,
                 default_pressure_mpa: toNumberOrUndefined(event.target.value),
+              })
+            }
+            className={GLOBAL_FIELD_CLASS}
+          />
+          <input
+            type="number"
+            step="0.1"
+            value={globalDefaults.default_temperature_c ?? ''}
+            placeholder="默认温度 ℃"
+            onChange={(event) =>
+              onGlobalDefaultsChange({
+                ...globalDefaults,
+                default_temperature_c: toNumberOrUndefined(event.target.value),
               })
             }
             className={GLOBAL_FIELD_CLASS}
@@ -165,7 +192,7 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
             }
             className={GLOBAL_FIELD_CLASS}
           />
-          <label className="flex items-center gap-1.5 rounded border border-cyan-500/20 bg-black/20 px-2 py-1 text-[11px] text-slate-200">
+          <label className="col-span-3 flex items-center gap-1.5 rounded border border-cyan-500/20 bg-black/20 px-2 py-1 text-[11px] text-slate-200">
             <input
               type="checkbox"
               checked={Boolean(globalDefaults.apply_to_sources)}
@@ -176,7 +203,7 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
                 })
               }
             />
-            默认值也用于气源点
+            默认值也应用于气源点
           </label>
         </div>
       </div>
@@ -184,7 +211,7 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <div className="text-[10px] text-slate-300">关键站场设置</div>
-          <div className="text-[10px] text-slate-500">进站设定只看不改，避免和最低约束混淆</div>
+          <div className="text-[10px] text-slate-500">进站设定只读，出站与最小压力可调</div>
         </div>
         {displayNodes.length === 0 ? (
           <div className="text-[11px] text-slate-400">当前还没有读到站场种子数据</div>
@@ -194,7 +221,7 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
               <div className="text-[10px] text-slate-500">站场</div>
               <div className="text-center text-[10px] text-slate-500">进站设定</div>
               <div className="text-center text-[10px] text-slate-500">出站设定</div>
-              <div className="text-center text-[10px] text-slate-500">最低约束</div>
+              <div className="text-center text-[10px] text-slate-500">最小约束</div>
             </div>
             {displayNodes.map((node) => (
               <div key={node.id} className="grid grid-cols-[minmax(54px,1fr)_60px_60px_60px] items-center gap-1">
@@ -205,7 +232,7 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
                   {node.name || node.id}
                 </div>
                 <div className={READONLY_FIELD_CLASS}>
-                  {formatDisplayNumber(getReferenceInPressure(node), 2)}
+                  {formatDisplayNumber(getReferenceInPressure(node), 2) || '--'}
                 </div>
                 <input
                   type="number"
@@ -231,7 +258,7 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
                     nodeOverrides[node.id]?.min_pressure_mpa ??
                     formatDisplayNumber(getMinConstraint(node), 2)
                   }
-                  placeholder="最低"
+                  placeholder="最小"
                   onChange={(event) =>
                     onNodeOverridesChange(
                       updateNodeOverride(nodeOverrides, node.id, {
@@ -249,25 +276,57 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-[10px] text-slate-300">关键管段长度</div>
-          <div className="text-[10px] text-slate-500">这一轮只展示，不开放编辑</div>
+          <div className="text-[10px] text-slate-300">关键管段参数</div>
+          <div className="text-[10px] text-slate-500">可单独设置长度和流量，留空即使用默认</div>
         </div>
         {displayEdges.length === 0 ? (
           <div className="text-[11px] text-slate-400">当前还没有读到主干管段数据</div>
         ) : (
           <div className="space-y-1">
-            <div className="grid grid-cols-[1fr_72px] items-center gap-1.5 px-0.5">
+            <div className="grid grid-cols-[1fr_72px_72px] items-center gap-1.5 px-0.5">
               <div className="text-[10px] text-slate-500">管段</div>
               <div className="text-center text-[10px] text-slate-500">长度 km</div>
+              <div className="text-center text-[10px] text-slate-500">流量 万方/天</div>
             </div>
             {displayEdges.map((edge) => (
-              <div key={edge.id} className="grid grid-cols-[1fr_72px] items-center gap-1.5">
+              <div key={edge.id} className="grid grid-cols-[1fr_72px_72px] items-center gap-1.5">
                 <div className="min-w-0 truncate text-[11px] text-slate-200" title={edge.name || edge.id}>
                   {edge.name || edge.id}
                 </div>
-                <div className={READONLY_FIELD_CLASS}>
-                  {formatDisplayNumber(edgeLengthOverrides[edge.id] ?? edge.defaultLength, 1)}
-                </div>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={edgeLengthOverrides[edge.id] ?? formatDisplayNumber(edge.defaultLength, 1)}
+                  placeholder="长度"
+                  onChange={(event) =>
+                    onEdgeLengthOverridesChange(
+                      updateEdgeLengthOverride(
+                        edgeLengthOverrides,
+                        edge.id,
+                        toNumberOrUndefined(event.target.value),
+                      ),
+                    )
+                  }
+                  className={INPUT_FIELD_CLASS}
+                />
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={edgeFlowOverrides[edge.id] ?? formatDisplayNumber(edge.defaultFlowRate, 1)}
+                  placeholder="流量"
+                  onChange={(event) =>
+                    onEdgeFlowOverridesChange(
+                      updateEdgeLengthOverride(
+                        edgeFlowOverrides,
+                        edge.id,
+                        toNumberOrUndefined(event.target.value),
+                      ),
+                    )
+                  }
+                  className={INPUT_FIELD_CLASS}
+                />
               </div>
             ))}
           </div>

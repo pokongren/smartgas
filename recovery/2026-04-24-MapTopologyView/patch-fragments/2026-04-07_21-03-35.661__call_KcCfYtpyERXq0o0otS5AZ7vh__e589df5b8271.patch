@@ -1,0 +1,328 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/backend/scripts/verify_we1_map_phase5.py
++"""
++WE1 第一张图主仿真第 5 阶段验收脚本。
++
++运行方式:
++    python backend/scripts/verify_we1_map_phase5.py
++"""
++
++from __future__ import annotations
++
++import json
++import sys
++from pathlib import Path
++from typing import Any, Dict, Iterable
++
++from sqlmodel import Session
++
++
++BACKEND_ROOT = Path(__file__).resolve().parents[1]
++REPO_ROOT = BACKEND_ROOT.parent
++if str(BACKEND_ROOT) not in sys.path:
++    sys.path.insert(0, str(BACKEND_ROOT))
++
++from app.database import engine  # noqa: E402
++from app.routers.topology_simulation import (  # noqa: E402
++    SaveSnapshotRequest,
++    SolveSteadyRequest,
++    create_simulation_snapshot,
++    get_simulation_overlay,
++    list_simulation_snapshots,
++    solve_steady_api,
++)
++
++
++def _assert(condition: bool, message: str) -> None:
++    if not condition:
++        raise AssertionError(message)
++
++
++def _assert_keys(data: Dict[str, Any], keys: Iterable[str], label: str) -> None:
++    missing = [key for key in keys if key not in data]
++    if missing:
++        raise AssertionError(f"{label} 缺少字段: {missing}")
++
++
++def _read_text(path: Path) -> str:
++    return path.read_text(encoding="utf-8")
++
++
++def _verify_overlay_contract(session: Session) -> Dict[str, Any]:
++    steady_overlay = get_simulation_overlay(
++        pilot_id="mainline_zhongwei_jingbian",
++        scenario_id="steady_base",
++        session=session,
++    )
++    solve_payload = solve_steady_api(
++        SolveSteadyRequest(
++            pilot_id="mainline_zhongwei_jingbian",
++            scenario_id="steady_base",
++        ),
++        session=session,
++    )
++
++    for label, payload in [
++        ("overlay", steady_overlay),
++        ("solve_steady", solve_payload),
++    ]:
++        _assert_keys(
++            payload,
++            [
++                "pilot_id",
++                "scenario_id",
++                "run_id",
++                "generated_at",
++                "solver_status",
++                "iterations",
++                "nodes",
++                "edges",
++                "summary",
++                "meta",
++            ],
++            label,
++        )
++        _assert(bool(payload["nodes"]), f"{label} nodes 为空")
++        _assert(bool(payload["edges"]), f"{label} edges 为空")
++
++    return {
++        "solver_status": steady_overlay["solver_status"],
++        "node_count": len(steady_overlay["nodes"]),
++        "edge_count": len(steady_overlay["edges"]),
++        "scenario_id": steady_overlay["scenario_id"],
++    }
++
++
++def _verify_snapshot_archive(session: Session) -> Dict[str, Any]:
++    created = create_simulation_snapshot(
++        SaveSnapshotRequest(
++            pilot_id="mainline_zhongwei_jingbian",
++            scenario_id="steady_base",
++        ),
++        session=session,
++    )
++    _assert(str(created.get("run_id") or ""), "快照创建后缺少 run_id")
++    _assert(created.get("snapshot_version") == "we1-snapshot-v1", "快照版本不正确")
++    _assert("result" in created and isinstance(created["result"], dict), "快照缺少 result")
++    _assert("input_summary" in created, "快照缺少 input_summary")
++    _assert("output_summary" in created, "快照缺少 output_summary")
++
++    listing = list_simulation_snapshots(
++        pilot_id="mainline_zhongwei_jingbian",
++        limit=20,
++    )
++    items = listing.get("items", [])
++    scenario_ids = {str(item.get("scenario_id")) for item in items if isinstance(item, dict)}
++    expected = {
++        "steady_base",
++        "zhongwei_compressor_offline",
++        "zhongwei_trunk_break",
++        "yanchi_jingbian_limited",
++    }
++    missing = sorted(expected - scenario_ids)
++
++    return {
++        "created_run_id": created["run_id"],
++        "listed_count": listing.get("count"),
++        "covered_scenarios": sorted(scenario_ids),
++        "missing_scenarios": missing,
++        "all_mainline_scenarios_covered": not missing,
++    }
++
++
++def _verify_frontend_phase5_contract() -> Dict[str, Any]:
++    map_path = REPO_ROOT / "src" / "views" / "MapTopologyView.tsx"
++    hook_path = REPO_ROOT / "src" / "hooks" / "useSimulation.ts"
++    map_text = _read_text(map_path)
++    hook_text = _read_text(hook_path)
++
++    checks = [
++        {
++            "id": "useSimulation_baseline_comparison",
++            "passed": all(
++                token in hook_text
++                for token in [
++                    "baselineSnapshotRunId",
++                    "SimulationComparison",
++                    "setBaselineSnapshotRunId",
++                    "runMissingTrialScenarios",
++                ]
++            ),
++            "file": str(hook_path),
++        },
++        {
++            "id": "map_phase5_coverage_summary",
++            "passed": all(
++                token in map_text
++                for token in [
++                    "trialCoverageSummary",
++                    "coverageResultSummary",
++                    "coverageChecklistItems",
++                    "recommendedCoverageScenario",
++                ]
++            ),
++            "file": str(map_path),
++        },
++        {
++            "id": "map_phase5_demo_playbook",
++            "passed": all(
++                token in map_text
++                for token in [
++                    "demoGuideSteps",
++                    "failureInvestigationLayerLabel",
++                    "simulationEntryHint",
++                ]
++            ),
++            "file": str(map_path),
++        },
++        {
++            "id": "map_phase5_snapshot_actions",
++            "passed": all(
++                token in map_text
++                for token in [
++                    "runSteadySimulation",
++                    "saveSteadySnapshot",
++                    "loadSteadySelectedSnapshot",
++                    "runSteadyMissingTrialScenarios",
++                ]
++            ),
++            "file": str(map_path),
++        },
++    ]
++    _assert(all(item["passed"] for item in checks), "第一张图第5阶段前端收口未完成")
++    return {"checks": checks}
++
++
++def main() -> int:
++    try:
++        print("=== WE1 第一张图第5阶段验收开始 ===")
++
++        with Session(engine) as session:
++            overlay_contract = _verify_overlay_contract(session)
++            snapshot_archive = _verify_snapshot_archive(session)
++
++        frontend_contract = _verify_frontend_phase5_contract()
++
++        output = {
++            "status": "passed",
++            "overlay_contract": overlay_contract,
++            "snapshot_archive": snapshot_archive,
++            "frontend_contract": frontend_contract["checks"],
++            "triage_order": [
++                "主入口状态层",
++                "映射层 source IDs / overlay IDs",
++                "overlay 与快照归档层",
++                "基线对比与覆盖结果清单层",
++                "求解主链层",
++            ],
++            "next_mode": (
++                "maintenance"
++                if snapshot_archive["all_mainline_scenarios_covered"]
++                else "phase5-round4"
++            ),
++        }
++
++        print("WE1 第一张图第5阶段验收通过")
++        print(json.dumps(output, ensure_ascii=False, indent=2))
++        return 0
++    except Exception as exc:
++        print("WE1 第一张图第5阶段验收失败")
++        print(str(exc))
++        return 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+*** Add File: F:/smartgas-grid/docs/2026-04-08-WE1第一张图主仿真总收口说明_人话版.md
++一、主目标
++1. 这份说明把 WE1 第一张图主仿真的现状、主链、验收口径、失败先查哪层和回退点一次写死，后面继续跑自动化时不用再重新猜链路。
++
++二、当前结论
++1. 当前正式入口是 [`/map-topology`](/F:/smartgas-grid/src/App.tsx) 对应的 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)，正式主链是 `useSimulation -> /api/pipeline-packages/simulation-overlay -> /topology-simulation/snapshots`。
++2. 第一张图已经接上正式仿真结果、基线对比、场景覆盖结果清单和固定演示口径；第二张图仍保留调试价值，但这份总收口说明只认第一张图主入口。
++3. 当前不改求解公式、不扩新试点、不新造第三套仿真页面；后续如果第 5 阶段验收脚本持续通过，就进入巡检、回归和修复模式。
++
++三、主链与文件口径
++1. 前端主入口文件是 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)，状态与请求封装在 [useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)。
++2. 后端主入口文件是 [topology_simulation.py](/F:/smartgas-grid/backend/app/routers/topology_simulation.py)，快照落档在 [we1_result_snapshot_service.py](/F:/smartgas-grid/backend/app/services/we1_result_snapshot_service.py)。
++3. 第一张图映射层在 [simulationOverlayMapping.ts](/F:/smartgas-grid/src/utils/simulationOverlayMapping.ts)，点线命中解释、失败先查哪层都从这里往前端落。
++4. 第 5 阶段独立验收脚本是 [verify_we1_map_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase5.py)，阶段 3-4 联合回归脚本是 [verify_we1_phase34_final.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase34_final.py)，快照归档脚本是 [verify_we1_snapshot_archive.py](/F:/smartgas-grid/backend/scripts/verify_we1_snapshot_archive.py)。
++
++四、验收怎么跑
++1. 先运行 `python backend/scripts/verify_we1_phase34_final.py`，确认正式求解链、overlay 契约和阶段 3-4 联合回归还是通的。
++2. 再运行 `python backend/scripts/verify_we1_map_phase5.py`，确认第一张图第 5 阶段的基线对比、覆盖结果清单、演示口径和快照归档口径都在。
++3. 如果只想单查快照归档，运行 `python backend/scripts/verify_we1_snapshot_archive.py`。
++
++五、失败先查哪层
++1. 第一层先查主入口状态层，也就是 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 和 [useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts) 里的场景、快照、基线、覆盖状态是不是串了。
++2. 第二层查映射层，也就是 [simulationOverlayMapping.ts](/F:/smartgas-grid/src/utils/simulationOverlayMapping.ts) 里的 source IDs、overlay IDs 和未命中统计。
++3. 第三层查 overlay 与快照归档层，也就是 [topology_simulation.py](/F:/smartgas-grid/backend/app/routers/topology_simulation.py) 和 [we1_result_snapshot_service.py](/F:/smartgas-grid/backend/app/services/we1_result_snapshot_service.py)。
++4. 最后一层才查求解主链，也就是 [topology_simulation.py](/F:/smartgas-grid/backend/app/services/topology_simulation.py) 和相关求解输入服务；除非验证明确指向这里，否则不要动公式。
++
++六、回退点
++1. 如果第 5 阶段脚本失败但阶段 3-4 联合回归还通过，优先把回退控制在第一张图展示层，不动求解和场景定义。
++2. 如果快照归档失败，优先回查快照创建、读取、列表三段，不直接回退映射层和页面层。
++3. 如果映射命中率下降，优先回查 [simulationOverlayMapping.ts](/F:/smartgas-grid/src/utils/simulationOverlayMapping.ts) 和 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 的消费逻辑，不直接改求解输出。
++
++七、前后对比
++| 项目 | 之前 | 现在 |
++| --- | --- | --- |
++| 主入口口径 | memory 仍停在第 3 阶段阻塞，接手时容易误判 | 统一按第一张图主入口和第 5 阶段独立验收脚本判断 |
++| 收口资料 | 阶段总结分散，缺一份总收口说明 | 现在有固定总收口说明，接手时能直接看 |
++| 验收链路 | 只有阶段 3-4 脚本和快照脚本，缺第一张图第 5 阶段独立验收 | 现在补上第 5 阶段独立验收脚本 |
++
++八、截图与替代
++1. 这轮没有补截图，因为本轮重点是验收脚本和总收口文档，不是新增页面视觉改动。
++2. 这次用上面的“前后对比表 + 验收脚本清单”代替截图，便于后续巡检直接照着跑。
+*** Add File: F:/smartgas-grid/docs/2026-04-08-WE1第一张图第5阶段第3轮验收收口总结_人话版.md
++一、主目标
++1. 这轮只补第 5 阶段后半段缺口：把第一张图主仿真的独立验收脚本和总收口说明补齐，让后面运行能按同一口径巡检和回归。
++
++二、上下文与已知信息
++1. 现有 docs 已经落了第 5 阶段第 1 轮“覆盖结果清单”和第 2 轮“固定演示口径”，说明 UI 收口已经推进过。
++2. automation memory 还停在第 3 阶段阻塞，和 docs 的真实推进状态不一致，接手时容易误判。
++3. 现有脚本里只有 [verify_we1_phase34_final.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase34_final.py) 和 [verify_we1_snapshot_archive.py](/F:/smartgas-grid/backend/scripts/verify_we1_snapshot_archive.py)，缺一份专门验第一张图第 5 阶段的独立脚本。
++
++三、主代理与子代理分工
++1. 侦察 A 查 docs 落盘、`MapTopologyView`、`useSimulation`，判断当前已到第 5 阶段第 2 轮。
++2. 侦察 B 查现有验证脚本和回归口径，确认缺口集中在“第 5 阶段独立验收 + 总收口说明”。
++3. 实施只动 3 类文件：新增第 5 阶段脚本、新增总收口说明、新增本轮总结。
++4. 验证单独跑阶段 3-4 联合回归和第 5 阶段新脚本，失败先查主入口状态层，再查映射层和快照层。
++
++四、修改逻辑
++1. 新增 [verify_we1_map_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase5.py)，把第 5 阶段真正要验的几件事收成一条脚本：正式 overlay 契约、快照归档、第一张图覆盖结果清单相关前端标识、固定演示口径相关前端标识。
++2. 新增 [2026-04-08-WE1第一张图主仿真总收口说明_人话版.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图主仿真总收口说明_人话版.md)，把主链、验收口径、失败先查哪层和回退点一次写死。
++3. 这轮没动求解公式、场景定义和第二张图，只把第 5 阶段后半段从“靠人记”补成“有脚本、有说明”。
++
++五、执行顺序
++1. 先根据 docs 和代码确认当前真实进度是第 5 阶段第 2 轮。
++2. 再补第 5 阶段独立验收脚本。
++3. 再补总收口说明和本轮总结。
++4. 最后更新 automation memory，把当前阶段纠正到第 5 阶段第 3 轮。
++
++六、验证方式
++1. 运行 `python backend/scripts/verify_we1_phase34_final.py`，确认阶段 3-4 主链回归不被这轮影响。
++2. 运行 `python backend/scripts/verify_we1_map_phase5.py`，确认第 5 阶段独立验收通过。
++3. 结果怎么看：两个脚本都通过，说明这轮新增的验收和总收口已经站住；如果新脚本失败，先查第一张图主入口状态层，再查映射层和快照层。
++
++七、风险与回退点
++1. 风险 1 是 docs 和 memory 不一致导致自动化重复推进旧阶段；这轮已用总收口说明和 memory 纠偏。
++2. 风险 2 是第 5 阶段脚本只做静态标识校验，不替代真实页面点按；后续巡检仍要继续跑已有联合回归脚本。
++3. 回退点很明确：如果第 5 阶段脚本后续暴露问题，先只回退脚本或第一张图展示层，不动求解公式。
++
++八、最终交付物
++1. [verify_we1_map_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase5.py)
++2. [2026-04-08-WE1第一张图主仿真总收口说明_人话版.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图主仿真总收口说明_人话版.md)
++3. [2026-04-08-WE1第一张图第5阶段第3轮验收收口总结_人话版.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图第5阶段第3轮验收收口总结_人话版.md)
++
++九、前后对比
++| 项目 | 之前 | 现在 |
++| --- | --- | --- |
++| 第 5 阶段验证 | 只有阶段 3-4 联合回归和快照脚本 | 补了第一张图第 5 阶段独立验收脚本 |
++| 总收口资料 | 只有分散的阶段总结 | 补了一份第一张图总收口说明 |
++| 自动化阶段判断 | memory 落后于 docs | 这轮会同步更新 memory 到第 5 阶段第 3 轮 |
++
++十、截图与替代
++1. 这轮没有合适截图，因为没有新增新的页面视觉层。
++2. 用“前后对比表 + 验收脚本输出 + 总收口说明”代替截图，更适合后续自动化巡检和接手。
+*** End Patch

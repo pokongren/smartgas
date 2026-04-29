@@ -1,0 +1,27 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\2026-04-23-去掉基础温度入口第1阶段第1轮总结_人话版.md
++一、主目标
++按“不要基础温度”处理，本轮把拓扑仿真参数面板里的手动基础温度入口去掉，只保留压力和流量相关设置。
++
++二、做了什么
++1. 修改了 [SimParamEditor.tsx](F:/smartgas-grid/src/components/topology/SimParamEditor.tsx)，去掉“全网默认温度”输入框和“节点温度设定”输入列。2. 修改了 [MapTopologyView.tsx](F:/smartgas-grid/src/views/MapTopologyView.tsx)，不再校验、不再组装、不再提交手动基础温度相关参数。3. 保留了仿真结果里的温度展示、实时数据带回的温度和后端兼容字段，避免把已有结果面板一起删坏。
++
++三、为什么这么改
++1. 你说“不要基础温度”，最直接对应的是前端参数面板里的手动温度入口，而不是仿真结果中的温度读数。2. 这样改动范围最小，风险最低，能把“不要这个配置项”准确落到 UI 和请求链路上。3. 后端字段先保留兼容，后面如果我们要彻底清理协议，再单独做一轮。
++
++四、影响范围
++1. 受影响页面主要是 [MapTopologyView.tsx](F:/smartgas-grid/src/views/MapTopologyView.tsx) 中展开的参数设置区域。2. 现在用户只能手动改压力、最小压力、默认流量，不再能手动填基础温度。3. 仿真结果区里的“出站温度”“基线出站温度”等展示仍然保留。
++
++五、前后对比
++| 场景 | 修改前 | 修改后 |
++| 1 | 可填写全网默认温度 | 不再显示该输入框 |
++| 2 | 可给单站填写温度设定 | 不再显示该列 |
++| 3 | 提交仿真时会带上手动温度参数 | 不再主动提交这类参数 |
++| 4 | 结果面板显示温度 | 显示不变 |
++
++六、验证结果
++1. 执行 `npx tsc --noEmit`，通过。2. 复核 `MapTopologyView.tsx`，确认手动基础温度已从校验和请求组装里移除。3. 复核残留 `temperature_c` 引用，确认它们属于结果展示和实时数据，不是这次要删的入口。
++
++七、风险与回退点
++1. 如果后续有人仍想手动控制仿真温度，这次改动会让前端没有入口。2. 当前后端协议还兼容温度字段，但前端不再主动发；如果以后要彻底去协议字段，可以再单开一轮。3. 回退时只需要恢复 [SimParamEditor.tsx](F:/smartgas-grid/src/components/topology/SimParamEditor.tsx) 和 [MapTopologyView.tsx](F:/smartgas-grid/src/views/MapTopologyView.tsx) 本次差异。
+*** End Patch

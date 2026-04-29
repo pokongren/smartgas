@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+             const poly = new AMap.Polyline({
+                 path: [startNode.position, endNode.position],
+                 strokeColor: LINE_COLOR,
+                 strokeWeight: LINE_WEIGHT,
+                 strokeStyle: 'solid',
+                 zIndex: 100,
+             })
+             poly.setMap(mapInstance)
++            poly.on('click', () => doEdgeClick(edge.id))
+             return { ...edge, poly }
+         })
+*** End Patch

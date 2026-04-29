@@ -1,0 +1,22 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ 2026-04-04 06:06 CST
+ 
+ - Follow-up implementation run completed in the live repo root `F:\smartgas-grid`; this was a real code + docs fix run, not a blockage judgment.
+ - Fixed the two core utility files that were still undermining the earlier heartbeat conclusions:
+@@
+ - Residual risk to remember next run:
+   - this hierarchy hookup covers the national map rendering chain, not `MapTopologyView.tsx`, which still uses its own editor rendering path;
+   - the wider repo still contains other mojibake-affected files, so this fix removes the core classification risk but does not claim a full-repo encoding cleanup.
+ - Memory updated after the fix run. Run completed at `2026-04-04 06:06:47 +08:00`.
++
++2026-04-04 06:20 CST
++
++- This run is `automation env mismatch / worktree-path blockage`, not a completed code-change or DB-change inspection.
++- Current `cwd` is `C:\Users\Administrator\.codex\worktrees\bd23\smartgas-grid`; current git root from `git -c safe.directory=... rev-parse --show-toplevel` is also `C:\Users\Administrator\.codex\worktrees\bd23\smartgas-grid`; configured target directory remains `F:\smartgas-grid`.
++- The current git root is still the minimal detached snapshot: root listing contains only `.git` and `README.md`, `.git` points at `F:/smartgas-grid/.git/worktrees/smartgas-grid25`, `git log --oneline -5` shows only `6410a10 Initial commit`, and there are no local `docs` changes or diff stats under this root.
++- Cross-check for context only: `git worktree list --porcelain` from `F:\smartgas-grid` still shows the live branch at `F:\smartgas-grid` on `HEAD eaf6ac4...`, while this automation runtime landed in the detached `bd23` worktree instead.
++- Cross-check for change surface only, not entity-level conclusions: the live repo at `F:\smartgas-grid` currently has broad uncommitted changes in `backend/`, `src/`, and `docs/`, plus local residue in `.npm-cache/` and `.agent/workflows/start.md`.
++- This run judged strictly from the current git root and did not reuse the live-repo path as the basis for the three business tracks. Memory updated only. Run completed at `2026-04-04 06:20:52 +08:00`.
+*** End Patch

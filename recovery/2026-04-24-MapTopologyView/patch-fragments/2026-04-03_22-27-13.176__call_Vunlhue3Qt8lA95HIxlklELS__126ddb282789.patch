@@ -1,0 +1,348 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\components\ClusterDetailPanel.tsx
+@@
+ import React from 'react'
+ import type { ClusterGroup } from '@/types/cluster'
+ import type { PipelineNode } from '@/types/pipeline'
++import { getNodeRawType } from '@/utils/pipelineDomain'
+@@
+     const { nodes, coordinate } = cluster
+ 
+-    // 分类节点
+-    const compressorNodes = nodes.filter(n => n.name.includes('压气站'))
+-    const distributionNodes = nodes.filter(n =>
+-        n.name.includes('分输站') || n.name.includes('门站')
+-    )
+-    const valveNodes = nodes.filter(n =>
+-        n.type === 'valve' || n.name.includes('阀室') || n.name.includes('阀门') || n.name.includes('#')
+-    )
++    const nodeGroups = [
++        {
++            key: 'source',
++            title: '气源/首末站',
++            icon: 'energy',
++            className: 'border-red-500/30 bg-red-900/20',
++            titleClassName: 'text-red-400',
++            nodes: nodes.filter(node => getNodeRawType(node) === 'source'),
++        },
++        {
++            key: 'compressor',
++            title: '压气站',
++            icon: 'compress',
++            className: 'border-cyan-500/30 bg-cyan-900/20',
++            titleClassName: 'text-cyan-400',
++            nodes: nodes.filter(node => getNodeRawType(node) === 'compressor'),
++        },
++        {
++            key: 'distribution',
++            title: '分输站',
++            icon: 'hub',
++            className: 'border-yellow-500/30 bg-yellow-900/20',
++            titleClassName: 'text-yellow-400',
++            nodes: nodes.filter(node => getNodeRawType(node) === 'distribution'),
++        },
++        {
++            key: 'valve',
++            title: '阀室',
++            icon: 'valve',
++            className: 'border-gray-500/30 bg-gray-800/50',
++            titleClassName: 'text-gray-400',
++            nodes: nodes.filter(node => getNodeRawType(node) === 'valve'),
++        },
++        {
++            key: 'other',
++            title: '其他节点',
++            icon: 'device_hub',
++            className: 'border-purple-500/30 bg-purple-900/20',
++            titleClassName: 'text-purple-300',
++            nodes: nodes.filter(node => {
++                const rawType = getNodeRawType(node)
++                return !['source', 'compressor', 'distribution', 'valve'].includes(rawType)
++            }),
++        },
++    ].filter(group => group.nodes.length > 0)
+ 
+     return (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+@@
+                 </div>
+ 
+                 {/* 节点列表 */}
+                 <div className="overflow-y-auto flex-1 p-4 space-y-3">
+-                    {/* 压气站 */}
+-                    {compressorNodes.length > 0 && (
+-                        <div className="border border-cyan-500/30 bg-cyan-900/20 rounded-lg p-3">
+-                            <h4 className="text-sm font-semibold mb-2 text-cyan-400 flex items-center gap-2">
+-                                <span className="material-symbols-outlined text-[18px]">compress</span>
+-                                压气站 ({compressorNodes.length})
+-                            </h4>
+-                            <div className="space-y-2">
+-                                {compressorNodes.map(node => (
+-                                    <NodeItem
+-                                        key={node.id}
+-                                        node={node}
+-                                        onClick={() => {
+-                                            onNodeSelect?.(node)
+-                                            onClose()
+-                                        }}
+-                                    />
+-                                ))}
+-                            </div>
+-                        </div>
+-                    )}
+-
+-                    {/* 分输站 */}
+-                    {distributionNodes.length > 0 && (
+-                        <div className="border border-yellow-500/30 bg-yellow-900/20 rounded-lg p-3">
+-                            <h4 className="text-sm font-semibold mb-2 text-yellow-400 flex items-center gap-2">
+-                                <span className="material-symbols-outlined text-[18px]">hub</span>
+-                                分输站 ({distributionNodes.length})
+-                            </h4>
+-                            <div className="space-y-2">
+-                                {distributionNodes.map(node => (
+-                                    <NodeItem
+-                                        key={node.id}
+-                                        node={node}
+-                                        onClick={() => {
+-                                            onNodeSelect?.(node)
+-                                            onClose()
+-                                        }}
+-                                    />
+-                                ))}
+-                            </div>
+-                        </div>
+-                    )}
+-
+-                    {/* 阀室 */}
+-                    {valveNodes.length > 0 && (
+-                        <div className="border border-gray-500/30 bg-gray-800/50 rounded-lg p-3">
+-                            <h4 className="text-sm font-semibold mb-2 text-gray-400 flex items-center gap-2">
+-                                <span className="material-symbols-outlined text-[18px]">valve</span>
+-                                阀室 ({valveNodes.length})
+-                            </h4>
+-                            <div className="space-y-2">
+-                                {valveNodes.map(node => (
+-                                    <NodeItem
+-                                        key={node.id}
+-                                        node={node}
+-                                        onClick={() => {
+-                                            onNodeSelect?.(node)
+-                                            onClose()
+-                                        }}
+-                                    />
+-                                ))}
+-                            </div>
+-                        </div>
+-                    )}
+-
+-                    {compressorNodes.length === 0 && distributionNodes.length === 0 && valveNodes.length === 0 && (
++                    <div className="text-xs text-gray-500 px-1">
++                        坐标：{coordinate.longitude.toFixed(4)}, {coordinate.latitude.toFixed(4)}
++                    </div>
++
++                    {nodeGroups.map(group => (
++                        <div key={group.key} className={`border rounded-lg p-3 ${group.className}`}>
++                            <h4 className={`text-sm font-semibold mb-2 flex items-center gap-2 ${group.titleClassName}`}>
++                                <span className="material-symbols-outlined text-[18px]">{group.icon}</span>
++                                {group.title} ({group.nodes.length})
++                            </h4>
++                            <div className="space-y-2">
++                                {group.nodes.map(node => (
++                                    <NodeItem
++                                        key={node.id}
++                                        node={node}
++                                        onClick={() => {
++                                            onNodeSelect?.(node)
++                                            onClose()
++                                        }}
++                                    />
++                                ))}
++                            </div>
++                        </div>
++                    ))}
++
++                    {nodeGroups.length === 0 && (
+                         <div className="text-center text-gray-500 py-8">
+                             无节点数据
+                         </div>
+@@
+ const NodeItem: React.FC<NodeItemProps> = ({ node, onClick }) => (
+     <div
+         onClick={onClick}
+         className="flex items-center justify-between p-3 rounded bg-gray-900/60 hover:bg-gray-700 cursor-pointer transition-all border border-transparent hover:border-gray-600"
+     >
+         <div className="flex flex-col">
+             <span className="text-sm text-gray-200 font-medium">{node.name}</span>
+-            <span className="text-[10px] text-gray-500 mt-1">
+-                {node.pressureLevel || '未知压力'}
++            <span className="text-[10px] text-gray-500 mt-1 flex items-center gap-2">
++                <span>{node.pressureLevel || '未知压力'}</span>
++                {node.properties?.layerName && (
++                    <span className="text-gray-600">{String(node.properties.layerName)}</span>
++                )}
+             </span>
+         </div>
+         <span className={`text-xs px-2 py-1 rounded-full ${node.status === 'normal'
+*** Update File: F:\smartgas-grid\src\views\GlobalPipelineView.tsx
+@@
+-import React, { useMemo, useState, useCallback, lazy, Suspense, useEffect } from 'react'
++import React, { useMemo, useState, useCallback, lazy, Suspense, useEffect } from 'react'
+ import MapView from '@/components/map-view/MapView'
+@@
+ import { EmptyScadaState, ScadaFloatingPanel } from '@/views/global-pipeline/ScadaFloatingPanel'
+ import type { ScadaRecord } from '@/views/global-pipeline/scadaConfig'
++import { useNavigate } from 'react-router-dom'
+ 
+ import { getNodeMarkerMap } from '@/utils/mapRenderer'
+ import { useNewWindow, usePopoutSync } from '@/hooks/useNewWindow'
++import { getNodeRawType } from '@/utils/pipelineDomain'
+@@
+ const GlobalPipelineView: React.FC = () => {
++    const navigate = useNavigate()
+     // 绠＄嚎鏁版嵁寮傛鍔犺浇
+     const [pipelines, setPipelines] = useState<PipelinePackage[]>([])
+@@
+     const [mapInstance, setMapInstance] = useState<any>(null)
++    const [selectedMapNode, setSelectedMapNode] = useState<PipelineNode | null>(null)
+@@
+     const stats = useMemo(() => ({
+         stations: pipelineData.nodes.length,
+         pipelines: pipelineData.lines.length,
+         groups: pipelines.length
+     }), [pipelineData, pipelines])
++
++    const selectedMapNodeMeta = useMemo(() => {
++        if (!selectedMapNode) return null
++
++        const rawType = getNodeRawType(selectedMapNode)
++        const rawTypeLabelMap: Record<string, string> = {
++            source: '气源/首末站',
++            compressor: '压气站',
++            distribution: '分输站',
++            valve: '阀室',
++            junction: '枢纽/连接点',
++            storage: '储气设施',
++            other: '其他节点',
++            shared: '共享节点',
++        }
++
++        return {
++            rawType,
++            rawTypeLabel: rawTypeLabelMap[rawType] || '其他节点',
++            layerName: selectedMapNode.properties?.layerName ? String(selectedMapNode.properties.layerName) : '未标记图层',
++            systemId: selectedMapNode.properties?.systemId ? String(selectedMapNode.properties.systemId) : '未标记系统',
++        }
++    }, [selectedMapNode])
++
++    const handleMapNodeClick = useCallback((event: { data: PipelineNode }) => {
++        setSelectedMapNode(event.data)
++    }, [])
+@@
+             <MapView
+                 pipelineData={pipelineData}
+                 onLoad={handleMapLoad}
++                onNodeClick={handleMapNodeClick}
+             />
+@@
+             {/* SCADA 鍘嗗彶鏇茬嚎娴姩闈㈡澘 鈥?鐐瑰嚮鍘嬪姏/娓╁害鍊煎脊鍑?*/}
+             {historyTarget && (
+@@
+                 </div>
+             )}
++
++            {selectedMapNode && selectedMapNodeMeta && (
++                <div className="absolute top-24 right-6 z-20 w-[340px] bg-[#0c1218]/95 backdrop-blur-md rounded-xl border border-cyan-500/20 shadow-2xl overflow-hidden">
++                    <div className="px-4 py-3 border-b border-cyan-500/20 bg-[#0f1722] flex items-center justify-between">
++                        <div>
++                            <h3 className="text-sm font-semibold text-white">{selectedMapNode.name}</h3>
++                            <p className="text-[11px] text-gray-400 mt-0.5">地图节点详情</p>
++                        </div>
++                        <button
++                            onClick={() => setSelectedMapNode(null)}
++                            className="text-gray-400 hover:text-white transition-colors"
++                        >
++                            <span className="material-symbols-outlined">close</span>
++                        </button>
++                    </div>
++
++                    <div className="p-4 space-y-3 text-sm">
++                        <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-2">
++                            <p className="text-xs text-gray-400">类型：<span className="text-gray-200">{selectedMapNodeMeta.rawTypeLabel}</span></p>
++                            <p className="text-xs text-gray-400">图层：<span className="text-gray-200">{selectedMapNodeMeta.layerName}</span></p>
++                            <p className="text-xs text-gray-400">系统：<span className="text-gray-200">{selectedMapNodeMeta.systemId}</span></p>
++                            <p className="text-xs text-gray-400">
++                                坐标：<span className="text-gray-200">{selectedMapNode.coordinate.longitude.toFixed(4)}, {selectedMapNode.coordinate.latitude.toFixed(4)}</span>
++                            </p>
++                        </div>
++
++                        <div className="grid grid-cols-2 gap-2">
++                            <button
++                                onClick={() => {
++                                    if (mapInstance) {
++                                        mapInstance.setZoomAndCenter(13, [selectedMapNode.coordinate.longitude, selectedMapNode.coordinate.latitude])
++                                    }
++                                }}
++                                className="bg-gray-800 hover:bg-gray-700 text-gray-200 py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
++                            >
++                                <span className="material-symbols-outlined text-sm">my_location</span>地图定位
++                            </button>
++                            <button
++                                onClick={() => {
++                                    navigate(`/map-topology?focus=${encodeURIComponent(selectedMapNode.id)}`)
++                                    setSelectedMapNode(null)
++                                }}
++                                className="bg-cyan-700/80 hover:bg-cyan-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
++                            >
++                                <span className="material-symbols-outlined text-sm">conversion_path</span>地图拓扑
++                            </button>
++                        </div>
++                    </div>
++                </div>
++            )}
+         </div>
+     )
+ }
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+ import MapView from '@/components/map-view/MapView'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
++import { useLocation } from 'react-router-dom'
+ import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+@@
+ const MapTopologyView: React.FC = () => {
++    const location = useLocation()
+     const [mapInstance, setMapInstance] = useState<any>(null)
+@@
+     const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+     // 已高亮的 marker 原始 content，用于恢复
+     const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
++    const focusedNodeIdRef = useRef<string | null>(null)
+@@
+     useEffect(() => { nodesRef.current = topoNodes; edgesRef.current = topoEdges }, [topoNodes, topoEdges])
+     useEffect(() => { modeRef.current = editMode; ptRef.current = pointType }, [editMode, pointType])
+     useEffect(() => { cfRef.current = connectFrom }, [connectFrom])
++    useEffect(() => {
++        const focusNodeId = new URLSearchParams(location.search).get('focus')
++        focusedNodeIdRef.current = focusNodeId
++    }, [location.search])
+@@
+     useEffect(() => {
+         if (!selectedNode) return
+         const nextSelected = topoNodes.find(node => node.id === selectedNode.id) || null
+         setSelectedNode(nextSelected)
+     }, [selectedNode?.id, topoNodes])
++
++    useEffect(() => {
++        const focusNodeId = focusedNodeIdRef.current
++        if (!focusNodeId || topoNodes.length === 0 || !mapInstance) return
++
++        const targetNode = topoNodes.find(node => node.id === focusNodeId)
++        if (!targetNode) return
++
++        setSelectedNode(targetNode)
++        mapInstance.setZoomAndCenter(12, targetNode.position)
++        focusedNodeIdRef.current = null
++        setStatusMsg(`已从全国视图定位到节点：${targetNode.name}`)
++    }, [mapInstance, topoNodes])
+*** End Patch

@@ -1,0 +1,25 @@
+*** Begin Patch
+*** Update File: C:/Users/Administrator/.codex/automations/automation/memory.md
+@@
+ ## 2026-04-06 11:21:40 +08:00
+ 
+ - 更正版摘要：本轮项目心跳继续只认 F:\smartgas-grid 主目录事实，主仓为 eaf6ac4，detached worktree 继续只算并行环境，不拿来顶替主仓判断。
+ - Git 事实未变：当前未提交变更规模仍为 47 files changed, 5434 insertions(+), 2761 deletions(-)，docs 变化继续集中在 docs/TOPOLOGY_SETUP_GUIDE.md 和 docs/TOPOLOGY_COMPUTATION_USAGE.md。
+ - 地图链路未变：GlobalPipelineView -> MapView -> mapRenderer -> hierarchyRenderer；LOD 阈值仍为 critical/high/medium=6/10/14、valveMinZoom=11、expandClusterZoom=12；MapTopologyView 仍是独立口径。
+ - 枢纽与数据库口径未变：运行时继续 rebuilt 优先、legacy 回退、manual overlay 叠加；check_db.py 结果仍是 pipeline_systems=13、we3 缺失、SJ2=70/69、SJ3=71/70、junction_groups=25、junction_groups_rebuilt=7、issue_count=0。
+ - 导入脚本边界未变：reimport_sj23.py 属于离线重导，rebuild_junctions.py 属于影子表重建，add_sj2.py 和 add_we3.py 更像局部补写。
+ - AI 链路未变：前端 useAiAssistantChat.ts 固定请求 /api/ai-assistant/chat；后端 ai_assistant.py 仍是 direct、orchestrated、legacy 三路并存。
+ - 本轮新增文档：F:\smartgas-grid\docs\automation\project-heartbeat-2026-04-06-111853.md。运行时间：2026-04-06 11:21 +08:00。
++
++## 2026-04-06 14:26:48 +08:00
++
++- 本轮继续严格落在 `F:\smartgas-grid` 主目录执行；`git rev-parse --show-toplevel=F:/smartgas-grid`，`git rev-parse --absolute-git-dir=F:/smartgas-grid/.git`，`.git` 通过 `Get-ChildItem -Force .git` 复核为实体目录，不是 worktree 指针文件。
++- 旧 memory 里的主仓快照已经过期：当前主仓 HEAD 已前进到 `602f715`，分支为 `拓扑设想`；`git worktree list --porcelain` 继续显示主目录挂分支，其余大量 `C:\Users\Administrator\.codex\worktrees\...\smartgas-grid` 仍是 `6410a10` 的 detached worktree，后续巡检继续只认主仓事实。
++- 当前主仓工作区比旧记忆干净很多：`git status --short` 只剩 3 个已跟踪改动文件 `backend/app/routers/pipeline_packages.py`、`backend/data/smartgas.db`、`src/data/pipelines/we1.ts`，另有 `backend/app/services/we1_pilot_service.py` 和数个 `tmp_*` 未跟踪文件；`git diff --stat` 当前是 `3 files changed, 448 insertions(+), 322 deletions(-)`，不再是旧记忆里的 `47 files changed, 5434 insertions(+), 2761 deletions(-)`。
++- docs 口径这轮也纠偏了：`git diff --name-only -- docs` 为空，`docs/TOPOLOGY_SETUP_GUIDE.md` 和 `docs/TOPOLOGY_COMPUTATION_USAGE.md` 当前没有已跟踪 diff；但这两份文档最近一次提交仍出现在 `git log -- docs/...` 里，说明“最近被改过”与“当前工作区仍有未提交改动”要分开写。
++- 地图链路复核结果未变：主渲染链仍是 `src/views/GlobalPipelineView.tsx -> src/components/map-view/MapView.tsx -> src/utils/mapRenderer.ts -> src/utils/hierarchyRenderer.ts`；统一阈值仍是 `critical/high/medium=6/10/14`、`valveMinZoom=11`、`expandClusterZoom=12`；`MapTopologyView.tsx` 文件内仍明确“不传 pipelineData 给 MapView”，所以它继续只是独立拓扑页口径，不是地图主渲染链一部分。
++- 枢纽与数据库口径未变：`backend/app/services/junction_groups.py` 运行时继续“优先 `junction_groups_rebuilt`，缺失时回退 `junction_groups`，再叠加 manual overlay”；`python backend/check_db.py` 结果仍是 `pipeline_systems=13`、`we3` 缺失、`SJ2=70/69`、`SJ3=71/70`、`junction_groups=25`、`junction_groups_backup_20260404=16`、`junction_groups_rebuilt=7`、`issue_count=0`，影子表最新生成时间 `2026-04-04T17:17:43.361829+00:00`。
++- 导入脚本边界未变：`backend/scripts/reimport_sj23.py` 仍是离线重导 `SJ2/SJ3` 工具，`backend/scripts/rebuild_junctions.py` 仍是影子表重建工具，`backend/scripts/add_sj2.py` / `backend/scripts/add_we3.py` 仍更像局部补写脚本，不能写成运行时主链。
++- AI 链路未变：前端 `src/components/ai-assistant/useAiAssistantChat.ts` 固定请求 `/api/ai-assistant/chat`，有页面上下文时发送 `analysis_mode=subagents`；后端 `backend/app/routers/ai_assistant.py` 先尝试 direct raw-excel reply，再按 `should_use_orchestration()` 在 orchestrated 和 legacy 间分流；模型出口在 `backend/app/services/ai_client.py`，工具能力在 `backend/app/services/assistant_tools.py`。
++- 本轮新增文档：`F:\smartgas-grid\docs\automation\project-heartbeat-2026-04-06-142648.md`。本轮运行时间：`2026-04-06 14:26 +08:00`。
+*** End Patch

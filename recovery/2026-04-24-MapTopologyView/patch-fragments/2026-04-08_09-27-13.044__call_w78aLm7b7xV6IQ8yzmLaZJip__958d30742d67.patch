@@ -1,0 +1,118 @@
+*** Begin Patch
+*** Add File: C:/Users/Administrator/.codex/worktrees/c93d/smartgas-grid/repo/docs/2026-04-08-WE1-maintenance-round12-topology-debug-guard-summary.md
++一、运行时间
++1. 2026-04-08 17:21:00 +08:00。
++
++二、当前状态
++1. WE1 第一张图五阶段主体仍已完成，当前处于维护模式第12轮，不进入下一阶段。
++2. 本轮只修维护模式下的默认入口语义，不改求解公式、不扩新试点、不新造第三套仿真页面。
++
++三、本轮动作
++1. 主代理先读 automation memory、五阶段方案和上一轮维护总结，确认当前只允许做巡检、回归和修复。
++2. 侦察子代理A核对 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)、[MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)、[App.tsx](/F:/smartgas-grid/src/App.tsx) 和 [useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)，确认 `/map-topology` 仍是正式入口，但 `/topology` 默认还挂着完整 `SimPanel`，会继续制造双入口语义风险。
++3. 侦察子代理B核对 [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)、[verify_we1_map_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase5.py)、[verify_we1_phase34_final.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase34_final.py)、[verify_we1_snapshot_archive.py](/F:/smartgas-grid/backend/scripts/verify_we1_snapshot_archive.py)，确认主链和快照归档仍成立，问题落在维护模式默认口径。
++4. 实施只改 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx) 和 [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)，把 `/topology` 收成“默认只看调试页，显式带 `debugActions=1` 才开启高级调试操作面”，同时给出返回第一张图主仿真入口的明确提示。
++5. 验证子代理独立回归维护脚本、阶段3到4联合脚本、第5阶段验收脚本、快照归档脚本，全部通过，不触发修复重试轮。
++
++四、改动文件
++1. [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)。
++2. [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)。
++3. [2026-04-08-WE1-maintenance-round12-topology-debug-guard-summary.md](/F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round12-topology-debug-guard-summary.md)。
++4. [memory.md](C:/Users/Administrator/.codex/automations/we1/memory.md)。
++
++五、修改逻辑
++1. `TopologyView` 继续保留调试页身份和原始拓扑排障视角，但不再默认直出完整 `SimPanel`。这样做的原因是维护模式下 `/topology` 只能是调试页，不能继续和第一张图形成默认双入口。
++2. 新增显式开关 `?debugActions=1`。这样做的原因是研发排障仍可能需要高级调试操作，但这类能力必须从“默认开放”改成“显式进入”，避免普通使用路径误触。
++3. 维护脚本新增对“默认隐藏高级调试操作面”的校验。这样做的原因是后续巡检不能只看主链通过，还要守住调试页边界不会被悄悄放开。
++
++六、验证方式
++1. 验证什么：验证维护模式入口语义已收紧，第一张图正式入口不变，阶段3到5主链和快照归档未被这次修复打坏。
++2. 怎么验证：运行 `python backend/scripts/verify_we1_maintenance.py`、`python backend/scripts/verify_we1_phase34_final.py`、`python backend/scripts/verify_we1_map_phase5.py`、`python backend/scripts/verify_we1_snapshot_archive.py`，再只读检查 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx) 是否改成 `debugActionsEnabled` 条件渲染。
++3. 结果怎么看：四条脚本全部返回 `passed`；维护脚本新增 `topology_view_hides_debug_actions_by_default=true`；`TopologyView` 源码里已经有 `debugActions` 参数、默认收起提示文案和 `debugActionsEnabled && (` 条件守卫。
++4. 失败时先查哪层：先查第一张图入口与 `TopologyView` 调试页守卫，其次查映射层和 source/overlay ID 对应关系，再查快照归档层，最后才查 backend solver input 与稳态求解主链。
++
++七、风险与回退点
++1. 当前剩余风险是这次只把调试页默认语义收紧，还没有做真实浏览器交互级自动化，所以后续若按钮文案或路由跳转被改坏，脚本只能守源码口径，仍需人工复核页面。
++2. 回退点很小，只涉及 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx) 的默认调试开关和 [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py) 的巡检条件；如果后面要恢复更强调试能力，也必须继续保持“默认关闭，显式开启”。
++
++八、前后对比
++| 项目 | 本轮之前 | 本轮之后 |
++| --- | --- | --- |
++| `/topology` 默认状态 | 直接暴露完整 `SimPanel`，仍像正式仿真页副本 | 默认只保留调试页说明和回主入口按钮 |
++| 高级调试操作 | 无边界，默认就能运行/快照/基线对比 | 只有 `/topology?debugActions=1` 才显式开启 |
++| 维护脚本口径 | 只校验调试页存在 | 同步校验默认收起高级调试操作面 |
++
++九、截图与替代
++1. 本轮没有附截图，因为自动化运行环境没有浏览器可视化快照输出。
++2. 这次用源码条件守卫、脚本回归结果和前后对比表代替截图，足够说明默认入口语义已经收紧。
++
++十、下一轮判断
++1. 不进入下一阶段，继续维护模式巡检与回归。
++2. 下一轮若再失败，先查 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx) 的默认守卫和 [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py) 的入口语义校验，再下钻映射、快照、求解层。
+*** Update File: C:/Users/Administrator/.codex/automations/we1/memory.md
+@@
+-一、运行时间
+-1. 2026-04-08 16:13:13 +08:00。
+-
+-二、当前状态
+-1. WE1 第一张图五阶段主体已完成，当前处于维护模式第11轮，不进入下一阶段。
+-2. 本轮仍只做维护巡检与结果落盘，保持 MapTopologyView 正式入口稳定，不再扩展业务链路。
+-
+-三、本轮动作
+-1. 重读五阶段左右文档、现有 memory 和侦察结论，确认第5阶段已封板、TopologyView 虽降级但依旧保留 `useSimulation + SimPanel` 主仿真能力，维持防线。
+-2. 继续按“主代理 + 多子代理”节奏：两名侦察分别核对阶段状态与主链语义，验证子代理跑 `verify_we1_maintenance.py`、`verify_we1_phase34_final.py`、`verify_we1_map_phase5.py`、`verify_we1_snapshot_archive.py`，均返回 `passed`。
+-3. 实施子代理本轮仅更新 round11 summary 与 memory，不改业务代码。
+-4. 记录 TopologyView 仍保留完整仿真操作面的风险，但本轮验证未命中，故继续监督而不动代码。
+-5. 新增总结 [2026-04-08-WE1-maintenance-round11-regression-patrol-summary.md](F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round11-regression-patrol-summary.md)。
+-
+-四、改动文件
+-1. [2026-04-08-WE1-maintenance-round11-regression-patrol-summary.md](F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round11-regression-patrol-summary.md)。
+-2. [memory.md](C:/Users/Administrator/.codex/automations/we1/memory.md)。
+-
+-五、验证结果
+-1. `python F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py` 通过，`status=passed`、`mode=maintenance`，说明主入口与旧入口隔离仍生效。
+-2. `python F:/smartgas-grid/backend/scripts/verify_we1_phase34_final.py` 通过，主辅 overlay 契约一致且编码清洁。
+-3. `python F:/smartgas-grid/backend/scripts/verify_we1_map_phase5.py` 通过，`next_mode=maintenance`，`snapshot_archive.all_mainline_scenarios_covered=true`。
+-4. `python F:/smartgas-grid/backend/scripts/verify_we1_snapshot_archive.py` 通过，`list_count=10`，`snapshot_path` 与 `failure_triage_order` 符合预期。
+-5. 所有脚本均通过，不触发修复轮，也未进入“连续两次修复失败”阻塞。
+-
+-六、失败先查哪层
+-1. 首先检查入口与前端消费层（`MapTopologyView.tsx`、`useSimulation.ts`），其次再查映射层与 source/overlay ID 匹配，再查快照归档层，最后才查 backend solver input 与稳态主链。
+-
+-七、下一轮判断
+-1. 不进入下一阶段，继续维护模式巡检与回归。
+-2. 若发生异常，优先回看 `verify_we1_maintenance.py` 的入口守卫，再对照 `MapTopologyView` 与 `TopologyView` 的消费逻辑，然后再下钻映射/快照/求解层。
++一、运行时间
++1. 2026-04-08 17:21:00 +08:00。
++
++二、当前状态
++1. WE1 第一张图五阶段主体已完成，当前处于维护模式第12轮，不进入下一阶段。
++2. 本轮完成 `/topology` 默认高级调试操作面收口，继续保持 `MapTopologyView` 为正式主入口。
++
++三、本轮动作
++1. 主代理先读五阶段方案、最近阶段总结和现有 memory，确认当前只能做维护模式巡检、回归和修复。
++2. 两名侦察子代理分别核对前端入口语义与后端维护脚本，收敛出唯一修复方向：`/topology` 默认仍暴露完整 `SimPanel`，不符合维护模式调试页边界。
++3. 实施子代理方向由主代理接管后落到两处代码：`TopologyView.tsx` 增加 `debugActions=1` 显式开关，默认收起高级调试操作面并引导回 `/map-topology`；`verify_we1_maintenance.py` 同步校验默认隐藏高级调试操作面。
++4. 验证子代理独立回归 `verify_we1_maintenance.py`、`verify_we1_phase34_final.py`、`verify_we1_map_phase5.py`、`verify_we1_snapshot_archive.py`，全部通过。
++5. 新增总结 [2026-04-08-WE1-maintenance-round12-topology-debug-guard-summary.md](F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round12-topology-debug-guard-summary.md)。
++
++四、改动文件
++1. [TopologyView.tsx](F:/smartgas-grid/src/views/TopologyView.tsx)。
++2. [verify_we1_maintenance.py](F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)。
++3. [2026-04-08-WE1-maintenance-round12-topology-debug-guard-summary.md](F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round12-topology-debug-guard-summary.md)。
++4. [memory.md](C:/Users/Administrator/.codex/automations/we1/memory.md)。
++
++五、验证结果
++1. `python F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py` 通过，`status=passed`、`mode=maintenance`，新增 `topology_view_hides_debug_actions_by_default=true`。
++2. `python F:/smartgas-grid/backend/scripts/verify_we1_phase34_final.py` 通过，主辅 overlay 契约一致，`steady_status=failure_status=converged`。
++3. `python F:/smartgas-grid/backend/scripts/verify_we1_map_phase5.py` 通过，`next_mode=maintenance`，四个主样板场景覆盖完整。
++4. `python F:/smartgas-grid/backend/scripts/verify_we1_snapshot_archive.py` 通过，`list_count=10`，快照归档仍可读写。
++5. 所有脚本均通过，不触发修复轮，也未进入“连续两次修复失败”阻塞。
++
++六、失败先查哪层
++1. 先查 `TopologyView.tsx` 和 `verify_we1_maintenance.py` 的入口守卫，再查 `MapTopologyView.tsx` 与 `useSimulation.ts` 的前端消费层，其次查映射层和 source/overlay ID 命中关系，再查快照归档层，最后才查 backend solver input 与稳态主链。
++
++七、下一轮判断
++1. 不进入下一阶段，继续维护模式巡检与回归。
++2. 下一轮若再失败，优先检查 `/topology` 默认守卫是否被打破，再按入口层 -> 映射层 -> 快照层 -> 求解层继续排查。
+*** End Patch

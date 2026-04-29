@@ -1,0 +1,68 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py
+@@
+ def _verify_entry_semantics() -> Dict[str, Any]:
+     app_path = REPO_ROOT / "src" / "App.tsx"
+     map_path = REPO_ROOT / "src" / "views" / "MapTopologyView.tsx"
++    topology_path = REPO_ROOT / "src" / "views" / "TopologyView.tsx"
+     ai_context_path = REPO_ROOT / "src" / "components" / "ai-assistant" / "useAiAssistantPageContext.ts"
+     app_text = _read_text(app_path)
+     map_text = _read_text(map_path)
++    topology_text = _read_text(topology_path)
+     ai_context_text = _read_text(ai_context_path)
+ 
+     checks = [
+         {
+             "id": "map_topology_route_present",
+@@
+         {
+             "id": "topology_navigation_present",
+             "passed": "navigate('/topology')" in app_text,
+             "file": str(app_path),
+         },
++        {
++            "id": "view_switcher_labels_primary_vs_debug",
++            "passed": all(
++                token in app_text
++                for token in [
++                    "切换正式主仿真页 / 调试页",
++                    'title="第一张图主仿真入口"',
++                    'title="TopologyView 调试页"',
++                ]
++            ),
++            "file": str(app_path),
++        },
+         {
+             "id": "map_view_exposes_primary_entry_hint",
+-            "passed": "simulationEntryHint" in map_text,
++            "passed": all(
++                token in map_text
++                for token in [
++                    "simulationEntryHint",
++                    "runSteadySimulation",
++                    "saveSteadySnapshot",
++                    "loadSteadySelectedSnapshot",
++                    "runSteadyMissingTrialScenarios",
++                ]
++            ),
+             "file": str(map_path),
+         },
++        {
++            "id": "topology_view_retains_debug_tooling",
++            "passed": all(
++                token in topology_text
++                for token in [
++                    "SimPanel",
++                    "MAINLINE_SCENARIOS",
++                    "rawData",
++                    "topology-canvas",
++                ]
++            ),
++            "file": str(topology_path),
++        },
+         {
+             "id": "ai_context_map_vs_topology_distinct",
+             "passed": all(
+                 token in ai_context_text
+                 for token in [
+*** End Patch

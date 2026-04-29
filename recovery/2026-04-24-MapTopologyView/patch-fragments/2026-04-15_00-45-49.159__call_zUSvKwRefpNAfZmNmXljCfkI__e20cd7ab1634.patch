@@ -1,0 +1,75 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+         const cappedEdges = graphEdges
+             .filter(edge => allowedNodeIds.has(edge.startNodeId) && allowedNodeIds.has(edge.endNodeId))
+             .slice(0, budget.maxEdges)
++        const isLargeGraph = renderSafetyMode === 'lite' || cappedNodes.length > 320 || cappedEdges.length > 480
+@@
+         const renderedNodes: TopoNode[] = cappedNodes.map(node => {
+             const size = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
+             const marker = new AMap.Marker({
+                 position: new AMap.LngLat(node.position[0], node.position[1]),
+-                content: createTopoMarkerContent(node.type, node.name, false, !!node.isJunction),
++                content: createTopoMarkerContent(node.type, isLargeGraph ? '' : node.name, false, !!node.isJunction),
+                 offset: new AMap.Pixel(-size / 2, -size / 2),
+-                draggable: !node.isJunction,
+-                cursor: node.isJunction ? 'pointer' : 'move',
++                draggable: !node.isJunction && !isLargeGraph,
++                cursor: node.isJunction ? 'pointer' : (!isLargeGraph ? 'move' : 'pointer'),
+                 zIndex: node.isJunction ? 260 : 200,
+                 zooms: [2, 18],
+             })
+             marker.setMap(mapInstance)
+ 
+             const nodeId = node.id
+-            if (!node.isJunction) {
++            if (!node.isJunction && !isLargeGraph) {
+                 marker.on('dragend', (event: any) => {
+                     const nextPosition: [number, number] = [event.lnglat.getLng(), event.lnglat.getLat()]
+                     setBaseTopoNodes(prev => prev.map(item => item.id === nodeId ? { ...item, position: nextPosition } : item))
+                     setDirtyPositions(prev => new Map(prev).set(nodeId, nextPosition))
+                 })
+             }
+@@
+-            // 缁戝畾鎮诞妗嗕簨浠?            poly.on('mouseover', (e: any) => {
+-                setHoveredEdgeId(edge.id)
+-                const clientX = e?.originEvent?.clientX
+-                const clientY = e?.originEvent?.clientY
+-                if (typeof clientX === 'number' && typeof clientY === 'number') {
+-                    setTooltipPos({ x: clientX, y: clientY })
+-                }
+-            })
+-            poly.on('mousemove', (e: any) => {
+-                const clientX = e?.originEvent?.clientX
+-                const clientY = e?.originEvent?.clientY
+-                if (typeof clientX === 'number' && typeof clientY === 'number') {
+-                    setTooltipPos({ x: clientX, y: clientY })
+-                }
+-            })
+-            poly.on('mouseout', () => {
+-                setHoveredEdgeId(null)
+-                setTooltipPos(null)
+-            })
++            if (!isLargeGraph) {
++                poly.on('mouseover', (e: any) => {
++                    setHoveredEdgeId(edge.id)
++                    const clientX = e?.originEvent?.clientX
++                    const clientY = e?.originEvent?.clientY
++                    if (typeof clientX === 'number' && typeof clientY === 'number') {
++                        setTooltipPos({ x: clientX, y: clientY })
++                    }
++                })
++                poly.on('mousemove', (e: any) => {
++                    const clientX = e?.originEvent?.clientX
++                    const clientY = e?.originEvent?.clientY
++                    if (typeof clientX === 'number' && typeof clientY === 'number') {
++                        setTooltipPos({ x: clientX, y: clientY })
++                    }
++                })
++                poly.on('mouseout', () => {
++                    setHoveredEdgeId(null)
++                    setTooltipPos(null)
++                })
++            }
+*** End Patch

@@ -1,0 +1,57 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\docs\2026-04-08-WE1第一张图主仿真入口第1阶段第1轮收口总结_人话版.md
++# WE1 第一张图主仿真入口第1阶段第1轮收口总结_人话版
++
++## 1. 这轮结论
++
++这轮把第一张图 `MapTopologyView` 的第1阶段第1轮收口做完整了。现在页面里只保留 1 套正式的 WE1 主仿真入口，旧的死代码块已经清掉，旧状态变量也删掉了，正式面板说明不再把人往旧故障仿真接口上带。
++
++## 2. 这轮做了什么
++
++1. 在 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 里清掉了之前被 `false &&` 挡住的旧仿真残留块，只保留真正生效的 `activeTab === 'simulation'` 正式面板。  
++2. 在 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 里删掉了已经没人用的旧状态变量：`isSimulating` 和 `simResults`。  
++3. 在 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 里把正式面板说明改成人话，明确“当前页已经切到 WE1 steady overlay 正式主链”，不再展示旧故障仿真入口地址。  
++4. 在 [src/services/api.ts](/F:/smartgas-grid/src/services/api.ts) 里把 `topologyAPI.simulate` 标成了 `legacy`，说明它现在只是兼容保留件，不是第一张图主链。  
++
++## 3. 为什么这么做
++
++1. 第1阶段第1轮要解决的不是地图着色，也不是求解器升级，而是“第一张图正式仿真到底认哪一条链”。这件事不收干净，后面做映射层时很容易接错。  
++2. 之前虽然正式 WE1 面板已经接上了，但页面里还残留死代码和旧接口字样，后面的人接手时容易误以为第一张图还在走旧故障仿真。  
++3. 先把页面入口层收干净，后面的第2阶段才好专心做“地图显示对象和 overlay 原始 ID 的映射”。  
++
++## 4. 影响范围
++
++1. 直接影响页面入口层：[src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)。  
++2. 直接影响旧接口标识层：[src/services/api.ts](/F:/smartgas-grid/src/services/api.ts)。  
++3. 没有改动稳态求解器，没有改动 overlay 契约，没有改动地图节点和边的映射逻辑。  
++
++## 5. 前后对比
++
++| 项目 | 收口前 | 收口后 |
++| --- | --- | --- |
++| 第一张图仿真面板 | 代码里还留着旧死代码块，阅读上容易混 | 页面里只剩 1 套正式 WE1 仿真面板 |
++| 旧仿真状态 | `isSimulating`、`simResults` 还挂着 | 已删除 |
++| 旧接口说明 | 正式面板里还显示旧故障接口地址 | 已改成人话说明，不再展示旧地址 |
++| API 口径 | `topologyAPI.simulate` 语义不清 | 已明确标注为 `legacy` |
++
++## 6. 验证方式和结果
++
++1. 主代理本地编译验证：执行 `npm run build`，通过。  
++2. 主链脚本验证：执行 `python backend/scripts/verify_we1_phase34_final.py`，通过。  
++3. 侦察代理复核：确认 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 里当前只剩 1 块正式仿真 UI，没有第二块重复 simulation 面板。  
++4. 侦察代理复核：确认旧 `/api/emergency/simulate-failure` 现在没有前端主链真实调用，只剩 [src/services/api.ts](/F:/smartgas-grid/src/services/api.ts) 里的兼容保留定义。  
++
++## 7. 剩余风险
++
++1. [src/services/api.ts](/F:/smartgas-grid/src/services/api.ts) 里的 `topologyAPI.simulate` 还在，只是已经明确为 `legacy`；如果后面确认全仓都不再需要，可以在后续阶段彻底删除。  
++2. 第一张图现在收住的是“入口层”，还没有进入“地图显示对象和 overlay 原始 ID 的映射层”，所以地图上仍然不能直接高亮 solver 命中边和节点压力点。  
++3. 如果后面跑仿真时发现页面能出摘要但地图没有联动，那先查映射层，不要回头怀疑这一轮的主入口。  
++
++## 8. 为什么这轮没有截图
++
++这轮主要是页面入口层和代码资产收口，不是地图视觉效果轮。当前验收重点是“主链是否唯一、旧残留是否清掉、编译和脚本是否通过”，所以这次用前后对比表和验证结果代替截图，避免放没有实际信息量的假截图。
++
++## 9. 下一轮做什么
++
++下一轮直接进第2阶段第1轮，重点做“地图显示对象到 overlay 原始节点/边 ID 的映射层”。到那一轮，才开始让第一张图上的点、线、枢纽能和正式仿真结果一一对上。
+*** End Patch

@@ -1,0 +1,75 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const buildCollapsedGraph = useCallback((
+         nodes: BaseTopoNode[],
+         edges: BaseTopoEdge[],
+         groups: JunctionGroup[]
+     ) => {
+         const stationToDisplayId = new Map<string, string>()
+         const displayNodes: TopoNode[] = []
++        const displayNodeMap = new Map<string, TopoNode>()
+ 
+         groups.forEach(group => {
+             const memberNodes = nodes.filter(node => group.station_ids.includes(node.id))
+             if (memberNodes.length === 0) return
+@@
+ 
+             group.station_ids.forEach(stationId => stationToDisplayId.set(stationId, junctionNodeId))
+-            displayNodes.push({
++            const junctionNode: TopoNode = {
+                 id: junctionNodeId,
+                 name: group.name,
+                 type: 'junction',
+                 position: [centerLng, centerLat],
+                 sourceNodeIds: [...group.station_ids],
++                internalSourceEdgeIds: [],
+                 junctionId: group.id,
+                 isJunction: true,
+                 junctionKind: group.junction_kind,
+                 sourceTable: group.source_table,
+-            })
++            }
++            displayNodes.push(junctionNode)
++            displayNodeMap.set(junctionNodeId, junctionNode)
+         })
+ 
+         nodes.forEach(node => {
+             if (stationToDisplayId.has(node.id)) return
+-            displayNodes.push({
++            const displayNode: TopoNode = {
+                 ...node,
+                 sourceNodeIds: [node.id],
++                internalSourceEdgeIds: [],
+                 isJunction: false,
+-            })
++            }
++            displayNodes.push(displayNode)
++            displayNodeMap.set(displayNode.id, displayNode)
+         })
+ 
+         const collapsedEdgeMap = new Map<string, TopoEdge>()
+         edges.forEach(edge => {
+             const startNodeId = stationToDisplayId.get(edge.startNodeId) ?? edge.startNodeId
+             const endNodeId = stationToDisplayId.get(edge.endNodeId) ?? edge.endNodeId
+-            if (startNodeId === endNodeId) return
++            const nextSourceEdgeIds = edge.sourceEdgeIds?.length ? edge.sourceEdgeIds : [edge.id]
++            if (startNodeId === endNodeId) {
++                const ownerNode = displayNodeMap.get(startNodeId)
++                if (ownerNode) {
++                    ownerNode.internalSourceEdgeIds = [
++                        ...new Set([...(ownerNode.internalSourceEdgeIds ?? []), ...nextSourceEdgeIds]),
++                    ]
++                }
++                return
++            }
+ 
+             const sorted = [startNodeId, endNodeId].sort()
+             const key = `${sorted[0]}__${sorted[1]}`
+             const existing = collapsedEdgeMap.get(key)
+-            const nextSourceEdgeIds = edge.sourceEdgeIds?.length ? edge.sourceEdgeIds : [edge.id]
+             if (existing) {
+                 existing.sourceEdgeIds = [...new Set([...(existing.sourceEdgeIds ?? []), ...nextSourceEdgeIds])]
+                 return
+             }
+*** End Patch

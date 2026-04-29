@@ -1,0 +1,25 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ ## 2026-04-05 16:23:31 +08:00
+ 
+ - 这轮入口继续通过，而且是直接在主目录收证据：初始会话 `cwd=C:\Users\Administrator\.codex\worktrees\5b09\smartgas-grid`，后续检查都切到 `F:\smartgas-grid`，`git rev-parse --show-toplevel=F:/smartgas-grid`。这轮结论只认 `F:\smartgas-grid`，没有沿用 detached worktree 的旧检查结果。
+ - 主目录不是空壳，`.git` 在 `F:\smartgas-grid` 里是目录；`src/`、`backend/`、`docs/`、`backend/data/smartgas.db` 和点名关键文件都在。`git worktree list` 还是 1 个主目录 + 42 个 detached worktree；根目录里那个 `F?smartgas-griddocs` 继续按路径噪音看，别拿它当真实 docs 目录。
+@@
+ - AI 链路这轮再收紧一句：前端 `src/components/ai-assistant/useAiAssistantChat.ts` 会在有页面上下文时默认带 `analysis_mode=subagents` 打 `/api/ai-assistant/chat`，`useAiAssistantPageContext.ts` 注入 `route/title/module/summary`；后端 `backend/app/routers/ai_assistant.py` 按 `context/analysis_mode` 在 legacy 和 orchestrated 间分流，`backend/app/services/ai_client.py` 默认仍是 `AI_BASE_URL=https://api.openai.com/v1`、`AI_DEFAULT_MODEL=gpt-3.5-turbo`，缺 `AI_API_KEY` 直接 fallback。`backend/app/services/ai_analysis_orchestrator.py`、`analysis_validator.py`、`fix_task_router.py` 以及前端两个 hook 这轮仍是未跟踪文件，所以对外只能继续叫“主目录里的本地未提交半接线能力”，不能说正式上线。
+ - 下轮继续守 4 条边界：1) 只认 `F:\smartgas-grid` 主目录事实；2) 先重查数据库和 `check_db.py` 输出，不复用旧 memory 数字；3) 不把 `MapTopologyView.tsx` 说成已并入统一 LOD；4) 不把未跟踪 AI 文件或脚本改动直接说成正式基线。
+ - 本轮运行时间：`2026-04-05 16:23:31 +08:00`
++
++## 2026-04-05 16:24:19 +08:00
++
++- 这轮仍先按入口修正，只认 `F:\smartgas-grid` 主目录。初始 `cwd=C:\Users\Administrator\.codex\worktrees\5b09\smartgas-grid`，切换后 `cwd=F:\smartgas-grid`，`git rev-parse --show-toplevel=F:/smartgas-grid`，`git rev-parse --absolute-git-dir=F:/smartgas-grid/.git`。入口通过，不是 `automation env mismatch / worktree-path blockage`。
++- 主目录不是空壳，`src/`、`backend/`、`docs/`、`backend/data/smartgas.db` 和点名文件都在；`.git` 是目录。`git worktree list` 现查是 `44` 个 worktree，其中 `43` 个 detached，主目录还是 `F:/smartgas-grid @ eaf6ac4`；根目录里的 `F?smartgas-griddocs` 继续只按路径噪音处理。
++- 当前变化口径还是“代码变化 + 数据库变化 + 本地实验 + AI 链路变化”，不是单纯 docs。现查 `git diff --stat` 是 `47 files changed, 4780 insertions(+), 2608 deletions(-)`；聚焦到地图/枢纽/AI/docs 这批核心文件是 `14 files changed, 3460 insertions(+), 1762 deletions(-)`；docs 仍是 `181 insertions / 587 deletions`。
++- 地图链路别说满：`src/utils/hierarchyRenderer.ts` 统一阈值还是 `critical/high/medium=6/10/14`，`valveMinZoom=11`、`expandClusterZoom=12` 还在；`src/utils/mapRenderer.ts` 已接 `getNodeLODStrategy()` / `shouldShowNodeAtZoom()`；`src/views/GlobalPipelineView.tsx` 继续走 `MapView -> mapRenderer`；但 `src/views/MapTopologyView.tsx` 明确还是“只拿 `MapView` 当底图，不传 `pipelineData`”，节点大小继续走自己的 `TOPO_SIZES`，所以不能说地图和拓扑编辑视图已经统一。
++- 数据库事实继续按主库实测：`stations=1256`、`pipelines=1251`、`pipeline_systems=13`、`junction_groups=25`、`junction_groups_rebuilt=7`，`WE3=0/0`，`SJ2=70/69`，`SJ3=71/70`。`junction_groups` 仍只有 `id/name/description/station_ids` 四列；description 里带 `manual_overlay=1` 的记录这轮现查是 `9` 条，不要再沿用更早的 `8` 条。
++- `backend/check_db.py` 继续按验收脚本看：当前 `we3: missing`、`major_junction_count=0`、`issue_count=0`。`junction_groups_rebuilt.id=7` 的 description 还残留 `systems=cred,sj2,we3`，但真实 `station_ids/system_ids/member_count` 只对应 `cred + sj2` 两线、2 个成员，以后判断运行时事实优先看真实成员，不看 description 残字。
++- 导入脚本和实库状态继续分开：`backend/scripts/reimport_sj23.py` 更像正式重导链路；`backend/scripts/add_sj2.py`、`backend/scripts/add_we3.py` 还是明显的局部补数/手工执行脚本。三者都直接写主库，但现在主库里 `WE3` 还是 0，不能把脚本改动当成数据库事实。
++- AI 链路继续按“主目录里的本地未提交半接线能力”写。已跟踪并在改的是 `backend/app/routers/ai_assistant.py`、`backend/app/services/ai_client.py`、`src/components/ai-assistant/AiAssistant.tsx`、`src/services/api.ts`；未跟踪的还是 `backend/app/services/ai_analysis_orchestrator.py`、`analysis_validator.py`、`fix_task_router.py`、`src/components/ai-assistant/useAiAssistantChat.ts`、`useAiAssistantPageContext.ts`、`src/services/apiBase.ts`。前端默认带 `context + analysis_mode=subagents` 打 `/api/ai-assistant/chat`，但后端仍保留问候语 / raw-excel 直返和 legacy/orchestrated 分流，所以别写成“所有请求都已统一走新编排”。
++- 下轮 heartbeat 继续守 5 条红线：1) 只认 `F:\smartgas-grid` 主目录；2) 先重查数据库和 `check_db.py`，别复用旧数字；3) 不把 `MapTopologyView.tsx` 说成已并入统一 LOD；4) 不把未跟踪 AI / rebuild / shadow 文件说成正式基线；5) `manual_overlay` 数量、`WE3` 是否落库、`junction_groups_rebuilt.description` 这三类口径都以本轮实查为准。
++- 本轮运行时间：`2026-04-05T16:24:19.7657314+08:00`
+*** End Patch

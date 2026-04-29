@@ -1,0 +1,45 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\TopologyView.tsx
+@@
+ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+ import '../styles/topology-view.css';
+ import { loadAllPipelines } from '@/data/pipelines';
+ import type { PipelinePackage } from '@/data/pipelines/types';
++import { resolveApiPath } from '@/services/apiBase';
+ import { findIsolatedNodes, computeBetweennessCentrality, countComponents } from '@/utils/topology-validator';
+@@
+-                const response = await fetch('/api/topology/graph');
++                const response = await fetch(resolveApiPath('/api/topology/graph'));
+@@
+-            const res = await fetch('/api/topology/junctions', {
++            const res = await fetch(resolveApiPath('/api/topology/junctions'), {
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ import MapView from '@/components/map-view/MapView'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
+ import { invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+ import type { PipelinePackage } from '@/data/pipelines/types'
++import { resolveApiPath } from '@/services/apiBase'
+ import type { PipelineNode, PipelineLine } from '@/types'
+@@
+-            const res = await fetch('/api/topology/junctions')
++            const res = await fetch(resolveApiPath('/api/topology/junctions'))
+@@
+-            const res = await fetch('/api/topology/junctions', {
++            const res = await fetch(resolveApiPath('/api/topology/junctions'), {
+@@
+-                const res = await fetch(`/api/topology/junctions/${group.id}`, { method: 'DELETE' })
++                const res = await fetch(resolveApiPath(`/api/topology/junctions/${group.id}`), { method: 'DELETE' })
+@@
+-                const res = await fetch(`/api/topology/junctions/${action.junctionId}`, { method: 'DELETE' })
++                const res = await fetch(resolveApiPath(`/api/topology/junctions/${action.junctionId}`), { method: 'DELETE' })
+@@
+-                const res = await fetch('/api/topology/junctions', {
++                const res = await fetch(resolveApiPath('/api/topology/junctions'), {
+@@
+-            const res = await fetch('/api/topology/positions/commit', {
++            const res = await fetch(resolveApiPath('/api/topology/positions/commit'), {
+@@
+-            const res = await fetch('/api/topology/positions/preview', {
++            const res = await fetch(resolveApiPath('/api/topology/positions/preview'), {
+*** End Patch

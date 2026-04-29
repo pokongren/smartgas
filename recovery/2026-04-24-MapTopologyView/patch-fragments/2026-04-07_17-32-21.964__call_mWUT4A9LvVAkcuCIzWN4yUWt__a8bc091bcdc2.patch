@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                                            if (result && result.data) {
+-                                                setSimResults(result.data)
+-                                                setStatusMsg(`浠跨湡瀹屾垚锛屽叡 ${result.data.length} 姝)
+-                                            }
++                                            if (result && result.data) {
++                                                setSimResults(result.data)
++                                                setStatusMsg(`WE1 formal simulation finished: ${currentScenario}`)
++                                            }
+*** End Patch

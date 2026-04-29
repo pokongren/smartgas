@@ -1,0 +1,30 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     useEffect(() => { nodesRef.current = topoNodes; edgesRef.current = topoEdges }, [topoNodes, topoEdges])
+     useEffect(() => { modeRef.current = editMode; ptRef.current = pointType }, [editMode, pointType])
+     useEffect(() => { cfRef.current = connectFrom }, [connectFrom])
+     useEffect(() => {
+         if (steadyOverlay) {
+             setStatusMsg(`姝ｅ紡浠跨湡宸插垏鍒?${steadyOverlay.scenario_id}锛宺un_id=${steadyOverlay.run_id.slice(0, 12)}`)
+         }
+     }, [steadyOverlay])
+     useEffect(() => {
+         if (steadySimError) {
+             setStatusMsg(`姝ｅ紡浠跨湡澶辫触锛?{steadySimError}`)
+         }
+     }, [steadySimError])
++    useEffect(() => {
++        writeSimulationShowcaseSyncContext({
++            source: 'map-topology',
++            pilotId: WE1_PRIMARY_PILOT_ID,
++            scenarioId: steadyOverlay?.scenario_id ?? steadyScenarioId,
++            selectedSnapshotRunId: steadySelectedSnapshotRunId,
++            baselineSnapshotRunId: steadyBaselineSnapshotRunId,
++            overlay: steadyOverlay,
++            updatedAt: new Date().toISOString(),
++        })
++    }, [steadyBaselineSnapshotRunId, steadyOverlay, steadyScenarioId, steadySelectedSnapshotRunId])
+ 
+     // ================== 鏀堕泦鍏ㄩ儴绠＄嚎鍘熷鏁版嵁锛堜笉浼犵粰 MapView锛屼粎渚涘鍏ョ敤锛?==================
+*** End Patch

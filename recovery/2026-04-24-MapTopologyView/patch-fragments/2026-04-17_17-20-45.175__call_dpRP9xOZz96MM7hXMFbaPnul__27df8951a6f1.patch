@@ -1,0 +1,34 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+     const selectedNodeDefaultPressure = useMemo(() => {
+         if (!selectedNodeSeedData) return null
+         return selectedNodeSeedData.operating_pressure_out
+             ?? selectedNodeSeedData.target_pressure_mpa
+             ?? null
+     }, [selectedNodeSeedData])
++    const simulatedNodeOutPressureMap = useMemo(() => {
++        const map = new Map<string, number>()
++        if (!simulationMapping) return map
++        topoNodes.forEach(node => {
++            const pressure = simulationMapping.nodeMatchesByDisplayId.get(node.id)?.averagePressureMpa
++            if (typeof pressure === 'number' && Number.isFinite(pressure)) {
++                map.set(node.id, pressure)
++            }
++        })
++        return map
++    }, [simulationMapping, topoNodes])
++    const selectedNodeAnimatedOutPressure = useMemo(() => {
++        if (!selectedNode) return null
++        return animatedNodeOutPressure.get(selectedNode.id) ?? null
++    }, [animatedNodeOutPressure, selectedNode])
++    const selectedNodeAnimatedInPressure = useMemo(() => {
++        if (selectedNodeAnimatedOutPressure != null) {
++            return selectedNodeAnimatedOutPressure * 0.95
++        }
++        if (selectedNodeSimulationMetrics?.pressure != null) {
++            return selectedNodeSimulationMetrics.pressure * 0.95
++        }
++        return selectedNodeSeedData?.operating_pressure_in ?? null
++    }, [selectedNodeAnimatedOutPressure, selectedNodeSeedData?.operating_pressure_in, selectedNodeSimulationMetrics?.pressure])
+*** End Patch

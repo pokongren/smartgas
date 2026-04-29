@@ -1,0 +1,111 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\docs\automation\project-heartbeat-2026-04-06-081306.md
++# 项目心跳巡检纪要（2026-04-06 08:13 +08:00）
++
++## 主目标
++只认 `F:\smartgas-grid` 主目录事实巡检仓库现状，复核 git/worktree/docs 变化，并检查地图缩放与层级显示、枢纽规则与数据库口径、导入脚本、AI 模块链路；本轮不改业务代码。
++
++## 上下文与已知信息
++
++- 巡检入口固定为 `F:\smartgas-grid`，不拿 detached worktree 顶主结论。
++- 本轮只允许更新 automation memory 和必要文档。
++- 主仓 `.git` 是实体目录，不是 `gitdir:` 指针文件。
++
++## 主代理与子代理分工
++
++| 角色 | 实际动作 |
++| --- | --- |
++| 主代理 | 锁定主目录事实，汇总 git/worktree/docs 状态，串联四条重点链路并做最终判断 |
++| 侦察代理 A | 只读核查地图主渲染链、LOD 阈值和 `MapTopologyView` 口径 |
++| 侦察代理 B | 只读核查运行时枢纽入口、`junction_groups_rebuilt` 优先级、导入/重建脚本边界和数据库验收口径 |
++| 侦察代理 C | 只读核查 AI 前后端入口、orchestrated/legacy/direct 分流和工具能力边界 |
++| 独立验证代理 | 只读复核 git/doc 事实，确认本轮需要新增巡检纪要 |
++
++## 修改逻辑
++
++本轮不改业务实现，只把“当前主仓事实”补成一份新的巡检纪要，并同步写回 automation memory，供后续巡检直接复用。
++
++## 执行顺序
++
++1. 校验主目录落点、`.git` 实体和 worktree 关系。
++2. 读取 `git status`、`git log`、未提交 docs diff、`git worktree list`。
++3. 复核地图 LOD、枢纽运行时入口、导入脚本边界、AI 前后端链路。
++4. 运行 `python backend/check_db.py` 做数据库口径验收。
++5. 输出本纪要并更新 automation memory。
++
++## 当前进展摘要
++
++- 主目录事实已确认：`git rev-parse --show-toplevel` 返回 `F:/smartgas-grid`，`.git` 是完整目录结构。
++- `git worktree list --porcelain` 显示主目录 `F:/smartgas-grid` 在 `eaf6ac4` 上挂分支，当前 automation 所在 `C:\Users\Administrator\.codex\worktrees\1fb5\smartgas-grid` 等大量路径都是 `6410a10` 的 detached worktree；本轮结论只认主仓。
++- 主仓工作区仍然很脏：`git diff --stat` 约为 `47 files changed, 5434 insertions(+), 2761 deletions(-)`；docs 变化集中在 `docs/TOPOLOGY_SETUP_GUIDE.md` 和 `docs/TOPOLOGY_COMPUTATION_USAGE.md`。
++- 最近主仓提交仍停在 `eaf6ac4`、`b31a010`、`d3c9d08` 这组“数据更新”提交，说明当前大量变化都还未提交。
++
++## 地图缩放与层级显示
++
++- 地图主渲染链仍是 `src/views/GlobalPipelineView.tsx -> src/components/map-view/MapView.tsx -> src/utils/mapRenderer.ts -> src/utils/hierarchyRenderer.ts`。
++- 统一 LOD 阈值仍落在 `src/utils/hierarchyRenderer.ts`：`critical/high/medium = 6/10/14`，`valveMinZoom = 11`，`expandClusterZoom = 12`。
++- 节点重要性仍按 `CRITICAL/HIGH/MEDIUM/LOW` 走，阀室/阀门归到 `LOW`；所以“阀室理论最早可在 zoom 11 出现”仍受重要性过滤影响，不能直接等同于“zoom 11 就稳定可见”。
++- `MapTopologyView.tsx` 仍是独立口径页面，没有接入 `GlobalPipelineView + MapView + mapRenderer` 这条地图主渲染链；它保留了自己的枢纽组装和拓扑展示逻辑。
++
++## 枢纽规则、数据库口径与导入脚本
++
++- 运行时枢纽入口仍在 `backend/app/services/topology.py`，通过 `load_runtime_junction_groups()` 注入 super junction。
++- `backend/app/services/junction_groups.py` 当前口径仍是“优先读 `junction_groups_rebuilt`，缺失时回退到旧 `junction_groups`，再叠加 manual overlay”。
++- `python backend/check_db.py` 的主仓验收结果是：
++  - `pipeline_systems.count = 13`
++  - `we3` 缺失
++  - `SJ2: stations=70, pipelines=69`
++  - `SJ3: stations=71, pipelines=70`
++  - `junction_groups.count = 25`
++  - `junction_groups_rebuilt.count = 7`
++  - `junction_shadow issue_count = 0`
++  - `junction_groups_rebuilt.latest = 2026-04-04T17:17:43.361829+00:00`
++- `backend/scripts/reimport_sj23.py` 仍是离线重导工具，会先删旧 `SJ2/SJ3` 再重写，不应写成运行时链路。
++- `backend/scripts/rebuild_junctions.py` 的职责仍是重建并覆盖影子表 `junction_groups_rebuilt`。
++- `backend/scripts/add_we3.py`、`backend/scripts/add_sj2.py` 更像局部补写脚本，不等于主库已经正式落成对应系统。
++
++## AI 模块链路
++
++- 前端主入口在 `src/components/ai-assistant/useAiAssistantChat.ts`，请求固定发到 `/api/ai-assistant/chat`；有页面上下文时会带上 `context`，并把 `analysis_mode` 设为 `subagents`。
++- 页面上下文来自 `src/components/ai-assistant/useAiAssistantPageContext.ts`，当前更像路由级摘要，不是强绑定业务对象的细粒度上下文。
++- 后端主路由仍在 `backend/app/routers/ai_assistant.py`：
++  - 先尝试 raw-excel direct reply
++  - 再根据 `should_use_orchestration()` 在 orchestrated 和 legacy 间分流
++- `backend/app/services/ai_analysis_orchestrator.py` 说明 orchestrated 已接入正式入口，但 `backend/app/routers/ai_assistant.py` 仍保留 legacy 链，当前更接近“编排增强主入口 + direct/legacy 兜底”的双轨并存。
++- `backend/app/services/assistant_tools.py` 当前能力边界仍是站场、管线、拓扑、仿真、知识库、趋势和相关性工具，不适合写成已经完成的成熟多代理分析平台。
++
++## 验证方式
++
++| 验证项 | 怎么验证 | 结果怎么看 | 本轮结果 |
++| --- | --- | --- | --- |
++| 主目录落点 | `git rev-parse --show-toplevel`、查看 `.git` | 必须回到 `F:\smartgas-grid` 且 `.git` 为实体目录 | 通过 |
++| worktree 事实 | `git worktree list --porcelain` | 主目录与 detached worktree 必须区分 | 通过 |
++| 提交与脏区 | `git log --oneline -5`、`git status --short --branch`、`git diff --stat` | 明确主仓 HEAD 和未提交改动规模 | 通过 |
++| docs 变化 | `git diff --stat -- docs`、`git diff --name-only -- docs` | 确认本轮 docs 重点集中范围 | 通过 |
++| 数据库口径 | `python backend/check_db.py` | 以主仓脚本输出为准 | 通过 |
++| AI 链路 | 检查 `useAiAssistantChat.ts`、`ai_assistant.py`、`ai_analysis_orchestrator.py` | 确认是 orchestrated 与 legacy/direct 并存 | 通过 |
++
++## 风险与回退点
++
++- 当前主仓未提交改动很多，且混有缓存、脚本、数据库和前后端并行修改；后续任何结论都要继续区分“运行时事实”和“开发中草稿”。
++- `junction_groups_rebuilt` 当前只有 `7` 条，而旧表有 `25` 条；即使 `issue_count = 0`，也不能直接把“影子表无问题”写成“覆盖范围已完全足够”。
++- AI 新链虽然已接入正式入口，但 direct reply 和 legacy 仍在前置或兜底位置；如果后续排障，先查 `ai_assistant.py` 分流，再查 `ai_client.py` 和工具层。
++- 如果下轮入口没有先落回 `F:\smartgas-grid`，应直接判为“入口失真”，本轮文档结论不能外推到 detached worktree。
++
++## 前后对比
++
++| 项目 | 上轮记忆 | 本轮复核 |
++| --- | --- | --- |
++| 主目录事实 | 只认 `F:\smartgas-grid` | 本轮再次确认成立 |
++| `.git` 形态 | 主仓为实体目录 | 本轮再次确认成立 |
++| docs 方向 | 收口 `8080` 与双前缀口径 | 本轮仍集中在两份 topology 文档 |
++| 枢纽口径 | rebuilt 优先，再叠加 overlay | 本轮源码和验收脚本仍一致 |
++| AI 入口 | 页面上下文 + `/api/ai-assistant/chat` | 本轮确认仍成立，但 direct/legacy 仍并存 |
++
++未附截图，因为本轮是仓库与链路巡检，没有新增 UI 或视觉回归；以上以前后对比表和命令/代码事实代替。
++
++## 最终交付物
++
++- 巡检纪要：`F:\smartgas-grid\docs\automation\project-heartbeat-2026-04-06-081306.md`
++- memory 更新：`C:\Users\Administrator\.codex\automations\automation\memory.md`
+*** End Patch

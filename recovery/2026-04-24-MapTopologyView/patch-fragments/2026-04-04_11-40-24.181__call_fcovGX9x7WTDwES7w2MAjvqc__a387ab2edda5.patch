@@ -1,0 +1,38 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const doNodeClick = (nodeId: string, event?: any) => {
++    const doNodeClick = (nodeId: string, event?: any) => {
+         const shiftPressed = extractShiftPressed(event)
+@@
+-        if (modeRef.current === 'merge' || shiftPressed) {
++        if (manualJunctionEditingEnabled && (modeRef.current === 'merge' || shiftPressed)) {
+             toggleMergeSelection(nodeId)
+             return
+         }
+@@
+-    const handleCreateJunction = useCallback(async () => {
++    const handleCreateJunction = useCallback(async () => {
++        if (!manualJunctionEditingEnabled) {
++            setStatusMsg(JUNCTION_READONLY_HINT)
++            return
++        }
++
+         const uniqueSelectedIds = [...new Set(selectedMergeNodeIds)]
+         const selectedNodes = baseTopoNodes.filter(node => uniqueSelectedIds.includes(node.id))
+@@
+-    }, [baseTopoNodes, junctionGroups, loadJunctionGroups, persistedTopologyNodeIds, selectedMergeNodeIds])
++    }, [baseTopoNodes, junctionGroups, loadJunctionGroups, manualJunctionEditingEnabled, persistedTopologyNodeIds, selectedMergeNodeIds])
+ 
+     const handleDeleteJunction = useCallback(async (group: JunctionGroup) => {
++        if (!manualJunctionEditingEnabled) {
++            setStatusMsg(JUNCTION_READONLY_HINT)
++            return
++        }
+         if (!window.confirm(`纭鎷嗗垎鏋㈢航銆?{group.name}銆嶏紝骞舵仮澶?${group.station_ids.length} 涓簳灞傜珯鐐瑰悧锛焋)) {
+             return
+         }
+@@
+-    }, [loadJunctionGroups])
++    }, [loadJunctionGroups, manualJunctionEditingEnabled])
+*** End Patch

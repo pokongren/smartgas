@@ -1,0 +1,17 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     useEffect(() => { nodesRef.current = topoNodes; edgesRef.current = topoEdges }, [topoNodes, topoEdges])
+     useEffect(() => { modeRef.current = editMode; ptRef.current = pointType }, [editMode, pointType])
+     useEffect(() => { cfRef.current = connectFrom }, [connectFrom])
++    useEffect(() => {
++        if (steadyOverlay) {
++            setStatusMsg(`正式仿真已切到 ${steadyOverlay.scenario_id}，run_id=${steadyOverlay.run_id.slice(0, 12)}`)
++        }
++    }, [steadyOverlay])
++    useEffect(() => {
++        if (steadySimError) {
++            setStatusMsg(`正式仿真失败：${steadySimError}`)
++        }
++    }, [steadySimError])
+*** End Patch

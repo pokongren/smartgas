@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const paintMergeSelection = useCallback((selectedIds: Set<string>) => {
+         for (const node of nodesRef.current) {
+             if (!node.marker) continue
+             const isSelected = !node.isJunction && selectedIds.has(node.id)
+             safeSetMarkerContent(node.marker, createTopoMarkerContent(node.type, isLargeGraphMode ? '' : node.name, isSelected, !!node.isJunction))
+         }
+-    }, [])
++    }, [isLargeGraphMode])
+*** End Patch

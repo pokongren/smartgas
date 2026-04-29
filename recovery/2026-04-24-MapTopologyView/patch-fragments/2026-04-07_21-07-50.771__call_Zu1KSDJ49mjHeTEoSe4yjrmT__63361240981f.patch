@@ -1,0 +1,30 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const exportSimulationReport = useCallback(() => {
++    function exportSimulationReport() {
+@@
+-        setStatusMsg('涓讳豢鐪熷鍑烘竻鍗曞凡鐢熸垚')
+-    }, [
+-        coverageChecklistItems,
+-        coverageResultSummary.currentScenarioCovered,
+-        coverageResultSummary.currentScenarioSnapshotCount,
+-        coverageResultSummary.latestCoverageTime,
+-        coverageResultSummary.matchedEdgeText,
+-        coverageResultSummary.matchedNodeText,
+-        coverageResultSummary.riskSummary,
+-        demoGuideSteps,
+-        failureInvestigationLayerLabel,
+-        recommendedCoverageScenario?.label,
+-        selectedBaselineSnapshotSummary,
+-        simulationVisualSummary?.highlightedEdgeCount,
+-        simulationVisualSummary?.highlightedNodeCount,
+-        steadyComparison,
+-        steadyOverlay,
+-        steadyScenarioId,
+-        steadyScenarioOption?.label,
+-        steadySnapshots.length,
+-    ])
++        setStatusMsg('涓讳豢鐪熷鍑烘竻鍗曞凡鐢熸垚')
++    }
+*** End Patch

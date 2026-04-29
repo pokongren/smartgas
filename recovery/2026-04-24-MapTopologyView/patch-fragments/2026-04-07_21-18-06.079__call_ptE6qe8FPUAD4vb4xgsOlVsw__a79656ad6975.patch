@@ -1,0 +1,385 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                        {/* 稳态仿真 */}
+-                        {activeTab === 'simulation' && (
+-                            <div className="space-y-3">
+-                                <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 p-3 space-y-3">
+-                                    <div>
+-                                        <div className="text-[10px] uppercase tracking-wider text-cyan-200">???????</div>
+-                                        <div className="mt-1 text-xs leading-5 text-gray-300">{simulationEntryHint}</div>
+-                                    </div>
+-                                    <div className="grid grid-cols-1 gap-2">
+-                                        <div>
+-                                            <div className="mb-1 text-[10px] text-gray-500">????</div>
+-                                            <select value={steadyScenarioId} onChange={event => setSteadyScenario(event.target.value)} className="w-full rounded-lg border border-cyan-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">{MAINLINE_SCENARIOS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+-                                        </div>
+-                                        <div>
+-                                            <div className="mb-1 text-[10px] text-gray-500">????</div>
+-                                            <div className="flex gap-2">
+-                                                <select value={steadySelectedSnapshotRunId} onChange={event => setSteadySelectedSnapshotRunId(event.target.value)} className="flex-1 rounded-lg border border-cyan-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
+-                                                    <option value="">??????</option>
+-                                                    {steadySnapshots.map(item => <option key={item.run_id} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
+-                                                </select>
+-                                                <button onClick={async () => { try { await loadSteadySelectedSnapshot(); setStatusMsg(`??????${selectedSnapshotSummary?.scenario_id ?? steadySelectedSnapshotRunId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '??????') } }} disabled={!steadySelectedSnapshotRunId || steadySnapshotLoading} className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs text-cyan-100 disabled:opacity-40">{steadySnapshotLoading ? '???...' : '??'}</button>
+-                                            </div>
+-                                        </div>
+-                                        <div>
+-                                            <div className="mb-1 text-[10px] text-gray-500">????</div>
+-                                            <select value={steadyBaselineSnapshotRunId} onChange={event => setSteadyBaselineSnapshotRunId(event.target.value)} className="w-full rounded-lg border border-violet-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
+-                                                <option value="">??????</option>
+-                                                {steadySnapshots.map(item => <option key={`baseline-${item.run_id}`} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
+-                                            </select>
+-                                        </div>
+-                                    </div>
+-                                    <div className="grid grid-cols-2 gap-2">
+-                                        <button onClick={async () => { try { await runSteadySimulation(); setStatusMsg(`WE1 ???????${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '????????') } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '???...' : '??????'}</button>
+-                                        <button onClick={async () => { try { await saveSteadySnapshot(); setStatusMsg(`??????${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '??????') } }} disabled={!steadyOverlay || steadySnapshotLoading} className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40">{steadySnapshotLoading ? '???...' : '????'}</button>
+-                                        <button onClick={async () => { try { await refreshSteadySnapshots(); setStatusMsg('???????') } catch (error) { setStatusMsg(error instanceof Error ? error.message : '??????') } }} disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40">????</button>
+-                                        <button onClick={() => { clearSteadyOverlay(); setStatusMsg('??????????') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">??????</button>
+-                                        <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">??????</button>
+-                                    </div>
+-                                    <div className="rounded-lg bg-black/15 px-3 py-2 text-[11px] leading-5 text-gray-300">
+-                                        <div>?????{steadyScenarioOption?.label ?? steadyScenarioId}</div>
+-                                        <div>?????{steadySnapshots.length} ?{selectedSnapshotSummary ? `????? ${formatDateTimeLabel(selectedSnapshotSummary.saved_at)}` : ''}</div>
+-                                        <div>?????{selectedBaselineSnapshotSummary ? `${selectedBaselineSnapshotSummary.scenario_id} | ${formatDateTimeLabel(selectedBaselineSnapshotSummary.saved_at)}` : '???'}</div>
+-                                    </div>
+-                                </div>
+-                                {(steadySimError || steadySnapshotError) && <div className="rounded-lg border border-red-900/40 bg-red-950/20 p-3 text-[11px] text-red-200">{steadySimError || steadySnapshotError}</div>}
+-                                {steadyOverlay && <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-3 space-y-2"><div className="text-[10px] uppercase tracking-wider text-emerald-200">??????</div><div className="rounded-lg bg-black/15 px-3 py-2 text-[11px] leading-5 text-gray-300"><div>???{steadyScenarioOption?.label ?? steadyOverlay.scenario_id}</div><div>?????{steadyOverlay.run_id}</div><div>?????{formatDateTimeLabel(steadyOverlay.generated_at)}</div><div>?????{SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}</div></div><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">???</div><div className="mt-1 font-semibold text-white">{steadyOverlay.summary.total_supply.toFixed(2)}</div></div><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">???</div><div className="mt-1 font-semibold text-white">{steadyOverlay.summary.total_demand.toFixed(2)}</div></div><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">?????</div><div className="mt-1 font-semibold text-white">{steadyOverlay.summary.avg_utilization.toFixed(3)}</div></div><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">???</div><div className="mt-1 font-semibold text-amber-300">{steadyOverlay.summary.alert_count}</div></div></div><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">????</div><div className="mt-1 font-semibold text-white">{simulationVisualSummary?.highlightedNodeCount ?? 0}</div></div><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">????</div><div className="mt-1 font-semibold text-white">{simulationVisualSummary?.highlightedEdgeCount ?? 0}</div></div></div></div>}
+-                                <div className="rounded-lg border border-violet-500/20 bg-violet-950/10 p-3 space-y-3 text-[11px] text-gray-300"><div><div className="text-[10px] uppercase tracking-wider text-violet-200">????</div><div className="mt-1 text-gray-400">?????????????????????????</div></div>{!steadyBaselineSnapshotRunId && <div className="rounded-lg bg-black/15 px-3 py-2 leading-5 text-gray-400">???????????????????????</div>}{steadyBaselineSnapshotRunId && !steadyComparison && <div className="rounded-lg bg-black/15 px-3 py-2 leading-5 text-gray-400">??????????????????????????????????</div>}{steadyComparison && <><div className="rounded-lg bg-black/15 px-3 py-2 leading-5"><div>?????{steadyComparison.current_scenario_id} | {steadyComparison.current_run_id.slice(0, 12)}</div><div>?????{steadyComparison.baseline_scenario_id} | {steadyComparison.baseline_run_id.slice(0, 12)}</div></div><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">????</div><div className={`mt-1 font-semibold ${steadyComparison.summary_delta.total_supply.delta >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatSignedNumber(steadyComparison.summary_delta.total_supply.delta, 2)}</div></div><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">????</div><div className={`mt-1 font-semibold ${steadyComparison.summary_delta.total_demand.delta >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatSignedNumber(steadyComparison.summary_delta.total_demand.delta, 2)}</div></div><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">?????</div><div className={`mt-1 font-semibold ${steadyComparison.summary_delta.avg_utilization.delta > 0 ? 'text-amber-300' : 'text-cyan-200'}`}>{formatSignedNumber(steadyComparison.summary_delta.avg_utilization.delta, 3)}</div></div><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">????</div><div className={`mt-1 font-semibold ${steadyComparison.summary_delta.alert_count.delta > 0 ? 'text-red-300' : 'text-emerald-300'}`}>{formatSignedNumber(steadyComparison.summary_delta.alert_count.delta, 0)}</div></div></div></>}
+-                                </div>
+-                                <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 p-3 space-y-3 text-[11px] text-gray-300"><div><div className="text-[10px] uppercase tracking-wider text-amber-200">?????</div><div className="mt-1 text-gray-400">??????????????????????????????????</div></div><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">?????</div><div className="mt-1 font-semibold text-emerald-300">{trialCoverageSummary.coveredCount}</div></div><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">?????</div><div className="mt-1 font-semibold text-amber-300">{trialCoverageSummary.pendingCount}</div></div></div><button onClick={async () => { try { await runSteadyMissingTrialScenarios(); setStatusMsg('???????????????????????????') } catch (error) { setStatusMsg(error instanceof Error ? error.message : '??????') } }} disabled={steadyBulkTrialRunActive || steadyTrialRunItems.length === 0 || trialCoverageSummary.pendingCount === 0} className="w-full rounded-lg bg-amber-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadyBulkTrialRunActive ? '?????...' : '???????'}</button><div className="space-y-2">{steadyTrialRunItems.map(item => { const isRunning = steadyTrialRunScenarioId === item.scenario_id; return <div key={`trial-item-${item.scenario_id}`} className="rounded-lg bg-black/15 px-3 py-2"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="truncate text-gray-100">{item.label}</div><div className="mt-1 text-[10px] text-gray-500">{item.covered ? `?????? ${item.snapshot_count} ?` : '????'}</div><div className="mt-1 text-[10px] text-gray-500">?????{item.last_saved_at ? formatDateTimeLabel(item.last_saved_at) : '?'}</div></div><button onClick={async () => { try { await runSteadyTrialScenario(item.scenario_id); setStatusMsg(`???????${item.label}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '???????') } }} disabled={isRunning || steadyBulkTrialRunActive} className={`rounded-lg px-3 py-1 text-[10px] font-semibold ${item.covered ? 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-100' : 'border border-amber-400/20 bg-amber-500/10 text-amber-100'} disabled:opacity-40`}>{isRunning ? '???...' : item.covered ? '??' : '??'}</button></div></div> })}</div></div>
+-                                <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-3 space-y-3 text-[11px] text-gray-300"><div className="flex items-center justify-between gap-3"><div><div className="text-[10px] uppercase tracking-wider text-emerald-200">??????</div><div className="mt-1 text-gray-400">????????????????????????????????</div></div><div className={`rounded-full px-3 py-1 text-[10px] font-semibold ${coverageResultSummary.readinessLabel === '?????' ? 'border border-emerald-400/30 bg-emerald-500/15 text-emerald-100' : coverageResultSummary.readinessLabel === '?????' ? 'border border-amber-400/30 bg-amber-500/15 text-amber-100' : 'border border-red-400/30 bg-red-500/15 text-red-100'}`}>{coverageResultSummary.readinessLabel}</div></div><div className="grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">??????</div><div className={`mt-1 font-semibold ${coverageResultSummary.currentScenarioCovered ? 'text-emerald-300' : 'text-amber-300'}`}>{coverageResultSummary.currentScenarioCovered ? `??? ${coverageResultSummary.currentScenarioSnapshotCount} ?` : '????'}</div></div><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">??????</div><div className="mt-1 font-semibold text-white">{coverageResultSummary.latestCoverageTime ? formatDateTimeLabel(coverageResultSummary.latestCoverageTime) : '??'}</div></div><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">??????</div><div className="mt-1 font-semibold text-white">{coverageResultSummary.matchedNodeText}</div></div><div className="rounded-lg bg-black/15 px-3 py-2"><div className="text-[10px] text-gray-500">??????</div><div className="mt-1 font-semibold text-white">{coverageResultSummary.matchedEdgeText}</div></div></div><div className="rounded-lg bg-black/15 px-3 py-2 leading-5 text-gray-300"><div>?????{recommendedCoverageScenario?.label ?? '??'}</div><div>?????{coverageResultSummary.riskSummary}</div></div><div className="space-y-2">{coverageChecklistItems.map(item => <div key={`coverage-check-${item.scenario_id}`} className="rounded-lg bg-black/15 px-3 py-2"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="truncate text-gray-100">{item.label}</span>{item.isCurrent && <span className="rounded-full border border-sky-400/20 bg-sky-500/10 px-2 py-0.5 text-[10px] text-sky-100">????</span>}{item.isRecommended && <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-100">????</span>}</div><div className="mt-1 text-[10px] leading-5 text-gray-400">????{item.focus}</div><div className="text-[10px] leading-5 text-gray-500">??????{item.success}</div><div className="text-[10px] leading-5 text-gray-500">?????{item.risk}</div></div><div className={`rounded-full px-2 py-1 text-[10px] font-semibold ${item.covered ? 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-100' : 'border border-amber-400/20 bg-amber-500/10 text-amber-100'}`}>{item.covered ? '???' : '???'}</div></div><div className="mt-2 text-[10px] leading-5 text-gray-500">?? {item.snapshot_count} ???????{item.last_saved_at ? formatDateTimeLabel(item.last_saved_at) : '?'}</div></div>)}</div></div>
+-                                <div className="rounded-lg border border-sky-500/20 bg-sky-950/10 p-3 space-y-3 text-[11px] text-gray-300"><div><div className="text-[10px] uppercase tracking-wider text-sky-200">??????</div><div className="mt-1 text-gray-400">???????????????????????</div></div><div className="rounded-lg bg-black/15 px-3 py-2 leading-5"><div>?????{recommendedCoverageScenario?.label ?? '????'}</div><div>?????{coverageChecklistItems.find(item => item.isRecommended)?.talk ?? '???????????????'}</div></div><div className="space-y-2">{demoGuideSteps.map((step, index) => <div key={`demo-step-${index}`} className="rounded-lg bg-black/15 px-3 py-2 leading-5 text-gray-300">{step}</div>)}</div><div className="grid grid-cols-1 gap-2"><div className="rounded-lg bg-black/15 px-3 py-2 leading-5">???????????????????????????????????????</div><div className="rounded-lg bg-black/15 px-3 py-2 leading-5">???????{failureInvestigationLayerLabel}</div></div></div>
+-                            </div>
+-                        )}
++                        {/* 稳态仿真 */}
++                        {activeTab === 'simulation' && (
++                            <div className="space-y-3">
++                                <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 p-3 space-y-3">
++                                    <div>
++                                        <div className="text-[10px] uppercase tracking-wider text-cyan-200">主仿真入口</div>
++                                        <div className="mt-1 text-xs leading-5 text-gray-300">{simulationEntryHint}</div>
++                                    </div>
++                                    <div className="grid grid-cols-1 gap-2">
++                                        <div>
++                                            <div className="mb-1 text-[10px] text-gray-500">当前场景</div>
++                                            <select value={steadyScenarioId} onChange={event => setSteadyScenario(event.target.value)} className="w-full rounded-lg border border-cyan-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
++                                                {MAINLINE_SCENARIOS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
++                                            </select>
++                                        </div>
++                                        <div>
++                                            <div className="mb-1 text-[10px] text-gray-500">结果快照</div>
++                                            <div className="flex gap-2">
++                                                <select value={steadySelectedSnapshotRunId} onChange={event => setSteadySelectedSnapshotRunId(event.target.value)} className="flex-1 rounded-lg border border-cyan-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
++                                                    <option value="">请选择一条快照</option>
++                                                    {steadySnapshots.map(item => <option key={item.run_id} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
++                                                </select>
++                                                <button
++                                                    onClick={async () => {
++                                                        try {
++                                                            await loadSteadySelectedSnapshot()
++                                                            setStatusMsg(`已加载快照：${selectedSnapshotSummary?.scenario_id ?? steadySelectedSnapshotRunId}`)
++                                                        } catch (error) {
++                                                            setStatusMsg(error instanceof Error ? error.message : '加载快照失败')
++                                                        }
++                                                    }}
++                                                    disabled={!steadySelectedSnapshotRunId || steadySnapshotLoading}
++                                                    className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs text-cyan-100 disabled:opacity-40"
++                                                >
++                                                    {steadySnapshotLoading ? '加载中...' : '加载'}
++                                                </button>
++                                            </div>
++                                        </div>
++                                        <div>
++                                            <div className="mb-1 text-[10px] text-gray-500">基线快照</div>
++                                            <select value={steadyBaselineSnapshotRunId} onChange={event => setSteadyBaselineSnapshotRunId(event.target.value)} className="w-full rounded-lg border border-violet-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
++                                                <option value="">请选择基线快照</option>
++                                                {steadySnapshots.map(item => <option key={`baseline-${item.run_id}`} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
++                                            </select>
++                                        </div>
++                                    </div>
++                                    <div className="grid grid-cols-2 gap-2">
++                                        <button
++                                            onClick={async () => {
++                                                try {
++                                                    await runSteadySimulation()
++                                                    setStatusMsg(`WE1 主仿真已运行：${steadyScenarioOption?.label ?? steadyScenarioId}`)
++                                                } catch (error) {
++                                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 主仿真运行失败')
++                                                }
++                                            }}
++                                            disabled={steadySimLoading}
++                                            className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40"
++                                        >
++                                            {steadySimLoading ? '运行中...' : '运行主仿真'}
++                                        </button>
++                                        <button
++                                            onClick={async () => {
++                                                try {
++                                                    await saveSteadySnapshot()
++                                                    setStatusMsg(`已保存快照：${steadyScenarioOption?.label ?? steadyScenarioId}`)
++                                                } catch (error) {
++                                                    setStatusMsg(error instanceof Error ? error.message : '保存快照失败')
++                                                }
++                                            }}
++                                            disabled={!steadyOverlay || steadySnapshotLoading}
++                                            className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40"
++                                        >
++                                            {steadySnapshotLoading ? '保存中...' : '保存快照'}
++                                        </button>
++                                        <button
++                                            onClick={async () => {
++                                                try {
++                                                    await refreshSteadySnapshots()
++                                                    setStatusMsg('快照列表已刷新')
++                                                } catch (error) {
++                                                    setStatusMsg(error instanceof Error ? error.message : '刷新快照失败')
++                                                }
++                                            }}
++                                            disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading}
++                                            className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40"
++                                        >
++                                            刷新快照
++                                        </button>
++                                        <button
++                                            onClick={() => {
++                                                clearSteadyOverlay()
++                                                setStatusMsg('已清空当前主仿真结果')
++                                            }}
++                                            className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200"
++                                        >
++                                            清空主仿真
++                                        </button>
++                                        <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">
++                                            导出演示清单
++                                        </button>
++                                    </div>
++                                    <div className="rounded-lg bg-black/15 px-3 py-2 text-[11px] leading-5 text-gray-300">
++                                        <div>当前状态：{steadyScenarioOption?.label ?? steadyScenarioId}</div>
++                                        <div>快照数量：{steadySnapshots.length} 条{selectedSnapshotSummary ? `，当前选中 ${formatDateTimeLabel(selectedSnapshotSummary.saved_at)}` : ''}</div>
++                                        <div>基线快照：{selectedBaselineSnapshotSummary ? `${selectedBaselineSnapshotSummary.scenario_id} | ${formatDateTimeLabel(selectedBaselineSnapshotSummary.saved_at)}` : '未选择'}</div>
++                                    </div>
++                                </div>
++
++                                {(steadySimError || steadySnapshotError) && (
++                                    <div className="rounded-lg border border-red-900/40 bg-red-950/20 p-3 text-[11px] text-red-200">{steadySimError || steadySnapshotError}</div>
++                                )}
++
++                                {steadyOverlay && (
++                                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-3 space-y-2">
++                                        <div className="text-[10px] uppercase tracking-wider text-emerald-200">运行结果摘要</div>
++                                        <div className="rounded-lg bg-black/15 px-3 py-2 text-[11px] leading-5 text-gray-300">
++                                            <div>当前场景：{steadyScenarioOption?.label ?? steadyOverlay.scenario_id}</div>
++                                            <div>运行编号：{steadyOverlay.run_id}</div>
++                                            <div>生成时间：{formatDateTimeLabel(steadyOverlay.generated_at)}</div>
++                                            <div>求解状态：{SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}</div>
++                                        </div>
++                                        <div className="grid grid-cols-2 gap-2 text-xs">
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">总供给</div>
++                                                <div className="mt-1 font-semibold text-white">{steadyOverlay.summary.total_supply.toFixed(2)}</div>
++                                            </div>
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">总需求</div>
++                                                <div className="mt-1 font-semibold text-white">{steadyOverlay.summary.total_demand.toFixed(2)}</div>
++                                            </div>
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">平均利用率</div>
++                                                <div className="mt-1 font-semibold text-white">{steadyOverlay.summary.avg_utilization.toFixed(3)}</div>
++                                            </div>
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">告警数</div>
++                                                <div className="mt-1 font-semibold text-amber-300">{steadyOverlay.summary.alert_count}</div>
++                                            </div>
++                                        </div>
++                                        <div className="grid grid-cols-2 gap-2 text-xs">
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">命中节点</div>
++                                                <div className="mt-1 font-semibold text-white">{simulationVisualSummary?.highlightedNodeCount ?? 0}</div>
++                                            </div>
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">命中连线</div>
++                                                <div className="mt-1 font-semibold text-white">{simulationVisualSummary?.highlightedEdgeCount ?? 0}</div>
++                                            </div>
++                                        </div>
++                                    </div>
++                                )}
++
++                                <div className="rounded-lg border border-violet-500/20 bg-violet-950/10 p-3 space-y-3 text-[11px] text-gray-300">
++                                    <div>
++                                        <div className="text-[10px] uppercase tracking-wider text-violet-200">基线对比</div>
++                                        <div className="mt-1 text-gray-400">用基线快照对照当前结果，方便看故障前后或限流前后的变化。</div>
++                                    </div>
++                                    {!steadyBaselineSnapshotRunId && (
++                                        <div className="rounded-lg bg-black/15 px-3 py-2 leading-5 text-gray-400">先在上面选一条基线快照，这里才会显示前后差值。</div>
++                                    )}
++                                    {steadyBaselineSnapshotRunId && !steadyComparison && (
++                                        <div className="rounded-lg bg-black/15 px-3 py-2 leading-5 text-gray-400">基线已选，但当前结果还没形成可对比数据；先运行主仿真或加载一条正式快照。</div>
++                                    )}
++                                    {steadyComparison && (
++                                        <>
++                                            <div className="rounded-lg bg-black/15 px-3 py-2 leading-5">
++                                                <div>当前结果：{steadyComparison.current_scenario_id} | {steadyComparison.current_run_id.slice(0, 12)}</div>
++                                                <div>基线结果：{steadyComparison.baseline_scenario_id} | {steadyComparison.baseline_run_id.slice(0, 12)}</div>
++                                            </div>
++                                            <div className="grid grid-cols-2 gap-2 text-xs">
++                                                <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                    <div className="text-[10px] text-gray-500">供给差值</div>
++                                                    <div className={`mt-1 font-semibold ${steadyComparison.summary_delta.total_supply.delta >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatSignedNumber(steadyComparison.summary_delta.total_supply.delta, 2)}</div>
++                                                </div>
++                                                <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                    <div className="text-[10px] text-gray-500">需求差值</div>
++                                                    <div className={`mt-1 font-semibold ${steadyComparison.summary_delta.total_demand.delta >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatSignedNumber(steadyComparison.summary_delta.total_demand.delta, 2)}</div>
++                                                </div>
++                                                <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                    <div className="text-[10px] text-gray-500">利用率差值</div>
++                                                    <div className={`mt-1 font-semibold ${steadyComparison.summary_delta.avg_utilization.delta > 0 ? 'text-amber-300' : 'text-cyan-200'}`}>{formatSignedNumber(steadyComparison.summary_delta.avg_utilization.delta, 3)}</div>
++                                                </div>
++                                                <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                    <div className="text-[10px] text-gray-500">告警差值</div>
++                                                    <div className={`mt-1 font-semibold ${steadyComparison.summary_delta.alert_count.delta > 0 ? 'text-red-300' : 'text-emerald-300'}`}>{formatSignedNumber(steadyComparison.summary_delta.alert_count.delta, 0)}</div>
++                                                </div>
++                                            </div>
++                                        </>
++                                    )}
++                                </div>
++
++                                <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 p-3 space-y-3 text-[11px] text-gray-300">
++                                    <div>
++                                        <div className="text-[10px] uppercase tracking-wider text-amber-200">试运行覆盖</div>
++                                        <div className="mt-1 text-gray-400">把典型场景逐个补跑并留档，方便验收时不再临场现跑。</div>
++                                    </div>
++                                    <div className="grid grid-cols-2 gap-2 text-xs">
++                                        <div className="rounded-lg bg-black/15 px-3 py-2">
++                                            <div className="text-[10px] text-gray-500">已覆盖场景</div>
++                                            <div className="mt-1 font-semibold text-emerald-300">{trialCoverageSummary.coveredCount}</div>
++                                        </div>
++                                        <div className="rounded-lg bg-black/15 px-3 py-2">
++                                            <div className="text-[10px] text-gray-500">待补跑场景</div>
++                                            <div className="mt-1 font-semibold text-amber-300">{trialCoverageSummary.pendingCount}</div>
++                                        </div>
++                                    </div>
++                                    <button
++                                        onClick={async () => {
++                                            try {
++                                                await runSteadyMissingTrialScenarios()
++                                                setStatusMsg('已补跑所有未留档的典型场景')
++                                            } catch (error) {
++                                                setStatusMsg(error instanceof Error ? error.message : '批量补跑失败')
++                                            }
++                                        }}
++                                        disabled={steadyBulkTrialRunActive || steadyTrialRunItems.length === 0 || trialCoverageSummary.pendingCount === 0}
++                                        className="w-full rounded-lg bg-amber-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40"
++                                    >
++                                        {steadyBulkTrialRunActive ? '补跑中...' : '一键补跑缺失场景'}
++                                    </button>
++                                    <div className="space-y-2">
++                                        {steadyTrialRunItems.map(item => {
++                                            const isRunning = steadyTrialRunScenarioId === item.scenario_id
++                                            return (
++                                                <div key={`trial-item-${item.scenario_id}`} className="rounded-lg bg-black/15 px-3 py-2">
++                                                    <div className="flex items-start justify-between gap-3">
++                                                        <div className="min-w-0">
++                                                            <div className="truncate text-gray-100">{item.label}</div>
++                                                            <div className="mt-1 text-[10px] text-gray-500">{item.covered ? `已留档 ${item.snapshot_count} 条` : '还没留档'}</div>
++                                                            <div className="mt-1 text-[10px] text-gray-500">最近时间：{item.last_saved_at ? formatDateTimeLabel(item.last_saved_at) : '-'}</div>
++                                                        </div>
++                                                        <button
++                                                            onClick={async () => {
++                                                                try {
++                                                                    await runSteadyTrialScenario(item.scenario_id)
++                                                                    setStatusMsg(`已补跑场景：${item.label}`)
++                                                                } catch (error) {
++                                                                    setStatusMsg(error instanceof Error ? error.message : '单场景补跑失败')
++                                                                }
++                                                            }}
++                                                            disabled={isRunning || steadyBulkTrialRunActive}
++                                                            className={`rounded-lg px-3 py-1 text-[10px] font-semibold ${item.covered ? 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-100' : 'border border-amber-400/20 bg-amber-500/10 text-amber-100'} disabled:opacity-40`}
++                                                        >
++                                                            {isRunning ? '运行中...' : item.covered ? '重跑' : '补跑'}
++                                                        </button>
++                                                    </div>
++                                                </div>
++                                            )
++                                        })}
++                                    </div>
++                                </div>
++
++                                <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-3 space-y-3 text-[11px] text-gray-300">
++                                    <div className="flex items-center justify-between gap-3">
++                                        <div>
++                                            <div className="text-[10px] uppercase tracking-wider text-emerald-200">覆盖结果清单</div>
++                                            <div className="mt-1 text-gray-400">这里看当前场景能不能直接讲、还缺什么、下一条建议讲哪个场景。</div>
++                                        </div>
++                                        <div className={`rounded-full px-3 py-1 text-[10px] font-semibold ${coverageResultSummary.readinessLabel === '可完整演示' ? 'border border-emerald-400/30 bg-emerald-500/15 text-emerald-100' : coverageResultSummary.readinessLabel === '可局部演示' ? 'border border-amber-400/30 bg-amber-500/15 text-amber-100' : 'border border-red-400/30 bg-red-500/15 text-red-100'}`}>
++                                            {coverageResultSummary.readinessLabel}
++                                        </div>
++                                    </div>
++                                    <div className="grid grid-cols-2 gap-2 text-xs">
++                                        <div className="rounded-lg bg-black/15 px-3 py-2">
++                                            <div className="text-[10px] text-gray-500">当前场景留档</div>
++                                            <div className={`mt-1 font-semibold ${coverageResultSummary.currentScenarioCovered ? 'text-emerald-300' : 'text-amber-300'}`}>{coverageResultSummary.currentScenarioCovered ? `已留档 ${coverageResultSummary.currentScenarioSnapshotCount} 条` : '还没留档'}</div>
++                                        </div>
++                                        <div className="rounded-lg bg-black/15 px-3 py-2">
++                                            <div className="text-[10px] text-gray-500">最近覆盖时间</div>
++                                            <div className="mt-1 font-semibold text-white">{coverageResultSummary.latestCoverageTime ? formatDateTimeLabel(coverageResultSummary.latestCoverageTime) : '暂无'}</div>
++                                        </div>
++                                        <div className="rounded-lg bg-black/15 px-3 py-2">
++                                            <div className="text-[10px] text-gray-500">当前命中节点</div>
++                                            <div className="mt-1 font-semibold text-white">{coverageResultSummary.matchedNodeText}</div>
++                                        </div>
++                                        <div className="rounded-lg bg-black/15 px-3 py-2">
++                                            <div className="text-[10px] text-gray-500">当前命中连线</div>
++                                            <div className="mt-1 font-semibold text-white">{coverageResultSummary.matchedEdgeText}</div>
++                                        </div>
++                                    </div>
++                                    <div className="rounded-lg bg-black/15 px-3 py-2 leading-5 text-gray-300">
++                                        <div>建议演示：{recommendedCoverageScenario?.label ?? '暂无'}</div>
++                                        <div>当前判断：{coverageResultSummary.riskSummary}</div>
++                                    </div>
++                                    <div className="space-y-2">
++                                        {coverageChecklistItems.map(item => (
++                                            <div key={`coverage-check-${item.scenario_id}`} className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="flex items-start justify-between gap-3">
++                                                    <div className="min-w-0">
++                                                        <div className="flex flex-wrap items-center gap-2">
++                                                            <span className="truncate text-gray-100">{item.label}</span>
++                                                            {item.isCurrent && <span className="rounded-full border border-sky-400/20 bg-sky-500/10 px-2 py-0.5 text-[10px] text-sky-100">当前场景</span>}
++                                                            {item.isRecommended && <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-100">建议先讲</span>}
++                                                        </div>
++                                                        <div className="mt-1 text-[10px] leading-5 text-gray-400">关注点：{item.focus}</div>
++                                                        <div className="text-[10px] leading-5 text-gray-500">通过怎么看：{item.success}</div>
++                                                        <div className="text-[10px] leading-5 text-gray-500">现场风险：{item.risk}</div>
++                                                    </div>
++                                                    <div className={`rounded-full px-2 py-1 text-[10px] font-semibold ${item.covered ? 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-100' : 'border border-amber-400/20 bg-amber-500/10 text-amber-100'}`}>
++                                                        {item.covered ? '已留档' : '待补跑'}
++                                                    </div>
++                                                </div>
++                                                <div className="mt-2 text-[10px] leading-5 text-gray-500">快照 {item.snapshot_count} 条，最近留档：{item.last_saved_at ? formatDateTimeLabel(item.last_saved_at) : '-'}</div>
++                                            </div>
++                                        ))}
++                                    </div>
++                                </div>
++
++                                <div className="rounded-lg border border-sky-500/20 bg-sky-950/10 p-3 space-y-3 text-[11px] text-gray-300">
++                                    <div>
++                                        <div className="text-[10px] uppercase tracking-wider text-sky-200">固定演示口径</div>
++                                        <div className="mt-1 text-gray-400">照着这里讲，现场就不会跳层，也不会漏掉对比和排查口径。</div>
++                                    </div>
++                                    <div className="rounded-lg bg-black/15 px-3 py-2 leading-5">
++                                        <div>建议主场景：{recommendedCoverageScenario?.label ?? '暂未确定'}</div>
++                                        <div>讲解重点：{coverageChecklistItems.find(item => item.isRecommended)?.talk ?? '先把当前主仿真结果跑通后再定讲解口径。'}</div>
++                                    </div>
++                                    <div className="space-y-2">
++                                        {demoGuideSteps.map((step, index) => <div key={`demo-step-${index}`} className="rounded-lg bg-black/15 px-3 py-2 leading-5 text-gray-300">{step}</div>)}
++                                    </div>
++                                    <div className="grid grid-cols-1 gap-2">
++                                        <div className="rounded-lg bg-black/15 px-3 py-2 leading-5">现场如果结果和地图看起来对不上，先回看“运行结果摘要”和“覆盖结果清单”，确认是不是场景没留档或映射没命中。</div>
++                                        <div className="rounded-lg bg-black/15 px-3 py-2 leading-5">失败先查哪层：{failureInvestigationLayerLabel}</div>
++                                    </div>
++                                </div>
++                            </div>
++                        )}
+*** End Patch

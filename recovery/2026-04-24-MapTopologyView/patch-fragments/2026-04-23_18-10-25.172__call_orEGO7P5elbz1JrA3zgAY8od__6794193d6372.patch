@@ -1,0 +1,39 @@
+*** Begin Patch
+*** Add File: docs/2026-04-24-MapTopologyView白屏修复说明.md
++# 2026-04-24 MapTopologyView白屏修复说明
++一、结论
++`/map-topology` 白屏问题已修复，核心做法是保留损坏文件并启用本地备份文件，前端构建已通过。
++
++二、主目标
++1. 恢复 `MapTopologyView.tsx` 的可编译状态。2. 解除动态导入失败导致的白屏。3. 不使用 `git` 回退。
++
++三、上下文与已知信息
++1. 页面报错为 `Failed to fetch dynamically imported module: MapTopologyView.tsx`。2. 构建首错为 `Unterminated string literal`，定位到 `src/views/MapTopologyView.tsx`。3. 当前文件存在大量字符串闭合损坏，逐行修补成本高且风险大。
++
++四、主代理与子代理分工
++1. 本轮由主代理完成侦察、实施、验证三项工作，未启用子代理，原因是用户未显式要求子代理并且问题边界单一。2. 侦察：复现构建错误并确认根因。3. 实施：保留损坏文件并切换到备份文件。4. 验证：执行生产构建确认通过。
++
++五、修改逻辑
++1. 将损坏文件重命名为 `src/views/MapTopologyView.tsx.broken-20260424`，用于现场留痕和可逆回退。2. 将 `src/views/MapTopologyView.tsx.backup-1649lines` 迁移为 `src/views/MapTopologyView.tsx`，恢复可用代码。3. 整个过程未执行 `git reset`、`git checkout --`、`git restore` 等回退命令。
++
++六、执行顺序
++1. 运行 `npm run -s build` 复现错误并记录定位。2. 重命名损坏文件并切换备份文件。3. 再次运行 `npm run -s build` 验证修复结果。
++
++七、验证方式
++1. 构建验证命令：`npm run -s build`。2. 验证结果：构建成功，`MapTopologyView.tsx` 不再触发语法错误。3. 结果判定：动态导入模块已可被打包解析，白屏根因已解除。
++
++八、风险与回退点
++1. 风险：备份文件可能与当前最新业务细节存在少量差异。2. 回退点：如发现功能差异，可直接把 `src/views/MapTopologyView.tsx.broken-20260424` 中需要的业务片段按需迁回，不需要全量回退仓库。
++
++九、前后对比
++1. 无截图对比，原因是本轮修复目标是语法编译链路，最直接证据是构建结果。2. 对比表如下：
++
++| 对比项 | 修复前 | 修复后 |
++|---|---|---|
++| `MapTopologyView.tsx` 状态 | 字符串损坏，无法编译 | 可编译 |
++| 构建结果 | `Unterminated string literal` 失败 | 构建通过 |
++| `/map-topology` 动态导入 | 失败 | 恢复可加载 |
++
++十、最终交付物
++1. 已恢复文件：`src/views/MapTopologyView.tsx`。2. 留存文件：`src/views/MapTopologyView.tsx.broken-20260424`。3. 说明文档：`docs/2026-04-24-MapTopologyView白屏修复说明.md`。
+*** End Patch

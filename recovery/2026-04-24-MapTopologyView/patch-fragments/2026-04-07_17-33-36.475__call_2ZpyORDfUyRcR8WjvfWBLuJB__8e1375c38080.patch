@@ -1,0 +1,17 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    // ================== 鏀堕泦鍏ㄩ儴绠＄嚎鍘熷鏁版嵁锛堜笉浼犵粰 MapView锛屼粎渚涘鍏ョ敤锛?==================
++    useEffect(() => {
++        if (simulationOverlay) {
++            setStatusMsg(`正式仿真已切到 WE1 主链：${simulationOverlay.scenario_id}，run_id=${simulationOverlay.run_id.slice(0, 12)}`)
++        }
++    }, [simulationOverlay])
++    useEffect(() => {
++        if (simulationError) {
++            setStatusMsg(`正式仿真失败：${simulationError}`)
++        }
++    }, [simulationError])
++
++    // ================== 鏀堕泦鍏ㄩ儴绠＄嚎鍘熷鏁版嵁锛堜笉浼犵粰 MapView锛屼粎渚涘鍏ョ敤锛?==================
+*** End Patch

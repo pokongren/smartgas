@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const [isSimulating, setIsSimulating] = useState(false)
+-    const [simResults, setSimResults] = useState<Array<{
+-        step: number
+-        affected_nodes: string[]
+-        pressure_drops: Record<string, number>
+-        is_stable: boolean
+-    }>>([])
+     const [cascadeValves, setCascadeValves] = useState(true)
+*** End Patch

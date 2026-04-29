@@ -1,0 +1,73 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const handleSavePositions = useCallback(async () => {
++    const handleCreateManualJunction = useCallback(async () => {
++        if (!manualJunctionEditingEnabled) {
++            setStatusMsg('当前环境未开放手工捏合写入')
++            return
++        }
++        if (selectedMergeNodeIds.length < 2 || isMerging) return
++
++        const name = mergeJunctionName.trim() || selectedMergeAutoName
++        if (!name) {
++            setStatusMsg('请先选择至少两个站点，再创建捏合枢纽')
++            return
++        }
++
++        setIsMerging(true)
++        try {
++            const result = await topologyEditorApi.createJunctionGroup({
++                name,
++                description: mergeJunctionDescription.trim() || undefined,
++                station_ids: selectedMergeNodeIds,
++            })
++            invalidatePipelineCache()
++            await loadJunctionGroups()
++            setUndoStack(prev => [...prev, { type: 'create-junction', junctionId: result.id, name }])
++            setEditMode('view')
++            setSelectedMergeNodeIds([])
++            setMergeJunctionName('')
++            setMergeJunctionDescription('')
++            setStatusMsg(`已创建手工捏合枢纽：${name}`)
++        } catch (error) {
++            console.error(error)
++            setStatusMsg(error instanceof Error ? `创建手工捏合失败：${error.message}` : '创建手工捏合失败')
++        } finally {
++            setIsMerging(false)
++        }
++    }, [
++        isMerging,
++        loadJunctionGroups,
++        manualJunctionEditingEnabled,
++        mergeJunctionDescription,
++        mergeJunctionName,
++        selectedMergeAutoName,
++        selectedMergeNodeIds,
++    ])
++
++    const handleDeleteManualJunction = useCallback(async (group: JunctionGroup) => {
++        if (isRuntimeReadonlyGroup(group) || deletingJunctionId === group.id) {
++            return
++        }
++
++        setDeletingJunctionId(group.id)
++        try {
++            await topologyEditorApi.deleteJunctionGroup(group.id)
++            invalidatePipelineCache()
++            await loadJunctionGroups()
++            setUndoStack(prev => [...prev, { type: 'delete-junction', group }])
++            setSelectedNode(current => (
++                current?.junctionId === group.id ? null : current
++            ))
++            setStatusMsg(`已拆分手工捏合枢纽：${group.name}`)
++        } catch (error) {
++            console.error(error)
++            setStatusMsg(error instanceof Error ? `拆分手工捏合失败：${error.message}` : '拆分手工捏合失败')
++        } finally {
++            setDeletingJunctionId(null)
++        }
++    }, [deletingJunctionId, isRuntimeReadonlyGroup, loadJunctionGroups])
++
++    const handleSavePositions = useCallback(async () => {
+*** End Patch

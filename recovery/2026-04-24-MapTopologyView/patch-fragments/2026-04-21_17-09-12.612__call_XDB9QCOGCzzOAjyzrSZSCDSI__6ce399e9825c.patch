@@ -1,0 +1,37 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    // 椤甸潰鍔犺浇鏃朵粠鍚庣璇诲彇 seed 鑺傜偣鍒濆鍘嬪姏锛屽缓绔?Map 渚涗豢鐪熷墠灞曠ず
+-    useEffect(() => {
+-        const pilotId = WE1_PRIMARY_PILOT_ID  // 涓?useSimulation 淇濇寔涓€鑷?
+-        seedNodeAPI.getNodePressures(pilotId)
+-            .then(res => {
+-                const map = new Map<string, SeedNodePressure>()
+-                for (const node of res.data.nodes) {
+-                    if (node.id) {
+-                        map.set(node.id, node)
+-                    }
+-                }
+-                setSeedNodePressures(map)
+-            })
+-            .catch(err => console.warn('[MapTopologyView] seed node pressures load failed', err))
+-    }, [])
++    const refreshSeedNodePressures = useCallback(async () => {
++        const pilotId = WE1_PRIMARY_PILOT_ID
++        const res = await seedNodeAPI.getNodePressures(pilotId)
++        const map = new Map<string, SeedNodePressure>()
++        for (const node of res.data.nodes) {
++            if (node.id) {
++                map.set(node.id, node)
++            }
++        }
++        setSeedNodePressures(map)
++        return map
++    }, [])
++
++    // 椤甸潰鍔犺浇鏃朵粠鍚庣璇诲彇 seed 鑺傜偣鍒濆鍘嬪姏锛屽缓绔?Map 渚涗豢鐪熷墠灞曠ず
++    useEffect(() => {
++        refreshSeedNodePressures()
++            .catch(err => console.warn('[MapTopologyView] seed node pressures load failed', err))
++    }, [refreshSeedNodePressures])
+*** End Patch

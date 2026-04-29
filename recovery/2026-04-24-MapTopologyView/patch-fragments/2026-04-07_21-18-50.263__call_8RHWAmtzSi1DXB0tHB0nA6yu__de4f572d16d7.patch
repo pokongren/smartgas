@@ -1,0 +1,42 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                                        <div className="text-[10px] uppercase tracking-wider text-cyan-200">???????</div>
++                                        <div className="text-[10px] uppercase tracking-wider text-cyan-200">主仿真入口</div>
+@@
+-                                            <div className="mb-1 text-[10px] text-gray-500">????</div>
++                                            <div className="mb-1 text-[10px] text-gray-500">当前场景</div>
+@@
+-                                            <div className="mb-1 text-[10px] text-gray-500">????</div>
++                                            <div className="mb-1 text-[10px] text-gray-500">结果快照</div>
+@@
+-                                                    <option value="">??????</option>
++                                                    <option value="">请选择一条快照</option>
+@@
+-                                                <button onClick={async () => { try { await loadSteadySelectedSnapshot(); setStatusMsg(`??????${selectedSnapshotSummary?.scenario_id ?? steadySelectedSnapshotRunId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '??????') } }} disabled={!steadySelectedSnapshotRunId || steadySnapshotLoading} className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs text-cyan-100 disabled:opacity-40">{steadySnapshotLoading ? '???...' : '??'}</button>
++                                                <button onClick={async () => { try { await loadSteadySelectedSnapshot(); setStatusMsg(`已加载快照：${selectedSnapshotSummary?.scenario_id ?? steadySelectedSnapshotRunId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '加载快照失败') } }} disabled={!steadySelectedSnapshotRunId || steadySnapshotLoading} className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs text-cyan-100 disabled:opacity-40">{steadySnapshotLoading ? '加载中...' : '加载'}</button>
+@@
+-                                            <div className="mb-1 text-[10px] text-gray-500">????</div>
++                                            <div className="mb-1 text-[10px] text-gray-500">基线快照</div>
+@@
+-                                                <option value="">??????</option>
++                                                <option value="">请选择基线快照</option>
+@@
+-                                        <button onClick={async () => { try { await runSteadySimulation(); setStatusMsg(`WE1 ???????${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '????????') } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '???...' : '??????'}</button>
+-                                        <button onClick={async () => { try { await saveSteadySnapshot(); setStatusMsg(`??????${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '??????') } }} disabled={!steadyOverlay || steadySnapshotLoading} className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40">{steadySnapshotLoading ? '???...' : '????'}</button>
+-                                        <button onClick={async () => { try { await refreshSteadySnapshots(); setStatusMsg('???????') } catch (error) { setStatusMsg(error instanceof Error ? error.message : '??????') } }} disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40">????</button>
+-                                        <button onClick={() => { clearSteadyOverlay(); setStatusMsg('??????????') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">??????</button>
+-                                        <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">??????</button>
++                                        <button onClick={async () => { try { await runSteadySimulation(); setStatusMsg(`WE1 主仿真已运行：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 主仿真运行失败') } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '运行中...' : '运行主仿真'}</button>
++                                        <button onClick={async () => { try { await saveSteadySnapshot(); setStatusMsg(`已保存快照：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '保存快照失败') } }} disabled={!steadyOverlay || steadySnapshotLoading} className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40">{steadySnapshotLoading ? '保存中...' : '保存快照'}</button>
++                                        <button onClick={async () => { try { await refreshSteadySnapshots(); setStatusMsg('快照列表已刷新') } catch (error) { setStatusMsg(error instanceof Error ? error.message : '刷新快照失败') } }} disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40">刷新快照</button>
++                                        <button onClick={() => { clearSteadyOverlay(); setStatusMsg('已清空当前主仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空主仿真</button>
++                                        <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">导出演示清单</button>
+@@
+-                                        <div>?????{steadyScenarioOption?.label ?? steadyScenarioId}</div>
+-                                        <div>?????{steadySnapshots.length} ?{selectedSnapshotSummary ? `????? ${formatDateTimeLabel(selectedSnapshotSummary.saved_at)}` : ''}</div>
+-                                        <div>?????{selectedBaselineSnapshotSummary ? `${selectedBaselineSnapshotSummary.scenario_id} | ${formatDateTimeLabel(selectedBaselineSnapshotSummary.saved_at)}` : '???'}</div>
++                                        <div>当前状态：{steadyScenarioOption?.label ?? steadyScenarioId}</div>
++                                        <div>快照数量：{steadySnapshots.length} 条{selectedSnapshotSummary ? `，当前选中 ${formatDateTimeLabel(selectedSnapshotSummary.saved_at)}` : ''}</div>
++                                        <div>基线快照：{selectedBaselineSnapshotSummary ? `${selectedBaselineSnapshotSummary.scenario_id} | ${formatDateTimeLabel(selectedBaselineSnapshotSummary.saved_at)}` : '未选择'}</div>
+*** End Patch

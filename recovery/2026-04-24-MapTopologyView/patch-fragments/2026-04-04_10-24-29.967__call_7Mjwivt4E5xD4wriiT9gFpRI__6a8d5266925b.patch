@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Add File: C:\Users\Administrator\.codex\automations\automation\memory.md
++## 2026-04-04 18:24:11 +08:00
++
++- 本轮先在 `F:\smartgas-grid` 落点校验通过：切换后 cwd 是 `F:\smartgas-grid`，`git rev-parse --show-toplevel` 也是 `F:\smartgas-grid`，没有把 detached worktree 当事实来源。
++- 主目录不是空壳仓库：根目录有 `src`、`backend`、`docs`，`git worktree list` 显示主目录 `F:\smartgas-grid` 在分支头上，Codex worktree 都是 detached。
++- 当前变化以“代码改动 + 数据库/导入脚本本地实验”混合为主，不是单一 docs 变更。`git status` 里地图/拓扑、AI、SCADA、docs、数据库都有未提交改动。
++- 地图/拓扑这条线的核心变化：`src/utils/hierarchyRenderer.ts` 新增统一 LOD 阈值（6/10/14，阀室 11，聚合展开 12）；`src/utils/mapRenderer.ts` 已接入统一 `shouldShowNodeAtZoom`；`src/views/GlobalPipelineView.tsx` 和 `src/views/MapTopologyView.tsx` 都转向 `rawType` 口径，并新增从全国图跳到 `/map-topology?focusNode=...` 的联动。
++- 枢纽规则这条线的核心变化：`backend/app/services/junction_groups.py` 现在会展开 `JUNCTION-x/junction-x` 引用、按站点交集合并重叠枢纽；`backend/app/routers/topology_editor.py` 创建枢纽时先做底层站点展开；`src/views/MapTopologyView.tsx` 增加了“只允许真实已导入站点参与捏合、已占用成员不能重复入组”的前端防线。
++- 数据库口径目前仍是旧 schema 兼容态，不要误判成结构已统一：`stations` 没有 `raw_type` 字段，`pipelines` 没有 `system_id` 字段，没有 `layers_config` 表，`junction_groups` 也没有 `layer_id`；真实配置仍在 `pipeline_systems.layers_config` 列里。
++- 数据库内容现状：`stations=1256`、`pipelines=1253`、`pipeline_systems=13`、`junction_groups=16`；有 `sj2`、`sj3`，但没有 `we3`。`add_we3.py`、`add_sj2.py`、`reimport_sj23.py` 更像本地导入/重导实验脚本，不代表库里已经全面落库。
++- docs 已有同步收口迹象：`docs/TOPOLOGY_COMPUTATION_USAGE.md`、`docs/TOPOLOGY_SETUP_GUIDE.md` 在强调 `8080` 端口，以及 `/api/topology/...` 和 `/topology/...` 并存的现状。
++- 下次巡检先复用这几个判断，避免重复卡在“主目录是不是对的”和“数据库 schema 是否已经升级完”这两类老问题。
+*** End Patch

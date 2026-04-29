@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-            importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} 鈫?${eNode.name}` })
++            importedEdges.push({
++                id: edgeId,
++                startNodeId: edge.startNodeId,
++                endNodeId: edge.endNodeId,
++                name: `${sNode.name} 鈫?${eNode.name}`,
++                sourceEdgeIds: edge.sourceEdgeIds,
++            })
+         }
+*** End Patch

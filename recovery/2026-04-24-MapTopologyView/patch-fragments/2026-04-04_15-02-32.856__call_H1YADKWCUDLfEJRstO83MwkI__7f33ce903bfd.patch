@@ -1,0 +1,29 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ interface TopoNode {
+     id: string
+     type: PointType
+     name: string
+     position: [number, number]
+     sourceNodeIds?: string[]
+     junctionId?: number
+     isJunction?: boolean
++    junctionKind?: string
++    sourceTable?: string
+     marker?: any
+ }
+@@
+             displayNodes.push({
+                 id: junctionNodeId,
+                 name: group.name,
+                 type: 'junction',
+                 position: [centerLng, centerLat],
+                 sourceNodeIds: [...group.station_ids],
+                 junctionId: group.id,
+                 isJunction: true,
++                junctionKind: group.junction_kind,
++                sourceTable: group.source_table,
+             })
+         })
+*** End Patch

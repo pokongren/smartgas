@@ -1,0 +1,90 @@
+*** Begin Patch
+*** Add File: C:\Users\Administrator\.codex\automations\automation\run-2026-04-05-122527.md
++# smartgas-grid 巡检总结（2026-04-05 12:25 +08:00）
++
++## 主目标
++
++这轮先按 automation 要求把巡检落到 `F:\smartgas-grid` 主目录，再基于主目录事实检查地图层级、枢纽规则、数据库口径、AI 链路和 docs 变化。
++
++## 做了什么
++
++1. 先读了 automation memory，没有沿用旧结论，重新做入口校验。
++2. 在 `F:\smartgas-grid` 执行了 `cwd`、`git rev-parse --show-toplevel`、`git worktree list`、`.git` 形态检查。
++3. 检查了 `git log`、`git status --short`、`git diff --stat`、`docs` 变更量。
++4. 逐条核对了以下文件和实库：
++   - 地图层级：`src/utils/hierarchyRenderer.ts`、`src/utils/mapRenderer.ts`、`src/views/GlobalPipelineView.tsx`、`src/views/MapTopologyView.tsx`
++   - 枢纽 / 数据库 / 导入：`backend/app/models.py`、`backend/app/services/junction_groups.py`、`backend/app/routers/topology_editor.py`、`backend/check_db.py`、`backend/scripts/add_sj2.py`、`backend/scripts/add_we3.py`、`backend/scripts/reimport_sj23.py`、`backend/data/smartgas.db`
++   - AI：`backend/app/routers/ai_assistant.py`、`backend/app/services/ai_client.py`、`backend/app/services/ai_analysis_orchestrator.py`、`backend/app/services/analysis_validator.py`、`backend/app/services/fix_task_router.py`、`src/components/ai-assistant/AiAssistant.tsx`、`src/components/ai-assistant/useAiAssistantChat.ts`、`src/components/ai-assistant/useAiAssistantPageContext.ts`、`src/services/api.ts`
++5. 额外跑了 `backend/check_db.py`，把“脚本里写了什么”和“库里现在真有什么”拆开验证。
++
++## 为什么这么做
++
++这轮最容易误判的地方有两个：
++
++- 当前会话起始目录不是主目录，必须先确认是不是已经真正落到 `F:\smartgas-grid`。
++- memory 里已经有一批过期数字，如果不重新查实库，很容易把旧库状态当成现在的状态。
++
++## 影响范围
++
++- 这轮结论只基于 `F:\smartgas-grid` 主目录，不拿 detached worktree 补事实。
++- 这轮确认项目不是空壳仓库，变化覆盖地图、拓扑编辑、枢纽 runtime、数据库脚本、AI 助手和 docs，不是单纯 docs 漂移。
++- 这轮也确认 AI 新链路和若干重编 / 校验脚本还在未跟踪状态，现阶段更像本地半接线能力，不适合说成正式基线。
++
++## 验证结果
++
++- 入口校验通过：
++
++| 检查项 | 结果 |
++| --- | --- |
++| cwd | `F:\smartgas-grid` |
++| git 根目录 | `F:/smartgas-grid` |
++| `.git` | 主目录里的真实目录 |
++| 仓库形态 | 有 `src/`、`backend/`、`docs/`、`backend/data/smartgas.db`，不是空壳 |
++
++- 数据库实测：
++
++| 项目 | 当前值 |
++| --- | --- |
++| `stations` | `1256` |
++| `pipelines` | `1251` |
++| `pipeline_systems` | `13` |
++| `junction_groups` | `25` |
++| `junction_groups_rebuilt` | `7` |
++| `WE3` 站 / 段 | `0 / 0` |
++| `SJ2` 站 / 段 | `70 / 69` |
++| `SJ3` 站 / 段 | `71 / 70` |
++
++- `backend/check_db.py --strict --require-prefix WE3 --require-prefix SJ2 --require-prefix SJ3 --require-system we3 --require-system sj2 --require-system sj3` 返回失败，失败点就是 `WE3` 当前不在实库里。
++- `junction_groups_rebuilt` 自检通过，`issue_count=0`，最新生成时间是 `2026-04-04T17:17:43.361829+00:00`。
++
++## 前后对比
++
++这轮没有改业务代码，也没有改数据库，只更新了 automation 侧记录。
++
++| 对比项 | 上轮 memory 常见口径 | 这轮实测口径 |
++| --- | --- |
++| `pipeline_systems` | 常被记成 `14` | `13` |
++| `stations / pipelines` | 常被记成 `1272 / 1268` | `1256 / 1251` |
++| `junction_groups` | 常被记成 `18` 或 `24` | `25` |
++| `WE3` | 曾被记成已在主库 | 当前主库 `0 / 0`，脚本存在但未落库 |
++
++## 截图 / 配图
++
++这轮没放截图。原因是这次重点是仓库落点、git 状态、代码链路和 SQLite 实库口径，用表格和命令验证比截图更直接。
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
++## 2026-04-05 12:25:27 +08:00
++
++- 这轮先按入口规则落到主目录再巡检。初始 `cwd=C:\Users\Administrator\.codex\worktrees\7485\smartgas-grid`，切换后 `cwd=F:\smartgas-grid`，`git rev-parse --show-toplevel=F:/smartgas-grid`。本轮结论只基于 `F:\smartgas-grid`，没有拿 detached worktree 当事实来源。
++- 入口通过，不是 `automation env mismatch / worktree-path blockage`，也不是空壳 worktree。`F:\smartgas-grid\.git` 是目录；`src/`、`backend/`、`docs/`、`backend/data/smartgas.db` 和本轮点名文件都在；`git worktree list` 里主目录 `F:/smartgas-grid` 停在 `eaf6ac4`，大量 `.codex/worktrees/*` 仍停在 `6410a10` detached，只能算背景噪音。
++- 当前主目录的变化不是单纯 docs。`git diff --stat` 命中 46 个已跟踪文件，约 `4589 insertions / 2543 deletions`；地图 / 拓扑相关核心文件、`backend/app/services/junction_groups.py`、`backend/app/routers/ai_assistant.py`、AI 前端组件、`backend/check_db.py`、导入脚本和 docs 都在动。
++- 地图层级这轮的准确信息：`src/utils/hierarchyRenderer.ts` 统一阈值还是 `critical/high/medium=6/10/14`，并保留 `valveMinZoom=11`、`expandClusterZoom=12`；`src/utils/mapRenderer.ts` 已真实接入 `getNodeLODStrategy()` / `shouldShowNodeAtZoom()`；`src/views/GlobalPipelineView.tsx` 通过 `MapView -> mapRenderer` 吃到这套规则；但 `src/views/MapTopologyView.tsx` 仍保留自己的 `TOPO_SIZES` 和 collapsed graph 渲染，所以别再写成“地图和拓扑编辑视图已经完全统一缩放口径”。
++- 枢纽 runtime 口径也要按这轮实测刷新：`backend/app/services/junction_groups.py` 现在是“`junction_groups_rebuilt` 优先 + `junction_groups` 兼容兜底 + 手工 overlay 单独覆盖”，并支持展开 `JUNCTION-x/junction-x`；`backend/app/routers/topology_editor.py` 的 `/api/topology/junctions` 返回 `load_runtime_junction_groups()`，同时带 `manual_editing_enabled` 和 `mode=runtime_readonly|legacy_editable`。`manual_overlay` 已经不是表字段，识别靠 `description` 里的标记。
++- 数据库口径必须按主库重查，别沿用旧 memory。当前 `backend/data/smartgas.db` 实测是 `stations=1256`、`pipelines=1251`、`pipeline_systems=13`、`junction_groups=25`、`junction_groups_rebuilt=7`；`pipeline_systems` 里没有 `we3`，当前 system ids 是 `cred,gn,gs,jxlz,ncsh,pt,sj2,sj3,sj4,we1,we2,zg,zm`；`WE3` 当前主库是 `stations=0 / pipelines=0`，`SJ2=70/69`，`SJ3=71/70`；`layers_config` 仍然挂在 `pipeline_systems.layers_config` 字段，不是单独表。
++- 导入脚本和实库状态要分开说。`backend/scripts/add_sj2.py`、`backend/scripts/add_we3.py`、`backend/scripts/reimport_sj23.py` 都改成直接指向主库 `backend/data/smartgas.db`，并把新增管段 `category` 收口到 `trunk/branch`，更像正式补数 / 重导脚本；但这不代表脚本已落库。当前实库里 `WE3` 仍缺失，`backend/check_db.py --strict --require-prefix WE3 --require-system we3 ...` 会因为 `WE3` 缺失直接失败。
++- `backend/check_db.py` 这轮已经升级成可复用验收脚本，不再只是随手扫表。它会核 `pipeline_systems`、前缀快照、`junction_groups_rebuilt` 的成员、`junction_kind`、嵌套 `JUNCTION-` 引用和最新生成时间。当前它对 `junction_groups_rebuilt` 的校验结果是 `issue_count=0`，最新 `generated_at=2026-04-04T17:17:43.361829+00:00`，但 `major_junction_count=0`，这个状态后面还要继续盯。
++- AI 链路这轮要保守收口。前端入口在 `src/components/ai-assistant/AiAssistant.tsx`，`src/components/ai-assistant/useAiAssistantChat.ts` 会把 `context + analysis_mode=subagents` 发到 `/api/ai-assistant/chat`，`src/components/ai-assistant/useAiAssistantPageContext.ts` 注入 route/title/module/summary；后端 `backend/app/routers/ai_assistant.py` 已经按 `context/analysis_mode` 分流到 legacy 或 `AiAnalysisOrchestrator -> AnalysisValidator -> FixTaskRouter`。但 orchestrator / validator / fix router 和前端两个 hook 目前仍是未跟踪文件，`ai_client.py` 默认还是 `AI_BASE_URL=https://api.openai.com/v1`、`AI_DEFAULT_MODEL=gpt-3.5-turbo`，缺 `AI_API_KEY` 时明确 fallback。所以这条链现在只能叫“主目录里的本地未提交半接线能力”，不能上升成正式基线。
++- docs 不是装饰性改字。`docs/TOPOLOGY_SETUP_GUIDE.md`、`docs/TOPOLOGY_COMPUTATION_USAGE.md` 明确把默认端口写成 `8080`，也把 `/api/topology/...` 和 `/topology/...` 的双路由现实写出来。本轮 docs diff 约 `181 insertions / 587 deletions`，是在清旧口径，不是简单美化。
++- 下轮继续沿用这几个硬边界：1) 只认 `F:\smartgas-grid` 主目录事实；2) 先重查实库，别复用旧数字；3) `MapTopologyView.tsx` 仍按“未完全并入统一 LOD”表述；4) AI 编排链和重编 / 校验脚本仍按“本地实验 / 半接线”口径，不说成正式上线。
++- 本轮运行时间：`2026-04-05T12:25:27.4680035+08:00`
+*** End Patch

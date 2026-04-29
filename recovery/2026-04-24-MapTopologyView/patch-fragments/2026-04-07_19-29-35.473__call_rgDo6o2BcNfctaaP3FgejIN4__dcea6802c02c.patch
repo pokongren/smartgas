@@ -1,0 +1,39 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+         topoEdges.forEach(edge => {
+             if (!edge.poly) return
+ 
+             const match = simulationMapping?.edgeMatchesByDisplayId.get(edge.id) ?? null
+             const hasSimulation = Boolean(shouldApplySimulationVisuals && match && match.matchedEdgeIds.length > 0)
+             const dimmed = Boolean(shouldApplySimulationVisuals && simulationHitFocus && !hasSimulation)
++            const isSelected = selectedEdgeId === edge.id
+             const strokeColor = hasSimulation
+                 ? (match?.matchedEdges[0]?.color ?? SIMULATION_ALERT_COLORS[match?.highestAlertLevel ?? 'normal'])
+                 : LINE_COLOR
+             const strokeWeight = hasSimulation
+                 ? Math.max(LINE_WEIGHT, Math.min(6, LINE_WEIGHT + (match?.averageUtilization ?? 0) * 3))
+                 : LINE_WEIGHT
+ 
+             edge.poly.setOptions({
+-                strokeColor,
+-                strokeWeight,
++                strokeColor: isSelected ? '#f8fafc' : strokeColor,
++                strokeWeight: isSelected ? strokeWeight + 1.5 : strokeWeight,
+                 strokeStyle: hasSimulation && match?.highestAlertLevel === 'critical' ? 'dashed' : 'solid',
+                 strokeOpacity: dimmed ? SIM_DIMMED_OPACITY : hasSimulation ? 0.95 : 0.75,
+-                zIndex: hasSimulation ? 130 : 100,
++                zIndex: isSelected ? 180 : hasSimulation ? 130 : 100,
+             })
+         })
+     }, [
+         activeTab,
+         editMode,
+         mapInstance,
++        selectedEdgeId,
+         selectedNode?.id,
+         shouldApplySimulationVisuals,
+         simulationHitFocus,
+         simulationMapping,
+         topoEdges,
+*** End Patch

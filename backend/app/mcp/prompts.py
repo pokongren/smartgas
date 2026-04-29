@@ -65,3 +65,20 @@ def emergency_response(pipeline_id: str) -> str:
         f"2. 调用 get_station_details 工具查询关键受到影响的站场详情（注意当前压力）。\n"
         f"3. 制定包含关阀指令、供气调配建议的管网调度应急响应报告。"
     )
+
+
+@mcp.prompt()
+def sim_evaluation(run_id: str = "", baseline_run_id: str = "") -> str:
+    """
+    稳态仿真评价模板 - 读取最新结果并生成答辩口径总结
+
+    @param run_id 仿真结果 run_id
+    @param baseline_run_id 对比基线 run_id
+    """
+    baseline_text = f"基线快照为 {baseline_run_id}。" if baseline_run_id else "不指定基线时，直接按当前结果给出评价。"
+    return (
+        f"请评价稳态仿真结果，结果 run_id 为 {run_id or '最新结果'}。\n"
+        f"{baseline_text}\n"
+        f"请优先调用 evaluate_sim_result 工具，再读取 smartgas://sim/latest，最后给出："
+        f"1. 一句结论；2. 关键风险点；3. 具体建议；4. 答辩时可直接复述的口语化总结。"
+    )

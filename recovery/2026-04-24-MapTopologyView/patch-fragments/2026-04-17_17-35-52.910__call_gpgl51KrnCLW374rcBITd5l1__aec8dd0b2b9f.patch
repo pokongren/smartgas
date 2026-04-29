@@ -1,0 +1,80 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+     const paramEditorEdges = useMemo(() => {
+         return topoEdges.map(edge => ({ id: edge.id, name: edge.name }))
+     }, [topoEdges])
++    const validateSimulationParams = useCallback((): string | null => {
++        const checkRange = (value: number | undefined, min: number, max: number, label: string): string | null => {
++            if (value == null) return null
++            if (!Number.isFinite(value) || value < min || value > max) {
++                return `${label}超出范围(${min}-${max})`
++            }
++            return null
++        }
++        for (const [nodeId, value] of Object.entries(nodeParamOverrides)) {
++            const targetErr = checkRange(value.target_pressure_mpa, 0.1, 20, `节点${nodeId}目标压力`)
++            if (targetErr) return targetErr
++            const minErr = checkRange(value.min_pressure_mpa, 0.1, 20, `节点${nodeId}最小压力`)
++            if (minErr) return minErr
++            const tempErr = checkRange(value.temperature_c, -50, 120, `节点${nodeId}温度`)
++            if (tempErr) return tempErr
++            if (value.target_pressure_mpa != null && value.min_pressure_mpa != null && value.min_pressure_mpa > value.target_pressure_mpa) {
++                return `节点${nodeId}最小压力不能大于目标压力`
++            }
++        }
++        for (const [edgeId, value] of Object.entries(edgeLengthOverrides)) {
++            const edgeErr = checkRange(value, 0.1, 3000, `管段${edgeId}长度`)
++            if (edgeErr) return edgeErr
++        }
++        const pErr = checkRange(globalParamDefaults.default_pressure_mpa, 0.1, 20, '全网默认压力')
++        if (pErr) return pErr
++        const tErr = checkRange(globalParamDefaults.default_temperature_c, -50, 120, '全网默认温度')
++        if (tErr) return tErr
++        const fErr = checkRange(globalParamDefaults.default_flow_rate, 0.01, 100000, '全网默认流量')
++        if (fErr) return fErr
++        return null
++    }, [edgeLengthOverrides, globalParamDefaults.default_flow_rate, globalParamDefaults.default_pressure_mpa, globalParamDefaults.default_temperature_c, nodeParamOverrides])
+     const buildSimulationInitialInput = useCallback((): SimulationInitialInput | undefined => {
+         const nodeEntries = Object.entries(nodeParamOverrides)
+             .map(([nodeId, value]) => ({
+                 node_id: nodeId,
+                 target_pressure_mpa: value.target_pressure_mpa,
++                min_pressure_mpa: value.min_pressure_mpa,
+                 temperature_c: value.temperature_c,
+             }))
+-            .filter(item => item.target_pressure_mpa != null || item.temperature_c != null)
++            .filter(item => item.target_pressure_mpa != null || item.min_pressure_mpa != null || item.temperature_c != null)
+         const edgeEntries = Object.entries(edgeLengthOverrides)
+             .map(([edgeId, length]) => ({ edge_id: edgeId, length_km: length }))
+             .filter(item => Number.isFinite(item.length_km))
+-        if (nodeEntries.length === 0 && edgeEntries.length === 0) {
++        const hasDefaults = globalParamDefaults.default_pressure_mpa != null
++            || globalParamDefaults.default_temperature_c != null
++            || globalParamDefaults.default_flow_rate != null
++            || globalParamDefaults.apply_to_sources === true
++        if (nodeEntries.length === 0 && edgeEntries.length === 0 && !hasDefaults) {
+             return undefined
+         }
+         return {
+             node_overrides: nodeEntries.length > 0 ? nodeEntries : undefined,
+             edge_overrides: edgeEntries.length > 0 ? edgeEntries : undefined,
++            default_pressure_mpa: globalParamDefaults.default_pressure_mpa,
++            default_temperature_c: globalParamDefaults.default_temperature_c,
++            default_flow_rate: globalParamDefaults.default_flow_rate,
++            apply_to_sources: globalParamDefaults.apply_to_sources,
+         }
+-    }, [edgeLengthOverrides, nodeParamOverrides])
++    }, [edgeLengthOverrides, globalParamDefaults.apply_to_sources, globalParamDefaults.default_flow_rate, globalParamDefaults.default_pressure_mpa, globalParamDefaults.default_temperature_c, nodeParamOverrides])
+     const runMainSteadySimulation = useCallback(async () => {
++        const error = validateSimulationParams()
++        setParamValidationError(error)
++        if (error) {
++            setStatusMsg(`参数校验失败：${error}`)
++            throw new Error(error)
++        }
+         const initialInput = buildSimulationInitialInput()
+         await runSteadySimulation(initialInput ? { initialInput } : undefined)
+-    }, [buildSimulationInitialInput, runSteadySimulation])
++    }, [buildSimulationInitialInput, runSteadySimulation, validateSimulationParams])
+*** End Patch

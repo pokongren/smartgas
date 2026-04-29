@@ -1,0 +1,17 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ const MANUAL_JUNCTION_EDIT_ENABLED_BY_DEFAULT =
+     String(import.meta.env.VITE_TOPOLOGY_MANUAL_JUNCTION_EDIT ?? '1').trim() !== '0'
+ const JUNCTION_READONLY_HINT = '当前枢纽由运行时重编结果维护，编辑器仅支持只读查看，不再以手工捏合作为主流程。'
++const JUNCTION_MODE_LABELS: Record<string, string> = {
++    runtime_readonly: '只读模式',
++    legacy_editable: '旧流程兼容',
++}
+@@
+-                                            {junctionMode === 'runtime_readonly' ? '只读模式' : junctionMode}
++                                            {JUNCTION_MODE_LABELS[junctionMode] || junctionMode}
+@@
+-                                            鏸忕厧顔愰幍瀣紣閹瑰繐鎮庨敍鍫ユ姜娑撶粯绁﹂敍?
++                                            兼容手工捏合（旧流程）
+*** End Patch

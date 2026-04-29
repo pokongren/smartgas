@@ -1,0 +1,58 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+         topoEdges.forEach(edge => {
+             if (!edge.poly) return
+             const match = simulationMapping.edgeMatchesByDisplayId.get(edge.id)
+             let color = LINE_COLOR
+             let weight = LINE_WEIGHT
+             let isDashed = false
+             let hasFlow = false
++            let flowSpeed = 0
+             if (activeTab === 'cutoff') {
+                 // In cutoff mode, we don't necessarily override line flows, keep the simulation lines for visual continuity if needed.
+                 // Or maybe revert to default. We'll retain the simulation match if active.
+             }
+ 
+             if (match && match.matchedEdges.length > 0) {
+                 if (match.highestAlertLevel === 'critical') {
+                     color = '#f43f5e' // rose-500
+                     weight = LINE_WEIGHT + 2
+                     isDashed = true
+                     hasFlow = true
++                    flowSpeed = 0.25
+                 } else if (match.highestAlertLevel === 'warning') {
+                     color = '#f59e0b' // amber-500
+                     weight = LINE_WEIGHT + 1
+                     hasFlow = true
++                    flowSpeed = 0.8
+                 } else if (match.averageUtilization != null && match.averageUtilization > 0) {
+                     color = '#10b981' // strong green
+                     weight = LINE_WEIGHT + 1
+                     hasFlow = true
++                    flowSpeed = Math.max(0.6, Math.min(2.6, match.averageUtilization * 2.8))
+                 } else if (match.averageUtilization === 0) {
+                     color = '#64748b' // slate
++                    flowSpeed = 0
+                 }
+             }
+-            edge.poly.setOptions({ strokeColor: color, strokeWeight: weight, strokeStyle: isDashed ? 'dashed' : 'solid', showDir: hasFlow })
++            if (isBreakScenarioActive && (match?.highestAlertLevel === 'critical' || (match?.averageUtilization ?? 0) <= 0.05)) {
++                flowSpeed = 0
++            }
++            const edgeOptions: any = {
++                strokeColor: color,
++                strokeWeight: weight,
++                strokeStyle: hasFlow || isDashed ? 'dashed' : 'solid',
++                showDir: hasFlow && flowSpeed > 0.05,
++            }
++            if (hasFlow || isDashed) {
++                edgeOptions.strokeDasharray = [10, 12]
++                edgeOptions.strokeDashoffset = -Math.round(lineFlowPhase * flowSpeed)
++            }
++            edge.poly.setOptions(edgeOptions)
+         })
+ 
+-    }, [simulationMapping, topoNodes, topoEdges, cutoffNodeId, selectedMergeNodeIds, activeTab, cutoffResult])
++    }, [simulationMapping, topoNodes, topoEdges, cutoffNodeId, selectedMergeNodeIds, activeTab, cutoffResult, lineFlowPhase, isBreakScenarioActive, nodePressureDeltaMap, damageFlashVisible])
+*** End Patch

@@ -11,6 +11,8 @@ from datetime import datetime
 from .core import mcp, _get_session
 from app.models import Station, Pipeline
 from app.services.topology import TopologyService
+from app.services.ai_sim_evaluator import evaluate_simulation_result
+from app.services.we1_result_snapshot_service import list_snapshots
 
 
 @mcp.resource("smartgas://stations")
@@ -69,4 +71,24 @@ def get_system_health() -> str:
         "database": "Connected",
         "simulation_engine": "Ready",
         "timestamp": datetime.now().isoformat()
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.resource("smartgas://sim/latest")
+def get_latest_simulation_snapshot() -> str:
+    """获取最新稳态仿真结果与人话评价（JSON 格式）"""
+    snapshots = list_snapshots(limit=1)
+    if not snapshots:
+        return json.dumps({
+            "status": "empty",
+            "message": "当前还没有可用的仿真快照",
+        }, ensure_ascii=False, indent=2)
+
+    latest = snapshots[0]
+    result = latest.get("result") or {}
+    evaluation = evaluate_simulation_result(result)
+    return json.dumps({
+        "status": "ok",
+        "latest_snapshot": latest,
+        "evaluation": evaluation,
     }, ensure_ascii=False, indent=2)

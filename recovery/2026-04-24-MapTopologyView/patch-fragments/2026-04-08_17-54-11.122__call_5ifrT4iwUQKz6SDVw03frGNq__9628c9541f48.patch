@@ -1,0 +1,27 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    return (
++    const openTopologyShowcase = useCallback(() => {
++        writeSimulationShowcaseSyncContext({
++            source: 'map-topology',
++            pilotId: WE1_PRIMARY_PILOT_ID,
++            scenarioId: steadyOverlay?.scenario_id ?? steadyScenarioId,
++            selectedSnapshotRunId: steadySelectedSnapshotRunId,
++            baselineSnapshotRunId: steadyBaselineSnapshotRunId,
++            overlay: steadyOverlay,
++            updatedAt: new Date().toISOString(),
++        })
++        setStatusMsg('已把当前主仿真上下文带到第三张图展示页')
++        navigate('/topology')
++    }, [
++        navigate,
++        steadyBaselineSnapshotRunId,
++        steadyOverlay,
++        steadyScenarioId,
++        steadySelectedSnapshotRunId,
++    ])
++
++    return (
+         <div className="h-screen w-screen overflow-hidden relative bg-[#101922]">
+*** End Patch

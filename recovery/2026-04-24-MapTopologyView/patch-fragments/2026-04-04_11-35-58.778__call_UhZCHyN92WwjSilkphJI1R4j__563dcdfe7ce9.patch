@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+             group.station_ids.forEach(stationId => stationToDisplayId.set(stationId, junctionNodeId))
+             displayNodes.push({
+                 id: junctionNodeId,
+                 name: group.name,
+-                type: 'station',
++                type: 'junction',
+                 position: [centerLng, centerLat],
+                 sourceNodeIds: [...group.station_ids],
+                 junctionId: group.id,
+                 isJunction: true,
+             })
+*** End Patch

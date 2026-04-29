@@ -1,0 +1,19 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     // 淇濆瓨鏈哄埗锛氳窡韪嫋鎷戒慨鏀圭殑鍧愭爣
+     const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
+     const [isSaving, setIsSaving] = useState(false)
++    const {
++        overlay: simulationOverlay,
++        isLoading: simulationLoading,
++        error: simulationError,
++        currentScenario,
++        setScenario,
++        runSimulation,
++        clearOverlay,
++    } = useSimulation({
++        pilotId: 'mainline_zhongwei_jingbian',
++        scenarios: MAINLINE_SCENARIOS,
++    })
+*** End Patch

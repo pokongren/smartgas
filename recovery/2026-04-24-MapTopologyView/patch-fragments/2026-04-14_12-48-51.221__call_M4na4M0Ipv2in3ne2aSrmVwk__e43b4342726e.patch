@@ -1,0 +1,44 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+             const marker = new AMap.Marker({
+                 position: new AMap.LngLat(node.position[0], node.position[1]),
+                 content: createTopoMarkerContent(node.type, node.name, false, !!node.isJunction),
+                 offset: new AMap.Pixel(-size / 2, -size / 2),
+                 draggable: !node.isJunction,
+                 cursor: node.isJunction ? 'pointer' : 'move',
+                 zIndex: node.isJunction ? 260 : 200,
+-                zooms: [2, 30],
++                zooms: [2, 20],
+             })
+@@
+             const poly = new AMap.Polyline({
+                 path: [startNode.position, endNode.position],
+                 strokeColor: LINE_COLOR,
+                 strokeWeight: LINE_WEIGHT,
+                 strokeStyle: 'solid',
+                 zIndex: 100,
+-                zooms: [2, 30],
++                zooms: [2, 20],
+             })
+             poly.setMap(mapInstance)
+             
+             // 绑定悬浮框事件
+             poly.on('mouseover', (e: any) => {
+                 setHoveredEdgeId(edge.id)
+-                setTooltipPos({ x: e.originEvent.clientX, y: e.originEvent.clientY })
++                const clientX = e?.originEvent?.clientX
++                const clientY = e?.originEvent?.clientY
++                if (typeof clientX === 'number' && typeof clientY === 'number') {
++                    setTooltipPos({ x: clientX, y: clientY })
++                }
+             })
+             poly.on('mousemove', (e: any) => {
+-                setTooltipPos({ x: e.originEvent.clientX, y: e.originEvent.clientY })
++                const clientX = e?.originEvent?.clientX
++                const clientY = e?.originEvent?.clientY
++                if (typeof clientX === 'number' && typeof clientY === 'number') {
++                    setTooltipPos({ x: clientX, y: clientY })
++                }
+             })
+*** End Patch

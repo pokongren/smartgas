@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-    const [nodeParamOverrides, setNodeParamOverrides] = useState<Record<string, { target_pressure_mpa?: number; min_pressure_mpa?: number; temperature_c?: number }>>({})
+-    const [edgeLengthOverrides, setEdgeLengthOverrides] = useState<Record<string, number>>({})
++    const [nodeParamOverrides, setNodeParamOverrides] = useState<Record<string, { target_pressure_mpa?: number; min_pressure_mpa?: number; temperature_c?: number }>>({})
++    const [edgeLengthOverrides, setEdgeLengthOverrides] = useState<Record<string, number>>({})
++    const [showSimParamEditor, setShowSimParamEditor] = useState(false)
+     const [globalParamDefaults, setGlobalParamDefaults] = useState<{
+         default_pressure_mpa?: number
+         default_temperature_c?: number
+         default_flow_rate?: number
+*** End Patch

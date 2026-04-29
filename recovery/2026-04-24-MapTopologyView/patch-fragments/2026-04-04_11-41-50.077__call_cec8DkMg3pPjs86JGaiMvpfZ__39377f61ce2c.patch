@@ -1,0 +1,165 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const toggleMergeSelection = useCallback((nodeId: string) => {
++        if (!manualJunctionEditingEnabled) {
++            setStatusMsg(JUNCTION_READONLY_HINT)
++            return
++        }
+         const clickedNode = nodesRef.current.find(node => node.id === nodeId)
+         const targetIds = clickedNode?.isJunction && clickedNode.sourceNodeIds?.length
+             ? clickedNode.sourceNodeIds
+             : [nodeId]
+@@
+-    }, [])
++    }, [manualJunctionEditingEnabled])
+@@
+-        if (modeRef.current === 'merge' || shiftPressed) {
++        if (manualJunctionEditingEnabled && (modeRef.current === 'merge' || shiftPressed)) {
+             toggleMergeSelection(nodeId)
+             return
+         }
+@@
+     const handleCreateJunction = useCallback(async () => {
++        if (!manualJunctionEditingEnabled) {
++            setStatusMsg(JUNCTION_READONLY_HINT)
++            return
++        }
+         const uniqueSelectedIds = [...new Set(selectedMergeNodeIds)]
+         const selectedNodes = baseTopoNodes.filter(node => uniqueSelectedIds.includes(node.id))
+@@
+-    }, [baseTopoNodes, junctionGroups, loadJunctionGroups, persistedTopologyNodeIds, selectedMergeNodeIds])
++    }, [baseTopoNodes, junctionGroups, loadJunctionGroups, manualJunctionEditingEnabled, persistedTopologyNodeIds, selectedMergeNodeIds])
+ 
+     const handleDeleteJunction = useCallback(async (group: JunctionGroup) => {
++        if (!manualJunctionEditingEnabled) {
++            setStatusMsg(JUNCTION_READONLY_HINT)
++            return
++        }
+         if (!window.confirm(`确认拆分枢纽「${group.name}」，并恢复 ${group.station_ids.length} 个底层站点吗？`)) {
+             return
+         }
+@@
+-    }, [loadJunctionGroups])
++    }, [loadJunctionGroups, manualJunctionEditingEnabled])
+@@
+-                                    <div className="grid grid-cols-4 gap-1.5">
+-                                        {([
++                                    <div className={`grid gap-1.5 ${manualJunctionEditingEnabled ? 'grid-cols-4' : 'grid-cols-3'}`}>
++                                        {([
+                                             { m: 'view' as EditMode, label: '浏览', icon: 'pan_tool' },
+                                             { m: 'draw-point' as EditMode, label: '添点', icon: 'add_location' },
+                                             { m: 'connect' as EditMode, label: '连线', icon: 'timeline' },
+                                             { m: 'merge' as EditMode, label: '捏合', icon: 'hub' },
+-                                        ]).map(item => (
++                                        ].filter(item => manualJunctionEditingEnabled || item.m !== 'merge')).map(item => (
+                                             <button key={item.m} onClick={() => setEditMode(item.m)}
+                                                 className={`py-2 rounded-lg text-[11px] transition-all flex flex-col items-center gap-0.5
+                                                     ${editMode === item.m ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20' : 'bg-gray-800/60 text-gray-400 hover:bg-gray-700'}`}>
+                                                 <span className="material-symbols-outlined text-base">{item.icon}</span>{item.label}
+                                             </button>
+                                         ))}
+                                     </div>
+                                 </div>
++
++                                <div className="border border-sky-500/20 bg-sky-950/20 rounded-lg p-2.5 space-y-2">
++                                    <div className="flex items-center justify-between gap-3">
++                                        <p className="text-[10px] text-sky-300 uppercase tracking-wider">运行时枢纽</p>
++                                        <span className="text-[10px] text-sky-400">
++                                            {junctionMode === 'runtime_readonly' ? '只读模式' : junctionMode}
++                                        </span>
++                                    </div>
++                                    <p className="text-xs text-gray-300 leading-5">{JUNCTION_READONLY_HINT}</p>
++                                    <div className="grid grid-cols-3 gap-2 text-[11px]">
++                                        <div className="rounded bg-white/5 px-2 py-2">
++                                            <div className="text-gray-500">枢纽数</div>
++                                            <div className="mt-1 text-white font-medium">{junctionGroups.length}</div>
++                                        </div>
++                                        <div className="rounded bg-white/5 px-2 py-2">
++                                            <div className="text-gray-500">大枢纽</div>
++                                            <div className="mt-1 text-white font-medium">
++                                                {junctionGroups.filter(group => group.junction_kind === 'major_junction').length}
++                                            </div>
++                                        </div>
++                                        <div className="rounded bg-white/5 px-2 py-2">
++                                            <div className="text-gray-500">覆盖站点</div>
++                                            <div className="mt-1 text-white font-medium">
++                                                {junctionGroups.reduce((sum, group) => sum + (group.member_count ?? group.station_ids.length ?? 0), 0)}
++                                            </div>
++                                        </div>
++                                    </div>
++                                </div>
+ 
+                                 {editMode === 'draw-point' && (
+                                     <div>
+@@
+-                                {(editMode === 'merge' || selectedMergeNodeIds.length > 0) && (
++                                {manualJunctionEditingEnabled && (editMode === 'merge' || selectedMergeNodeIds.length > 0) && (
+                                     <div className="border border-purple-500/20 bg-purple-950/20 rounded-lg p-2.5 space-y-2">
+@@
+                             {selectedNode.isJunction ? (
+                                 <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 space-y-3">
+                                     <div>
+                                         <p className="text-xs text-purple-300 uppercase tracking-wider">底层站点</p>
+@@
+                                             })}
+                                         </div>
+                                     </div>
+-                                    <button
+-                                        onClick={() => {
+-                                            const group = junctionGroups.find(item => item.id === selectedNode.junctionId)
+-                                            if (group) handleDeleteJunction(group)
+-                                        }}
+-                                        className="w-full bg-red-700/80 hover:bg-red-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+-                                    >
+-                                        <span className="material-symbols-outlined text-sm">device_hub</span>解除捏合
+-                                    </button>
++                                    {!manualJunctionEditingEnabled && (
++                                        <div className="rounded-lg border border-sky-500/20 bg-sky-950/20 px-3 py-2.5 text-xs text-gray-300 leading-5">
++                                            当前枢纽来自运行时重编影子表，继续作为拓扑枢纽参与展示和计算，但这里不再把手工拆分当主流程。
++                                        </div>
++                                    )}
++                                    {manualJunctionEditingEnabled && (
++                                        <button
++                                            onClick={() => {
++                                                const group = junctionGroups.find(item => item.id === selectedNode.junctionId)
++                                                if (group) handleDeleteJunction(group)
++                                            }}
++                                            className="w-full bg-red-700/80 hover:bg-red-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
++                                        >
++                                            <span className="material-symbols-outlined text-sm">device_hub</span>解除捏合
++                                        </button>
++                                    )}
+                                     <button
+                                         onClick={() => setHistoryChartTarget({
+                                             junctionId: selectedNode.junctionId ? `JUNCTION-${selectedNode.junctionId}` : selectedNode.id,
+@@
+                             ) : (
+                                 <div className="rounded-lg border border-gray-700/40 bg-white/5 p-3">
+-                                    <button
+-                                        onClick={() => {
+-                                            setEditMode('merge')
+-                                            toggleMergeSelection(selectedNode.id)
+-                                        }}
+-                                        className="w-full bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+-                                    >
+-                                        <span className="material-symbols-outlined text-sm">hub</span>加入待捏合列表
+-                                    </button>
++                                    {manualJunctionEditingEnabled ? (
++                                        <button
++                                            onClick={() => {
++                                                setEditMode('merge')
++                                                toggleMergeSelection(selectedNode.id)
++                                            }}
++                                            className="w-full bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
++                                        >
++                                            <span className="material-symbols-outlined text-sm">hub</span>加入待捏合列表
++                                        </button>
++                                    ) : (
++                                        <p className="text-xs text-gray-300 leading-5">
++                                            这里保留站点查看和点位编辑。枢纽关系由后台按交汇规则运行时生成，不再在这个面板里手工捏合。
++                                        </p>
++                                    )}
+                                 </div>
+                             )}
+*** End Patch

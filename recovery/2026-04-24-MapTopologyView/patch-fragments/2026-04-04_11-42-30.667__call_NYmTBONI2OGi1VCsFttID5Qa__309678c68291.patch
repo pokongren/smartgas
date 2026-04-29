@@ -1,0 +1,391 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-type EditMode = 'view' | 'draw-point' | 'connect' | 'merge'
++type EditMode = 'view' | 'draw-point' | 'connect'
+@@
+-    type UndoAction = 
+-        | { type: 'add-node'; nodeId: string }
+-        | { type: 'add-edge'; edgeId: string }
+-        | { type: 'create-junction'; junctionId: number; name: string; stationIds: string[] }
+-        | { type: 'delete-junction'; group: JunctionGroup }
++    type UndoAction =
++        | { type: 'add-node'; nodeId: string }
++        | { type: 'add-edge'; edgeId: string }
+     const [undoStack, setUndoStack] = useState<UndoAction[]>([])
+@@
+-    // 鍚堝缓绔欙細鍚堝苟妯″紡鐘舵€?    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+-    // 宸查珮浜殑 marker 鍘熷 content锛岀敤浜庢仮澶?    const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
++    const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
+@@
+-    const persistedTopologyNodeIds = useMemo(
+-        () => new Set(rawPipelineData.nodes.map(node => node.id)),
+-        [rawPipelineData.nodes]
+-    )
+-
+     const clearRenderedTopology = useCallback(() => {
+         nodesRef.current.forEach(node => node.marker?.setMap(null))
+         edgesRef.current.forEach(edge => edge.poly?.setMap(null))
+         highlightedMarkersRef.current.clear()
+@@
+-        if (editMode === 'draw-point') setStatusMsg(`缁樺埗锛氱偣鍑诲湴鍥炬坊鍔犮€?{TOPO_LABELS[pointType]}銆峘)
+-        else if (editMode === 'connect') { setStatusMsg('杩炵嚎锛氱偣鍑昏捣鐐硅妭鐐?); setConnectFrom(null) }
+-        else if (editMode === 'merge') {
+-            setConnectFrom(null)
+-            if (manualJunctionEditingEnabled) setStatusMsg('鎹忓悎锛氱偣鍑昏妭鐐硅繘琛屽閫夛紝鍐嶇偣鍑汇€屽垱寤烘灑绾姐€?)
+-            else setStatusMsg(JUNCTION_READONLY_HINT)
+-        }
++        if (editMode === 'draw-point') setStatusMsg(`缁樺埗锛氱偣鍑诲湴鍥炬坊鍔犮€?{TOPO_LABELS[pointType]}銆峘)
++        else if (editMode === 'connect') { setStatusMsg('杩炵嚎锛氱偣鍑昏捣鐐硅妭鐐?); setConnectFrom(null) }
+         else setStatusMsg('娴忚妯″紡')
+-    }, [editMode, manualJunctionEditingEnabled, pointType, mapInstance])
+-
+-    useEffect(() => {
+-        if (manualJunctionEditingEnabled) return
+-        if (editMode === 'merge') {
+-            setEditMode('view')
+-        }
+-        if (selectedMergeNodeIds.length > 0) {
+-            setSelectedMergeNodeIds([])
+-        }
+-    }, [editMode, manualJunctionEditingEnabled, selectedMergeNodeIds.length])
++    }, [editMode, pointType, mapInstance])
+@@
+-    const extractShiftPressed = (event?: any): boolean => {
+-        return Boolean(
+-            event?.originEvent?.shiftKey ??
+-            event?.originEvent?.domEvent?.shiftKey ??
+-            event?.domEvent?.shiftKey
+-        )
+-    }
+-
+-    const toggleMergeSelection = useCallback((nodeId: string) => {
+-        const clickedNode = nodesRef.current.find(node => node.id === nodeId)
+-        const targetIds = clickedNode?.isJunction && clickedNode.sourceNodeIds?.length
+-            ? clickedNode.sourceNodeIds
+-            : [nodeId]
+-
+-        setSelectedMergeNodeIds(prev => {
+-            const shouldRemove = targetIds.every(id => prev.includes(id))
+-            const next = shouldRemove
+-                ? prev.filter(id => !targetIds.includes(id))
+-                : [...prev, ...targetIds.filter(id => !prev.includes(id))]
+-            setStatusMsg(`宸查€夋嫨 ${next.length} 涓緟鎹忓悎鑺傜偣`)
+-            return next
+-        })
+-    }, [])
+-
+     const doNodeClick = (nodeId: string, event?: any) => {
+-        const shiftPressed = extractShiftPressed(event)
+-
+         if (modeRef.current === 'connect') {
+             const from = cfRef.current
+             if (!from) {
+@@
+             }
+             return
+         }
+-        if (modeRef.current === 'merge' || shiftPressed) {
+-            toggleMergeSelection(nodeId)
+-            return
+-        }
+ 
+         const clickedNode = nodesRef.current.find(n => n.id === nodeId) || null
+         setSelectedNode(clickedNode)
+@@
+-    const restoreSelectionHighlights = useCallback(() => {
+-        nodesRef.current.forEach(node => {
+-            if (!node.marker) return
+-            const isHighlighted = selectedMergeNodeIds.includes(node.id)
+-            node.marker.setContent(createTopoMarkerContent(node.type, node.name, isHighlighted, !!node.isJunction))
+-        })
+-    }, [selectedMergeNodeIds])
+-
+-    useEffect(() => {
+-        restoreSelectionHighlights()
+-    }, [restoreSelectionHighlights, topoNodes])
+-
+-    const handleCreateJunction = useCallback(async () => {
+-        const uniqueSelectedIds = [...new Set(selectedMergeNodeIds)]
+-        const selectedNodes = baseTopoNodes.filter(node => uniqueSelectedIds.includes(node.id))
+-
+-        if (selectedNodes.length < 2) {
+-            setStatusMsg('鑷冲皯閫夋嫨涓や釜鏈夋晥搴曞眰绔欑偣鎵嶈兘鎹忓悎')
+-            return
+-        }
+-
+-        if (selectedNodes.length !== uniqueSelectedIds.length) {
+-            setStatusMsg('褰撳墠閫夋嫨涓寘鍚け鏁堣妭鐐癸紝璇烽噸鏂伴€夋嫨鍚庡啀璇?)
+-            return
+-        }
+-
+-        const transientNodes = selectedNodes.filter(node => !persistedTopologyNodeIds.has(node.id))
+-        if (transientNodes.length > 0) {
+-            const transientNames = transientNodes.slice(0, 3).map(node => node.name).join('銆?)
+-            const suffix = transientNodes.length > 3 ? ' 绛夎妭鐐? : ''
+-            setStatusMsg(`褰撳墠閫夋嫨鍖呭惈涓存椂鑺傜偣锛?{transientNames}${suffix}锛屽彧鑳芥崗鍚堝凡瀵煎叆鐨勭湡瀹炵珯鐐筦)
+-            return
+-        }
+-
+-        const occupiedNodeIds = new Set(junctionGroups.flatMap(group => group.station_ids))
+-        const occupiedNodes = selectedNodes.filter(node => occupiedNodeIds.has(node.id))
+-        if (occupiedNodes.length > 0) {
+-            const occupiedNames = occupiedNodes.slice(0, 3).map(node => node.name).join('銆?)
+-            const suffix = occupiedNodes.length > 3 ? ' 绛夌珯鐐? : ''
+-            setStatusMsg(`鎵€閫夌珯鐐逛腑宸叉湁鏋㈢航鎴愬憳锛?{occupiedNames}${suffix}锛岃鍏堟媶鍒嗗悗鍐嶉噸缁刞)
+-            return
+-        }
+-
+-        const stationIds = selectedNodes.map(node => node.id)
+-        const defaultName = selectedNodes.map(node => node.name).slice(0, 2).join('-') || `鑱斿悎鏋㈢航-${Date.now().toString().slice(-4)}`
+-        const junctionName = window.prompt('璇疯緭鍏ユ灑绾藉悕绉?, `${defaultName}鏋㈢航`)
+-        if (!junctionName?.trim()) return
+-
+-        try {
+-            const data = await topologyEditorApi.createJunctionGroup({
+-                name: junctionName.trim(),
+-                station_ids: stationIds,
+-                description: 'MapTopologyView 鍒涘缓',
+-            })
+-            invalidatePipelineCache()
+-            await loadJunctionGroups()
+-            setUndoStack(prev => [...prev, {
+-                type: 'create-junction',
+-                junctionId: data.id,
+-                name: junctionName.trim(),
+-                stationIds,
+-            }])
+-            setSelectedMergeNodeIds([])
+-            setEditMode('view')
+-            setStatusMsg(`宸叉崗鍚?${stationIds.length} 涓妭鐐逛负銆?{junctionName.trim()}銆峘)
+-        } catch (error) {
+-            console.error(error)
+-            setStatusMsg(error instanceof Error ? `鍒涘缓鏋㈢航澶辫触锛?{error.message}` : '鍒涘缓鏋㈢航澶辫触')
+-        }
+-    }, [baseTopoNodes, junctionGroups, loadJunctionGroups, persistedTopologyNodeIds, selectedMergeNodeIds])
+-
+-    const handleDeleteJunction = useCallback(async (group: JunctionGroup) => {
+-        if (!window.confirm(`纭鎷嗗垎鏋㈢航銆?{group.name}銆嶏紝骞舵仮澶?${group.station_ids.length} 涓簳灞傜珯鐐瑰悧锛焋)) {
+-            return
+-        }
+-        try {
+-            const result = await topologyEditorApi.deleteJunctionGroup(group.id)
+-            invalidatePipelineCache()
+-            await loadJunctionGroups()
+-            setUndoStack(prev => [...prev, { type: 'delete-junction', group }])
+-            setSelectedNode(null)
+-            setStatusMsg(result.message || `鏋㈢航銆?{group.name}銆嶅凡鎷嗗垎`)
+-        } catch (error) {
+-            console.error(error)
+-            setStatusMsg(error instanceof Error ? `鎷嗗垎鏋㈢航澶辫触锛?{error.message}` : '鎷嗗垎鏋㈢航澶辫触')
+-        }
+-    }, [loadJunctionGroups])
+-
+     const doUndo = useCallback(async () => {
+         const stack = [...undoStack]
+         const action = stack.pop()
+@@
+         } else if (action.type === 'add-node') {
+             const node = baseTopoNodes.find(n => n.id === action.nodeId)
+             setBaseTopoEdges(prev => prev.filter(e => e.startNodeId !== action.nodeId && e.endNodeId !== action.nodeId))
+             setBaseTopoNodes(prev => prev.filter(n => n.id !== action.nodeId))
+-            setSelectedMergeNodeIds(prev => prev.filter(id => id !== action.nodeId))
+             setStatusMsg(`宸叉挙閿€: 鍒犻櫎 ${node?.name || '鑺傜偣'}`)
+-        } else if (action.type === 'create-junction') {
+-            try {
+-                await topologyEditorApi.deleteJunctionGroup(action.junctionId)
+-                invalidatePipelineCache()
+-                await loadJunctionGroups()
+-                setSelectedNode(null)
+-                setStatusMsg(`宸叉挙閿€: 鎷嗗垎鏋㈢航銆?{action.name}銆峘)
+-            } catch (error) {
+-                console.error(error)
+-                setStatusMsg(error instanceof Error ? `鎾ら攢鏋㈢航鍒涘缓澶辫触锛?{error.message}` : '鎾ら攢鏋㈢航鍒涘缓澶辫触')
+-            }
+-        } else if (action.type === 'delete-junction') {
+-            try {
+-                await topologyEditorApi.createJunctionGroup({
+-                    name: action.group.name,
+-                    station_ids: action.group.station_ids,
+-                    description: action.group.description ?? undefined,
+-                })
+-                invalidatePipelineCache()
+-                await loadJunctionGroups()
+-                setStatusMsg(`宸叉挙閿€: 鎭㈠鏋㈢航銆?{action.group.name}銆峘)
+-            } catch (error) {
+-                console.error(error)
+-                setStatusMsg(error instanceof Error ? `鎾ら攢鏋㈢航鎷嗗垎澶辫触锛?{error.message}` : '鎾ら攢鏋㈢航鎷嗗垎澶辫触')
+-            }
+         }
+-    }, [baseTopoNodes, loadJunctionGroups, undoStack])
++    }, [baseTopoNodes, undoStack])
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                                    <div className="grid grid-cols-4 gap-1.5">
++                                    <div className="grid grid-cols-3 gap-1.5">
+                                         {([
+                                             { m: 'view' as EditMode, label: '娴忚', icon: 'pan_tool' },
+                                             { m: 'draw-point' as EditMode, label: '娣荤偣', icon: 'add_location' },
+                                             { m: 'connect' as EditMode, label: '杩炵嚎', icon: 'timeline' },
+-                                            { m: 'merge' as EditMode, label: '鎹忓悎', icon: 'hub' },
+                                         ]).map(item => (
+                                             <button key={item.m} onClick={() => setEditMode(item.m)}
+                                                 className={`py-2 rounded-lg text-[11px] transition-all flex flex-col items-center gap-0.5
+@@
+-                                {(editMode === 'merge' || selectedMergeNodeIds.length > 0) && (
+-                                    <div className="border border-purple-500/20 bg-purple-950/20 rounded-lg p-2.5 space-y-2">
+-                                        <div className="flex items-center justify-between">
+-                                            <p className="text-[10px] text-purple-300 uppercase tracking-wider">寰呮崗鍚堣妭鐐?/p>
+-                                            <span className="text-[10px] text-purple-400">{selectedMergeNodeIds.length} 涓?/span>
+-                                        </div>
+-                                        <div className="max-h-28 overflow-y-auto space-y-1">
+-                                            {selectedMergeNodeIds.length === 0 && (
+-                                                <p className="text-[10px] text-gray-500">杩涘叆鎹忓悎妯″紡鍚庣偣鍑昏妭鐐癸紝鎴栧湪娴忚妯″紡鎸変綇 Shift 杩涜澶氶€夈€?/p>
+-                                            )}
+-                                            {selectedMergeNodeIds.map(nodeId => {
+-                                                const node = baseTopoNodes.find(item => item.id === nodeId)
+-                                                    ?? topoNodes.find(item => item.id === nodeId)
+-                                                if (!node) return null
+-                                                return (
+-                                                    <div key={nodeId} className="flex items-center gap-2 text-[11px] bg-white/5 rounded px-2 py-1">
+-                                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TOPO_COLORS[node.type] }} />
+-                                                        <span className="text-gray-200 flex-1 truncate">{node.name}</span>
+-                                                        <button
+-                                                            onClick={() => toggleMergeSelection(nodeId)}
+-                                                            className="text-gray-500 hover:text-red-400 transition-colors"
+-                                                        >
+-                                                            <span className="material-symbols-outlined text-sm">close</span>
+-                                                        </button>
+-                                                    </div>
+-                                                )
+-                                            })}
+-                                        </div>
+-                                        <div className="flex gap-1.5">
+-                                            <button
+-                                                onClick={() => setSelectedMergeNodeIds([])}
+-                                                disabled={selectedMergeNodeIds.length === 0}
+-                                                className="flex-1 bg-gray-800/60 hover:bg-gray-700 text-gray-300 py-2 rounded-lg text-xs transition-colors disabled:opacity-40"
+-                                            >
+-                                                娓呯┖閫夋嫨
+-                                            </button>
+-                                            <button
+-                                                onClick={() => void handleCreateJunction()}
+-                                                disabled={selectedMergeNodeIds.length < 2}
+-                                                className="flex-1 bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+-                                            >
+-                                                <span className="material-symbols-outlined text-sm">hub</span>鍒涘缓鏋㈢航
+-                                            </button>
+-                                        </div>
+-                                    </div>
+-                                )}
++                                <div className="border border-purple-500/20 bg-purple-950/20 rounded-lg p-2.5 space-y-2">
++                                    <div className="flex items-center justify-between">
++                                        <p className="text-[10px] text-purple-300 uppercase tracking-wider">鏋㈢航妯″紡</p>
++                                        <span className="text-[10px] text-purple-400">
++                                            {manualJunctionEditingEnabled ? 'legacy_editable' : junctionMode}
++                                        </span>
++                                    </div>
++                                    <p className="text-xs text-gray-300 leading-5">{JUNCTION_READONLY_HINT}</p>
++                                    <p className="text-[10px] text-gray-500">
++                                        褰撳墠杩欎釜椤甸潰鍙互鏌ョ湅銆佸畾浣嶃€佸洖鐪嬬枟鏁板拰鎷撴墤鍏崇郴锛屼絾涓嶅啀鐢ㄦ墜宸ュ垱寤恒€佹媶鍒嗘垨鍚堝苟鏋㈢航銆?
++                                    </p>
++                                </div>
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                             {selectedNode.isJunction ? (
+                                 <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 space-y-3">
++                                    <div className="rounded-lg border border-purple-400/20 bg-black/15 p-2.5 text-xs text-gray-300 space-y-1">
++                                        <p>{JUNCTION_READONLY_HINT}</p>
++                                        <p className="text-[11px] text-gray-400">
++                                            妯″紡锛?{manualJunctionEditingEnabled ? 'legacy_editable' : junctionMode}
++                                        </p>
++                                        <p className="text-[11px] text-gray-400">
++                                            绫诲瀷锛歿junctionGroups.find(item => item.id === selectedNode.junctionId)?.junction_kind ?? 'junction'}
++                                        </p>
++                                        <p className="text-[11px] text-gray-400">
++                                            鎴愬憳鏁帮細{junctionGroups.find(item => item.id === selectedNode.junctionId)?.member_count ?? selectedNode.sourceNodeIds?.length ?? 0}
++                                        </p>
++                                    </div>
+                                     <div>
+                                         <p className="text-xs text-purple-300 uppercase tracking-wider">搴曞眰绔欑偣</p>
+                                         <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+@@
+                                             })}
+                                         </div>
+                                     </div>
+-                                    <button
+-                                        onClick={() => {
+-                                            const group = junctionGroups.find(item => item.id === selectedNode.junctionId)
+-                                            if (group) handleDeleteJunction(group)
+-                                        }}
+-                                        className="w-full bg-red-700/80 hover:bg-red-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+-                                    >
+-                                        <span className="material-symbols-outlined text-sm">device_hub</span>瑙ｉ櫎鎹忓悎
+-                                    </button>
+                                     <button
+                                         onClick={() => setHistoryChartTarget({
+                                             junctionId: selectedNode.junctionId ? `JUNCTION-${selectedNode.junctionId}` : selectedNode.id,
+@@
+                             ) : (
+                                 <div className="rounded-lg border border-gray-700/40 bg-white/5 p-3">
+-                                    <button
+-                                        onClick={() => {
+-                                            setEditMode('merge')
+-                                            toggleMergeSelection(selectedNode.id)
+-                                        }}
+-                                        className="w-full bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+-                                    >
+-                                        <span className="material-symbols-outlined text-sm">hub</span>鍔犲叆寰呮崗鍚堝垪琛?
+-                                    </button>
++                                    <p className="text-xs text-gray-300 leading-5">{JUNCTION_READONLY_HINT}</p>
+                                 </div>
+                             )}
+*** Update File: F:\smartgas-grid\src\views\TopologyView.tsx
+@@
+ const EDGE_COLORS: Record<string, string> = {
+     trunk: '#34d399',
+     branch: '#60a5fa',
+     default: '#475569',
+ };
+ 
++const JUNCTION_READONLY_HINT = '当前枢纽由运行时重编结果维护，这里不再提供手工合并入口。';
++
+ const NODE_RADIUS = 16;
+ const CRITICAL_RADIUS = 22;
+@@
+-    const [contextMenu, setContextMenu] = useState<{screenX: number, screenY: number} | null>(null);
++    const [contextMenu, setContextMenu] = useState<{screenX: number, screenY: number, selectedCount: number} | null>(null);
+@@
+     const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+         e.preventDefault();
+         if (selectedNodeIds.size > 1) {
+-            setContextMenu({ screenX: e.clientX, screenY: e.clientY });
++            setContextMenu({ screenX: e.clientX, screenY: e.clientY, selectedCount: selectedNodeIds.size });
+         }
+     }, [selectedNodeIds]);
+-
+-    const handleCreateJunction = async () => {
+-        if (selectedNodeIds.size < 2) return;
+-        try {
+-            const nodes = Array.from(selectedNodeIds);
+-            const name = prompt("璇疯緭鍏ヨ仈鍚堝ぇ鏋㈢航鍚嶇О:", `鑱斿悎澶ф灑绾?` + Date.now().toString().slice(-4));
+-            if (!name) return;
+-            
+-            const res = await fetch(resolveApiPath('/api/topology/junctions'), {
+-                method: 'POST',
+-                headers: { 'Content-Type': 'application/json' },
+-                body: JSON.stringify({ name: name, station_ids: nodes, description: '鍓嶇鎵归噺鍚堟垚' })
+-            });
+-            if (res.ok) {
+-                alert(`瓒呯骇鏋㈢航銆?{name}銆戣瀺鍚堟垚鍔燂紒搴曞眰鏈夊悜鍥惧凡鏇存柊銆俙);
+-                setContextMenu(null);
+-                setSelectedNodeIds(new Set());
+-            } else {
+-                const err = await res.text();
+-                alert(`鍚堝苟澶辫触: ${err}`);
+-            }
+-        } catch(e) {
+-            console.error(e);
+-        }
+-    };
+*** End Patch

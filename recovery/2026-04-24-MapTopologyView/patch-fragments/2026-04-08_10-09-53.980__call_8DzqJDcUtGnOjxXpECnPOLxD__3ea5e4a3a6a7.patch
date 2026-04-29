@@ -1,0 +1,66 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round13-regression-patrol-summary.md
++一、主目标
++1. 本轮只做 WE1 第一张图五阶段封板后的维护模式第13轮巡检，确认正式入口、调试页边界、快照归档和主链契约都没有回退，不进入下一阶段。
++
++二、上下文与已知信息
++1. automation memory 已确认五阶段主体完成，当前只能做巡检、回归和修复，不能继续扩阶段。
++2. 上一轮已把 `/topology` 收成默认调试页，本轮重点是确认这条边界没有被后续改动打破。
++3. 当前仓库存在较多未归属本轮的改动，因此本轮默认先做只读侦察和独立验证，避免误改别人的工作区内容。
++
++三、主代理与子代理分工
++1. 主代理负责读取方案、memory、最近总结，判定当前处于维护模式第13轮，并决定本轮只做巡检落盘。
++2. 侦察子代理A负责核对前端入口语义，重点看 `App.tsx`、`MapTopologyView.tsx`、`TopologyView.tsx`、`useSimulation.ts`、`useAiAssistantPageContext.ts`。
++3. 侦察子代理B负责核对维护脚本、快照归档和主链契约，重点看 `verify_we1_maintenance.py`、`verify_we1_phase34_final.py`、`verify_we1_map_phase5.py`、`verify_we1_snapshot_archive.py`、`topology_simulation.py`、`topology_simulation.py service` 契约。
++4. 实施子代理本轮不改业务代码，只新增本轮总结并更新 automation memory。
++5. 验证子代理独立复跑维护巡检脚本，确认主链和维护模式仍成立。
++
++四、修改逻辑
++1. 两路侦察都没有发现需要进入代码修复的唯一缺陷方向，最可信结论是当前正式入口、调试页边界、快照归档和主链契约均保持稳定。
++2. 因为没有验证失败，所以本轮不触发修复轮，也不为了“有动作”去碰求解公式、扩场景或新造页面。
++3. 这一轮真正的实施动作只有两件：新增人话版维护总结，更新 automation memory，把第13轮巡检结论写死，方便下一轮直接接着巡检。
++
++五、执行顺序
++1. 第1阶段第13轮先读五阶段方案、自动化执行方案、现有阶段总结和 memory，确认本轮是维护模式巡检。
++2. 第1阶段第13轮并行跑两路侦察，一路查入口语义，一路查脚本契约与快照归档。
++3. 主代理汇总证据后确认不进入代码修复，只落文档和 memory。
++4. 验证子代理独立运行 `python F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py`，确认维护模式巡检继续通过。
++
++六、验证方式
++1. 验证什么：验证 `/map-topology` 仍是正式主入口，`/topology` 仍是默认收起高级调试操作的调试页，WE1 主链契约与快照归档没有回退。
++2. 怎么验证：运行 `python F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py`，并结合脚本输出里的 `entry_semantics`、`payload_checks`、`next_action` 判断是否仍为 maintenance。
++3. 结果怎么看：本轮脚本返回 `status=passed`、`mode=maintenance`，`phase34_status_passed=true`、`phase5_status_passed=true`、`snapshot_archive_status_passed=true`，说明主链、快照和入口语义都还稳。
++4. 失败时先查哪层：先查入口层与前端消费层，再查映射层和 source/overlay ID 命中关系，再查快照归档层，最后查 backend solver input 与稳态求解主链。
++
++七、风险与回退点
++1. 当前最大风险不是主链失效，而是后续其他改动把 `/topology` 的默认调试边界重新放开，或把第一张图重新混入旧入口语义。
++2. 本轮没有业务代码改动，所以回退点只涉及本轮新增总结和 memory 记录，不影响现有仿真链路。
++3. 如果下一轮巡检失败，仍按“入口层 -> 映射层 -> 快照层 -> 求解层”顺序排查，不直接怀疑求解公式。
++
++八、最终交付物
++1. 新增总结文件：`F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round13-regression-patrol-summary.md`。
++2. 更新 automation memory：`C:/Users/Administrator/.codex/automations/we1/memory.md`。
++3. 本轮没有业务代码改动，交付物以巡检结论和维护记录为主。
++
++九、影响范围
++1. 本轮只影响自动化维护记录，不影响前端页面行为、后端路由、求解逻辑和快照归档数据结构。
++
++十、验证结果
++1. `python F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py` 通过，维护模式仍成立。
++2. 本轮未触发修复轮，也未出现连续两次修复失败阻塞。
++3. 下一轮继续停留在维护模式，不进入新阶段。
++
++十一、前后对比
++| 项目 | 本轮之前 | 本轮之后 |
++| --- | --- | --- |
++| 当前模式 | 维护模式第12轮已完成 | 维护模式第13轮巡检已完成 |
++| 正式入口口径 | `/map-topology` 为正式主入口 | 保持不变，并由巡检脚本再次确认 |
++| 调试页口径 | `/topology` 为默认收起高级调试操作的调试页 | 保持不变，并由巡检脚本再次确认 |
++| 快照归档状态 | 上轮已通过 | 本轮巡检再次确认仍可用 |
++| 业务代码改动 | 无要求 | 仍无改动，只更新文档与 memory |
++
++十二、截图与替代
++1. 本轮没有新增截图，因为这是纯巡检轮，没有浏览器可视化输出，也没有页面差异需要展示。
++2. 本轮用验证脚本结果和前后对比表替代截图，已经足够说明当前状态。
+*** Delete File: C:/Users/Administrator/.codex/automations/we1/memory.md
+*** End Patch

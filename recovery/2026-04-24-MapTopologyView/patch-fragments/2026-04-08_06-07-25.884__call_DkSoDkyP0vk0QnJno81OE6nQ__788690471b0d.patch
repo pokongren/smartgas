@@ -1,0 +1,39 @@
+*** Begin Patch
+*** Update File: backend/scripts/verify_we1_maintenance.py
+@@
+ def _verify_entry_semantics() -> Dict[str, Any]:
+     app_path = REPO_ROOT / "src" / "App.tsx"
+     map_path = REPO_ROOT / "src" / "views" / "MapTopologyView.tsx"
+     topology_path = REPO_ROOT / "src" / "views" / "TopologyView.tsx"
++    hook_path = REPO_ROOT / "src" / "hooks" / "useSimulation.ts"
+     ai_context_path = REPO_ROOT / "src" / "components" / "ai-assistant" / "useAiAssistantPageContext.ts"
+     app_text = _read_text(app_path)
+     map_text = _read_text(map_path)
+     topology_text = _read_text(topology_path)
++    hook_text = _read_text(hook_path)
+     ai_context_text = _read_text(ai_context_path)
+@@
+         {
+             "id": "map_view_exposes_primary_entry_hint",
+             "passed": all(
+@@
+             ),
+             "file": str(map_path),
+         },
++        {
++            "id": "map_view_rejects_legacy_failure_entry",
++            "passed": all(
++                token not in map_text and token not in hook_text
++                for token in [
++                    "/api/emergency/simulate-failure",
++                    "emergencyAPI.simulate",
++                    "failure_node_id",
++                    "failed_node_id",
++                ]
++            ),
++            "file": f"{map_path};{hook_path}",
++        },
+         {
+             "id": "topology_view_retains_debug_tooling",
+             "passed": all(
+*** End Patch

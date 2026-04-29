@@ -1,0 +1,8 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-        setStatusMsg('正在导入起始压力并运行主仿真...')
++        setStatusMsg('正在导入起始压力并运行主仿真...')
++        setShowSnapshotPressureOverlay(true)
+         const latestSeedMap = await fetchLatestSeedNodePressureMap()
+*** End Patch

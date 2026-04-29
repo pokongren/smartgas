@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     useEffect(() => {
+-        if (!steadyOverlay) return
++        if (!steadyOverlay || isMapInteracting) return
+         const timer = window.setInterval(() => {
+             setLineFlowPhase(prev => (prev + 2) % 1000)
+-        }, 120)
++        }, 180)
+         return () => window.clearInterval(timer)
+-    }, [steadyOverlay?.run_id])
++    }, [steadyOverlay?.run_id, isMapInteracting])
+*** End Patch

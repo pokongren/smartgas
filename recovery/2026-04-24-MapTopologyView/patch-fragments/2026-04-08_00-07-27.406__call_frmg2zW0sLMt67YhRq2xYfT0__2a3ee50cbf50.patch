@@ -1,0 +1,124 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round1-check-summary.md
++一、主目标
++1. 本轮不再推进新阶段，只按维护模式完成 WE1 第一张图主仿真巡检、回归和结论落盘。
++
++二、上下文与已知信息
++1. automation memory 已记录第5阶段第4轮封板完成，后续运行固定进入维护模式，不再扩第6阶段。
++2. 本轮先读取 [2026-04-08-WE1第一张图主仿真入口五阶段收口方案.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图主仿真入口五阶段收口方案.md)、[2026-04-08-WE1第一张图主仿真五阶段自动化执行与Subagents验证修复方案.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图主仿真五阶段自动化执行与Subagents验证修复方案.md) 和上一轮收口总结 [2026-04-08-WE1-phase5-round4-closure-summary.md](/F:/smartgas-grid/docs/2026-04-08-WE1-phase5-round4-closure-summary.md)。
++3. 本轮未改 solver 公式，未扩新试点，未新造第三套仿真页面。
++
++三、主代理与子代理分工
++1. 主代理负责判定当前处于“第5阶段完成后维护模式第1轮”，只允许做巡检、回归和必要修复。
++2. 侦察子代理 A 负责看前端入口与页面语义，重点核对 `/map-topology`、`/topology`、`MapTopologyView`、`TopologyView`、`useSimulation`。
++3. 侦察子代理 B 负责看后端主链与脚本链，重点核对 `topology_simulation.py`、`we1_result_snapshot_service.py`、维护脚本和快照脚本。
++4. 实施子代理本轮只保留待命权限；因独立验证最终通过，本轮没有进入代码修改。
++5. 验证子代理按维护模式独立复跑总巡检脚本和三条子脚本，不以主代理主观判断替代结果。
++
++四、侦察结论
++1. 当前正式入口仍是 `/map-topology`，在 [App.tsx](/F:/smartgas-grid/src/App.tsx) 中保留了 `/map-topology` 和 `/topology` 两条路由，第一张图仍挂正式主链 [App.tsx](/F:/smartgas-grid/src/App.tsx)。
++2. `MapTopologyView` 仍直接消费 `useSimulation` 的 overlay、snapshot、baseline comparison 与 trial run 能力，没有回退到旧 `simulate-failure` 语义 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)。
++3. `TopologyView` 仍保留 `SimPanel` 和 `useSimulation` 能力，说明它还承担调试页/研发页职责，但当前代码里没有更强的中文提示把它显式标成“调试页”，这仍是维护期需要盯的前端语义风险 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)。
++4. 后端维护脚本 [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py) 已固定串联 `verify_we1_phase34_final.py`、`verify_we1_map_phase5.py`、`verify_we1_snapshot_archive.py`，符合维护模式只做巡检回归的要求。
++
++五、实施结论
++1. 本轮未改代码。原因是第一次维护巡检虽短暂报出 `verify_we1_snapshot_archive.py` 的 `isinstance() arg 2 must be a type`，但单独复跑快照归档脚本和第二次维护巡检均通过，未形成可稳定复现的真实回归。
++2. 主代理据此没有放行实施子代理去改路由、脚本或求解链，避免在维护模式里为了瞬时失败乱动正式主链。
++
++六、验证方式与结果
++1. 验证入口一：运行 `python F:\smartgas-grid\backend\scripts\verify_we1_snapshot_archive.py`，结果通过，返回 `status=passed`、`list_count=10`。
++2. 验证入口二：运行 `python F:\smartgas-grid\backend\scripts\verify_we1_maintenance.py`，结果通过，返回 `status=passed`、`mode=maintenance`。
++3. 维护脚本内三条子脚本结果如下表。
++
++| 脚本 | 结果 | 关键输出 |
++| --- | --- | --- |
++| `verify_we1_phase34_final.py` | 通过 | 主链 contract checks 通过，主干与支线稳态结果均为 `converged` |
++| `verify_we1_map_phase5.py` | 通过 | `listed_count=81`，`missing_scenarios=[]`，`next_mode=maintenance` |
++| `verify_we1_snapshot_archive.py` | 通过 | 快照创建、回读、列表查询均通过，`list_count=10` |
++
++4. 失败先查哪层固定为：第一张图入口与前端消费层 -> 映射层与 source IDs 命中关系 -> 快照归档层 -> 后端 solver input 与稳态求解主链。
++
++七、前后对比
++1. 本轮没有代码前后差异，所以不提供截图。原因是本轮结论是“维护巡检通过，无需实施改动”。
++2. 用结果对比代替截图，见下表。
++
++| 项目 | 首次巡检 | 复跑结论 |
++| --- | --- | --- |
++| `verify_we1_snapshot_archive.py` | 短暂失败，报 `isinstance() arg 2 must be a type` | 单独复跑通过 |
++| `verify_we1_maintenance.py` | 首次失败，失败点落在快照归档脚本 | 第二次复跑整体通过 |
++| 是否进入代码修复 | 否 | 否 |
++
++八、风险与回退点
++1. 当前最大风险不是主链错，而是快照归档脚本存在低概率瞬时失败现象；若后续再现，先查 Python 运行环境与脚本直调链，再查快照路由和归档服务。
++2. 前端维护期仍要盯 `/topology` 的页面语义。如果后续导航、文案或 AI 上下文把它重新说成正式入口，会打穿第4阶段降级边界。
++3. 本轮没有代码改动，所以不存在代码回退操作；回退点仍以上一轮收口状态为准。
++
++九、最终交付物
++1. 本轮新增总结 [2026-04-08-WE1-maintenance-round1-check-summary.md](/F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round1-check-summary.md)。
++2. 更新 automation memory，写明当前处于维护模式第1轮、本轮无代码改动、巡检已通过、下轮继续维护模式。
++
++十、当前结论
++1. 当前处于第5阶段完成后维护模式第1轮，本轮不进入下一阶段。
++2. WE1 第一张图主仿真维护巡检已通过，当前无需修复代码。
++3. 下轮继续只做巡检、回归和修复；如果快照归档脚本再复现同类失败，再按“脚本直调链 -> 快照归档层 -> 前端消费层 -> 求解主链”的顺序收口。
+*** Update File: C:/Users/Administrator/.codex/automations/we1/memory.md
+@@
+-一、运行时间
+-1. 2026-04-08 07:03:02 +08:00。
+-
+-二、当前阶段
+-1. 第5阶段第4轮封板修复已完成，第5阶段按当前验收口径已收口。
+-2. 后续运行不再推进新阶段，只做巡检、回归和修复，默认进入维护模式。
+-3. 如后续再出现封板异常，仍按第5阶段口径回查，不新开第6阶段。
+-
+-三、本轮完成内容
+-1. 修正 [topology_simulation.py](/F:/smartgas-grid/backend/app/routers/topology_simulation.py) 的 snapshot 路由查询参数声明，避免脚本直调时把 FastAPI `Query(None)` 对象传进服务层误过滤。
+-2. 修正 [verify_we1_map_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase5.py) 的主样板快照覆盖断言，避免“缺场景但脚本仍返回通过”的假通过。
+-3. 新增本轮总结 [2026-04-08-WE1-phase5-round4-closure-summary.md](/F:/smartgas-grid/docs/2026-04-08-WE1-phase5-round4-closure-summary.md)。
+-4. 本轮没有改 solver 公式，没有扩新试点，没有新造第三套仿真页面。
+-
+-四、验证结果
+-1. 直调 `list_simulation_snapshots(pilot_id='mainline_zhongwei_jingbian', limit=20)` 通过，返回 `count=20`，`scenario_id=None`，不再误报空列表。
+-2. `python F:\smartgas-grid\backend\scripts\verify_we1_map_phase5.py` 通过，输出 `listed_count=46`、`missing_scenarios=[]`、`next_mode=maintenance`。
+-3. `python F:\smartgas-grid\backend\scripts\verify_we1_phase34_final.py` 通过。
+-4. `python F:\smartgas-grid\backend\scripts\verify_we1_snapshot_archive.py` 通过。
+-5. 失败先查哪层：先查 snapshot 路由默认参数和脚本直调口径 -> 再查 snapshot list 服务过滤 -> 再查前端消费层 -> 最后查 solver input 与稳态求解主链。
+-
+-五、改动文件
+-1. [topology_simulation.py](/F:/smartgas-grid/backend/app/routers/topology_simulation.py)
+-2. [verify_we1_map_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase5.py)
+-3. [2026-04-08-WE1-phase5-round4-closure-summary.md](/F:/smartgas-grid/docs/2026-04-08-WE1-phase5-round4-closure-summary.md)
+-4. [memory.md](C:/Users/Administrator/.codex/automations/we1/memory.md)
+-
+-六、下一轮优先项
+-1. 进入维护模式，只做 WE1 第一张图主链巡检、回归和修复。
+-2. 优先关注第5阶段验收脚本、快照归档链和第一张图正式入口是否被后续改动回归打穿。
++一、运行时间
++1. 2026-04-08 08:06:22 +08:00。
++
++二、当前阶段
++1. 当前处于第5阶段完成后维护模式第1轮。
++2. 5 个阶段已全部收口，后续运行不再推进新阶段，只做巡检、回归和修复。
++3. 如后续再出现封板异常，仍按第5阶段与维护模式口径回查，不新开第6阶段。
++
++三、本轮完成内容
++1. 读取 automation memory、五阶段方案、自动化执行方案和上一轮封板总结，确认本轮只能做维护巡检。
++2. 运行维护总巡检 [verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)，并独立复跑 [verify_we1_snapshot_archive.py](/F:/smartgas-grid/backend/scripts/verify_we1_snapshot_archive.py)。
++3. 新增本轮总结 [2026-04-08-WE1-maintenance-round1-check-summary.md](/F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round1-check-summary.md)。
++4. 本轮未改代码；没有改 solver 公式，没有扩新试点，没有新造第三套仿真页面。
++
++四、验证结果
++1. `python F:\smartgas-grid\backend\scripts\verify_we1_snapshot_archive.py` 单独复跑通过，返回 `status=passed`、`list_count=10`。
++2. `python F:\smartgas-grid\backend\scripts\verify_we1_maintenance.py` 复跑通过，返回 `status=passed`、`mode=maintenance`。
++3. 维护脚本内三条子脚本均通过：`verify_we1_phase34_final.py`、`verify_we1_map_phase5.py`、`verify_we1_snapshot_archive.py`。
++4. 首次维护巡检曾短暂出现 `verify_we1_snapshot_archive.py` 报 `isinstance() arg 2 must be a type`，但未稳定复现；当前结论是继续维护观察，不做无证据代码修改。
++5. 失败先查哪层：先查第一张图入口与前端消费层 -> 再查映射层与 source IDs 命中关系 -> 再查快照归档层 -> 最后查 solver input 与稳态求解主链。
++
++五、改动文件
++1. [2026-04-08-WE1-maintenance-round1-check-summary.md](/F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round1-check-summary.md)
++2. [memory.md](C:/Users/Administrator/.codex/automations/we1/memory.md)
++
++六、下一轮优先项
++1. 继续维护模式，只做 WE1 第一张图主链巡检、回归和修复。
++2. 优先盯住 `/map-topology` 正式入口语义、`/topology` 调试页边界、快照归档脚本是否再复现瞬时失败。
+*** End Patch

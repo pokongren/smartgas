@@ -1,0 +1,8 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                        {/* 绋虫€佷豢鐪?*/}
+-                        {activeTab === 'simulation' && (
++                        {/* 绋虫€佷豢鐪?*/}
++                        {false && activeTab === 'simulation' && (
+*** End Patch

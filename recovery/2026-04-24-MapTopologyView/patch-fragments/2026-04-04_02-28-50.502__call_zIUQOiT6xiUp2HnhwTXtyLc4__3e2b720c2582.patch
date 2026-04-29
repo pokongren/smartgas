@@ -1,0 +1,16 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ - API/docs line: runtime code still uses a mixed contract. `backend/run.py` and `vite.config.ts` are on `8080`; `src/hooks/useTopology.ts` uses `BACKEND_BASE_URL` and calls `/topology/...`; `src/services/api.ts` keeps `/api/topology/...` for graph/stats and `/topology/correct/...` for correction. `docs/TOPOLOGY_SETUP_GUIDE.md`, `docs/TOPOLOGY_COMPUTATION_USAGE.md`, and new `docs/code-improvement-review.md` now document this mixed state instead of pretending everything is still the old `/api/topology/...` path.
+ - Local experiment residue worth remembering next run: DB `stations.properties` currently has 89 rows carrying `positionMeta`, which looks like local topology-position experiments rather than stable imported source data.
+ - No business code was modified by this heartbeat run. Memory updated only. Run completed at `2026-04-04 10:23:27 +08:00`.
++
++2026-04-04 10:27 CST
++
++- This run again passed the main-root entry check correctly: initial `cwd` was `C:\Users\Administrator\.codex\worktrees\7c57\smartgas-grid`, but all evidence was collected only after switching into `F:\smartgas-grid`, where both runtime `cwd` and `git rev-parse --show-toplevel` matched the configured live repo root.
++- Current progress summary: this is still real code change + DB content change + local experiment/noise mixed together, not a blockage. `git status --short` still spans `src/`, `backend/`, and `docs/`, while `.npm-cache/` and `.agent/workflows/start.md` remain non-business residue.
++- Map line: `src/utils/hierarchyRenderer.ts` and `src/utils/mapRenderer.ts` now form the live national-map LOD chain, but the valve rule is still internally inconsistent: `valveMinZoom=11`, yet `getNodeImportance()` marks valve nodes as `LOW`, so `shouldShowNodeAtZoom()` keeps them hidden until `zoom >= 14`. `src/views/GlobalPipelineView.tsx` uses this chain, while `src/views/MapTopologyView.tsx` still mounts `MapView` without `pipelineData` and keeps its own simplified point taxonomy (`station/valve/distribution/compressor`).
++- Junction/DB line: backend runtime normalization is still ahead of stored data. `backend/app/services/junction_groups.py` expands `JUNCTION-x` refs and merges overlaps, `backend/app/routers/topology_editor.py` still allows `merge_stations` to write single-station groups, and the live DB still contains nested plus single-station rows (`junction_groups.id=17` stores `["JUNCTION-16","JXLZ-11"]`; ids `6/7/9/11/12/13/15` are single-station groups).
++- Schema/import/docs line: this run still looks like import-script churn + DB-content change, not schema migration. `pipeline_systems` columns remain `id,name,color,sort_order,layers_config`; `junction_groups` columns remain `id,name,description,station_ids`; `backend/scripts/add_sj2.py`, `backend/scripts/add_we3.py`, and `backend/scripts/reimport_sj23.py` are all modified; `docs/TOPOLOGY_SETUP_GUIDE.md` and `docs/TOPOLOGY_COMPUTATION_USAGE.md` now explicitly document 8080 plus the mixed `/api/topology/...` and `/topology/...` contract.
++- No business code was modified by this heartbeat run. Memory updated only. Run completed at `2026-04-04 10:27:24 +08:00`.
+*** End Patch

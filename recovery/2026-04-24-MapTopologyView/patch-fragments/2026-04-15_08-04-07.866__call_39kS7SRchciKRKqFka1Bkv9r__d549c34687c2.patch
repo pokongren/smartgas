@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                    <div className="grid grid-cols-2 gap-2">
++                                    {false && (<div className="grid grid-cols-2 gap-2">
+@@
+-                                    </div>
++                                    </div>)}
++                                    <div className="grid grid-cols-2 gap-2">
++                                        <button onClick={async () => { try { await runSteadySimulation(); setStatusMsg(`WE1 主仿真已运行：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 主仿真运行失败') } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '运行中...' : '运行主仿真'}</button>
++                                        <button onClick={async () => { try { await saveSteadySnapshot(); setStatusMsg(`已保存快照：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '保存快照失败') } }} disabled={!steadyOverlay || steadySnapshotLoading} className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40">{steadySnapshotLoading ? '保存中...' : '保存快照'}</button>
++                                        <button onClick={async () => { try { await refreshSteadySnapshots(); setStatusMsg('快照列表已刷新') } catch (error) { setStatusMsg(error instanceof Error ? error.message : '刷新快照失败') } }} disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40">刷新快照</button>
++                                        <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('已清空当前主仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空主仿真</button>
++                                    </div>
+*** End Patch

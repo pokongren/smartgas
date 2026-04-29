@@ -1,0 +1,10 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+     const [junctionMode, setJunctionMode] = useState<string>('runtime_readonly')
+     const [editMode, setEditMode] = useState<EditMode>('view')
+     const [pointType, setPointType] = useState<PointType>('station')
+     const [connectFrom, setConnectFrom] = useState<string | null>(null)
++/*
+     const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+*** End Patch

@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    const simulationEntryHint = steadyOverlay
++    const simulationRunStateText = steadySimLoading ? 'running' : steadyOverlay ? 'ready' : 'idle'
++    const simulationSnapshotCountText = `${steadySnapshots.length}`
++    const simulationHitFocusText = simulationHitFocus ? 'on' : 'off'
++    const simulationEntryHint = steadyOverlay
+*** End Patch

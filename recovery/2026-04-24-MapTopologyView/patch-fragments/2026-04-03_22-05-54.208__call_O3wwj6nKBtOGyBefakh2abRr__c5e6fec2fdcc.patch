@@ -1,0 +1,96 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\docs\2026-04-04-topology-alignment-fix-summary.md
++# 拓扑口径收口修复总结
++
++## 改动目标
++
++把这三件事真正落地：
++
++1. `hierarchyRenderer.ts` 不再是摆设，接进全国地图渲染链。
++2. `pipelineDomain.ts` 里的中文回退判断恢复正常，不再被乱码带偏。
++3. 拓扑文档改成当前真实口径，不再写旧的 `8000` 和单一的旧接口前缀。
++
++## 改动前的问题
++
++- `src/utils/hierarchyRenderer.ts` 没有被真实渲染链消费。
++- `src/utils/pipelineDomain.ts` 的中文关键词乱码，导致回退分类有误判风险。
++- `docs/TOPOLOGY_SETUP_GUIDE.md`、`docs/TOPOLOGY_COMPUTATION_USAGE.md` 还在写 `8000` 和旧的 `/api/topology/...` 口径。
++
++## 改动后的结果
++
++- `src/utils/hierarchyRenderer.ts`
++  - 重写成可读版本。
++  - 提供 `getNodeImportance()` 和 `getMaxVisibleImportanceForZoom()`。
++- `src/utils/mapRenderer.ts`
++  - 已引入 `hierarchyRenderer`。
++  - 节点分组时会记录重要性。
++  - 缩放过滤时会按 importance 决定节点是否进入渲染链。
++- `src/utils/pipelineDomain.ts`
++  - 中文回退关键词恢复正常。
++  - 节点和管线的回退分类不再依赖乱码字符串。
++- `docs/TOPOLOGY_SETUP_GUIDE.md`
++  - 收口到 `8080`。
++  - 明确区分 `/api/topology/...` 和 `/topology/...` 的当前用途。
++- `docs/TOPOLOGY_COMPUTATION_USAGE.md`
++  - 收口到 `8080`。
++  - 明确 `useTopology` 当前走的是 `/topology/...`。
++
++## 影响范围
++
++- 全国地图相关视图
++  - 通过 `GlobalPipelineView -> MapView -> mapRenderer` 这条链吃到新的 hierarchy 规则。
++- 节点/管线类型判断
++  - 地图渲染
++  - `useTopology`
++  - 其他依赖 `pipelineDomain.ts` 的前端逻辑
++- 拓扑文档和联调说明
++  - 前后端联调
++  - 本地启动
++  - curl 验证
++
++## 验证方式
++
++- 搜索引用链，确认 `src/utils/mapRenderer.ts` 已实际调用 `getNodeImportance()` 和 `getMaxVisibleImportanceForZoom()`。
++- 搜索乱码特征词，确认 `src/utils/hierarchyRenderer.ts` 和 `src/utils/pipelineDomain.ts` 不再出现原来的乱码中文关键词。
++- 搜索文档中的端口和路径，确认两份文档已改为 `8080`，并写清 `/api/topology/...` 与 `/topology/...` 的差异。
++- 跑了一次 TypeScript 检查。
++  - 结果：存在仓库内既有错误，主要在 `src/views/TopologyDemoView.tsx` 和 `src/components/ai-assistant/useAiAssistantChat.ts`，不是本次改动引入的目标文件错误。
++
++## 前后对比
++
++这次没有合适的界面截图。
++
++原因：
++- 这次主要修的是渲染规则接线、类型判断和文档口径，不是单一页面样式改动。
++- 用截图很难把“规则已经接线”这件事讲清楚。
++
++所以这里用表格替代。
++
++| 项目 | 改动前 | 改动后 |
++| --- | --- | --- |
++| hierarchy 接线 | `hierarchyRenderer.ts` 存在，但没人用 | `mapRenderer.ts` 已消费 hierarchy 规则 |
++| 节点分类回退 | 中文关键词乱码，存在误判风险 | 中文关键词恢复正常，回退逻辑可读可用 |
++| 文档端口 | 仍写 `8000` | 已改成 `8080` |
++| 文档接口口径 | 继续假设全是旧 `/api/topology/...` | 已明确区分 `/api/topology/...` 和 `/topology/...` |
++
++## 关键文件清单
++
++- `src/utils/hierarchyRenderer.ts`
++- `src/utils/pipelineDomain.ts`
++- `src/utils/mapRenderer.ts`
++- `docs/TOPOLOGY_SETUP_GUIDE.md`
++- `docs/TOPOLOGY_COMPUTATION_USAGE.md`
++
++## 风险点
++
++- `MapTopologyView.tsx` 不走 `MapView` 的全国地图渲染链，所以这次 hierarchy 接线主要先覆盖全国地图，不等于拓扑编辑页也同步完成统一。
++- 仓库里还有别的乱码文件，这次没有一口气全清，只先修核心判断链。
++- 项目里当前仍然同时存在 `/api/topology/...` 和 `/topology/...` 两种风格。这次是把文档说实话，不是一次性把后端契约全部统一。
++
++## 回退方式
++
++如果这次 hierarchy 规则导致全国地图显示过少或过多，优先回退：
++
++1. `src/utils/mapRenderer.ts` 中基于 `getMaxVisibleImportanceForZoom()` 的过滤逻辑。
++2. `src/utils/hierarchyRenderer.ts` 中 zoom 对应的 importance 阈值。
+*** End Patch

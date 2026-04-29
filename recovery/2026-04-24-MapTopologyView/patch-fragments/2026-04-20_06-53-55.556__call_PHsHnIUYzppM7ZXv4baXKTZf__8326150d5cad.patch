@@ -1,0 +1,41 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                 <div className="flex items-center justify-between gap-3 text-xs">
+                                     <span className="text-gray-400">鍑虹珯娓╁害</span>
+                                     <span className="text-emerald-100 font-medium">
+                                         {selectedNodeSimulationMetrics?.temperatureC != null
+                                             ? `${selectedNodeSimulationMetrics.temperatureC.toFixed(1)}掳C${selectedNodeSimulationMetrics.estimated ? '锛堜及绠楋級' : ''}`
+                                             : selectedNodeSeedData?.operating_temp_out != null
+                                                 ? `${selectedNodeSeedData.operating_temp_out.toFixed(1)}掳C`
+                                                 : '鏆傛棤鏁版嵁'}
+                                     </span>
+                                 </div>
++                                <div className="my-1 h-px bg-emerald-400/20" />
++                                <div className="text-[10px] uppercase tracking-wider text-violet-200">基线快照</div>
++                                <div className="flex items-center justify-between gap-3 text-xs">
++                                    <span className="text-gray-400">基线进站压力</span>
++                                    <span className="text-violet-200 font-medium">
++                                        {selectedNodeBaselineMetrics?.pressure != null
++                                            ? `${(selectedNodeBaselineMetrics.pressure * 0.95).toFixed(2)} MPa`
++                                            : '暂无数据'}
++                                    </span>
++                                </div>
++                                <div className="flex items-center justify-between gap-3 text-xs">
++                                    <span className="text-gray-400">基线出站压力</span>
++                                    <span className="text-violet-200 font-medium">
++                                        {selectedNodeBaselineMetrics?.pressure != null
++                                            ? `${selectedNodeBaselineMetrics.pressure.toFixed(2)} MPa`
++                                            : '暂无数据'}
++                                    </span>
++                                </div>
++                                <div className="flex items-center justify-between gap-3 text-xs">
++                                    <span className="text-gray-400">基线出站温度</span>
++                                    <span className="text-violet-200 font-medium">
++                                        {selectedNodeBaselineMetrics?.temperatureC != null
++                                            ? `${selectedNodeBaselineMetrics.temperatureC.toFixed(1)}°C${selectedNodeBaselineMetrics.estimated ? '（估算）' : ''}`
++                                            : '暂无数据'}
++                                    </span>
++                                </div>
+                             </div>
+*** End Patch

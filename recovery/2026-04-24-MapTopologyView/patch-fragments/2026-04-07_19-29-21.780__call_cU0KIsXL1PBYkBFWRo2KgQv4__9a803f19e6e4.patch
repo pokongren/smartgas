@@ -1,0 +1,36 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const simulationMapping = useMemo(() => {
+         return buildSimulationOverlayMapping(topoNodes, topoEdges, steadyOverlay)
+     }, [steadyOverlay, topoEdges, topoNodes])
++    const selectedEdge = useMemo(() => {
++        if (!selectedEdgeId) return null
++        return topoEdges.find(edge => edge.id === selectedEdgeId) ?? null
++    }, [selectedEdgeId, topoEdges])
+     const selectedNodeSimulationMatch = useMemo(() => {
+         if (!selectedNode || !simulationMapping) return null
+         return simulationMapping.nodeMatchesByDisplayId.get(selectedNode.id) ?? null
+     }, [selectedNode, simulationMapping])
++    const selectedEdgeSimulationMatch = useMemo(() => {
++        if (!selectedEdge || !simulationMapping) return null
++        return simulationMapping.edgeMatchesByDisplayId.get(selectedEdge.id) ?? null
++    }, [selectedEdge, simulationMapping])
+     const selectedNodeRelatedEdgeMatches = useMemo(() => {
+         if (!selectedNode || !simulationMapping) return []
+         return topoEdges
+             .filter(edge => edge.startNodeId === selectedNode.id || edge.endNodeId === selectedNode.id)
+             .map(edge => ({
+@@
+     const selectedBaselineSnapshotSummary = useMemo(() => {
+         if (!steadyBaselineSnapshotRunId) return null
+         return steadySnapshots.find(item => item.run_id === steadyBaselineSnapshotRunId) ?? null
+     }, [steadyBaselineSnapshotRunId, steadySnapshots])
++
++    useEffect(() => {
++        if (!selectedEdgeId) return
++        if (!topoEdges.some(edge => edge.id === selectedEdgeId)) {
++            setSelectedEdgeId(null)
++        }
++    }, [selectedEdgeId, topoEdges])
+*** End Patch

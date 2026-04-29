@@ -1,0 +1,46 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     } = useSimulation({
+         pilotId: WE1_PRIMARY_PILOT_ID,
+         scenarios: MAINLINE_SCENARIOS,
+     })
+-    const isSimulating = simulationLoading
+-    const setIsSimulating = (_value: boolean) => {}
+-    const simResults = useMemo<SimulationResult[]>(
+-        () =>
+-            simulationOverlay
+-                ? [{
+-                    step: 1,
+-                    affected_nodes: simulationOverlay.nodes
+-                        .filter(node => node.alert_level !== 'normal')
+-                        .map(node => node.id),
+-                    pressure_drops: Object.fromEntries(
+-                        simulationOverlay.nodes.map(node => [node.id, node.pressure_mpa])
+-                    ),
+-                    is_stable: simulationOverlay.solver_status === 'converged',
+-                }]
+-                : [],
+-        [simulationOverlay]
+-    )
+-    const setSimResults = (_results: SimulationResult[]) => {}
+     const [cascadeValves, setCascadeValves] = useState(true)
+     const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
+     const [isPreviewing, setIsPreviewing] = useState(false)
+@@
+     useEffect(() => { nodesRef.current = topoNodes; edgesRef.current = topoEdges }, [topoNodes, topoEdges])
+     useEffect(() => { modeRef.current = editMode; ptRef.current = pointType }, [editMode, pointType])
+     useEffect(() => { cfRef.current = connectFrom }, [connectFrom])
++    useEffect(() => {
++        if (simulationOverlay) {
++            setStatusMsg(`正式仿真已切到 WE1 主链：${simulationOverlay.scenario_id}，run_id=${simulationOverlay.run_id.slice(0, 12)}`)
++        }
++    }, [simulationOverlay])
++    useEffect(() => {
++        if (simulationError) {
++            setStatusMsg(`正式仿真失败：${simulationError}`)
++        }
++    }, [simulationError])
+ 
+     // ================== 鏀堕泦鍏ㄩ儴绠＄嚎鍘熷鏁版嵁锛堜笉浼犵粰 MapView锛屼粎渚涘鍏ョ敤锛?==================
+*** End Patch

@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-            const queue = [...(adj.get(sn.id) || [])]
++            const queue = (adj.get(sn.id) || []).map(item => ({
++                nodeId: item.nodeId,
++                sourceEdgeIds: [item.edgeId],
++            }))
+*** End Patch

@@ -13,9 +13,26 @@ from datetime import datetime, timedelta
 from sqlmodel import Session, select
 
 from app.database import scada_history_engine
+from app.routers.topology_simulation import (
+    InitialConditionsInput,
+    _apply_initial_conditions,
+    _build_solver_input_or_raise,
+    _finalize_result_payload,
+)
+from app.services.ai_sim_evaluator import evaluate_simulation_result_text
 from app.services.raw_excel_ai_index import STATION_TYPE_LABELS, raw_excel_ai_index
 from app.services.topology import TopologyService
+from app.services.topology_simulation import solve_steady
+from app.services.we1_result_snapshot_service import get_snapshot, save_snapshot
 from app.services.simulation_service import OptimizedSimulationEngine as SimulationEngine
+from app.services.we1_data_alignment_service import (
+    explain_flow_topology_situation as build_we1_flow_topology_explanation,
+    get_flow_direction as get_we1_flow_direction,
+    get_pressure_profile as get_we1_pressure_profile,
+    get_we1_alignment_report,
+    query_sim_flow_topology as query_we1_sim_flow_topology,
+    query_topology_relation as query_we1_topology_relation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +151,74 @@ TOOL_DEFINITIONS = [
         "description": "模拟某个站场突然停机后的截断推演：用 BFS 图算法找出所有受影响的下游站点，并根据管存容量估算下游可支撑的剩余时间。",
         "parameters": {
             "station_id": {"description": "故障站场名称或 ID", "required": True},
+        },
+    },
+    {
+        "name": "run_steady_sim",
+        "description": "运行稳态仿真并自动归档最新快照，用于查看压力、流量、利用率和答辩口径。返回运行摘要和 AI 评价。",
+        "parameters": {
+            "pilot_id": {"description": "试点 ID，默认主样板", "required": False},
+            "scenario_id": {"description": "场景 ID", "required": False},
+            "initial_conditions_json": {"description": "初值覆盖 JSON 字符串", "required": False},
+        },
+    },
+    {
+        "name": "evaluate_sim_result",
+        "description": "评价稳态仿真结果，支持按 run_id 或直接传 overlay JSON。可选基线快照做对比。",
+        "parameters": {
+            "run_id": {"description": "快照 run_id", "required": False},
+            "pilot_id": {"description": "试点 ID", "required": False},
+            "overlay_json": {"description": "仿真结果 JSON", "required": False},
+            "baseline_run_id": {"description": "对比基线 run_id", "required": False},
+        },
+    },
+    {
+        "name": "query_we1_data_alignment",
+        "description": "查询 WE1 中卫样板数据库对照结果，确认站点映射、压力来源、真实流量缺口和跨系统边界。",
+        "parameters": {},
+    },
+    {
+        "name": "get_we1_pressure_profile",
+        "description": "查询 WE1 样板站点统一压力口径，区分当前压力、起始压力、仿真压力和基线压力。",
+        "parameters": {
+            "station_ref": {"description": "站点名称或 ID，如 中卫、盐池、靖边、WE1-76", "required": True},
+            "run_id": {"description": "可选仿真快照 run_id", "required": False},
+            "baseline_run_id": {"description": "可选基线快照 run_id", "required": False},
+        },
+    },
+    {
+        "name": "get_flow_direction",
+        "description": "查询管段流向。优先用仿真结果，其次按压力差推断，最后回退拓扑默认方向。",
+        "parameters": {
+            "edge_id": {"description": "管段 ID 或名称，如 WE1-T-76", "required": True},
+            "run_id": {"description": "可选仿真快照 run_id，不填则尝试读取最新快照", "required": False},
+        },
+    },
+    {
+        "name": "query_topology_relation",
+        "description": "查询 WE1 站点上下游、相邻管段和两站路径。",
+        "parameters": {
+            "station_ref": {"description": "起点站点名称或 ID，如 中卫", "required": True},
+            "target_ref": {"description": "可选目标站点，如 靖边", "required": False},
+            "scope": {"description": "查询范围，默认 we1，可填 all 纳入跨系统边", "required": False},
+            "depth": {"description": "路径搜索深度，默认 20", "required": False},
+        },
+    },
+    {
+        "name": "query_sim_flow_topology",
+        "description": "查询仿真后流量和拓扑变化，返回流量变化、压力变化、高利用率管段和依据。",
+        "parameters": {
+            "run_id": {"description": "可选仿真快照 run_id，不填则读取最新快照", "required": False},
+            "baseline_run_id": {"description": "可选基线快照 run_id", "required": False},
+            "top_n": {"description": "返回前 N 项，默认 5", "required": False},
+        },
+    },
+    {
+        "name": "explain_flow_topology_situation",
+        "description": "把 WE1 仿真后的流量、压力和拓扑变化归纳成人话结论。",
+        "parameters": {
+            "run_id": {"description": "可选仿真快照 run_id，不填则读取最新快照", "required": False},
+            "baseline_run_id": {"description": "可选基线快照 run_id", "required": False},
         },
     },
     {
@@ -1048,6 +1133,159 @@ def _handle_simulate_cutoff(args: dict, session: Session) -> str:
     return "\n".join(lines)
 
 
+def _handle_run_steady_sim(args: dict, session: Session) -> str:
+    pilot_id = str(args.get("pilot_id") or "mainline_zhongwei_jingbian").strip() or "mainline_zhongwei_jingbian"
+    scenario_id = str(args.get("scenario_id") or "steady_base").strip() or "steady_base"
+    initial_conditions_json = str(args.get("initial_conditions_json") or "").strip()
+
+    solver_input = _build_solver_input_or_raise(pilot_id, session)
+    initial_conditions_raw = json.loads(initial_conditions_json) if initial_conditions_json else None
+    if isinstance(initial_conditions_raw, dict):
+        if hasattr(InitialConditionsInput, "model_validate"):
+            initial_conditions = InitialConditionsInput.model_validate(initial_conditions_raw)
+        else:
+            initial_conditions = InitialConditionsInput(**initial_conditions_raw)
+    else:
+        initial_conditions = initial_conditions_raw
+    _apply_initial_conditions(solver_input, scenario_id, initial_conditions)
+    result = solve_steady(seed=solver_input, scenario_id=scenario_id, pilot_id=pilot_id)
+    payload = _finalize_result_payload(result.to_dict(), solver_input, pilot_id, scenario_id)
+    saved = save_snapshot(payload, solver_input)
+    evaluation = evaluate_simulation_result_text(saved.get("result") or payload)
+
+    lines = [
+        f"稳态仿真已完成：{saved['run_id']}",
+        f"试点：{saved['pilot_id']}，场景：{saved['scenario_id']}，状态：{saved['solver_status']}，迭代：{saved['iterations']}",
+        f"总供气：{saved['output_summary'].get('total_supply', 0):.1f} 万方/天",
+        f"未满足需求：{saved['output_summary'].get('unserved_demand', 0):.1f} 万方/天",
+        f"平均利用率：{saved['output_summary'].get('avg_utilization', 0) * 100:.1f}%",
+        "AI 评价：",
+        evaluation or "暂无可评价内容",
+    ]
+    return "\n".join(lines)
+
+
+def _handle_evaluate_sim_result(args: dict, session: Session) -> str:
+    run_id = str(args.get("run_id") or "").strip()
+    pilot_id = str(args.get("pilot_id") or "").strip()
+    overlay_json = str(args.get("overlay_json") or "").strip()
+    baseline_run_id = str(args.get("baseline_run_id") or "").strip()
+
+    if overlay_json:
+        result_data = json.loads(overlay_json)
+    elif run_id:
+        snapshot = get_snapshot(run_id, pilot_id=pilot_id or None)
+        result_data = snapshot.get("result") or snapshot
+    else:
+        return "请提供 run_id 或 overlay_json。"
+
+    baseline_data = None
+    if baseline_run_id:
+        try:
+            snapshot = get_snapshot(baseline_run_id, pilot_id=pilot_id or None)
+            baseline_data = snapshot.get("result") or snapshot
+        except Exception:
+            baseline_data = None
+
+    return evaluate_simulation_result_text(result_data, baseline_data)
+
+
+def _json_result(title: str, payload: dict[str, Any]) -> str:
+    return f"{title}\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
+
+
+def _handle_query_we1_data_alignment(args: dict, session: Session) -> str:
+    report = get_we1_alignment_report(session)
+    compact = {
+        "pilot_id": report.get("pilot_id"),
+        "scope": report.get("scope"),
+        "database_sources": report.get("database_sources"),
+        "integrity": report.get("integrity"),
+        "flow_boundary": report.get("flow_boundary"),
+        "sample_stations": [
+            {
+                "station": item.get("station"),
+                "mapping": item.get("mapping"),
+                "pressure_source_type": (item.get("pressure") or {}).get("source_type"),
+                "scada_pressure_found": bool(
+                    ((item.get("pressure") or {}).get("scada") or {}).get("pressure", {}).get("found")
+                ),
+                "we1_edge_count": len(item.get("connected_edges_we1") or []),
+                "all_edge_count": len(item.get("connected_edges_all") or []),
+            }
+            for item in report.get("sample_stations", [])
+        ],
+    }
+    return _json_result("WE1 数据库对照结果", compact)
+
+
+def _handle_get_we1_pressure_profile(args: dict, session: Session) -> str:
+    station_ref = str(args.get("station_ref") or args.get("station_id") or "").strip()
+    if not station_ref:
+        return "请提供 station_ref，例如 中卫、盐池、靖边 或 WE1-76。"
+    payload = get_we1_pressure_profile(
+        session,
+        station_ref,
+        run_id=str(args.get("run_id") or "").strip() or None,
+        baseline_run_id=str(args.get("baseline_run_id") or "").strip() or None,
+    )
+    return _json_result("WE1 压力口径", payload)
+
+
+def _handle_get_flow_direction(args: dict, session: Session) -> str:
+    edge_ref = str(args.get("edge_id") or args.get("edge_ref") or "").strip()
+    if not edge_ref:
+        return "请提供 edge_id，例如 WE1-T-76。"
+    payload = get_we1_flow_direction(
+        session,
+        edge_ref,
+        run_id=str(args.get("run_id") or "").strip() or None,
+    )
+    return _json_result("WE1 管段流向", payload)
+
+
+def _handle_query_topology_relation(args: dict, session: Session) -> str:
+    station_ref = str(args.get("station_ref") or args.get("station_id") or "").strip()
+    if not station_ref:
+        return "请提供 station_ref，例如 中卫。"
+    depth_raw = args.get("depth")
+    try:
+        depth = int(depth_raw or 20)
+    except (TypeError, ValueError):
+        depth = 20
+    payload = query_we1_topology_relation(
+        session,
+        station_ref,
+        target_ref=str(args.get("target_ref") or "").strip() or None,
+        scope=str(args.get("scope") or "we1").strip() or "we1",
+        depth=depth,
+    )
+    return _json_result("WE1 拓扑关系", payload)
+
+
+def _handle_query_sim_flow_topology(args: dict, session: Session) -> str:
+    try:
+        top_n = int(args.get("top_n") or 5)
+    except (TypeError, ValueError):
+        top_n = 5
+    payload = query_we1_sim_flow_topology(
+        session,
+        run_id=str(args.get("run_id") or "").strip() or None,
+        baseline_run_id=str(args.get("baseline_run_id") or "").strip() or None,
+        top_n=max(1, min(top_n, 20)),
+    )
+    return _json_result("WE1 仿真后流量拓扑", payload)
+
+
+def _handle_explain_flow_topology_situation(args: dict, session: Session) -> str:
+    payload = build_we1_flow_topology_explanation(
+        session,
+        run_id=str(args.get("run_id") or "").strip() or None,
+        baseline_run_id=str(args.get("baseline_run_id") or "").strip() or None,
+    )
+    return _json_result("WE1 仿真人话归纳", payload)
+
+
 # 工具名 → 处理函数的映射
 TOOL_HANDLERS = {
     "query_stations": _handle_query_stations,
@@ -1063,6 +1301,14 @@ TOOL_HANDLERS = {
     "predict_trend": _handle_predict_trend,
     "analyze_correlation": _handle_analyze_correlation,
     "simulate_cutoff": _handle_simulate_cutoff,
+    "run_steady_sim": _handle_run_steady_sim,
+    "evaluate_sim_result": _handle_evaluate_sim_result,
+    "query_we1_data_alignment": _handle_query_we1_data_alignment,
+    "get_we1_pressure_profile": _handle_get_we1_pressure_profile,
+    "get_flow_direction": _handle_get_flow_direction,
+    "query_topology_relation": _handle_query_topology_relation,
+    "query_sim_flow_topology": _handle_query_sim_flow_topology,
+    "explain_flow_topology_situation": _handle_explain_flow_topology_situation,
     "query_users": _handle_query_users,
 }
 

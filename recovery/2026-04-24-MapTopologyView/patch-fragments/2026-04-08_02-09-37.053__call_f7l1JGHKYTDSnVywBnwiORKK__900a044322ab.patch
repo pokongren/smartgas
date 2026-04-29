@@ -1,0 +1,45 @@
+*** Begin Patch
+*** Update File: backend/scripts/verify_we1_maintenance.py
+@@
+ def _verify_entry_semantics() -> Dict[str, Any]:
+     app_path = REPO_ROOT / "src" / "App.tsx"
+     map_path = REPO_ROOT / "src" / "views" / "MapTopologyView.tsx"
++    ai_context_path = REPO_ROOT / "src" / "components" / "ai-assistant" / "useAiAssistantPageContext.ts"
+     app_text = _read_text(app_path)
+     map_text = _read_text(map_path)
++    ai_context_text = _read_text(ai_context_path)
+ 
+     checks = [
+         {
+             "id": "map_topology_route_present",
+             "passed": '<Route path="/map-topology" element={<MapTopologyView />} />' in app_text,
+@@
+         {
+             "id": "topology_marked_as_debug_page",
+             "passed": 'title="TopologyView 调试页"' in app_text,
+             "file": str(app_path),
+         },
++        {
++            "id": "entry_switch_hint_present",
++            "passed": "切换正式主仿真页 / 调试页" in app_text,
++            "file": str(app_path),
++        },
+         {
+             "id": "map_view_exposes_primary_entry_hint",
+             "passed": "主仿真入口" in map_text and "simulationEntryHint" in map_text,
+             "file": str(map_path),
+         },
++        {
++            "id": "ai_context_marks_map_as_primary_entry",
++            "passed": "'/map-topology':" in ai_context_text
++            and "Primary WE1 simulation entry on the first map" in ai_context_text,
++            "file": str(ai_context_path),
++        },
++        {
++            "id": "ai_context_marks_topology_as_debug_only",
++            "passed": "'/topology':" in ai_context_text
++            and "Debug-only topology canvas" in ai_context_text,
++            "file": str(ai_context_path),
++        },
+     ]
+*** End Patch

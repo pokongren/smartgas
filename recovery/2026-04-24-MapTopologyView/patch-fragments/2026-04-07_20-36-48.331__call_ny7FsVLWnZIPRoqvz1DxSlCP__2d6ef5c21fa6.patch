@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     useEffect(() => { nodesRef.current = topoNodes; edgesRef.current = topoEdges }, [topoNodes, topoEdges])
+     useEffect(() => { modeRef.current = editMode; ptRef.current = pointType }, [editMode, pointType])
+     useEffect(() => { cfRef.current = connectFrom }, [connectFrom])
++    useEffect(() => {
++        if (activeTab !== 'simulation') return
++        if (simulationSnapshotAutoloadedRef.current) return
++        simulationSnapshotAutoloadedRef.current = true
++        void refreshSteadySnapshots().catch(error => {
++            setStatusMsg(error instanceof Error ? `snapshot auto refresh failed: ${error.message}` : 'snapshot auto refresh failed')
++        })
++    }, [activeTab, refreshSteadySnapshots])
+*** End Patch

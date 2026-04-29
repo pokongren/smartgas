@@ -1,0 +1,36 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+             {/* 纯底图 —— 不传 pipelineData，不渲染任何站场/阀室 */}
+             <MapView onLoad={handleMapLoad} />
++            <SimPanel
++                scenarioId={steadyScenarioId}
++                scenarios={MAINLINE_SCENARIOS}
++                isLoading={steadySimLoading}
++                snapshotLoading={steadySnapshotLoading}
++                baselineSnapshotLoading={steadyBaselineSnapshotLoading}
++                error={steadySimError}
++                snapshotError={steadySnapshotError}
++                overlay={steadyOverlay}
++                snapshots={steadySnapshots}
++                selectedSnapshotRunId={steadySelectedSnapshotRunId}
++                baselineSnapshotRunId={steadyBaselineSnapshotRunId}
++                trialRunScenarioId={steadyTrialRunScenarioId}
++                bulkTrialRunActive={steadyBulkTrialRunActive}
++                comparison={steadyComparison}
++                trialRunItems={steadyTrialRunItems}
++                onScenarioChange={setSteadyScenario}
++                onSnapshotSelect={setSteadySelectedSnapshotRunId}
++                onBaselineSnapshotSelect={setSteadyBaselineSnapshotRunId}
++                onRun={() => void runSteadySimulation()}
++                onSaveSnapshot={() => void saveSteadySnapshot()}
++                onRefreshSnapshots={() => void refreshSteadySnapshots()}
++                onLoadSnapshot={() => void loadSteadySelectedSnapshot()}
++                onRunTrialScenario={scenarioId => void runSteadyTrialScenario(scenarioId)}
++                onRunMissingTrialScenarios={() => void runSteadyMissingTrialScenarios()}
++                onClear={clearSteadyOverlay}
++            />
+ 
+             {/* 左侧面板 */}
+             <div className="absolute top-[68px] left-4 bottom-4 z-20 w-72 flex flex-col">
+*** End Patch

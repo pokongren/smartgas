@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    const [activeTab, setActiveTab] = useState<PanelTab>('edit')
++    const [activeTab, setActiveTab] = useState<PanelTab>('simulation')
+*** End Patch

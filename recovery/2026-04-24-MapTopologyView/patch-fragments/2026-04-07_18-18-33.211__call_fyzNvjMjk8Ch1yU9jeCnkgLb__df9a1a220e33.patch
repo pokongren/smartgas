@@ -1,0 +1,25 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const stats = useMemo(() => ({
+         nodes: topoNodes.length,
+         edges: topoEdges.length,
+         isolated: topoNodes.length > 0
+             ? findIsolatedNodes(
+@@
+             ).length
+             : 0,
+     }), [topoNodes, topoEdges])
++    const simulationMapping = useMemo(() => {
++        return buildSimulationOverlayMapping(topoNodes, topoEdges, steadyOverlay)
++    }, [steadyOverlay, topoEdges, topoNodes])
++    const selectedNodeSimulationMatch = useMemo(() => {
++        if (!selectedNode || !simulationMapping) return null
++        return simulationMapping.nodeMatchesByDisplayId.get(selectedNode.id) ?? null
++    }, [selectedNode, simulationMapping])
++    const mappingSummary = simulationMapping?.summary ?? null
++    const unmatchedNodePreview = mappingSummary?.unmatchedOverlayNodeIds.slice(0, 5) ?? []
++    const unmatchedEdgePreview = mappingSummary?.unmatchedOverlayEdgeIds.slice(0, 5) ?? []
+ 
+     // ================== 娓叉煋 ==================
+*** End Patch

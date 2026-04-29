@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                            ${node.name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: ${isCriticalAlert ? '#f87171' : isWarningAlert ? '#fbbf24' : '#fff'}; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10; display: flex; flex-direction: column; align-items: center;">${node.name}${extraLabel}</div>` : ''}
++                            ${node.name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: ${isCriticalAlert ? '#f87171' : isWarningAlert ? '#fbbf24' : '#fff'}; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10; display: flex; flex-direction: column; align-items: center;">${node.name}${extraLabel}${baselineExtraLabel}</div>` : ''}
+*** End Patch

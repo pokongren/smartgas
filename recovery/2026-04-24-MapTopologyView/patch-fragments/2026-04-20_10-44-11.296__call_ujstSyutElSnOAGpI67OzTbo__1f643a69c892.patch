@@ -1,0 +1,154 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                if (!content) {
+-                    const match = simulationMapping.nodeMatchesByDisplayId.get(node.id)
+-                    let color = TOPO_COLORS[node.type]
+-                    let glow = 'none'
+-                    let isAlert = false
+-                    let isCriticalAlert = false
+-                    let isWarningAlert = false
+-                    if (match && match.matchedNodes.length > 0) {
+-                        if (match.highestAlertLevel === 'critical') {
+-                            color = '#f87171' // red-400
+-                            glow = '0 0 12px #f87171'
+-                            isAlert = true
+-                            isCriticalAlert = true
+-                        } else if (match.highestAlertLevel === 'warning') {
+-                            color = '#fbbf24' // amber-400
+-                            glow = '0 0 10px #fbbf24'
+-                            isAlert = true
+-                            isWarningAlert = true
+-                        } else {
+-                            glow = '0 0 6px #6ee7b7' // mild green glow
+-                        }
+-                    }
+-                    
+-                    const size = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
+-                    const border = isAlert ? '2px solid #fff' : '1px solid rgba(255,255,255,0.5)'
+-                    const shouldPulseCore = allowFancyNodeEffect && (isCriticalAlert || (isBreakScenarioActive && node.id === 'WE1-76'))
+-                    const pressureDelta = nodePressureDeltaMap.get(node.id)
+-                    const showDamage = allowFancyNodeEffect && damageFlashVisible && typeof pressureDelta === 'number' && pressureDelta < -0.01
+-                    const damageText = showDamage ? `${formatSignedNumber(pressureDelta, 2)} MPa` : ''
+-                    const shapeStyle = node.isJunction
+-                        ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 3px;background:${color};border:${border};box-shadow:${glow}; pointer-events: auto; transition: all 0.5s;`
+-                        : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${glow}; pointer-events: auto; transition: all 0.5s;`
+-                    
+-                    // 浠跨湡鍚庢樉绀鸿绠楀帇鍔涳紝浠跨湡鍓嶆樉绀烘暟鎹簱鍒濆鍑虹珯鍘嬪姏
+-                    const _seedEntry = seedNodePressures.get(node.id) ?? (
+-                        (node.sourceNodeIds ?? []).find(sid => seedNodePressures.has(sid))
+-                            ? seedNodePressures.get((node.sourceNodeIds ?? []).find(sid => seedNodePressures.has(sid))!)
+-                            : undefined
+-                    )
+-                    const _dbOutPressure = _seedEntry?.operating_pressure_out ?? null
+-                    const _dbInPressure = _seedEntry?.operating_pressure_in ?? null
+-                    const _simOutPressure = animatedNodeOutPressure.get(node.id) ?? (match?.averagePressureMpa ?? null)
+-                    const _simInPressure = _simOutPressure != null ? _simOutPressure * 0.95 : null
+-                    const _baselineMatch = baselineSimulationMapping?.nodeMatchesByDisplayId.get(node.id)
+-                    const _baselineOutPressure = _baselineMatch?.averagePressureMpa ?? null
+-                    const _baselineInPressure = _baselineOutPressure != null ? _baselineOutPressure * 0.95 : null
+-                    const _baselineTempItems = (_baselineMatch?.matchedNodes ?? [])
+-                        .map((item: any) => item.temperature_c)
+-                        .filter((value: unknown): value is number => typeof value === 'number' && Number.isFinite(value))
+-                    const _baselineTemp = _baselineTempItems.length > 0
+-                        ? _baselineTempItems.reduce((sum: number, value: number) => sum + value, 0) / _baselineTempItems.length
+-                        : (_baselineOutPressure != null ? estimateTemperatureByPressure(_baselineOutPressure) : null)
+-                    const extraLabel = _simOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #67e8f9; background: rgba(0,20,30,0.82); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px solid rgba(103,232,249,0.3);">杩?${_simInPressure!.toFixed(2)} | 鍑?${_simOutPressure.toFixed(2)} MPa</div>`
+-                        : _dbOutPressure != null || _dbInPressure != null
+-                            ? `<div style="font-size: 9px; color: #86efac; background: rgba(0,15,0,0.75); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px dashed rgba(134,239,172,0.4);">杩?${(_dbInPressure ?? (_dbOutPressure != null ? _dbOutPressure * 0.95 : 0)).toFixed(2)} | 鍑?${(_dbOutPressure ?? 0).toFixed(2)} MPa</div>`
+-                            : ''
+-                    const baselineExtraLabel = _baselineOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">閸?${_baselineInPressure!.toFixed(2)} | 閸?${_baselineOutPressure.toFixed(2)} MPa | 濞?${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}掳C</div>`
+-                        : ''
+-                    const displayExtraLabel = _simOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #67e8f9; background: rgba(0,20,30,0.82); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px solid rgba(103,232,249,0.3);">杩?{_simInPressure!.toFixed(2)} | 鍑?{_simOutPressure.toFixed(2)} MPa</div>`
+-                        : _dbOutPressure != null || _dbInPressure != null
+-                            ? `<div style="font-size: 9px; color: #86efac; background: rgba(0,15,0,0.75); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px dashed rgba(134,239,172,0.4);">杩?{(_dbInPressure ?? (_dbOutPressure != null ? _dbOutPressure * 0.95 : 0)).toFixed(2)} | 鍑?{(_dbOutPressure ?? 0).toFixed(2)} MPa</div>`
+-                            : ''
+-                    const displayBaselineExtraLabel = _baselineOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩鸿繘${_baselineInPressure!.toFixed(2)} | 鍩哄嚭${_baselineOutPressure.toFixed(2)} MPa | 鍩烘俯${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}掳C</div>`
+-                        : ''
+-
+-                    content = `
+-                        <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+-                            ${shouldPulseCore ? `<div class="we1-fault-ripple" style="--ripple-color:${isCriticalAlert ? '#f87171' : '#fb7185'}; --ripple-size:${size + 10}px;"></div>` : ''}
+-                            ${showDamage ? `<div class="we1-damage-pop">${damageText}</div>` : ''}
+-                            <div style="${shapeStyle}"></div>
+-                            ${node.name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: ${isCriticalAlert ? '#f87171' : isWarningAlert ? '#fbbf24' : '#fff'}; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10; display: flex; flex-direction: column; align-items: center;">${node.name}${displayExtraLabel}${displayBaselineExtraLabel}</div>` : ''}
+-                        </div>
+-                    `
+-                }
++                if (!content) {
++                    const match = simulationMapping.nodeMatchesByDisplayId.get(node.id)
++                    let color = TOPO_COLORS[node.type]
++                    let glow = 'none'
++                    let isAlert = false
++                    let isCriticalAlert = false
++                    let isWarningAlert = false
++                    if (match && match.matchedNodes.length > 0) {
++                        if (match.highestAlertLevel === 'critical') {
++                            color = '#f87171'
++                            glow = '0 0 12px #f87171'
++                            isAlert = true
++                            isCriticalAlert = true
++                        } else if (match.highestAlertLevel === 'warning') {
++                            color = '#fbbf24'
++                            glow = '0 0 10px #fbbf24'
++                            isAlert = true
++                            isWarningAlert = true
++                        } else {
++                            glow = '0 0 6px #6ee7b7'
++                        }
++                    }
++
++                    const size = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
++                    const border = isAlert ? '2px solid #fff' : '1px solid rgba(255,255,255,0.5)'
++                    const shouldPulseCore = allowFancyNodeEffect && (isCriticalAlert || (isBreakScenarioActive && node.id === 'WE1-76'))
++                    const pressureDelta = nodePressureDeltaMap.get(node.id)
++                    const showDamage = allowFancyNodeEffect && damageFlashVisible && typeof pressureDelta === 'number' && pressureDelta < -0.01
++                    const damageText = showDamage ? `${formatSignedNumber(pressureDelta, 2)} MPa` : ''
++                    const shapeStyle = node.isJunction
++                        ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 3px;background:${color};border:${border};box-shadow:${glow}; pointer-events: auto; transition: all 0.5s;`
++                        : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${glow}; pointer-events: auto; transition: all 0.5s;`
++
++                    const seedEntry = seedNodePressures.get(node.id) ?? (
++                        (node.sourceNodeIds ?? []).find(sid => seedNodePressures.has(sid))
++                            ? seedNodePressures.get((node.sourceNodeIds ?? []).find(sid => seedNodePressures.has(sid))!)
++                            : undefined
++                    )
++                    const dbOutPressure = seedEntry?.operating_pressure_out ?? null
++                    const dbInPressure = seedEntry?.operating_pressure_in ?? null
++                    const simOutPressure = animatedNodeOutPressure.get(node.id) ?? (match?.averagePressureMpa ?? null)
++                    const simInPressure = simOutPressure != null ? simOutPressure * 0.95 : null
++                    const baselineMatch = baselineSimulationMapping?.nodeMatchesByDisplayId.get(node.id)
++                    const baselineOutPressure = baselineMatch?.averagePressureMpa ?? null
++                    const baselineInPressure = baselineOutPressure != null ? baselineOutPressure * 0.95 : null
++                    const baselineTempItems = (baselineMatch?.matchedNodes ?? [])
++                        .map((item: any) => item.temperature_c)
++                        .filter((value: unknown): value is number => typeof value === 'number' && Number.isFinite(value))
++                    const baselineTemp = baselineTempItems.length > 0
++                        ? baselineTempItems.reduce((sum: number, value: number) => sum + value, 0) / baselineTempItems.length
++                        : (baselineOutPressure != null ? estimateTemperatureByPressure(baselineOutPressure) : null)
++
++                    const displayExtraLabel = showSnapshotPressureOverlay
++                        ? (simOutPressure != null
++                            ? `<div style="font-size: 9px; color: #67e8f9; background: rgba(0,20,30,0.82); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px solid rgba(103,232,249,0.3);">进${simInPressure!.toFixed(2)} | 出${simOutPressure.toFixed(2)} MPa</div>`
++                            : dbOutPressure != null || dbInPressure != null
++                                ? `<div style="font-size: 9px; color: #86efac; background: rgba(0,15,0,0.75); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px dashed rgba(134,239,172,0.4);">进${(dbInPressure ?? (dbOutPressure != null ? dbOutPressure * 0.95 : 0)).toFixed(2)} | 出${(dbOutPressure ?? 0).toFixed(2)} MPa</div>`
++                                : '')
++                        : ''
++                    const displayBaselineExtraLabel = showSnapshotPressureOverlay && baselineOutPressure != null
++                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">基进${baselineInPressure!.toFixed(2)} | 基出${baselineOutPressure.toFixed(2)} MPa | 基温${(baselineTemp ?? estimateTemperatureByPressure(baselineOutPressure)).toFixed(1)}°C</div>`
++                        : ''
++
++                    content = `
++                        <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
++                            ${shouldPulseCore ? `<div class="we1-fault-ripple" style="--ripple-color:${isCriticalAlert ? '#f87171' : '#fb7185'}; --ripple-size:${size + 10}px;"></div>` : ''}
++                            ${showDamage ? `<div class="we1-damage-pop">${damageText}</div>` : ''}
++                            <div style="${shapeStyle}"></div>
++                            ${node.name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: ${isCriticalAlert ? '#f87171' : isWarningAlert ? '#fbbf24' : '#fff'}; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10; display: flex; flex-direction: column; align-items: center;">${node.name}${displayExtraLabel}${displayBaselineExtraLabel}</div>` : ''}
++                        </div>
++                    `
++                }
+*** End Patch

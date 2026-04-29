@@ -1,0 +1,10 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    const steadyOverlayStatusText = steadyOverlay
+-        ? `主仿真 ${steadyScenarioOption?.label ?? steadyOverlay.scenario_id} · ${SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}`
+-        : '主仿真还没运行'
++    const steadyOverlayStatusText = steadyOverlay
++        ? `${steadyScenarioOption?.label ?? steadyOverlay.scenario_id} · ${SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}`
++        : '未运行'
+*** End Patch

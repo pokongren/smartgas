@@ -1,0 +1,24 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-15-WE1仿真结果接入AI分析_第4阶段第1轮_人话版.md
++一、主目标
++1. 把 WE1 主仿真结果直接接入 AI 助手，实现“一键发送结果并自动分析”。
++
++二、本轮实现
++1. 在 `src/components/ai-assistant/AiAssistant.tsx` 新增 `assistant-send-message` 事件监听。  
++2. 监听到事件后自动打开 AI 面板，并调用 `chat.handleSend(message)` 发起分析请求。  
++3. 在 `src/views/MapTopologyView.tsx` 新增 `sendSimulationToAiAnalysis`。  
++4. 该函数会把“人话简报 + 结构化JSON + 固定分析模板”拼成一条完整提问，发给 AI。  
++5. 在仿真操作区新增按钮“发送仿真结果到AI分析”。
++
++三、为什么这样做
++1. 你不需要手工复制粘贴多段内容，避免漏字段。  
++2. AI 侧拿到的内容包含叙述和结构化数据，分析稳定性更高。
++
++四、验证结果
++1. 已执行 `npm run build`，构建通过。  
++2. 预期交互：运行仿真后点“发送仿真结果到AI分析”，AI 面板自动弹出并开始回答。
++
++五、交付物
++1. 代码：`src/components/ai-assistant/AiAssistant.tsx`、`src/views/MapTopologyView.tsx`。  
++2. 文档：`docs/2026-04-15-WE1仿真结果接入AI分析_第4阶段第1轮_人话版.md`。
+*** End Patch

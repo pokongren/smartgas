@@ -1,0 +1,122 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     }, [
+         coverageResultSummary.matchedEdgeText,
+         coverageResultSummary.matchedNodeText,
+         coverageResultSummary.riskSummary,
+         steadyComparison,
+@@
+         topoNodes,
+         topoEdges,
+     ])
++    const simulationNarrativePlain = useMemo(() => {
++        if (!steadyOverlay) {
++            return '还没有仿真结果。先点“运行主仿真”，再看这块的人话解释。'
++        }
++        const supply = steadyOverlay.summary.total_supply
++        const demand = steadyOverlay.summary.total_demand
++        const gap = supply - demand
++        const utilization = steadyOverlay.summary.avg_utilization
++        const status = SOLVER_STATUS_LABELS[steadyOverlay.solver_status]
++        const compareSummary = steadyComparison
++            ? `相对基线，供给差值${formatSignedNumber(steadyComparison.summary_delta.total_supply.delta, 2)}，需求差值${formatSignedNumber(steadyComparison.summary_delta.total_demand.delta, 2)}，利用率差值${formatSignedNumber(steadyComparison.summary_delta.avg_utilization.delta, 3)}。`
++            : '当前没有选基线快照，所以先给出本次绝对结果。'
++        const suggestion = buildOpsSuggestion(steadyOverlay.summary.alert_count, utilization, steadyOverlay.solver_status)
++        return [
++            `这次场景是“${steadyScenarioOption?.label ?? steadyScenarioId}”，求解状态是“${status}”。`,
++            `系统供给${supply.toFixed(2)}，需求${demand.toFixed(2)}，差值${formatSignedNumber(gap, 2)}，平均利用率${utilization.toFixed(3)}，告警${steadyOverlay.summary.alert_count}个。`,
++            `映射命中情况：节点${coverageResultSummary.matchedNodeText}，连线${coverageResultSummary.matchedEdgeText}。`,
++            compareSummary,
++            `建议动作：${suggestion}`,
++        ].join('\n')
++    }, [
++        coverageResultSummary.matchedEdgeText,
++        coverageResultSummary.matchedNodeText,
++        steadyComparison,
++        steadyOverlay,
++        steadyScenarioId,
++        steadyScenarioOption?.label,
++    ])
++    const simulationStructuredBrief = useMemo(() => {
++        if (!steadyOverlay) {
++            return {
++                pilot: WE1_PRIMARY_PILOT_ID,
++                scenario_id: steadyScenarioId,
++                status: 'idle',
++                message: 'no_result',
++            }
++        }
++        const gap = steadyOverlay.summary.total_supply - steadyOverlay.summary.total_demand
++        return {
++            pilot: WE1_PRIMARY_PILOT_ID,
++            scenario_id: steadyOverlay.scenario_id,
++            run_id: steadyOverlay.run_id,
++            solver_status: steadyOverlay.solver_status,
++            summary: {
++                total_supply: Number(steadyOverlay.summary.total_supply.toFixed(3)),
++                total_demand: Number(steadyOverlay.summary.total_demand.toFixed(3)),
++                gap: Number(gap.toFixed(3)),
++                avg_utilization: Number(steadyOverlay.summary.avg_utilization.toFixed(4)),
++                alert_count: steadyOverlay.summary.alert_count,
++            },
++            coverage: {
++                matched_nodes: coverageResultSummary.matchedNodeText,
++                matched_edges: coverageResultSummary.matchedEdgeText,
++                readiness: coverageResultSummary.readinessLabel,
++            },
++            baseline_delta: steadyComparison ? {
++                total_supply: Number(steadyComparison.summary_delta.total_supply.delta.toFixed(3)),
++                total_demand: Number(steadyComparison.summary_delta.total_demand.delta.toFixed(3)),
++                avg_utilization: Number(steadyComparison.summary_delta.avg_utilization.delta.toFixed(4)),
++                alert_count: steadyComparison.summary_delta.alert_count.delta,
++            } : null,
++            recommendation: buildOpsSuggestion(
++                steadyOverlay.summary.alert_count,
++                steadyOverlay.summary.avg_utilization,
++                steadyOverlay.solver_status,
++            ),
++            generated_at: new Date().toISOString(),
++        }
++    }, [
++        coverageResultSummary.matchedEdgeText,
++        coverageResultSummary.matchedNodeText,
++        coverageResultSummary.readinessLabel,
++        steadyComparison,
++        steadyOverlay,
++        steadyScenarioId,
++    ])
++    const simulationRunTimeline = useMemo(() => {
++        const stage = steadySimLoading
++            ? 'running'
++            : steadyOverlay?.solver_status === 'converged'
++                ? 'done'
++                : steadyOverlay?.solver_status === 'max_iter'
++                    ? 'warn'
++                    : steadyOverlay?.solver_status === 'error'
++                        ? 'error'
++                        : 'idle'
++        return [
++            { key: 'load', label: '加载场景', active: stage !== 'idle' },
++            { key: 'solve', label: '求解计算', active: ['running', 'done', 'warn', 'error'].includes(stage), pulse: stage === 'running' },
++            { key: 'overlay', label: '叠加渲染', active: ['done', 'warn'].includes(stage) },
++            { key: 'ai', label: '同步AI', active: stage !== 'idle' && stage !== 'running' },
++        ]
++    }, [steadyOverlay?.solver_status, steadySimLoading])
+     const copySimulationNarrative = useCallback(async () => {
+         try {
+             await navigator.clipboard.writeText(simulationNarrative)
+             setStatusMsg('浠跨湡绠€鎶ュ凡澶嶅埗锛屽彲鐩存帴绮樿创缁?AI 鍔╂墜')
+         } catch (error) {
+             setStatusMsg(error instanceof Error ? error.message : '澶嶅埗浠跨湡绠€鎶ュけ璐?)
+         }
+     }, [simulationNarrative])
++    const copySimulationStructuredBrief = useCallback(async () => {
++        try {
++            await navigator.clipboard.writeText(JSON.stringify(simulationStructuredBrief, null, 2))
++            setStatusMsg('仿真结构化简报已复制，可直接贴给 AI 继续分析')
++        } catch (error) {
++            setStatusMsg(error instanceof Error ? error.message : '复制结构化简报失败')
++        }
++    }, [simulationStructuredBrief])
+*** End Patch

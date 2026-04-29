@@ -1,0 +1,16 @@
+*** Begin Patch
+*** Delete File: C:/Users/Administrator/.codex/automations/automation/memory.md
+*** Add File: C:/Users/Administrator/.codex/automations/automation/memory.md
++# automation memory
++
++- 运行时间：2026-04-07 08:12:27 +08:00
++- 本轮入口通过：`F:\smartgas-grid` 是主仓真实落点，`.git` 是实体目录，不拿 detached worktree 顶结论。
++- 主仓当前 `HEAD=f75536d`，分支相对远端 `ahead 3`；主仓外的大量 detached worktree 仍停在 `6410a10`。
++- 本轮开始前 `docs` 工作区无已跟踪未提交 diff；本轮只新增巡检文档并重写 memory，不改业务代码。
++- 当前未提交重点已扩到三块：AI（`backend/app/routers/ai_assistant.py`、`src/components/ai-assistant/*`）、拓扑仿真（`backend/app/routers/topology_simulation.py`、`backend/app/services/topology_simulation.py`、`backend/app/services/we1_*`、`backend/scripts/verify_we1_phase*.py`）、地图层级/视图（`src/utils/hierarchyRenderer.ts`、`src/views/GlobalPipelineView.tsx`、`src/views/MapTopologyView.tsx`）。
++- 地图链路结论：全国地图主链仍是 `GlobalPipelineView -> MapView -> mapRenderer -> hierarchyRenderer`；LOD 阈值仍是 `4/9/12/11/12`，且 `showFlowArrows >= 10` 仍成立；`MapTopologyView` 仍是独立渲染和独立模拟入口，不能写成已并入主链。
++- 枢纽链路结论：运行时仍是 `junction_groups_rebuilt` 优先，缺失回退 `junction_groups`，最后叠 `manual overlay`；旧表没有退出。
++- 数据库巡检结论：`pipeline_systems.count=13`、`we3` 仍缺失、`junction_groups.count=25`、`junction_groups_rebuilt.count=7`、`issue_count=0`；重点继续盯 rebuilt coverage，不是只看无报错。
++- 导入/仿真结论：传统导入脚本仍是离线工具边界；主推进仍在 `useSimulation -> /api/pipeline-packages/simulation-overlay -> topology_simulation -> solve_steady / solver input`，同时保留 `MapTopologyView -> topologyAPI.simulate()` 独立入口；`verify_we1_phase3.py` 和 `verify_we1_phase4.py` 本轮重新执行均通过。
++- AI 链路结论：前端有页面上下文时仍会带 `analysis_mode=subagents` 调 `/api/ai-assistant/chat`；后端仍是 direct / orchestrated / legacy 三路并存，排障先分流再查层。
+*** End Patch

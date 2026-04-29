@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-        const collapsedEdges = new Set<string>()  // "minId_maxId" 去重
+-        const edgePairs: Array<[string, string]> = []
++        const collapsedEdges = new Map<string, { startNodeId: string; endNodeId: string; sourceEdgeIds: string[] }>()
+*** End Patch

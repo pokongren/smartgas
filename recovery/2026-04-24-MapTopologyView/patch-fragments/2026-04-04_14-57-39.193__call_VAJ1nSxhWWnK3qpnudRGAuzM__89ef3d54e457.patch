@@ -1,0 +1,11 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const [activeTab, setActiveTab] = useState<PanelTab>('edit')
++    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
++    const [mergeJunctionName, setMergeJunctionName] = useState('')
++    const [mergeJunctionDescription, setMergeJunctionDescription] = useState('')
++    const [isMerging, setIsMerging] = useState(false)
++    const [deletingJunctionId, setDeletingJunctionId] = useState<number | null>(null)
++    const [activeTab, setActiveTab] = useState<PanelTab>('edit')
+*** End Patch

@@ -1,0 +1,11 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ const SIMULATION_ALERT_COLORS: Record<'normal' | 'warning' | 'critical', string> = {
+     normal: '#22c55e',
+     warning: '#f59e0b',
+     critical: '#ef4444',
+ }
+ const SIMULATION_NEUTRAL_COLOR = '#38bdf8'
++const SIM_DIMMED_OPACITY = 0.22
+*** End Patch

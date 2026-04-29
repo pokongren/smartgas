@@ -1,0 +1,85 @@
+*** Begin Patch
+*** Add File: C:\Users\Administrator\.codex\automations\automation\automation.toml
++version = 1
++id = "automation"
++kind = "cron"
++name = "项目心跳"
++prompt = """
++巡检 smartgas-grid 当前工作区，只以本次运行时的 cwd 和 git 根目录为准，不依赖旧 memory 里的历史 worktree 路径做实体判断。先读取 automation memory，避免重复输出同一类阻塞结论；再检查最近 git log、git status、未提交 diff、git worktree list、.git 指向和 docs 变化。
++
++先做入口判定：
++1. 如果当前 git 根目录下缺少 src、backend、docs 或本次要求核查的关键文件，或者 git log 只显示最小初始提交、仓库树只有 README.md 一类极小快照，就把本轮明确归类为“worktree/path sync blockage”，不要假装完成三条主线的实体核查。
++2. 只有在当前 git 根目录下确实存在目标文件和数据库时，才继续做下面三条主线的深查。
++
++若入口通过，再按三条主线核查：
++1. 全国地图缩放与层级显示：重点看 src/utils/mapRenderer.ts、src/utils/hierarchyRenderer.ts、src/views/MapTopologyView.tsx、src/views/GlobalPipelineView.tsx，确认气源、压气站、分输站、阀室、枢纽在不同 zoom 下的显示阈值、隐藏规则、节点重要性分层是否一致，是否存在阈值散落、命名规则冲突，或地图与拓扑视图口径不一致。
++2. 起源点与枢纽规则：重点看 backend/app/models.py、backend/app/services/junction_groups.py、backend/app/routers/topology_editor.py、src/utils/mapRenderer.ts，确认 source、junction、JUNCTION-x 引用展开、重叠枢纽合并、起终点/连接点渲染与命名口径是否一致。
++3. 数据库口径与导入脚本：重点看 backend/data/smartgas.db、backend/check_db.py、backend/scripts/add_sj2.py、backend/scripts/add_we3.py、backend/scripts/reimport_sj23.py、src/services/api.ts、src/hooks/useTopology.ts，确认 stations、pipelines、pipeline_systems、junction_groups 的数量、ID 前缀、system id、layers_config、API 端口与前后端字段口径是否一致，并区分这是结构变更、导入脚本变更、数据库内容变更，还是本地实验数据。
++
++输出要求：
++1. 先给“当前进展摘要”，第一句必须直接说明本轮主要是代码变化、数据库变化、本地实验，还是 worktree/path sync blockage。
++2. 再给 1 条简明 inbox 更新，严格使用“变化 / 风险 / 下一步”三段结构，每段 1-3 句，必须点名涉及文件、模块或目录。
++3. 如果当前 git 根目录是空壳 worktree，要明确写出阻塞原因，例如：当前根目录只有 README.md 和 .git、目标模块缺失、git worktree list 显示真实开发分支在别处；并注明“本轮已按当前 git 根目录判断，没有沿用旧 memory 路径做实体结论”。
++4. 如果没有明显变化，也不能只写“无变化”；要明确当前待确认项、阻塞点，或为什么这次无法得出业务层面的结论。
++5. 不修改业务代码；只允许更新 automation memory，必要时补充自动化说明文档。
++"""
++status = "ACTIVE"
++rrule = "FREQ=HOURLY;INTERVAL=2"
++model = "gpt-5.4"
++reasoning_effort = "medium"
++execution_environment = "worktree"
++cwds = ["F:\\smartgas-grid"]
++created_at = 1775004724195
++updated_at = 1775200000000
+*** Add File: C:\Users\Administrator\.codex\automations\automation\HEARTBEAT_GUIDE.md
++# 项目心跳说明
++
++这套自动化的目标不是盲目“找变化”，而是先判断这次巡检落到的仓库是否真的是可检查的项目工作区。
++
++## 先判定入口
++
++每次运行先只看当前 `cwd` 和当前 `git` 根目录。
++
++如果出现下面任一情况，本轮就直接归类为 `worktree/path sync blockage`：
++
++- 当前根目录只有 `.git`、`README.md` 一类最小内容
++- `git log` 只看到初始提交或最小快照
++- `src`、`backend`、`docs` 不存在
++- 指定检查文件不存在，比如 `src/utils/mapRenderer.ts`、`backend/app/models.py`、`backend/data/smartgas.db`
++- `git worktree list` 显示真实开发分支在别的 worktree
++
++遇到这些情况时，不要假装进入业务核查；要直接说明这是路径或同步阻塞。
++
++## 三条主线什么时候检查
++
++只有当当前 git 根目录下确实存在项目代码和数据库时，才继续检查：
++
++- 地图缩放与层级显示
++- 起源点与枢纽规则
++- 数据库口径与导入脚本
++
++## 输出口径
++
++输出必须稳定遵守下面格式：
++
++1. 当前进展摘要
++2. 变化
++3. 风险
++4. 下一步
++
++其中：
++
++- 第一段必须先说清楚，本轮是代码变化、数据库变化、本地实验，还是 `worktree/path sync blockage`
++- 如果是阻塞，要明确写出缺了哪些目录或文件
++- 如果引用历史 memory，只能作为背景，不能替代当前 git 根目录的实体判断
++
++## 允许修改的文件
++
++默认只允许更新：
++
++- `C:\\Users\\Administrator\\.codex\\automations\\automation\\memory.md`
++- 当前说明文档
++- `C:\\Users\\Administrator\\.codex\\automations\\automation\\automation.toml`
++
++不要因为心跳巡检而顺手修改业务仓库里的代码、脚本或数据库。
+*** End Patch

@@ -1,0 +1,31 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     useEffect(() => {
+         if (!selectedNode) return
+         const nextSelected = topoNodes.find(node => node.id === selectedNode.id) || null
+         setSelectedNode(nextSelected)
+     }, [selectedNode?.id, topoNodes])
++
++    const flyTo = useCallback((node: TopoNode) => {
++        if (!mapInstance) return
++        mapInstance.setZoomAndCenter(10, node.position, true, 500)
++        setStatusMsg(`已定位: ${node.name}`)
++    }, [mapInstance])
+ 
+     useEffect(() => {
+         const params = new URLSearchParams(location.search)
+         const focusNodeId = params.get('focusNode')
+@@
+     const searchResults = useMemo(() => {
+         if (!searchText.trim()) return []
+         const kw = searchText.trim().toLowerCase()
+         return topoNodes.filter(n => n.name.toLowerCase().includes(kw))
+     }, [searchText, topoNodes])
+-
+-    const flyTo = useCallback((node: TopoNode) => {
+-        if (!mapInstance) return
+-        mapInstance.setZoomAndCenter(10, node.position, true, 500)
+-        setStatusMsg(`已定位: ${node.name}`)
+-    }, [mapInstance])
+*** End Patch

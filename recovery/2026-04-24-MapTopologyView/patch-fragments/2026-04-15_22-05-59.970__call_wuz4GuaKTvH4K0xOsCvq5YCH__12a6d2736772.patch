@@ -1,0 +1,17 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-function buildOpsSuggestion(alertCount: number, avgUtilization: number, solverStatus: '"'"'converged'"'"' | '"'"'max_iter'"'"' | '"'"'error'"'"'): string {
+-    if (solverStatus === '"'"'error'"'"') return '"'"'鏈姹傝В澶辫触锛屽厛妫€鏌ュ満鏅弬鏁板拰杈圭晫鏉′欢锛屽啀閲嶈窇涓讳豢鐪熴€?"'"'"'
+-    if (solverStatus === '"'"'max_iter'"'"') return '"'"'鏈杈惧埌杩唬涓婇檺锛屽缓璁厛鍑忓皬鎵板姩骞呭害骞舵牳瀵瑰熀绾垮揩鐓с€?"'"'"'
+-    if (alertCount >= 5) return '"'"'鍛婅鍋忓锛屼紭鍏堟帓鏌ヤ富骞查珮璐熻嵎娈靛拰鍘嬫皵绔欎笂涓嬫父鍘嬪樊銆?"'"'"'
+-    if (avgUtilization >= 0.82) return '"'"'鍒╃敤鐜囧亸楂橈紝寤鸿鍏堝仛闄愭祦鍦烘櫙瀵规瘮骞跺噯澶囪皟宄扮瓥鐣ャ€?"'"'"'
+-    return '"'"'杩愯鐘舵€佸钩绋筹紝鍙皢褰撳墠缁撴灉浣滀负涓嬩竴杞紓甯稿満鏅姣斿熀绾裤€?"'"'"'
++function buildOpsSuggestion(alertCount: number, avgUtilization: number, solverStatus: 'converged' | 'max_iter' | 'error'): string {
++    if (solverStatus === 'error') return '本次求解失败，先检查场景参数和边界条件，再重跑主仿真。'
++    if (solverStatus === 'max_iter') return '本次达到迭代上限，建议先减小扰动幅度并核对基线快照。'
++    if (alertCount >= 5) return '告警偏多，优先排查主干高负荷段和压气站上下游压差。'
++    if (avgUtilization >= 0.82) return '利用率偏高，建议先做限流场景对比并准备调峰策略。'
++    return '运行状态平稳，可将当前结果作为下一轮异常场景对比基线。'
+ }
+*** End Patch

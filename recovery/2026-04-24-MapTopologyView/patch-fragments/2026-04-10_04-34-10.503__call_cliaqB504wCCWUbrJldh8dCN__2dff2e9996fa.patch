@@ -1,0 +1,29 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                 <p className="text-xs text-gray-400 mt-1">
+                                     关联连线：{topoEdges.filter(edge => edge.startNodeId === selectedNode.id || edge.endNodeId === selectedNode.id).length}
+                                 </p>
+                             </div>
++                            <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/20 p-3 space-y-2">
++                                <p className="text-xs text-emerald-300 uppercase tracking-wider">仿真状态</p>
++                                <div className="flex items-center justify-between gap-3 text-xs">
++                                    <span className="text-gray-400">当前压力</span>
++                                    <span className="text-emerald-100 font-medium">
++                                        {selectedNodeSimulationMetrics?.pressure != null
++                                            ? `${selectedNodeSimulationMetrics.pressure.toFixed(2)} MPa`
++                                            : '未运行仿真'}
++                                    </span>
++                                </div>
++                                <div className="flex items-center justify-between gap-3 text-xs">
++                                    <span className="text-gray-400">当前温度</span>
++                                    <span className="text-emerald-100 font-medium">
++                                        {selectedNodeSimulationMetrics?.temperatureC != null
++                                            ? `${selectedNodeSimulationMetrics.temperatureC.toFixed(1)}°C${selectedNodeSimulationMetrics.estimated ? '（估算）' : ''}`
++                                            : '未运行仿真'}
++                                    </span>
++                                </div>
++                            </div>
+ 
+                             {selectedNode.isJunction ? (
+*** End Patch

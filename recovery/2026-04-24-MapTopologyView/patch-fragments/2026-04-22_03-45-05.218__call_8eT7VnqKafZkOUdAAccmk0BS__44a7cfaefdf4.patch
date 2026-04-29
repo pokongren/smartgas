@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                     <button
+                                         onClick={() => {
+-                                            if (!steadyOverlay) {
+-                                                setStatusMsg('璇峰厛鍔犺浇鎴栬繍琛屼竴鏉″揩鐓х粨鏋滐紝鍐嶄笂鍥炬樉绀哄帇鍔?)
++                                            if (!steadyOverlay && seedNodePressures.size === 0) {
++                                                setStatusMsg('请先读取起始压力或先运行一次主仿真')
+                                                 return
+                                             }
+                                             setShowSnapshotPressureOverlay(prev => !prev)
+                                         }}
+*** End Patch

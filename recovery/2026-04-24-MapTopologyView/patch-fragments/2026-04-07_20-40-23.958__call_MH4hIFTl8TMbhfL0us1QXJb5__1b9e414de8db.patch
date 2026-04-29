@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                            { id: 'simulation' as PanelTab, label: '浠跨湡', icon: 'science' },
++                            { id: 'simulation' as PanelTab, label: 'MainSim', icon: 'science' },
+*** End Patch

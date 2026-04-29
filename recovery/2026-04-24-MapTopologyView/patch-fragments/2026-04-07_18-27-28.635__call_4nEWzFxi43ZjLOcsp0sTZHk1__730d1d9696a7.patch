@@ -1,0 +1,45 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\docs\2026-04-08-WE1第一张图主仿真入口第2阶段第1轮阻塞总结_人话版.md
++一、主目标
++1. 本轮目标原本是推进第2阶段第1轮，也就是补第一张图显示对象到 overlay 原始 node/edge 的映射层，并补独立验证，不进入第3阶段。
++
++二、这轮实际做了什么
++1. 主代理先读了五阶段方案、自动化执行方案和现有第1阶段第1轮总结，确认当前应处于“第2阶段第1轮”。
++2. 侦察A聚焦 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)，确认地图页显示节点来自 `baseTopoNodes + junctionGroups` 折叠，显示边来自阀室穿越后的 `ce-* / merged-*` 展示 ID，当前边映射的主要断点是原始 line id 在导入拓扑时被丢掉。
++3. 侦察B聚焦 [useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)、[simulation.ts](/F:/smartgas-grid/src/types/simulation.ts)、[topology_simulation.py](/F:/smartgas-grid/backend/app/routers/topology_simulation.py) 和已有 verify 脚本，确认 overlay 原始契约是稳定的，缺的是地图显示层到原始 node/edge 的解释层。
++4. 实施阶段尝试在 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 上补 `sourceEdgeIds` 透传和映射摘要展示，但在独立验证前发现这个文件现有工作树里已经存在大面积编码/语法异常，无法在本轮安全收口。
++
++三、为什么判定阻塞
++1. 独立验证执行 `cmd /c node node_modules\\typescript\\bin\\tsc --noEmit` 后，报错集中在 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)，表现为大量 `Unterminated string literal`、`Unexpected token`、`JSX closing tag` 异常。
++2. 这类错误不是单个映射逻辑点的问题，而是整份文件已经存在编码和字符串损坏，导致第2阶段的最小改动也无法通过独立验证。
++3. `cmd /c npm run build` 另外还被当前环境的 `esbuild spawn EPERM` 卡住，所以本轮不能拿前端构建作为兜底验收。
++
++四、失败先查哪层
++1. 先查 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 的文件编码和字符串闭合。
++2. 再查地图页阶段1接管过程中遗留的未完成改动，尤其是 simulation 面板接入段和中文文案段。
++3. 文件恢复到可编译后，再回到第2阶段真正要做的映射层：`sourceNodeIds / sourceEdgeIds -> overlay 原始 node/edge`。
++
++五、影响范围
++1. 本轮没有放行任何求解公式修改，没有扩新试点，没有新造第三套仿真页面。
++2. 第2阶段第1轮未通过独立验证，所以不能进入下一阶段。
++
++六、前后对比
++1. 计划状态对比：原计划是“补映射层并验证通过”；当前实际是“侦察完成，验证发现基线文件损坏，阶段阻塞”。
++2. 验证状态对比：
++
++| 项目 | 预期 | 实际 |
++| --- | --- | --- |
++| TypeScript 校验 | 通过 | [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 出现大面积语法错误 |
++| 前端构建 | 可作为回归入口 | 当前环境 `esbuild spawn EPERM`，无法作为有效验收 |
++| 阶段推进 | 进入第2阶段第2轮或第3阶段 | 未放行，停在第2阶段第1轮阻塞 |
++
++七、截图说明
++1. 本轮没有附截图。
++2. 原因是阻塞发生在代码语法和验证层，浏览器侧无法进入有效验收。
++3. 这里用“错误类别 + 验证结论表”代替截图留痕。
++
++八、下一轮应该怎么做
++1. 先把 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 恢复到可编译状态，这是继续第2阶段的前置条件。
++2. 恢复后再重做本轮唯一目标：保留原始 line id，补 `sourceEdgeIds` 透传，计算显示节点/显示边到 overlay 原始对象的命中统计，再补独立 verify 脚本。
++3. 在 `tsc --noEmit` 和独立 verify 都通过前，不进入下一阶段。
+*** End Patch

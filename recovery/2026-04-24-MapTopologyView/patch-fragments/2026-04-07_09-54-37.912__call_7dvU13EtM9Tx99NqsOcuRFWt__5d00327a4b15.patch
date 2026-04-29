@@ -1,0 +1,125 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-07-WE1四轮推进完成收口巡检总结_人话版.md
++# WE1 四轮推进完成收口巡检总结
++
++## 本轮结论
++
++WE1 原定四轮推进已经完成，当前处于“第 4 轮完成后的收口维护态”。本轮不再继续改 `backend/app/services`、`backend/app/routers`、`backend/scripts`、`src/hooks`、`src/components/topology`、`src/views` 的业务代码，只补收口总结并重做独立验证，避免后续自动化误判成还要继续开第 5 轮。
++
++## 主目标
++
++把“WE1 四轮已完成、后续只做维护/回归”这件事重新确认并写实，同时补上这次巡检的新证据。
++
++## 上下文与已知信息
++
++- 自动化记忆已经记录 `Current round: Four-round WE1 push already completed (4/4), closeout-only mode`。
++- `docs/2026-04-07-WE1下一阶段-试点转产品化四步方案.md` 和四份分轮总结已经把第 1 轮到第 4 轮的落地链路写完整。
++- `backend/app/routers/topology_simulation.py` 仍保留 `solve-steady`、`solve-failure`、`simulation-overlay` 三个主链入口。
++- `src/hooks/useSimulation.ts`、`src/components/topology/SimPanel.tsx`、`src/views/TopologyView.tsx` 仍在消费统一 overlay 契约和快照能力。
++- 之前心跳文档已经指出唯一明确偏差不在 WE1 主链，而在 `src/views/MapTopologyView.tsx` 还挂着旧仿真入口；这次复核结果保持一致。
++
++## 主代理与子代理分工
++
++- 主代理：判断当前轮次、汇总证据、决定本轮只做收口文档、给出最终结论。
++- 侦察代理 A：复核后端路由、快照服务、验收脚本是否仍保持 WE1 主链能力。
++- 侦察代理 B：复核前端 hook、面板、视图是否仍消费统一 overlay 契约，并检查是否有旧入口漂移。
++- 验证代理：独立执行 WE1 第 4 轮验收和第 3-4 轮联合回归脚本，不参与业务代码改动。
++
++## 修改逻辑
++
++这次只更新这份收口总结，不动业务实现，原因很简单：当前最关键的问题已经不是“还有哪一轮没做”，而是“要把已经完成这件事固定下来”。如果这时继续碰代码，会把已封板的四轮范围重新打开，反而增加漂移风险。
++
++## 执行顺序
++
++### 第1阶段第1轮
++
++先读 automation memory、四轮方案文档和最近的人话总结，判断当前是否还在四轮推进内。
++
++### 第1阶段第2轮
++
++抽查后端与前端主链文件，确认 `TopologyView -> useSimulation -> simulation-overlay` 这条链仍然成立，同时确认 `MapTopologyView` 的旧入口偏差是否还在。
++
++### 第1阶段第3轮
++
++独立执行下面两条验证命令：
++
++```bash
++python F:\smartgas-grid\backend\scripts\verify_we1_phase4.py
++python F:\smartgas-grid\backend\scripts\verify_we1_phase34_final.py
++```
++
++### 第1阶段第4轮
++
++更新这份收口总结，并同步更新 automation memory，明确后续运行只做维护、回归、总结，不再沿原四轮路径继续改代码。
++
++## 验证方式
++
++- 文档验证：核对四轮方案文档和四份分轮总结是否已经闭环。
++- 代码验证：抽查 `topology_simulation.py`、`useSimulation.ts`、`SimPanel.tsx`、`TopologyView.tsx`、`MapTopologyView.tsx`。
++- 脚本验证：重跑第 4 轮验收脚本和第 3-4 轮联合回归脚本。
++- 失败时先查：
++  1. `TopologyView` / `useSimulation` 前端消费层。
++  2. `backend/app/routers/topology_simulation.py` 路由层。
++  3. solver input / steady solver 服务层。
++  4. `MapTopologyView` 是否仍走旧入口。
++
++## 验证结果
++
++执行时间：`2026-04-07 17:14:19 +08:00` 之后重新复核
++
++### 结果 1：第 4 轮验收继续通过
++
++- 命令：`python F:\smartgas-grid\backend\scripts\verify_we1_phase4.py`
++- 返回码：`0`
++- 关键结论：
++  - 主样板 steady / failure API 契约可用。
++  - 主样板故障后下游压力下降。
++  - 辅样板 overlay 契约带 `meta`，且暴露 `branch_limited`。
++  - 辅样板负荷上调和限流场景已导致分流变化。
++  - 前端继续消费统一 overlay 契约。
++
++### 结果 2：第 3-4 轮联合回归继续通过
++
++- 命令：`python F:\smartgas-grid\backend\scripts\verify_we1_phase34_final.py`
++- 返回码：`0`
++- 关键结论：
++  - 主样板和辅样板的 overlay 契约已经统一。
++  - 主样板稳态和故障场景都能收敛。
++  - 辅样板场景列表完整，可直接进入维护阶段。
++
++### 结果 3：已知偏差仍然存在，但不属于本轮继续改代码范围
++
++- `src/views/TopologyView.tsx` 仍通过 `useSimulation({ pilotId: 'mainline_zhongwei_jingbian' ... })` 命中 WE1 主链。
++- `src/views/MapTopologyView.tsx` 仍能看到 `simulateCutoff`、`topologyAPI.simulate`、`/api/emergency/simulate-failure` 等旧入口痕迹。
++- 结论：WE1 四轮主链已经完成并稳定，已知偏差仍是地图拓扑页独立入口未切换，不影响“原四轮已完成”的判断。
++
++## 影响范围
++
++- 文档层：更新本次收口巡检总结。
++- 自动化层：给后续运行一个更明确的边界，避免误开第 5 轮。
++- 代码层：本轮没有新增、删除或修改任何业务代码。
++
++## 前后对比
++
++| 对比项 | 本轮之前 | 本轮之后 |
++| --- | --- | --- |
++| 四轮推进状态 | 已有完成证据，但需要本轮再确认 | 明确写成“4/4 已完成，进入收口维护态” |
++| 验收记录 | 主要依赖上一轮记载 | 本轮重新跑 phase4 与 phase34_final，继续通过 |
++| 自动化口径 | 可能继续把 WE1 当作未完工任务推进 | 明确改成后续只做维护、回归、总结 |
++| 业务代码 | 已封板 | 保持不动 |
++
++## 截图说明
++
++这次没有附截图，因为本轮没有新增界面改动；这里用“脚本验证结果 + 前后对比表”来代替截图，更能说明这次工作的重点。
++
++## 风险与回退点
++
++- 风险：如果后续自动化忽略这份结论，仍可能误判成要继续开第 5 轮。
++- 风险：`MapTopologyView` 旧入口仍在，未来如果要推进新阶段，优先应把它纳入新的独立实施线，而不是回头改原四轮收口线。
++- 回退点：本轮只改这份文档；如需回退，直接回退这个文件即可，不涉及业务代码回退。
++
++## 最终交付物
++
++- 更新后的收口总结：`F:\smartgas-grid\docs\2026-04-07-WE1四轮推进完成收口巡检总结_人话版.md`
++- 运行结论：WE1 四轮推进已完成，后续这条自动化只做维护、回归检查和总结，不再继续按原四轮路径改代码。
+*** End Patch

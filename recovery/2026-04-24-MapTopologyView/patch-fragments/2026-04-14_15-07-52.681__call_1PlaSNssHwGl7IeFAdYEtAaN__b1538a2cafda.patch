@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-            const showDamage = damageFlashVisible && typeof pressureDelta === 'number' && pressureDelta < -0.01
++            const showDamage = !isMapInteracting && damageFlashVisible && typeof pressureDelta === 'number' && pressureDelta < -0.01
+@@
+-            if (hasFlow || isDashed) {
++            if (hasFlow || isDashed) {
+                 edgeOptions.strokeDasharray = [10, 12]
+-                edgeOptions.strokeDashoffset = -Math.round(lineFlowPhase * flowSpeed)
++                edgeOptions.strokeDashoffset = isMapInteracting ? 0 : -Math.round(lineFlowPhase * flowSpeed)
+             }
+             safeSetPolylineOptions(edge.poly, edgeOptions)
+         })
+ 
+-    }, [simulationMapping, topoNodes, topoEdges, cutoffNodeId, selectedMergeNodeIds, activeTab, cutoffResult, lineFlowPhase, isBreakScenarioActive, nodePressureDeltaMap, damageFlashVisible])
++    }, [simulationMapping, topoNodes, topoEdges, cutoffNodeId, selectedMergeNodeIds, activeTab, cutoffResult, lineFlowPhase, isBreakScenarioActive, nodePressureDeltaMap, damageFlashVisible, isMapInteracting])
+*** End Patch

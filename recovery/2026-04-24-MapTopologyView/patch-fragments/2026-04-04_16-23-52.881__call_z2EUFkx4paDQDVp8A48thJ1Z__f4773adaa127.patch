@@ -1,0 +1,35 @@
+*** Begin Patch
+*** Add File: C:\Users\Administrator\.codex\automations\automation\memory.md
++# automation memory
++
++- Last inspected: 2026-04-05T00:23:24.4443452+08:00
++- Main directory check:
++  - initial cwd: `C:\Users\Administrator\.codex\worktrees\225d\smartgas-grid`
++  - switched cwd: `F:\smartgas-grid`
++  - git toplevel: `F:/smartgas-grid`
++  - conclusion: this run did land on the main repo; do not use detached worktrees as fact source.
++- Repo state snapshot:
++  - main repo HEAD: `eaf6ac4`
++  - detached worktrees in `.codex/worktrees/*` are still on `6410a10`; they lag behind the main repo.
++  - main repo is not an empty shell; root contains `src`, `backend`, `docs`, and `backend/data/smartgas.db`.
++- Main findings from this run:
++  - Map/topology rendering changed for real: `src/utils/hierarchyRenderer.ts`, `src/utils/mapRenderer.ts`, `src/views/MapTopologyView.tsx`, `src/views/GlobalPipelineView.tsx`.
++  - Junction/runtime rule path changed for real: `backend/app/services/junction_groups.py` now prefers `junction_groups_rebuilt`, and `backend/app/routers/topology_editor.py` exposes runtime mode plus manual overlay behavior.
++  - DB + import path changed for real: `backend/data/smartgas.db`, `backend/check_db.py`, `backend/scripts/add_sj2.py`, `backend/scripts/add_we3.py`, `backend/scripts/reimport_sj23.py`.
++  - AI module changed for real: `backend/app/routers/ai_assistant.py`, `backend/app/services/ai_client.py`, plus new orchestrator/validator/fix-router files and frontend chat/context hooks.
++- DB facts confirmed on 2026-04-05:
++  - `pipeline_systems`: 14
++  - `stations`: not re-counted separately this run because `check_db.py` already passed required prefixes
++  - required systems present: `we3`, `sj2`, `sj3`
++  - required prefixes present: `WE3` stations 16 / pipelines 15; `SJ2` stations 70 / pipelines 69; `SJ3` stations 71 / pipelines 70
++  - `junction_groups`: 16
++  - `junction_groups_rebuilt`: 12
++  - rebuilt junction stats: 10 normal + 2 major, `issue_count=0`
++  - latest rebuilt timestamp: `2026-04-04T11:09:08.312826+00:00`
++- Docs drift seen this run:
++  - modified: `docs/TOPOLOGY_COMPUTATION_USAGE.md`, `docs/TOPOLOGY_SETUP_GUIDE.md`
++  - docs are being rewritten toward port `8080` and mixed `/api/topology/...` + `/topology/...` routing explanation.
++- Local/non-product residue seen in worktree:
++  - `.npm-cache/`, screenshots, temp/debug files, extra JSON/DB shadows, and helper scripts like `fix_ai_doc.py`
++  - treat those as local experiment residue unless later commits wire them into app entrypoints.
+*** End Patch

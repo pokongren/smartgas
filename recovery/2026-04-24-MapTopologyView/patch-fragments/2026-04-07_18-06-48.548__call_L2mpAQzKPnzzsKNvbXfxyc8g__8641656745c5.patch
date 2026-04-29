@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const selectedJunctionGroup = useMemo(() => {
+         if (!selectedNode?.isJunction || !selectedNode.junctionId) return null
+         return junctionGroups.find(group => group.id === selectedNode.junctionId) ?? null
+     }, [junctionGroups, selectedNode])
+     const canDeleteSelectedJunction = !!(
+         selectedJunctionGroup && !isRuntimeReadonlyGroup(selectedJunctionGroup)
+     )
++    const simulationOverlayMapping = useMemo(() => {
++        return buildSimulationOverlayMapping(topoNodes, topoEdges, steadyOverlay)
++    }, [steadyOverlay, topoEdges, topoNodes])
++    const selectedNodeSimulationMatch = useMemo(() => {
++        if (!selectedNode || !simulationOverlayMapping) return null
++        return simulationOverlayMapping.nodeMatchesByDisplayId.get(selectedNode.id) ?? null
++    }, [selectedNode, simulationOverlayMapping])
+*** End Patch

@@ -113,6 +113,7 @@ function MapView({
     onNodeClick,
     onLineClick,
     onDeviceClick,
+    simulationOverlay,
 }: MapViewProps) {
     const mapContainerRef = useRef<HTMLDivElement>(null)
     const [mapInstance, setMapInstance] = useState<any>(null)
@@ -288,20 +289,20 @@ function MapView({
         isInitializedRef.current = true
 
         const initMap = async () => {
+            const fallbackAmapKey = 'f60a02b69a072cb6b93d7cc4c6b0a42c'
+            const fallbackAmapSecret = 'f33664d5ca92eb775080e76db01f379f'
+
             try {
                 setLoadingStage('加载地图 SDK...')
-                const amapKey = import.meta.env.VITE_AMAP_KEY
-
-                if (!amapKey) {
-                    throw new Error('VITE_AMAP_KEY 环境变量未设置')
-                }
+                const amapKey = import.meta.env.VITE_AMAP_KEY || fallbackAmapKey
+                const amapSecret = import.meta.env.VITE_AMAP_SECRET || fallbackAmapSecret
 
                 ; (window as any)._AMapSecurityConfig = {
-                    securityJsCode: import.meta.env.VITE_AMAP_SECRET || '',
+                    securityJsCode: amapSecret,
                 }
 
                 // 预加载必要的插件
-                const loadAMapWithRetry = async () => {
+                const loadAMapWithRetry = async (key: string) => {
                     const maxAttempts = 3
                     const attemptTimeoutMs = 12000
                     let lastError: unknown = null
@@ -327,9 +328,9 @@ function MapView({
                         try {
                             return await withTimeout(
                                 AMapLoader.load({
-                                    key: amapKey,
+                                    key,
                                     version: '2.0',
-                                    plugins: ['AMap.Scale', 'AMap.ToolBar', 'AMap.ControlBar', 'AMap.DistrictLayer'],
+                                    plugins: [],
                                 }),
                                 attemptTimeoutMs,
                             )
@@ -345,7 +346,20 @@ function MapView({
                     throw (lastError instanceof Error ? lastError : new Error(String(lastError)))
                 }
 
-                const AMap = await loadAMapWithRetry()
+                let AMap
+                try {
+                    AMap = await loadAMapWithRetry(amapKey)
+                } catch (primaryError) {
+                    if (amapKey !== fallbackAmapKey) {
+                        console.warn('[MapView] AMap key load failed, retrying with bundled fallback key.', primaryError)
+                        ; (window as any)._AMapSecurityConfig = {
+                            securityJsCode: fallbackAmapSecret,
+                        }
+                        AMap = await loadAMapWithRetry(fallbackAmapKey)
+                    } else {
+                        throw primaryError
+                    }
+                }
 
                 setLoadingStage('初始化地图...')
 
@@ -360,6 +374,7 @@ function MapView({
                         center: [mapConfig.center.longitude, mapConfig.center.latitude],
                         zoom: mapConfig.zoom,
                         mapStyle: 'amap://styles/dark',
+                        features: ['bg', 'road'],
                         viewMode,
                     }
 
@@ -421,9 +436,13 @@ function MapView({
 
                 // 后台异步加载非关键资源
                 const loadNonCriticalResources = () => {
-                    loadControls(AMap, map)
-                    if (mapConfig.showDistrictLayer) {
-                        loadDistrictLayer(AMap, map)
+                    try {
+                        loadControls(AMap, map)
+                        if (mapConfig.showDistrictLayer) {
+                            loadDistrictLayer(AMap, map)
+                        }
+                    } catch (error) {
+                        console.warn('[MapView] loadNonCriticalResources failed', error)
                     }
                 }
 
@@ -434,8 +453,12 @@ function MapView({
                 }
 
                 const loadLabels = () => {
-                    if (mapConfig.showProvinceLabels) {
-                        loadProvinceLabels(AMap, map)
+                    try {
+                        if (mapConfig.showProvinceLabels) {
+                            loadProvinceLabels(AMap, map)
+                        }
+                    } catch (error) {
+                        console.warn('[MapView] loadLabels failed', error)
                     }
                 }
 
@@ -497,6 +520,7 @@ function MapView({
                     const lineOverlays = await renderPipelineLines(
                         mapInstanceRef.current,
                         effectivePipelineData.lines,
+                        effectivePipelineData.nodes,
                         onLineClick ? (e) => onLineClick({
                             type: 'line',
                             targetId: e.line.id,
@@ -542,6 +566,39 @@ function MapView({
             abortController.abort()
         }
     }, [effectivePipelineData, mapInstance])
+
+    /**
+     * 仿真覆盖层着色
+     */
+    useEffect(() => {
+        if (!mapInstance || !simulationOverlay) return
+        const overlayLineMap = new Map(simulationOverlay.edges.map(edge => [edge.id, edge]))
+
+        lineOverlaysRef.current.forEach((overlay: any) => {
+            const extData = overlay?.getExtData?.() || overlay?.getExtData?.call?.(overlay)
+            const line = extData?.line
+            if (!line?.id) return
+
+            const simEdge = overlayLineMap.get(line.id)
+            if (!simEdge) return
+
+            const baseColor = simEdge.color || '#22c55e'
+            const lineColor = extData?.isHalo ? 'rgba(8, 15, 23, 0.92)' : baseColor
+            const strokeWeight = extData?.isHalo
+                ? 10
+                : Math.max(2, Math.min(8, Math.round(3 + simEdge.width_factor * 4)))
+
+            try {
+                overlay.setOptions?.({
+                    strokeColor: lineColor,
+                    strokeWeight,
+                    strokeOpacity: extData?.isHalo ? 0.78 : 0.98,
+                })
+            } catch (error) {
+                console.warn('[MapView] simulation overlay color failed', error)
+            }
+        })
+    }, [simulationOverlay, mapInstance])
 
     /**
      * 节点渲染

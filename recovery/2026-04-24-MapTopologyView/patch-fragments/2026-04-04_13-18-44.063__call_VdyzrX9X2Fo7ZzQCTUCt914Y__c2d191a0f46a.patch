@@ -1,0 +1,23 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                                     {manualJunctionEditingEnabled && (
+                                         <button
+                                             onClick={() => setEditMode('merge')}
+                                             className={`mt-2 w-full py-2 rounded-lg text-[11px] transition-all flex items-center justify-center gap-1.5
+                                                 ${editMode === 'merge' ? 'bg-purple-700/80 text-white' : 'bg-purple-900/40 text-purple-200 hover:bg-purple-800/50'}`}
+                                         >
+                                             <span className="material-symbols-outlined text-sm">hub</span>
+-                                            閸忕厧顔愰幍瀣紣閹瑰繐鎮庨敍鍫ユ姜娑撶粯绁﹂敍?
++                                            兼容手工捏合（旧流程）
+                                         </button>
+                                     )}
+@@
+                                     <div className="flex items-center justify-between gap-3">
+                                         <p className="text-[10px] text-sky-300 uppercase tracking-wider">运行时枢纽</p>
+                                         <span className="text-[10px] text-sky-400">
+-                                            {junctionMode === 'runtime_readonly' ? '只读模式' : junctionMode}
++                                            {JUNCTION_MODE_LABELS[junctionMode] || junctionMode}
+                                         </span>
+                                     </div>
+*** End Patch

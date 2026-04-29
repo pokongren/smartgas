@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+             {/* 纯底图 —— 不传 pipelineData，不渲染任何站场/阀室 */}
+             <MapView
+-                config={{ viewMode: '2D' }}
++                config={{
++                    viewMode: '2D',
++                    showProvinceLabels: false,
++                    showDistrictLayer: false,
++                    showScale: false,
++                    showCompass: false,
++                    maxRenderNodes: 900,
++                    maxRenderLines: 1400,
++                }}
+                 onLoad={handleMapLoad}
+             />
+*** End Patch

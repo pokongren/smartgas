@@ -1,0 +1,30 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const exportSimulationReport = useCallback(() => {
++    function exportSimulationReport() {
+@@
+-        setStatusMsg('主仿真导出清单已生成')
+-    }, [
+-        coverageChecklistItems,
+-        coverageResultSummary.currentScenarioCovered,
+-        coverageResultSummary.currentScenarioSnapshotCount,
+-        coverageResultSummary.latestCoverageTime,
+-        coverageResultSummary.matchedEdgeText,
+-        coverageResultSummary.matchedNodeText,
+-        coverageResultSummary.riskSummary,
+-        demoGuideSteps,
+-        failureInvestigationLayerLabel,
+-        recommendedCoverageScenario?.label,
+-        selectedBaselineSnapshotSummary,
+-        simulationVisualSummary?.highlightedEdgeCount,
+-        simulationVisualSummary?.highlightedNodeCount,
+-        steadyComparison,
+-        steadyOverlay,
+-        steadyScenarioId,
+-        steadyScenarioOption?.label,
+-        steadySnapshots.length,
+-    ])
++        setStatusMsg('主仿真导出清单已生成')
++    }
+*** End Patch

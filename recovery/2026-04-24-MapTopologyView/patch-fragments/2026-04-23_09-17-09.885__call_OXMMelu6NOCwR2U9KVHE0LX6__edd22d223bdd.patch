@@ -1,0 +1,43 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                     const _baselineMatch = baselineSimulationMapping?.nodeMatchesByDisplayId.get(node.id)
+                     const _baselineOutPressure = _baselineMatch?.averagePressureMpa ?? null
+                     const _baselineInPressure = _baselineOutPressure != null ? _baselineOutPressure * 0.95 : null
+-                    const _baselineTempItems = (_baselineMatch?.matchedNodes ?? [])
+-                        .map((item: any) => item.temperature_c)
+-                        .filter((value: unknown): value is number => typeof value === 'number' && Number.isFinite(value))
+-                    const _baselineTemp = _baselineTempItems.length > 0
+-                        ? _baselineTempItems.reduce((sum: number, value: number) => sum + value, 0) / _baselineTempItems.length
+-                        : (_baselineOutPressure != null ? estimateTemperatureByPressure(_baselineOutPressure) : null)
+                     const snapshotPressureLabel = showSnapshotPressureOverlay
+                         ? (_simOutPressure != null
+                             ? `<div style="font-size: 9px; color: #67e8f9; background: rgba(0,20,30,0.82); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px solid rgba(103,232,249,0.3);">杩?{_simInPressure!.toFixed(2)} | 鍑?{_simOutPressure.toFixed(2)} MPa</div>`
+@@
+                                 : '')
+                         : ''
+                     const baselinePressureLabel = showSnapshotPressureOverlay && _baselineOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩鸿繘${_baselineInPressure!.toFixed(2)} | 鍩哄嚭${_baselineOutPressure.toFixed(2)} MPa | 鍩烘俯${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}掳C</div>`
++                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩鸿繘${_baselineInPressure!.toFixed(2)} | 鍩哄嚭${_baselineOutPressure.toFixed(2)} MPa</div>`
+                         : ''
+@@
+                     const baselineExtraLabel = _baselineOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">閸?${_baselineInPressure!.toFixed(2)} | 閸?${_baselineOutPressure.toFixed(2)} MPa | 濞?${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}掳C</div>`
++                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">閸?${_baselineInPressure!.toFixed(2)} | 閸?${_baselineOutPressure.toFixed(2)} MPa</div>`
+                         : ''
+@@
+                     const displayBaselineExtraLabel = _baselineOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩鸿繘${_baselineInPressure!.toFixed(2)} | 鍩哄嚭${_baselineOutPressure.toFixed(2)} MPa | 鍩烘俯${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}掳C</div>`
++                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩鸿繘${_baselineInPressure!.toFixed(2)} | 鍩哄嚭${_baselineOutPressure.toFixed(2)} MPa</div>`
+                         : ''
+@@
+                     const baselinePressureLabelV2 = showSnapshotPressureOverlay && _baselineOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩鸿繘${_baselineInPressure!.toFixed(2)} | 鍩哄嚭${_baselineOutPressure.toFixed(2)} MPa | 鍩烘俯${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}掳C</div>`
++                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩鸿繘${_baselineInPressure!.toFixed(2)} | 鍩哄嚭${_baselineOutPressure.toFixed(2)} MPa</div>`
+                         : ''
+@@
+                     const baselinePressureLabelV3 = showSnapshotPressureOverlay && _baselineOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩鸿繘${_baselineInPressure!.toFixed(2)} | 鍩哄嚭${_baselineOutPressure.toFixed(2)} MPa | 鍩烘俯${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}掳C</div>`
++                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩鸿繘${_baselineInPressure!.toFixed(2)} | 鍩哄嚭${_baselineOutPressure.toFixed(2)} MPa</div>`
+                         : ''
+*** End Patch

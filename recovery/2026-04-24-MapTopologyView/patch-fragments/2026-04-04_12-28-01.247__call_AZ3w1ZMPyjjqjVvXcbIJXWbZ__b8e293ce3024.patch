@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ - API 口径仍是双轨并存：`src/services/api.ts` 还有 `/api/topology/...`，`src/hooks/useTopology.ts` 直连 `/topology/...`，`src/services/apiBase.ts` 把 `VITE_API_BASE_URL` 拆成 `API_BASE_URL` 和 `BACKEND_BASE_URL`。docs 这轮是在补这件事，不代表前后端和数据库都已完全统一。
++
++# 2026-04-04 20:27:13 +08:00
++
++- 本轮继续先落点到 `F:\smartgas-grid`；初始 cwd 是 `C:\Users\Administrator\.codex\worktrees\868b\smartgas-grid`，切换后 cwd 和 git 根目录都确认是 `F:\smartgas-grid`。结论仍然不是 `automation env mismatch / worktree-path blockage`，也不是空壳 worktree。
++- 这次要覆盖上一轮过期数字。当前 `backend/data/smartgas.db` 实测是：`stations=1272`、`pipelines=1268`、`pipeline_systems=14`、`junction_groups=16`、`junction_groups_rebuilt=12`；`we3` 已经落库，`pipeline_systems WHERE id='we3' = 1`，前缀计数是 `WE3=16/15`、`SJ2=70/69`、`SJ3=71/70`。
++- 当前主判断还是“代码变化 + 数据库变化 + docs 收口，并夹着本地实验痕迹”，但要把重点说得更准：`src/utils/hierarchyRenderer.ts` / `src/utils/mapRenderer.ts` 确实统一了地图 LOD，`backend/app/services/junction_groups.py` / `backend/app/routers/topology_editor.py` / `src/views/MapTopologyView.tsx` 确实把枢纽切到运行时影子表优先和只读口径，`docs/TOPOLOGY_COMPUTATION_USAGE.md` / `docs/TOPOLOGY_SETUP_GUIDE.md` 在补 8080 与 `/api` + `/topology` 双轨说明。
++- 不要把“全国地图”和“拓扑视图”说成完全同一套显示规则。全国地图渲染链在 `MapView -> mapRenderer -> hierarchyRenderer`，有 `6/10/14/11/12` 这套 zoom/聚合阈值；`MapTopologyView` 主要是拓扑折叠与枢纽查看，只支持从 `focusNode` 联动定位，不走同一套地图 LOD 隐藏逻辑。
++- 本地实验痕迹这次也比上一轮更明显：工作区除了代码和 DB，还有 `backend/data/*preview*.json|db`、`backend/scripts/rebuild_junctions.py`、`backend/scripts/verify_junctions.py`、`.npm-cache/*`、`tmp_debug.txt` 这类未跟踪/半跟踪文件。后续巡检要继续把它们归到“本地实验/辅助验证”，不要直接当正式交付物。
++- 当前运行时间：`2026-04-04 20:27:13 +08:00`。
+*** End Patch

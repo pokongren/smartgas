@@ -1,0 +1,38 @@
+*** Begin Patch
+*** Add File: C:\Users\Administrator\.codex\automations\automation\memory.md
++# 项目心跳 memory
++
++## 2026-04-05 00:23:40 +08:00
++
++### 本轮结论
++- 这轮不是路径阻塞，主目录落点已修正到 `F:\smartgas-grid`，后续判断都基于这个目录，没有拿 detached worktree 顶替事实。
++- 当前主线是代码变化 + 数据库变化 + AI 模块链路变化，不是单纯文档改动。
++- `backend/data/smartgas.db` 已有实质更新，库内现在是 `stations=1272`、`pipelines=1268`、`pipeline_systems=14`、`junction_groups=16`、`junction_groups_rebuilt=12`。
++- `backend/check_db.py` 验证通过：`we3/sj2/sj3` 都在，前缀快照 `WE3=16/15`、`SJ2=70/69`、`SJ3=71/70`，shadow junction `issue_count=0`，最新重编时间是 `2026-04-04T11:09:08.312826+00:00`。
++- 地图/拓扑这条线已经在把显示口径往 `rawType + junction_kind + zoom LOD` 收口，`src/utils/hierarchyRenderer.ts`、`src/utils/mapRenderer.ts`、`src/views/MapTopologyView.tsx`、`src/views/GlobalPipelineView.tsx` 都在改。
++- 枢纽这条线已经从“直接读老 `junction_groups`”往“优先读 `junction_groups_rebuilt`，手工捏合作为 overlay”迁移，`backend/app/services/junction_groups.py` 和 `backend/app/routers/topology_editor.py` 是主落点。
++- AI 这条线不是纯调试残留，前后端入口已经接上：`src/components/ai-assistant/useAiAssistantChat.ts` 发 `/api/ai-assistant/chat`，后端 `backend/app/routers/ai_assistant.py` 接 `context + analysis_mode`，并接了 `ai_analysis_orchestrator / analysis_validator / fix_task_router`。但这批文件里有新增未跟踪文件，且有中文字符串乱码风险，仍要按“正式链路在接线中”看。
++
++### 为什么这么记
++- 之前这类巡检容易被 detached worktree 带偏，所以先把“只认 `F:\smartgas-grid` 主目录”记死，后面不用再重复争论入口。
++- 这次主要变化集中在地图层级、枢纽运行时口径、数据库导入/校验、AI 助手编排四条线，后续巡检可以直接按这四块看增量。
++
++### 影响范围
++- 主目录 git 现状里，这些文件确认有变化：`backend/app/routers/ai_assistant.py`、`backend/app/routers/topology_editor.py`、`backend/app/services/junction_groups.py`、`backend/check_db.py`、`backend/scripts/add_sj2.py`、`backend/scripts/add_we3.py`、`backend/scripts/reimport_sj23.py`、`src/utils/hierarchyRenderer.ts`、`src/utils/mapRenderer.ts`、`src/views/MapTopologyView.tsx`、`src/views/GlobalPipelineView.tsx`、`src/hooks/useTopology.ts`、`src/services/api.ts`、`docs/TOPOLOGY_COMPUTATION_USAGE.md`、`docs/TOPOLOGY_SETUP_GUIDE.md`。
++- AI 新增未跟踪文件：`backend/app/services/ai_analysis_orchestrator.py`、`backend/app/services/analysis_validator.py`、`backend/app/services/fix_task_router.py`、`src/components/ai-assistant/useAiAssistantChat.ts`、`src/components/ai-assistant/useAiAssistantPageContext.ts`。
++
++### 验证方式
++- 入口验证：确认 `cwd=F:\smartgas-grid`，`git rev-parse --show-toplevel=F:/smartgas-grid`。
++- 仓库验证：看了 `git status --short`、`git log --oneline -5`、`git worktree list --porcelain`、`git diff --stat`、`git diff -- docs`。
++- 数据库验证：直接查 SQLite 计数，再跑 `python backend/check_db.py --db backend/data/smartgas.db --require-system we3 --require-system sj2 --require-system sj3 --require-prefix WE3 --require-prefix SJ2 --require-prefix SJ3`。
++- 链路验证：逐个核对地图 LOD、枢纽规则、API 前后端路径、AI 前端 hook 与后端 router/orchestrator/validator/fix router 的接线关系。
++
++### 前后对比
++| 项目 | 之前容易误判 | 这轮确认后的口径 |
++| --- | --- | --- |
++| 巡检目录 | 容易把 detached worktree 当事实来源 | 只认 `F:\smartgas-grid` |
++| 枢纽事实源 | 老 `junction_groups` 和手工捏合混在一起 | 优先 `junction_groups_rebuilt`，手工捏合作为 overlay |
++| 地图显示规则 | 站点名称关键词驱动较多 | 往 `rawType + junction_kind + zoom LOD` 收口 |
++| 拓扑 API 口径 | 容易以为全都还在 `/api/topology/...` | 现在是 `/api/...` 和 `/topology/...` 并存，文档已跟着收口 |
++| AI 助手状态 | 容易被当成单点试验 | 已形成前后端链路，但仍有未跟踪文件和字符串质量风险 |
+*** End Patch

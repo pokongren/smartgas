@@ -1,0 +1,66 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                                 {steadyOverlay && selectedNodeSimulationMatch && (
+                                     <div className="space-y-1 text-gray-300">
+                                         <div>来源节点：{selectedNodeSimulationMatch.sourceNodeIds.join(', ') || '无'}</div>
+                                         <div>命中节点：{selectedNodeSimulationMatch.matchedNodeIds.join(', ') || '无'}</div>
+                                         <div>未命中节点：{selectedNodeSimulationMatch.missingSourceNodeIds.join(', ') || '无'}</div>
+                                         <div>平均压力：{selectedNodeSimulationMatch.averagePressureMpa === null ? '-' : `${selectedNodeSimulationMatch.averagePressureMpa.toFixed(3)} MPa`}</div>
+                                         <div>最高节点告警：{ALERT_LEVEL_LABELS[selectedNodeSimulationMatch.highestAlertLevel]}</div>
+                                     </div>
+                                 )}
++                                {selectedNodeComparisonDelta && (
++                                    <div className="rounded bg-black/15 px-2 py-2 text-gray-300">
++                                        <div className="text-[10px] uppercase tracking-wider text-gray-500">当前 vs 基线</div>
++                                        <div className="mt-1 space-y-1 text-[11px]">
++                                            <div>当前压力：{selectedNodeComparisonDelta.currentPressure === null ? '-' : `${selectedNodeComparisonDelta.currentPressure.toFixed(3)} MPa`}</div>
++                                            <div>基线压力：{selectedNodeComparisonDelta.baselinePressure === null ? '-' : `${selectedNodeComparisonDelta.baselinePressure.toFixed(3)} MPa`}</div>
++                                            <div>
++                                                压力差值：
++                                                {selectedNodeComparisonDelta.pressureDelta === null
++                                                    ? ' -'
++                                                    : ` ${formatSignedNumber(selectedNodeComparisonDelta.pressureDelta, 3)} MPa`}
++                                            </div>
++                                        </div>
++                                    </div>
++                                )}
+                                 {steadyOverlay && selectedNodeSimulationMatch && selectedNodeSimulationMatch.internalSourceEdgeIds.length > 0 && (
+                                     <div className="rounded bg-black/15 px-2 py-2 text-gray-300">
+                                         <div className="text-[10px] uppercase tracking-wider text-gray-500">枢纽内部边映射</div>
+@@
+                                 {steadyOverlay && selectedEdgeSimulationMatch && (
+                                     <div className="space-y-1 text-gray-300">
+                                         <div>来源边：{selectedEdgeSimulationMatch.sourceEdgeIds.join(', ') || '无'}</div>
+                                         <div>命中 overlay 边：{selectedEdgeSimulationMatch.matchedEdgeIds.join(', ') || '无'}</div>
+                                         <div>未命中边：{selectedEdgeSimulationMatch.missingSourceEdgeIds.join(', ') || '无'}</div>
+                                         <div>流量合计：{selectedEdgeSimulationMatch.totalFlowRate.toFixed(2)}</div>
+                                         <div>平均利用率：{selectedEdgeSimulationMatch.averageUtilization === null ? '-' : selectedEdgeSimulationMatch.averageUtilization.toFixed(3)}</div>
+                                         <div>最高告警：{ALERT_LEVEL_LABELS[selectedEdgeSimulationMatch.highestAlertLevel]}</div>
+                                     </div>
+                                 )}
++                                {selectedEdgeComparisonDelta && (
++                                    <div className="rounded bg-black/15 px-2 py-2 text-gray-300">
++                                        <div className="text-[10px] uppercase tracking-wider text-gray-500">当前 vs 基线</div>
++                                        <div className="mt-1 space-y-1 text-[11px]">
++                                            <div>当前流量：{selectedEdgeComparisonDelta.currentFlow === null ? '-' : selectedEdgeComparisonDelta.currentFlow.toFixed(2)}</div>
++                                            <div>基线流量：{selectedEdgeComparisonDelta.baselineFlow === null ? '-' : selectedEdgeComparisonDelta.baselineFlow.toFixed(2)}</div>
++                                            <div>
++                                                流量差值：
++                                                {selectedEdgeComparisonDelta.flowDelta === null
++                                                    ? ' -'
++                                                    : ` ${formatSignedNumber(selectedEdgeComparisonDelta.flowDelta, 2)}`}
++                                            </div>
++                                            <div>当前利用率：{selectedEdgeComparisonDelta.currentUtil === null ? '-' : selectedEdgeComparisonDelta.currentUtil.toFixed(3)}</div>
++                                            <div>基线利用率：{selectedEdgeComparisonDelta.baselineUtil === null ? '-' : selectedEdgeComparisonDelta.baselineUtil.toFixed(3)}</div>
++                                            <div>
++                                                利用率差值：
++                                                {selectedEdgeComparisonDelta.utilizationDelta === null
++                                                    ? ' -'
++                                                    : ` ${formatSignedNumber(selectedEdgeComparisonDelta.utilizationDelta, 3)}`}
++                                            </div>
++                                        </div>
++                                    </div>
++                                )}
+                             </div>
+*** End Patch

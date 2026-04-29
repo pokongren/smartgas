@@ -1,0 +1,285 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/src/services/topologyEditorApi.ts
++import { api } from './api'
++
++export interface JunctionGroup {
++    id: number
++    name: string
++    description?: string | null
++    station_ids: string[]
++}
++
++export interface CreateJunctionGroupPayload {
++    name: string
++    description?: string
++    station_ids: string[]
++}
++
++export interface PositionUpdate {
++    id: string
++    longitude: number
++    latitude: number
++}
++
++export interface PositionPreviewResult {
++    updated_station_ids: string[]
++    updated_valve_ids: string[]
++    affected_layers: string[]
++    impacted_segments: Array<{
++        start_id: string
++        end_id: string
++        valve_ids: string[]
++    }>
++    errors: Array<{ id?: string | null; error: string }>
++    preview_only?: boolean
++}
++
++export interface PositionCommitPayload {
++    updates: PositionUpdate[]
++    cascade_valves: boolean
++    cascade_scope?: 'segment' | 'all'
++}
++
++export interface PositionCommitResult extends PositionPreviewResult {
++    message?: string
++}
++
++export const topologyEditorApi = {
++    async getJunctionGroups() {
++        const response = await api.get<{ junctions: JunctionGroup[] }>('/api/topology/junctions')
++        return Array.isArray(response.data.junctions) ? response.data.junctions : []
++    },
++
++    async createJunctionGroup(payload: CreateJunctionGroupPayload) {
++        const response = await api.post<{ message: string; id: number }>('/api/topology/junctions', payload)
++        return response.data
++    },
++
++    async deleteJunctionGroup(junctionId: number) {
++        const response = await api.delete<{ ok: boolean; message: string }>(`/api/topology/junctions/${junctionId}`)
++        return response.data
++    },
++
++    async previewPositions(payload: PositionCommitPayload) {
++        const response = await api.post<PositionPreviewResult>('/api/topology/positions/preview', payload)
++        return response.data
++    },
++
++    async commitPositions(payload: PositionCommitPayload) {
++        const response = await api.put<PositionCommitResult>('/api/topology/positions/commit', payload)
++        return response.data
++    },
++}
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ import MapView from '@/components/map-view/MapView'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
+ import { invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+ import type { PipelinePackage } from '@/data/pipelines/types'
+-import { resolveApiPath } from '@/services/apiBase'
++import { topologyEditorApi } from '@/services/topologyEditorApi'
++import type { JunctionGroup, PositionPreviewResult } from '@/services/topologyEditorApi'
+ import type { PipelineNode, PipelineLine } from '@/types'
+@@
+-interface JunctionGroup {
+-    id: number
+-    name: string
+-    description?: string | null
+-    station_ids: string[]
+-}
+-
+-interface PositionPreviewResult {
+-    updated_station_ids: string[]
+-    updated_valve_ids: string[]
+-    affected_layers: string[]
+-    impacted_segments: Array<{
+-        start_id: string
+-        end_id: string
+-        valve_ids: string[]
+-    }>
+-    errors: Array<{ id?: string | null; error: string }>
+-    preview_only?: boolean
+-}
+-
+ // ================== 鎷撴墤鏍峰紡锛堟瀬绠€鍦嗙偣 + 棰滆壊鍖哄垎锛?==================
+@@
+     const [undoStack, setUndoStack] = useState<UndoAction[]>([])
+@@
+     const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+@@
+     const loadJunctionGroups = useCallback(async () => {
+         try {
+-            const res = await fetch(resolveApiPath('/api/topology/junctions'))
+-            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+-            const data = await res.json()
+-            setJunctionGroups(Array.isArray(data.junctions) ? data.junctions : [])
+-            return Array.isArray(data.junctions) ? data.junctions as JunctionGroup[] : []
++            const groups = await topologyEditorApi.getJunctionGroups()
++            setJunctionGroups(groups)
++            return groups
+         } catch (error) {
+             console.error('[MapTopologyView] 鏋㈢航缁勫姞杞藉け璐?', error)
+             setStatusMsg('鍔犺浇鏋㈢航缁勫け璐?)
+             return []
+         }
+@@
+     const handleCreateJunction = useCallback(async () => {
+-        if (selectedMergeNodeIds.length < 2) {
++        const normalizedSelection = [...new Set(selectedMergeNodeIds)]
++        if (normalizedSelection.length < 2) {
+             setStatusMsg('鑷冲皯閫夋嫨涓や釜鑺傜偣鎵嶈兘鎹忓悎')
+             return
+         }
+ 
+-        const selectedNodes = baseTopoNodes.filter(node => selectedMergeNodeIds.includes(node.id))
++        const occupiedGroups = junctionGroups.filter(group =>
++            group.station_ids.some(stationId => normalizedSelection.includes(stationId))
++        )
++        if (occupiedGroups.length > 0) {
++            setStatusMsg(`所选节点中已有 ${occupiedGroups.length} 个属于已存在枢纽，请先拆分后再重新捏合`)
++            return
++        }
++
++        const selectedNodes = baseTopoNodes.filter(node => normalizedSelection.includes(node.id))
++        if (selectedNodes.length < 2) {
++            setStatusMsg('当前选中的可编辑底层节点不足两个，无法创建枢纽')
++            return
++        }
+         const defaultName = selectedNodes.map(node => node.name).slice(0, 2).join('-') || `鑱斿悎鏋㈢航-${Date.now().toString().slice(-4)}`
+         const junctionName = window.prompt('璇疯緭鍏ユ灑绾藉悕绉?, `${defaultName}鏋㈢航`)
+         if (!junctionName?.trim()) return
+ 
+         try {
+-            const res = await fetch(resolveApiPath('/api/topology/junctions'), {
+-                method: 'POST',
+-                headers: { 'Content-Type': 'application/json' },
+-                body: JSON.stringify({
+-                    name: junctionName.trim(),
+-                    station_ids: selectedMergeNodeIds,
+-                    description: 'MapTopologyView 鍒涘缓',
+-                }),
+-            })
+-            if (!res.ok) throw new Error(await res.text())
+-
+-            const data = await res.json()
++            const data = await topologyEditorApi.createJunctionGroup({
++                name: junctionName.trim(),
++                station_ids: normalizedSelection,
++                description: 'MapTopologyView 鍒涘缓',
++            })
+             invalidatePipelineCache()
+             await loadJunctionGroups()
+             setUndoStack(prev => [...prev, {
+                 type: 'create-junction',
+                 junctionId: data.id,
+                 name: junctionName.trim(),
+-                stationIds: [...selectedMergeNodeIds],
++                stationIds: normalizedSelection,
+             }])
+             setSelectedMergeNodeIds([])
+             setEditMode('view')
+-            setStatusMsg(`宸叉崗鍚?${selectedMergeNodeIds.length} 涓妭鐐逛负銆?{junctionName.trim()}銆峘)
++            setStatusMsg(`宸叉崗鍚?${normalizedSelection.length} 涓妭鐐逛负銆?{junctionName.trim()}銆峘)
+         } catch (error) {
+             console.error(error)
+             setStatusMsg('鍒涘缓鏋㈢航澶辫触')
+         }
+-    }, [baseTopoNodes, loadJunctionGroups, selectedMergeNodeIds])
++    }, [baseTopoNodes, junctionGroups, loadJunctionGroups, selectedMergeNodeIds])
+@@
+         ; (async () => {
+             try {
+-                const res = await fetch(resolveApiPath(`/api/topology/junctions/${group.id}`), { method: 'DELETE' })
+-                if (!res.ok) throw new Error(await res.text())
++                await topologyEditorApi.deleteJunctionGroup(group.id)
+                 invalidatePipelineCache()
+                 await loadJunctionGroups()
+                 setUndoStack(prev => [...prev, { type: 'delete-junction', group }])
+@@
+         } else if (action.type === 'create-junction') {
+             try {
+-                const res = await fetch(resolveApiPath(`/api/topology/junctions/${action.junctionId}`), { method: 'DELETE' })
+-                if (!res.ok) throw new Error(await res.text())
++                await topologyEditorApi.deleteJunctionGroup(action.junctionId)
+                 invalidatePipelineCache()
+                 await loadJunctionGroups()
+                 setSelectedNode(null)
+@@
+         } else if (action.type === 'delete-junction') {
+             try {
+-                const res = await fetch(resolveApiPath('/api/topology/junctions'), {
+-                    method: 'POST',
+-                    headers: { 'Content-Type': 'application/json' },
+-                    body: JSON.stringify({
+-                        name: action.group.name,
+-                        station_ids: action.group.station_ids,
+-                        description: action.group.description,
+-                    }),
+-                })
+-                if (!res.ok) throw new Error(await res.text())
++                await topologyEditorApi.createJunctionGroup({
++                    name: action.group.name,
++                    station_ids: action.group.station_ids,
++                    description: action.group.description || undefined,
++                })
+                 invalidatePipelineCache()
+                 await loadJunctionGroups()
+                 setStatusMsg(`宸叉挙閿€: 鎭㈠鏋㈢航銆?{action.group.name}銆峘)
+@@
+     const handleSavePositions = useCallback(async () => {
+         if (dirtyPositions.size === 0 || isSaving) return
+         setIsSaving(true)
+         try {
+             const updates = [...dirtyPositions.entries()].map(([id, position]) => ({
+@@
+                 longitude: position[1],
+             }))
+-            const res = await fetch(resolveApiPath('/api/topology/positions/commit'), {
+-                method: 'PUT',
+-                headers: { 'Content-Type': 'application/json' },
+-                body: JSON.stringify({
+-                    updates,
+-                    cascade_valves: cascadeValves,
+-                    cascade_scope: 'segment',
+-                }),
+-            })
+-            if (!res.ok) throw new Error(await res.text())
+-
+-            const data = await res.json()
++            const data = await topologyEditorApi.commitPositions({
++                updates,
++                cascade_valves: cascadeValves,
++                cascade_scope: 'segment',
++            })
+             invalidatePipelineCache()
+             const packages = await loadAllPipelines()
+             setPipelines(packages)
+@@
+     const handlePreviewPositions = useCallback(async () => {
+         if (dirtyPositions.size === 0 || isPreviewing || isSaving) return
+         setIsPreviewing(true)
+         try {
+             const updates = [...dirtyPositions.entries()].map(([id, position]) => ({
+@@
+                 longitude: position[1],
+             }))
+-            const res = await fetch(resolveApiPath('/api/topology/positions/preview'), {
+-                method: 'POST',
+-                headers: { 'Content-Type': 'application/json' },
+-                body: JSON.stringify({
+-                    updates,
+-                    cascade_valves: cascadeValves,
+-                    cascade_scope: 'segment',
+-                }),
+-            })
+-            if (!res.ok) throw new Error(await res.text())
+-            const data = await res.json()
++            const data = await topologyEditorApi.previewPositions({
++                updates,
++                cascade_valves: cascadeValves,
++                cascade_scope: 'segment',
++            })
+             setPositionPreview(data)
+             setStatusMsg(
+                 `棰勮瀹屾垚锛氬皢褰卞搷 ${data.updated_station_ids?.length ?? 0} 涓富鐐广€?{data.updated_valve_ids?.length ?? 0} 涓榾瀹
+*** End Patch

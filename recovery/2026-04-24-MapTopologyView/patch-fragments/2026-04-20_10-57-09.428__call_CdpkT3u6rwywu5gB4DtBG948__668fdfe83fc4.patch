@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 px-3 py-2 text-[11px] text-cyan-100">
++                                    <button
++                                        onClick={() => {
++                                            if (!steadyOverlay) {
++                                                setStatusMsg('请先加载或运行一条快照结果，再上图显示压力')
++                                                return
++                                            }
++                                            setShowSnapshotPressureOverlay(prev => !prev)
++                                        }}
++                                        className="w-full rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs font-medium text-cyan-100"
++                                    >
++                                        {showSnapshotPressureOverlay ? '隐藏快照压力上图' : '快照压力上图'}
++                                    </button>
++                                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 px-3 py-2 text-[11px] text-cyan-100">
+*** End Patch

@@ -1,0 +1,32 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
++import { useLocation } from 'react-router-dom'
+ import MapView from '@/components/map-view/MapView'
+@@
+ const MapTopologyView: React.FC = () => {
++    const location = useLocation()
+     const [mapInstance, setMapInstance] = useState<any>(null)
+@@
+     useEffect(() => {
+         if (!selectedNode) return
+         const nextSelected = topoNodes.find(node => node.id === selectedNode.id) || null
+         setSelectedNode(nextSelected)
+     }, [selectedNode?.id, topoNodes])
++
++    useEffect(() => {
++        const params = new URLSearchParams(location.search)
++        const focusNodeId = params.get('focusNode')
++        if (!focusNodeId || topoNodes.length === 0) return
++
++        const targetNode = topoNodes.find(node =>
++            node.id === focusNodeId || node.sourceNodeIds?.includes(focusNodeId)
++        )
++        if (!targetNode) return
++
++        flyTo(targetNode)
++        setSelectedNode(targetNode)
++        setStatusMsg(`已从地图联动定位到拓扑节点：${targetNode.name}`)
++    }, [flyTo, location.search, topoNodes])
+*** End Patch

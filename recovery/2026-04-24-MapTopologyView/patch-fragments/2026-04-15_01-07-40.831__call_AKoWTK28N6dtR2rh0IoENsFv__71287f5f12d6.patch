@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+         if (!hoveredEdgeId) return null;
+         const e = topoEdges.find(edge => edge.id === hoveredEdgeId);
+         if (!e) return null;
+         for (const p of pipelines) {
+-            const l = p.lines.find(x => x.startNodeId === e.startNodeId || e.sourceEdgeIds?.includes(x.id));
++            const lines = Array.isArray(p?.lines) ? p.lines : [];
++            const l = lines.find(x => x.startNodeId === e.startNodeId || e.sourceEdgeIds?.includes(x.id));
+             if (l) {
+                 return {
+                     name: e.name || l.name,
+*** End Patch

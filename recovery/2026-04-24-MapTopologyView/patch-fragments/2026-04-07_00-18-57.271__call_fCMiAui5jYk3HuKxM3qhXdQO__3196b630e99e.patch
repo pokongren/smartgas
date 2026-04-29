@@ -1,0 +1,28 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/docs/automation/project-heartbeat-2026-04-07-081618.md
+@@
+ ### 2. docs 变化
+ - 巡检开始前 `git diff -- docs` 为空，说明 docs 没有未提交现场。
++- `.gitignore` 第 31 行是 `docs/`，所以 docs 新增文件默认不会出现在 `git status` 里；巡检文档落地后要结合 `git status --ignored` 才能看到 `docs/automation/` 被忽略。
+ - `docs/automation` 最近已有多份心跳记录，本轮是增量续写，不覆盖旧结论。
+@@
+ ### 5. 导入脚本与仿真链路
+ - 传统导入脚本仍是离线工具边界，重点文件仍在 `backend/scripts` 下，不是运行时主链。
+ - 当前主仓新增进展集中在仿真 overlay：
+   - 前端主链是 `TopologyView -> useSimulation -> GET /api/pipeline-packages/simulation-overlay`
+   - 后端主链是 `topology_simulation router -> build_we1_solver_input -> solve_steady`
++- 独立验证时还发现一个新的未跟踪脚本 `backend/scripts/verify_we1_phase34_final.py`，创建时间是 `2026-04-07 08:17:39 +08:00`；它属于运行中的现场变化，不计入本轮主动交付物。
+ - [`/F:/smartgas-grid/src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 新增的 simulation 相关 UI 仍调用 `topologyAPI.simulate()`，它是另一条独立入口，不能和 overlay 主链混写成一回事。
+@@
+ - 风险 4：AI 仍是多分支并存，排障一定先分 direct、orchestrated、legacy。
++- 风险 5：本轮验证阶段现场又新增了 `backend/scripts/verify_we1_phase34_final.py`，说明仓库仍在持续变化；后续心跳要先重新抓一遍 `git status` 再下结论。
+ - 回退点：本轮只新增巡检文档和 memory；如果表述有误，直接回退这两个文档落点即可。
+*** Update File: C:/Users/Administrator/.codex/automations/automation/memory.md
+@@
+ - docs 入口通过：巡检开始前 `git diff -- docs` 为空；本轮只新增巡检文档和更新 memory，不改业务代码。
++- `.gitignore` 第 31 行是 `docs/`，所以巡检文档不会进入普通 `git status`；复核 docs 落点时要配合 `git status --ignored` 看。
+@@
+ - 导入脚本结论不变：`backend/scripts` 下传统导入脚本仍是离线补数工具，不是运行时主链；当前新增进展主要在 WE1 solver input + simulation overlay。
++- 验证阶段发现现场又新增一个未跟踪脚本 `backend/scripts/verify_we1_phase34_final.py`（创建于 2026-04-07 08:17:39 +08:00）；它属于运行中的仓库新变化，不算本轮主动交付物，但下轮巡检要继续盯。
+ - AI 结论更新：前后端主链仍通，但不是单一路径，仍是 `direct / orchestrated / legacy` 并存；现在还叠加了页面上下文能力，排障时先确认命中哪条分支。
+*** End Patch

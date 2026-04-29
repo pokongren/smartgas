@@ -1,0 +1,39 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ import MapView from '@/components/map-view/MapView'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
+ import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+ import type { PipelinePackage } from '@/data/pipelines/types'
+-import type { SimulationResult } from '@/services/api'
++import { useSimulation } from '@/hooks/useSimulation'
+ import {
+     topologyEditorApi,
+     type JunctionGroup,
+     type PositionPreviewResult,
+ } from '@/services/topologyEditorApi'
+@@
+ } from '@/utils/topology-validator'
+ import type { ValidationReport } from '@/utils/topology-validator'
++import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
+ import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+ import type { CutoffResult } from '@/utils/cutoff-simulator'
++import { MAINLINE_SCENARIOS } from '@/types/simulation'
+@@
+-type PanelTab = 'edit' | 'validate' | 'search' | 'centrality' | 'cutoff'
++type PanelTab = 'edit' | 'validate' | 'search' | 'centrality' | 'cutoff' | 'simulation'
+@@
+ interface BaseTopoEdge {
+     id: string
+     startNodeId: string
+     endNodeId: string
+     name?: string
++    sourceEdgeIds?: string[]
+ }
++
++const WE1_PRIMARY_PILOT_ID = 'mainline_zhongwei_jingbian'
++
++function formatSnapshotOption(runId: string, scenarioId: string, savedAt: string): string {
++    return `${scenarioId} | ${runId.slice(0, 12)} | ${savedAt.slice(11, 19)}`
++}
+*** End Patch

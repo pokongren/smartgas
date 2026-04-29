@@ -1,0 +1,350 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+ import { useLocation } from 'react-router-dom'
+ import MapView from '@/components/map-view/MapView'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
+ import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+ import type { PipelinePackage } from '@/data/pipelines/types'
+-import { topologyAPI, type SimulationResult } from '@/services/api'
++import { useSimulation } from '@/hooks/useSimulation'
++import { MAINLINE_SCENARIOS } from '@/types/simulation'
+ import {
+     topologyEditorApi,
+     type JunctionGroup,
+     type PositionPreviewResult,
+@@
+ interface BaseTopoEdge {
+     id: string
+     startNodeId: string
+     endNodeId: string
+     name?: string
+ }
++
++const WE1_PRIMARY_PILOT_ID = 'mainline_zhongwei_jingbian'
++
++function formatSimulationDateTime(value?: string): string {
++    if (!value) return '-'
++    return value.replace('T', ' ').slice(0, 19)
++}
++
++function formatSimulationDelta(value: number, digits = 2, suffix = ''): string {
++    const sign = value > 0 ? '+' : ''
++    return `${sign}${value.toFixed(digits)}${suffix}`
++}
++
++function formatSnapshotOption(runId: string, scenarioId: string, savedAt: string): string {
++    return `${scenarioId} | ${runId.slice(0, 12)} | ${savedAt.slice(11, 19)}`
++}
+ 
+ function resolveFocusTarget(nodes: TopoNode[], focusNodeId: string): TopoNode | null {
+     const directNode = nodes.find(node => node.id === focusNodeId)
+     if (directNode) return directNode
+@@
+-    // 浠跨湡鐘舵€?(Sim Status)
+-    const [simDrawerVisible, setSimDrawerVisible] = useState(false)
+-    const [isSimulating, setIsSimulating] = useState(false)
+-    const [simResults, setSimResults] = useState<SimulationResult[]>([])
+-    const [currentSimStep, setCurrentSimStep] = useState(0)
+     const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
+     const [historyChartTarget, setHistoryChartTarget] = useState<null | {
+         stationName?: string
+         junctionId?: string
+         displayName?: string
+@@
+     useEffect(() => { nodesRef.current = topoNodes; edgesRef.current = topoEdges }, [topoNodes, topoEdges])
+     useEffect(() => { modeRef.current = editMode; ptRef.current = pointType }, [editMode, pointType])
+     useEffect(() => { cfRef.current = connectFrom }, [connectFrom])
++
++    const {
++        overlay: simulationOverlay,
++        isLoading: simulationLoading,
++        error: simulationError,
++        currentScenario,
++        snapshots,
++        snapshotLoading,
++        baselineSnapshotLoading,
++        snapshotError,
++        selectedSnapshotRunId,
++        baselineSnapshotRunId,
++        comparison,
++        setScenario,
++        setSelectedSnapshotRunId,
++        setBaselineSnapshotRunId,
++        runSimulation,
++        saveSnapshot,
++        refreshSnapshots,
++        loadSelectedSnapshot,
++        clearOverlay,
++    } = useSimulation({
++        pilotId: WE1_PRIMARY_PILOT_ID,
++        scenarios: MAINLINE_SCENARIOS,
++    })
++
++    useEffect(() => {
++        if (simulationOverlay) {
++            setStatusMsg(
++                `正式仿真已切到 WE1 主链：${simulationOverlay.scenario_id}，run_id=${simulationOverlay.run_id.slice(0, 12)}`
++            )
++        }
++    }, [simulationOverlay])
++
++    useEffect(() => {
++        if (simulationError) {
++            setStatusMsg(`正式仿真失败：${simulationError}`)
++        }
++    }, [simulationError])
+ 
+     // ================== 鏀堕泦鍏ㄩ儴绠＄嚎鍘熷鏁版嵁锛堜笉浼犵粰 MapView锛屼粎渚涘鍏ョ敤锛?==================
+     const rawPipelineData = useMemo(() => {
+         const { nodes, lines } = buildPipelineDataFromPackages(pipelines)
+         return { nodes, lines }
+@@
+                         {activeTab === 'simulation' && (
+                             <div className="space-y-4">
+                                 <div className="text-center pb-2 border-b border-gray-700/50">
+                                     <span className="material-symbols-outlined text-3xl text-cyan-500 mb-1">science</span>
+-                                    <h3 className="text-sm font-medium text-gray-300">后端稳态仿真</h3>
++                                    <h3 className="text-sm font-medium text-gray-300">WE1 正式稳态仿真</h3>
+                                 </div>
+-                                <div className="text-xs text-gray-400 leading-normal mb-3">
+-                                    调用后端 \`/api/emergency/simulate-failure\` 接口计算全局压降与断供范围。
++                                <div className="rounded-lg border border-cyan-800/40 bg-cyan-950/20 px-3 py-2 text-[11px] text-cyan-100 leading-5">
++                                    这一页现在已经切到正式 WE1 主链，运行按钮会走
++                                    <code className="mx-1 text-cyan-300">useSimulation -&gt; simulation-overlay / snapshots</code>
++                                    。当前第 1 阶段只统一正式链路，不在地图上直接落 overlay 颜色和线宽；第 2 阶段再接 ID 映射和命中落图。
+                                 </div>
+-                                <button
+-                                    onClick={async () => {
+-                                        setIsSimulating(true)
+-                                        try {
+-                                            const result = await topologyAPI.simulate({ steps: 5 })
+-                                            if (result && result.data) {
+-                                                setSimResults(result.data)
+-                                                setStatusMsg(`仿真完成，共 ${result.data.length} 步`)
+-                                            }
+-                                        } catch (e) {
+-                                            setStatusMsg('仿真失败：' + (e as Error).message)
+-                                        } finally {
+-                                            setIsSimulating(false)
+-                                        }
+-                                    }}
+-                                    disabled={isSimulating}
+-                                    className="w-full bg-cyan-700/80 hover:bg-cyan-600 text-white flex items-center justify-center py-2.5 rounded-lg text-xs shadow hover:shadow-cyan-500/20 disabled:opacity-50 transition-all font-medium"
+-                                >
+-                                    <span className="material-symbols-outlined text-sm mr-1.5">{isSimulating ? 'hourglass_empty' : 'play_arrow'}</span>
+-                                    {isSimulating ? '正在进行网络仿真...' : '运行稳态仿真'}
+-                                </button>
+-
+-                                {simResults.length > 0 && (
+-                                    <div className="space-y-2 mt-4 max-h-64 overflow-y-auto pr-1">
+-                                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">仿真步骤结果</p>
+-                                        {simResults.map((step, i) => (
+-                                            <div key={i} className="bg-white/5 border border-white/10 rounded-lg p-2.5 hover:bg-white/10 transition-colors">
+-                                                <div className="flex justify-between items-center mb-1.5">
+-                                                    <span className="text-sky-300 text-xs font-medium">✨ 步骤 {step.step}</span>
+-                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${step.is_stable ? 'bg-green-900/50 text-green-400 border border-green-800/50' : 'bg-red-900/50 text-red-400 border border-red-800/50'}`}>
+-                                                        {step.is_stable ? 'Stable' : 'Fluctuating'}
+-                                                    </span>
+-                                                </div>
+-                                                <div className="text-[10px] text-gray-400">
+-                                                    影响节点: <span className="text-white ml-0.5">{step.affected_nodes?.length || 0}</span> 个
+-                                                </div>
++                                <div className="space-y-2">
++                                    <div>
++                                        <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">场景</label>
++                                        <select
++                                            value={currentScenario}
++                                            onChange={event => setScenario(event.target.value)}
++                                            className="w-full rounded-lg border border-gray-700 bg-slate-900/80 px-3 py-2 text-xs text-gray-200 outline-none"
++                                        >
++                                            {MAINLINE_SCENARIOS.map(item => (
++                                                <option key={item.id} value={item.id}>
++                                                    {item.label}
++                                                </option>
++                                            ))}
++                                        </select>
++                                    </div>
++
++                                    <div className="grid grid-cols-2 gap-2">
++                                        <button
++                                            onClick={() => void runSimulation()}
++                                            disabled={simulationLoading}
++                                            className="bg-cyan-700/80 hover:bg-cyan-600 text-white flex items-center justify-center py-2.5 rounded-lg text-xs shadow hover:shadow-cyan-500/20 disabled:opacity-50 transition-all font-medium"
++                                        >
++                                            <span className="material-symbols-outlined text-sm mr-1.5">
++                                                {simulationLoading ? 'hourglass_empty' : 'play_arrow'}
++                                            </span>
++                                            {simulationLoading ? '运行中...' : '运行仿真'}
++                                        </button>
++                                        <button
++                                            onClick={() => void saveSnapshot()}
++                                            disabled={snapshotLoading || baselineSnapshotLoading}
++                                            className="bg-sky-900/70 hover:bg-sky-800 text-sky-100 flex items-center justify-center py-2.5 rounded-lg text-xs border border-sky-700/40 disabled:opacity-50 transition-all font-medium"
++                                        >
++                                            <span className="material-symbols-outlined text-sm mr-1.5">
++                                                {snapshotLoading ? 'hourglass_empty' : 'save'}
++                                            </span>
++                                            {snapshotLoading ? '保存中...' : '保存快照'}
++                                        </button>
++                                    </div>
++
++                                    <div className="grid grid-cols-2 gap-2">
++                                        <button
++                                            onClick={() => void refreshSnapshots()}
++                                            disabled={snapshotLoading || baselineSnapshotLoading}
++                                            className="bg-gray-800/80 hover:bg-gray-700 text-gray-200 flex items-center justify-center py-2.5 rounded-lg text-xs border border-gray-700/40 disabled:opacity-50 transition-all font-medium"
++                                        >
++                                            刷新快照
++                                        </button>
++                                        <button
++                                            onClick={clearOverlay}
++                                            disabled={!simulationOverlay}
++                                            className="bg-gray-800/80 hover:bg-gray-700 text-gray-200 flex items-center justify-center py-2.5 rounded-lg text-xs border border-gray-700/40 disabled:opacity-50 transition-all font-medium"
++                                        >
++                                            清除结果
++                                        </button>
++                                    </div>
++                                </div>
++
++                                <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.03] p-3">
++                                    <div>
++                                        <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">历史快照回放</label>
++                                        <select
++                                            value={selectedSnapshotRunId}
++                                            onChange={event => setSelectedSnapshotRunId(event.target.value)}
++                                            className="w-full rounded-lg border border-gray-700 bg-slate-900/80 px-3 py-2 text-xs text-gray-200 outline-none"
++                                        >
++                                            <option value="">选择历史快照</option>
++                                            {snapshots.map(item => (
++                                                <option key={item.run_id} value={item.run_id}>
++                                                    {formatSnapshotOption(item.run_id, item.scenario_id, item.saved_at)}
++                                                </option>
++                                            ))}
++                                        </select>
++                                    </div>
++                                    <button
++                                        onClick={() => void loadSelectedSnapshot()}
++                                        disabled={!selectedSnapshotRunId || snapshotLoading || baselineSnapshotLoading}
++                                        className="w-full bg-emerald-900/70 hover:bg-emerald-800 text-emerald-100 flex items-center justify-center py-2.5 rounded-lg text-xs border border-emerald-700/40 disabled:opacity-50 transition-all font-medium"
++                                    >
++                                        加载快照
++                                    </button>
++                                    <div>
++                                        <label className="text-[10px] uppercase tracking-wider text-gray-500 mb-1 block">基线快照</label>
++                                        <select
++                                            value={baselineSnapshotRunId}
++                                            onChange={event => setBaselineSnapshotRunId(event.target.value)}
++                                            className="w-full rounded-lg border border-gray-700 bg-slate-900/80 px-3 py-2 text-xs text-gray-200 outline-none"
++                                        >
++                                            <option value="">选择对比基线</option>
++                                            {snapshots.map(item => (
++                                                <option key={item.run_id} value={item.run_id}>
++                                                    {formatSnapshotOption(item.run_id, item.scenario_id, item.saved_at)}
++                                                </option>
++                                            ))}
++                                        </select>
++                                        <p className="mt-1 text-[10px] text-gray-500">
++                                            {baselineSnapshotLoading ? '基线快照加载中...' : '默认建议选 steady_base 快照做对比'}
++                                        </p>
++                                    </div>
++                                </div>
++
++                                {(simulationError || snapshotError) && (
++                                    <div className="space-y-2">
++                                        {simulationError && (
++                                            <div className="rounded-lg border border-red-800/50 bg-red-950/20 px-3 py-2 text-xs text-red-300">
++                                                正式仿真失败：{simulationError}
+                                             </div>
+-                                        ))}
++                                        )}
++                                        {snapshotError && (
++                                            <div className="rounded-lg border border-orange-800/50 bg-orange-950/20 px-3 py-2 text-xs text-orange-300">
++                                                快照操作失败：{snapshotError}
++                                            </div>
++                                        )}
+                                     </div>
+                                 )}
++
++                                {simulationOverlay && (
++                                    <div className="space-y-3 rounded-lg border border-cyan-900/40 bg-cyan-950/10 p-3">
++                                        <div className="flex items-center justify-between">
++                                            <span className={`text-xs font-semibold ${simulationOverlay.solver_status === 'converged' ? 'text-emerald-400' : 'text-orange-300'}`}>
++                                                {simulationOverlay.solver_status === 'converged' ? '已收敛' : '需复核'}
++                                            </span>
++                                            <span className="text-[10px] text-gray-400">{simulationOverlay.iterations} 次迭代</span>
++                                        </div>
++                                        <div className="space-y-1 text-[10px] text-gray-400">
++                                            <div>run_id: {simulationOverlay.run_id}</div>
++                                            <div>generated_at: {formatSimulationDateTime(simulationOverlay.generated_at)}</div>
++                                        </div>
++                                        <div className="grid grid-cols-2 gap-2 text-xs">
++                                            <div className="rounded bg-white/[0.04] px-2 py-2">
++                                                <div className="text-gray-500 text-[10px] mb-1">总供气</div>
++                                                <div className="text-emerald-300 font-semibold">
++                                                    {simulationOverlay.summary.total_supply.toFixed(1)} 万方/天
++                                                </div>
++                                            </div>
++                                            <div className="rounded bg-white/[0.04] px-2 py-2">
++                                                <div className="text-gray-500 text-[10px] mb-1">总需求</div>
++                                                <div className="text-sky-300 font-semibold">
++                                                    {simulationOverlay.summary.total_demand.toFixed(1)} 万方/天
++                                                </div>
++                                            </div>
++                                            <div className="rounded bg-white/[0.04] px-2 py-2">
++                                                <div className="text-gray-500 text-[10px] mb-1">未满足</div>
++                                                <div className={`font-semibold ${simulationOverlay.summary.unserved_demand > 0 ? 'text-red-300' : 'text-emerald-300'}`}>
++                                                    {simulationOverlay.summary.unserved_demand.toFixed(1)} 万方/天
++                                                </div>
++                                            </div>
++                                            <div className="rounded bg-white/[0.04] px-2 py-2">
++                                                <div className="text-gray-500 text-[10px] mb-1">平均利用率</div>
++                                                <div className="text-gray-100 font-semibold">
++                                                    {(simulationOverlay.summary.avg_utilization * 100).toFixed(1)}%
++                                                </div>
++                                            </div>
++                                        </div>
++                                        <div className="rounded bg-white/[0.04] px-2 py-2 text-xs">
++                                            <div className="text-gray-500 text-[10px] mb-1">告警数</div>
++                                            <div className={`font-semibold ${simulationOverlay.summary.alert_count > 0 ? 'text-amber-300' : 'text-gray-100'}`}>
++                                                {simulationOverlay.summary.alert_count}
++                                            </div>
++                                        </div>
++                                    </div>
++                                )}
++
++                                {comparison && (
++                                    <div className="space-y-2 rounded-lg border border-indigo-900/40 bg-indigo-950/10 p-3">
++                                        <div className="text-[10px] uppercase tracking-wider text-gray-500">快照对比</div>
++                                        <div className="space-y-1 text-[10px] text-gray-400">
++                                            <div>当前: {comparison.current_scenario_id}</div>
++                                            <div>基线: {comparison.baseline_scenario_id}</div>
++                                        </div>
++                                        <div className="space-y-2 text-xs">
++                                            <div className="flex items-center justify-between">
++                                                <span className="text-gray-400">总供气变化</span>
++                                                <span className="text-gray-100">{formatSimulationDelta(comparison.summary_delta.total_supply.delta, 1, ' 万方/天')}</span>
++                                            </div>
++                                            <div className="flex items-center justify-between">
++                                                <span className="text-gray-400">总需求变化</span>
++                                                <span className="text-gray-100">{formatSimulationDelta(comparison.summary_delta.total_demand.delta, 1, ' 万方/天')}</span>
++                                            </div>
++                                            <div className="flex items-center justify-between">
++                                                <span className="text-gray-400">未满足变化</span>
++                                                <span className="text-gray-100">{formatSimulationDelta(comparison.summary_delta.unserved_demand.delta, 1, ' 万方/天')}</span>
++                                            </div>
++                                            <div className="flex items-center justify-between">
++                                                <span className="text-gray-400">利用率变化</span>
++                                                <span className="text-gray-100">{formatSimulationDelta(comparison.summary_delta.avg_utilization.delta * 100, 1, '%')}</span>
++                                            </div>
++                                            <div className="flex items-center justify-between">
++                                                <span className="text-gray-400">告警数变化</span>
++                                                <span className="text-gray-100">{formatSimulationDelta(comparison.summary_delta.alert_count.delta, 0)}</span>
++                                            </div>
++                                        </div>
++                                    </div>
++                                )}
+                             </div>
+                         )}
+*** End Patch

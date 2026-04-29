@@ -1,0 +1,20 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ ## 2026-04-06 08:13:06 +08:00
+ 
+ - 本轮严格落在 `F:\smartgas-grid` 主目录执行；`git rev-parse --show-toplevel` 返回 `F:/smartgas-grid`，`.git` 仍是实体目录，不是 worktree 指针文件。
+ - `git worktree list --porcelain` 继续显示主目录 `HEAD=eaf6ac4` 挂分支，其余大量 `C:\Users\Administrator\.codex\worktrees\...\smartgas-grid` 仍是 `6410a10` 的 detached worktree；后续巡检继续只认主仓事实。
+@@
+ - AI 链路本轮收紧为“双轨并存”口径：前端 `src/components/ai-assistant/useAiAssistantChat.ts` 固定发 `/api/ai-assistant/chat`，有页面上下文时带 `analysis_mode=subagents`；后端 `backend/app/routers/ai_assistant.py` 仍先尝试 direct reply，再在 orchestrated 和 legacy 之间分流，所以不能写成单一路径正式替换完成。
+ - 本轮新增落盘：`F:\smartgas-grid\docs\automation\project-heartbeat-2026-04-06-081306.md`。本轮运行时间：`2026-04-06 08:13 +08:00`
++
++## 2026-04-06 11:14:20 +08:00
++
++- 用户中断深挖后，要求立即返回“地图缩放/层级显示链路摘要”；本轮不再继续扩展巡检范围，只收口当前最可信地图结论。
++- 已确认的地图主链仍是 `src/views/GlobalPipelineView.tsx -> src/components/map-view/MapView.tsx -> src/utils/mapRenderer.ts -> src/utils/hierarchyRenderer.ts`。
++- `src/utils/hierarchyRenderer.ts` 是统一 LOD 策略落点：`critical/high/medium = 6/10/14`，`valveMinZoom = 11`，`expandClusterZoom = 12`；节点显隐由 `getNodeLODStrategy()` / `shouldShowNodeAtZoom()` 决定，不是页面里散落的硬编码。
++- `src/utils/mapRenderer.ts` 负责把上述 LOD 结果落到地图渲染层，决定聚合显示、展开显示和 marker 显隐；`MapView.tsx` 是地图组件承接层。
++- `src/views/MapTopologyView.tsx` 仍是独立口径，没有接入 `GlobalPipelineView + MapView + mapRenderer` 这条地图主渲染链；它更偏拓扑编辑/拓扑展示页，不应和地图主链混写成一个入口。
++- 本轮运行时间：`2026-04-06 11:14 +08:00`
+*** End Patch

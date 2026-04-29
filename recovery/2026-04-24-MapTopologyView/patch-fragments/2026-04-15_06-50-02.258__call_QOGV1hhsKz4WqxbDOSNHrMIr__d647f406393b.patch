@@ -1,0 +1,11 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+         setTopoNodes([])
+         setTopoEdges([])
+         setDirtyPositions(new Map())
++        setUnsavedEdgeIds(new Set())
+         setPositionPreview(null)
+         setReport(null)
+         setCentralityData([])
+*** End Patch

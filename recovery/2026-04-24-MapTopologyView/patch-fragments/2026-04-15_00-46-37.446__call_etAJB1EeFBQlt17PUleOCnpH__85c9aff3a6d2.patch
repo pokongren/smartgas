@@ -1,0 +1,25 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+         const cappedEdges = graphEdges
+             .filter(edge => allowedNodeIds.has(edge.startNodeId) && allowedNodeIds.has(edge.endNodeId))
+             .slice(0, budget.maxEdges)
++        const isLargeGraph = renderSafetyMode === 'lite' || cappedNodes.length > 320 || cappedEdges.length > 480
+@@
+-                content: createTopoMarkerContent(node.type, node.name, false, !!node.isJunction),
++                content: createTopoMarkerContent(node.type, isLargeGraph ? '' : node.name, false, !!node.isJunction),
+                 offset: new AMap.Pixel(-size / 2, -size / 2),
+-                draggable: !node.isJunction,
+-                cursor: node.isJunction ? 'pointer' : 'move',
++                draggable: !node.isJunction && !isLargeGraph,
++                cursor: node.isJunction ? 'pointer' : (!isLargeGraph ? 'move' : 'pointer'),
+                 zIndex: node.isJunction ? 260 : 200,
+                 zooms: [2, 18],
+             })
+@@
+-            if (!node.isJunction) {
++            if (!node.isJunction && !isLargeGraph) {
+                 marker.on('dragend', (event: any) => {
+                     const nextPosition: [number, number] = [event.lnglat.getLng(), event.lnglat.getLat()]
+                     setBaseTopoNodes(prev => prev.map(item => item.id === nodeId ? { ...item, position: nextPosition } : item))
+*** End Patch

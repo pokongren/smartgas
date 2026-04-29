@@ -4,8 +4,18 @@ SmartGas MCP Tools 模块
 定义供 AI 客户端主动调用的工具节点。
 包括：站场查询、管线查询、故障影响分析、备选路径搜索、推演等。
 """
+import json
+
 from .core import mcp, _get_session
 from app.services.assistant_tools import execute_tool
+from app.routers.topology_simulation import (
+    _apply_initial_conditions,
+    _build_solver_input_or_raise,
+    _finalize_result_payload,
+)
+from app.services.ai_sim_evaluator import evaluate_simulation_result_text
+from app.services.topology_simulation import solve_steady
+from app.services.we1_result_snapshot_service import get_snapshot, list_snapshots, save_snapshot
 
 
 @mcp.tool()
@@ -133,3 +143,74 @@ def simulate_failure(
             {"station_id": station_id, "max_ticks": max_ticks},
             session,
         )
+
+
+@mcp.tool()
+def run_steady_sim(
+    pilot_id: str = "mainline_zhongwei_jingbian",
+    scenario_id: str = "steady_base",
+    initial_conditions_json: str = "",
+) -> str:
+    """
+    运行稳态仿真，并自动归档最新快照。
+
+    @param pilot_id 试点 ID，默认主样板
+    @param scenario_id 场景 ID
+    @param initial_conditions_json 初值覆盖 JSON 字符串
+    @returns 仿真结果摘要
+    """
+    with _get_session() as session:
+        solver_input = _build_solver_input_or_raise(pilot_id, session)
+        initial_conditions = None
+        if initial_conditions_json.strip():
+            initial_conditions = json.loads(initial_conditions_json)
+        _apply_initial_conditions(solver_input, scenario_id, initial_conditions)
+        result = solve_steady(seed=solver_input, scenario_id=scenario_id, pilot_id=pilot_id)
+        payload = _finalize_result_payload(result.to_dict(), solver_input, pilot_id, scenario_id)
+        saved = save_snapshot(payload, solver_input)
+        evaluation = evaluate_simulation_result_text(saved["result"])
+        return "\n".join([
+            f"稳态仿真已完成：{saved['run_id']}",
+            f"试点：{saved['pilot_id']}，场景：{saved['scenario_id']}，状态：{saved['solver_status']}，迭代：{saved['iterations']}",
+            f"总供气：{saved['output_summary'].get('total_supply', 0):.1f}，未满足需求：{saved['output_summary'].get('unserved_demand', 0):.1f}，平均利用率：{saved['output_summary'].get('avg_utilization', 0) * 100:.1f}%",
+            "AI 评价：",
+            evaluation,
+        ])
+
+
+@mcp.tool()
+def evaluate_sim_result(
+    run_id: str = "",
+    pilot_id: str = "",
+    overlay_json: str = "",
+    baseline_run_id: str = "",
+) -> str:
+    """
+    评价稳态仿真结果，可按 run_id 或直接传 overlay JSON。
+
+    @param run_id 快照 run_id
+    @param pilot_id 试点 ID，配合 run_id 读取快照
+    @param overlay_json 直接传入仿真结果 JSON
+    @param baseline_run_id 对比基线快照 run_id
+    @returns 人话评价
+    """
+    result_data: dict[str, object] | None = None
+    baseline_data: dict[str, object] | None = None
+
+    if overlay_json.strip():
+        result_data = json.loads(overlay_json)
+    elif run_id.strip():
+        snapshot = get_snapshot(run_id.strip(), pilot_id=pilot_id.strip() or None)
+        result_data = snapshot.get("result") or snapshot
+    else:
+        return "请提供 run_id 或 overlay_json。"
+
+    if baseline_run_id.strip():
+        try:
+            baseline_snapshot = get_snapshot(baseline_run_id.strip(), pilot_id=pilot_id.strip() or None)
+            baseline_data = baseline_snapshot.get("result") or baseline_snapshot
+        except Exception:
+            baseline_data = None
+
+    evaluation = evaluate_simulation_result_text(result_data or {}, baseline_data)
+    return evaluation or "暂时没有可评价的结果。"

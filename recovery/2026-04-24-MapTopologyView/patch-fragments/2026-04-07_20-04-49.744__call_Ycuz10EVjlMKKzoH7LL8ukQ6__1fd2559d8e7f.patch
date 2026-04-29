@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+ import { useLocation } from 'react-router-dom'
+ import MapView from '@/components/map-view/MapView'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
++import { SimPanel } from '@/components/topology/SimPanel'
+*** End Patch

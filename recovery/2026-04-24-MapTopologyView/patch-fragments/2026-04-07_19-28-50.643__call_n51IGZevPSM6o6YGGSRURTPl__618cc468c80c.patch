@@ -1,0 +1,65 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-08-WE1第一张图主仿真映射层第2阶段第3轮总结_人话版.md
++# 2026-04-08 WE1第一张图主仿真映射层第2阶段第3轮总结
++
++一、主目标
++1. 本轮只收一件事：把第2阶段“地图仿真映射层可解释性”补完整，让摘要不只告诉我们命中了没有，还能告诉我们命中质量、缺了哪些 source IDs、枢纽内部边是否接住、验证失败先查哪层。
++
++二、上下文与已知信息
++1. 上一轮已经把 `MapTopologyView` 的 `sourceEdgeIds` 回填到显示边，并把映射函数独立到 [`simulationOverlayMapping.ts`](/F:/smartgas-grid/src/utils/simulationOverlayMapping.ts)。
++2. 当前正式主链仍然是 `useSimulation -> simulation-overlay/snapshots`，本轮没有动求解公式，没有扩试点，也没有新造第三套仿真页面。
++3. 本轮的缺口不是“有没有映射”，而是“映射摘要是否足够解释失败原因”。如果摘要只报命中数，不报部分缺失和 source IDs 缺口，验证过了也很难真正收口第2阶段。
++
++三、主代理与子代理分工
++1. 主代理负责判断阶段状态、锁定只做第2阶段第3轮、收敛改动范围并汇总结论。
++2. 侦察子代理A查看 [`MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 和 [`simulationOverlayMapping.ts`](/F:/smartgas-grid/src/utils/simulationOverlayMapping.ts)，确认当前问题集中在映射解释性，而不是主链契约断裂。
++3. 侦察子代理B查看 [`verify_we1_map_phase2.py`](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase2.py) 和 overlay 契约，确认脚本原先只证明“能命中”，不足以证明“为什么没命中”。
++4. 实施子代理单点收这 3 个文件：[`simulationOverlayMapping.ts`](/F:/smartgas-grid/src/utils/simulationOverlayMapping.ts)、[`MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx)、[`verify_we1_map_phase2.py`](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase2.py)。
++5. 验证子代理按只读口径复核新增摘要字段、脚本断言和失败先查层，不参与改代码。
++
++四、修改逻辑
++1. 在 [`simulationOverlayMapping.ts`](/F:/smartgas-grid/src/utils/simulationOverlayMapping.ts) 里把摘要从“命中总数”扩成“完全命中、部分缺失、完全未命中、缺失 source 节点 ID、缺失 source 边 ID、缺失枢纽内部边 ID、失败先查层”。这样做的原因是第2阶段要回答“映射为什么过/不过”，而不只是回答“有没有跑起来”。
++2. 在 [`MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 里把这些摘要落到仿真面板，补上缺失 source IDs 预览、缺失内部边预览、未命中 overlay 预览和“验证失败先查哪层”。这样做的原因是第2阶段验收必须人能看懂，不能只靠脚本输出。
++3. 在 [`verify_we1_map_phase2.py`](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase2.py) 里增加部分命中、完全未命中、枢纽内部边部分命中和失败先查层的断言。这样做的原因是脚本必须覆盖第2阶段真正的验收口径，不能只校验一个最顺的 happy path。
++
++五、执行顺序
++1. 先确认当前仍处于第2阶段，不提前进入第3阶段 UI 接管。
++2. 再补映射摘要和失败定位逻辑。
++3. 再把这些字段接到地图页摘要面板。
++4. 最后扩展 `verify_we1_map_phase2.py` 的映射样例和断言。
++
++六、验证方式
++1. 代码口径验证：搜索 3 个文件，确认摘要字段、UI 消费点和脚本断言全部存在。
++2. 脚本验证：执行 `python backend/scripts/verify_we1_map_phase2.py`，看它是否同时断言完全命中、部分缺失、完全未命中、缺失 source IDs、枢纽内部边和失败先查层。
++3. 回归观察：保留 `node .\node_modules\typescript\bin\tsc --noEmit` 的结果作为仓库级背景噪声参考，不把已有全局 TypeScript 历史错误误判成第2阶段阻塞。
++
++七、验证结果
++1. `python backend/scripts/verify_we1_map_phase2.py` 已通过，结果明确给出：`displayNodesFullyMatched=1`、`displayNodesPartiallyMatched=1`、`displayNodesUnmatched=1`、`displayEdgesFullyMatched=1`、`displayEdgesPartiallyMatched=1`、`displayEdgesUnmatched=1`、`missingSourceNodeIdCount=2`、`missingSourceEdgeIdCount=2`、`missingInternalSourceEdgeIdCount=1`，并断言 `failureInvestigationLayer = mapping-source-ids`。
++2. [`MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 已消费这些摘要字段，页面上可以直接看到命中质量分档、缺失 source IDs 预览、缺失内部边预览、未命中 overlay 预览和失败先查层。
++3. `node .\node_modules\typescript\bin\tsc --noEmit` 仍有仓库既有错误，主要在 `MapView.tsx`、`useSimulation.ts`、`GlobalPipelineView.tsx`、`TopologyDemoView.tsx`，不属于本轮映射层新增逻辑引入的独有阻塞，因此本轮不据此回退第2阶段。
++
++八、前后对比
++1. 这轮没有新增合适截图，因为重点是映射摘要和验证口径，不是单一视觉改版。这里用表格代替。
++
++| 对比项 | 本轮前 | 本轮后 |
++| --- | --- | --- |
++| 节点/边摘要 | 只有命中总数 | 增加完全命中、部分缺失、完全未命中 |
++| source IDs 缺口 | 只能点进节点细看，且不完整 | 面板直接给出缺失 source 节点/边/内部边预览 |
++| 枢纽内部边 | 只知道是否有命中 | 能看到命中、缺失和累计流量 |
++| 失败定位 | 只能靠人猜 | 摘要直接给出失败先查层 |
++| 脚本覆盖面 | 主要是 happy path | 覆盖部分命中、完全未命中、内部边缺失和失败定位 |
++
++九、风险与回退点
++1. 当前页面文本里仍有部分历史编码噪声，这是仓库既有问题，不影响本轮映射摘要字段和脚本断言成立；如果后续做第3阶段 UI 接管，再统一收页面文案编码。
++2. 目前“失败先查层”是规则判断，不是动态诊断引擎；它适合指导排查顺序，但不替代真实调试。
++3. 如果本轮需要回退，优先回退 [`simulationOverlayMapping.ts`](/F:/smartgas-grid/src/utils/simulationOverlayMapping.ts)、[`MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx)、[`verify_we1_map_phase2.py`](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase2.py) 这 3 个文件，不影响主链求解。
++
++十、最终交付物
++1. 映射摘要增强后的 [`simulationOverlayMapping.ts`](/F:/smartgas-grid/src/utils/simulationOverlayMapping.ts)。
++2. 已消费新摘要的 [`MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx)。
++3. 覆盖部分命中和内部边断言的 [`verify_we1_map_phase2.py`](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase2.py)。
++4. 本轮人话总结文档。
++
++十一、当前结论
++1. 第2阶段第3轮已完成，映射层现在能解释“命中多少、缺了什么、先查哪层”，可以进入第3阶段第1轮“第一张图接管仿真 UI 与覆盖层”。
+*** End Patch

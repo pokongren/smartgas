@@ -1,0 +1,22 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ import {
+     validateTopology,
+     computeBetweennessCentrality,
+     findIsolatedNodes,
+ } from '@/utils/topology-validator'
+ import type { ValidationReport } from '@/utils/topology-validator'
++import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
+ import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+ import type { CutoffResult } from '@/utils/cutoff-simulator'
+ import { MAINLINE_SCENARIOS } from '@/types/simulation'
+@@
+ interface BaseTopoEdge {
+     id: string
+     startNodeId: string
+     endNodeId: string
+     name?: string
++    sourceEdgeIds?: string[]
+ }
+*** End Patch

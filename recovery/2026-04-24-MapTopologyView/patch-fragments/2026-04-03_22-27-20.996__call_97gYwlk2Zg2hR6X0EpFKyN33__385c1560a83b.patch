@@ -1,0 +1,247 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\components\ClusterDetailPanel.tsx
+@@
+ import React from 'react'
+ import type { ClusterGroup } from '@/types/cluster'
+ import type { PipelineNode } from '@/types/pipeline'
++import { getNodeRawType } from '@/utils/pipelineDomain'
+@@
+ export const ClusterDetailPanel: React.FC<ClusterDetailPanelProps> = ({
+@@
+     if (!visible || !cluster) return null
+ 
+-    const { nodes, coordinate } = cluster
++    const { nodes } = cluster
+ 
+-    // 分类节点
+-    const compressorNodes = nodes.filter(n => n.name.includes('压气站'))
+-    const distributionNodes = nodes.filter(n =>
+-        n.name.includes('分输站') || n.name.includes('门站')
+-    )
+-    const valveNodes = nodes.filter(n =>
+-        n.type === 'valve' || n.name.includes('阀室') || n.name.includes('阀门') || n.name.includes('#')
+-    )
++    const compressorNodes = nodes.filter(node => getNodeRawType(node) === 'compressor')
++    const distributionNodes = nodes.filter(node => getNodeRawType(node) === 'distribution')
++    const valveNodes = nodes.filter(node => getNodeRawType(node) === 'valve')
++    const sourceNodes = nodes.filter(node => getNodeRawType(node) === 'source')
++    const otherNodes = nodes.filter(node => {
++        const rawType = getNodeRawType(node)
++        return rawType !== 'compressor' && rawType !== 'distribution' && rawType !== 'valve' && rawType !== 'source'
++    })
+@@
+                 <div className="overflow-y-auto flex-1 p-4 space-y-3">
++                    {sourceNodes.length > 0 && (
++                        <div className="border border-rose-500/30 bg-rose-900/20 rounded-lg p-3">
++                            <h4 className="text-sm font-semibold mb-2 text-rose-400 flex items-center gap-2">
++                                <span className="material-symbols-outlined text-[18px]">flare</span>
++                                气源/首末站 ({sourceNodes.length})
++                            </h4>
++                            <div className="space-y-2">
++                                {sourceNodes.map(node => (
++                                    <NodeItem
++                                        key={node.id}
++                                        node={node}
++                                        onClick={() => {
++                                            onNodeSelect?.(node)
++                                            onClose()
++                                        }}
++                                    />
++                                ))}
++                            </div>
++                        </div>
++                    )}
++
+                     {/* 压气站 */}
+                     {compressorNodes.length > 0 && (
+@@
+                     {valveNodes.length > 0 && (
+                         <div className="border border-gray-500/30 bg-gray-800/50 rounded-lg p-3">
+@@
+                             </div>
+                         </div>
+                     )}
+ 
+-                    {compressorNodes.length === 0 && distributionNodes.length === 0 && valveNodes.length === 0 && (
++                    {otherNodes.length > 0 && (
++                        <div className="border border-slate-500/30 bg-slate-900/40 rounded-lg p-3">
++                            <h4 className="text-sm font-semibold mb-2 text-slate-300 flex items-center gap-2">
++                                <span className="material-symbols-outlined text-[18px]">account_tree</span>
++                                其他节点 ({otherNodes.length})
++                            </h4>
++                            <div className="space-y-2">
++                                {otherNodes.map(node => (
++                                    <NodeItem
++                                        key={node.id}
++                                        node={node}
++                                        onClick={() => {
++                                            onNodeSelect?.(node)
++                                            onClose()
++                                        }}
++                                    />
++                                ))}
++                            </div>
++                        </div>
++                    )}
++
++                    {sourceNodes.length === 0 && compressorNodes.length === 0 && distributionNodes.length === 0 && valveNodes.length === 0 && otherNodes.length === 0 && (
+                         <div className="text-center text-gray-500 py-8">
+                             无节点数据
+                         </div>
+@@
+ const NodeItem: React.FC<NodeItemProps> = ({ node, onClick }) => (
+     <div
+         onClick={onClick}
+         className="flex items-center justify-between p-3 rounded bg-gray-900/60 hover:bg-gray-700 cursor-pointer transition-all border border-transparent hover:border-gray-600"
+     >
+         <div className="flex flex-col">
+             <span className="text-sm text-gray-200 font-medium">{node.name}</span>
+-            <span className="text-[10px] text-gray-500 mt-1">
+-                {node.pressureLevel || '未知压力'}
+-            </span>
++            <div className="text-[10px] text-gray-500 mt-1 space-y-1">
++                <div>{getNodeMetaLabel(node)}</div>
++                {node.properties?.layerName && (
++                    <div>图层：{String(node.properties.layerName)}</div>
++                )}
++            </div>
+         </div>
+         <span className={`text-xs px-2 py-1 rounded-full ${node.status === 'normal'
+             ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+             : 'bg-red-500/10 text-red-400 border border-red-500/20'
+             }`}>
+             {node.status === 'normal' ? '正常' : '异常'}
+         </span>
+     </div>
+ )
++
++function getNodeMetaLabel(node: PipelineNode): string {
++    const rawType = getNodeRawType(node)
++    switch (rawType) {
++        case 'source':
++            return '气源/首末站'
++        case 'compressor':
++            return '压气站'
++        case 'distribution':
++            return '分输站'
++        case 'valve':
++            return '阀室'
++        case 'junction':
++            return '交汇/枢纽'
++        default:
++            return node.pressureLevel || '未知类型'
++    }
++}
+ 
+ export default ClusterDetailPanel
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
++import { useLocation } from 'react-router-dom'
+ import MapView from '@/components/map-view/MapView'
+@@
+ const MapTopologyView: React.FC = () => {
++    const location = useLocation()
+     const [mapInstance, setMapInstance] = useState<any>(null)
+@@
+     useEffect(() => {
+         if (!selectedNode) return
+         const nextSelected = topoNodes.find(node => node.id === selectedNode.id) || null
+         setSelectedNode(nextSelected)
+     }, [selectedNode?.id, topoNodes])
++
++    useEffect(() => {
++        const params = new URLSearchParams(location.search)
++        const focusNodeId = params.get('focusNode')
++        if (!focusNodeId || topoNodes.length === 0) return
++
++        const targetNode = topoNodes.find(node =>
++            node.id === focusNodeId || node.sourceNodeIds?.includes(focusNodeId)
++        )
++        if (!targetNode) return
++
++        flyTo(targetNode)
++        setSelectedNode(targetNode)
++        setStatusMsg(`已从地图联动定位到拓扑节点：${targetNode.name}`)
++    }, [flyTo, location.search, topoNodes])
+*** Update File: F:\smartgas-grid\src\views\GlobalPipelineView.tsx
+@@
+-import React, { useMemo, useState, useCallback, lazy, Suspense, useEffect } from 'react'
++import React, { useMemo, useState, useCallback, lazy, Suspense, useEffect } from 'react'
++import { useNavigate } from 'react-router-dom'
+ import MapView from '@/components/map-view/MapView'
+@@
+ import type { PipelineData, PipelineLine, PipelineNode } from '@/types'
+@@
+ import { getNodeMarkerMap } from '@/utils/mapRenderer'
+ import { useNewWindow, usePopoutSync } from '@/hooks/useNewWindow'
++import { getNodeRawType } from '@/utils/pipelineDomain'
+@@
+ const GlobalPipelineView: React.FC = () => {
++    const navigate = useNavigate()
+     // 绠＄嚎鏁版嵁寮傛鍔犺浇
+@@
+     const [mapInstance, setMapInstance] = useState<any>(null)
++    const [selectedMapNode, setSelectedMapNode] = useState<PipelineNode | null>(null)
+@@
+             <MapView
+                 pipelineData={pipelineData}
+                 onLoad={handleMapLoad}
++                onNodeClick={(event) => setSelectedMapNode(event.data as PipelineNode)}
+             />
++
++            {selectedMapNode && (
++                <div className="absolute top-24 right-6 z-20 w-[320px] rounded-xl border border-cyan-500/20 bg-[#0c1218]/95 backdrop-blur-md shadow-[0_16px_48px_rgba(0,0,0,0.55)] overflow-hidden">
++                    <div className="flex items-center justify-between px-4 py-3 border-b border-cyan-500/20 bg-[#101922]">
++                        <div>
++                            <h3 className="text-sm font-semibold text-white">{selectedMapNode.name}</h3>
++                            <p className="text-[11px] text-gray-400 mt-0.5">地图节点详情</p>
++                        </div>
++                        <button
++                            onClick={() => setSelectedMapNode(null)}
++                            className="text-gray-400 hover:text-white transition-colors"
++                        >
++                            <span className="material-symbols-outlined">close</span>
++                        </button>
++                    </div>
++
++                    <div className="p-4 space-y-3 text-xs">
++                        <div className="rounded-lg border border-cyan-500/15 bg-cyan-500/5 p-3 space-y-2">
++                            <div className="flex items-center justify-between gap-3">
++                                <span className="text-gray-400">业务类型</span>
++                                <span className="text-cyan-300">{formatNodeRawType(selectedMapNode)}</span>
++                            </div>
++                            <div className="flex items-center justify-between gap-3">
++                                <span className="text-gray-400">坐标</span>
++                                <span className="text-gray-200 font-mono">
++                                    {selectedMapNode.coordinate.longitude.toFixed(4)}, {selectedMapNode.coordinate.latitude.toFixed(4)}
++                                </span>
++                            </div>
++                            <div className="flex items-center justify-between gap-3">
++                                <span className="text-gray-400">图层</span>
++                                <span className="text-gray-200 truncate text-right">
++                                    {selectedMapNode.properties?.layerName ? String(selectedMapNode.properties.layerName) : '未标注'}
++                                </span>
++                            </div>
++                            <div className="flex items-center justify-between gap-3">
++                                <span className="text-gray-400">系统</span>
++                                <span className="text-gray-200 truncate text-right">
++                                    {selectedMapNode.properties?.systemId ? String(selectedMapNode.properties.systemId) : '未标注'}
++                                </span>
++                            </div>
++                        </div>
++
++                        <button
++                            onClick={() => {
++                                navigate(`/map-topology?focusNode=${encodeURIComponent(selectedMapNode.id)}`)
++                                setSelectedMapNode(null)
++                            }}
++                            className="w-full rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white py-2.5 transition-colors flex items-center justify-center gap-2"
++                        >
++                            <span className="material-symbols-outlined text-base">conversion_path</span>
++                            去地图拓扑查看
++                        </button>
++                    </div>
++                </div>
++            )}
+*** End Patch

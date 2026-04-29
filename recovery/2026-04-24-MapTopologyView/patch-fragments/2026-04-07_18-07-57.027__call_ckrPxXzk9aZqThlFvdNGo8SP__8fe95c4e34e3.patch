@@ -1,0 +1,211 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const stats = useMemo(() => ({
+         nodes: topoNodes.length,
+         edges: topoEdges.length,
+         isolated: topoNodes.length > 0
+             ? findIsolatedNodes(
+@@
+             ).length
+             : 0,
+     }), [topoNodes, topoEdges])
++    const simulationMapping = useMemo(() => {
++        return buildSimulationOverlayMapping(topoNodes, topoEdges, steadyOverlay)
++    }, [steadyOverlay, topoEdges, topoNodes])
++    const selectedNodeSimulationMatch = useMemo(() => {
++        if (!selectedNode || !simulationMapping) return null
++        return simulationMapping.nodeMatchesByDisplayId.get(selectedNode.id) ?? null
++    }, [selectedNode, simulationMapping])
++    const mappingSummary = simulationMapping?.summary ?? null
++    const unmatchedNodePreview = mappingSummary?.unmatchedOverlayNodeIds.slice(0, 5) ?? []
++    const unmatchedEdgePreview = mappingSummary?.unmatchedOverlayEdgeIds.slice(0, 5) ?? []
+@@
+-        // 2. 构建全量邻接表（包含阀室）
+-        const adj = new Map<string, Set<string>>()
++        // 2. 构建全量邻接表（包含阀室和原始边 ID）
++        const adj = new Map<string, Array<{ nodeId: string; edgeId: string }>>()
+         for (const sn of srcN) {
+-            adj.set(sn.id, new Set())
++            adj.set(sn.id, [])
+         }
+         for (const sl of srcL) {
+             if (adj.has(sl.startNodeId) && adj.has(sl.endNodeId)) {
+-                adj.get(sl.startNodeId)!.add(sl.endNodeId)
+-                adj.get(sl.endNodeId)!.add(sl.startNodeId)
++                adj.get(sl.startNodeId)!.push({ nodeId: sl.endNodeId, edgeId: sl.id })
++                adj.get(sl.endNodeId)!.push({ nodeId: sl.startNodeId, edgeId: sl.id })
+             }
+         }
+ 
+         // 3. BFS：从每个非阀室节点出发，穿越阀室链路，找到所有可达的非阀室邻居
+         //    A → V1 → V2 → B  合并为 A → B
+-        const collapsedEdges = new Set<string>()  // "minId_maxId" 去重
+-        const edgePairs: Array<[string, string]> = []
++        const collapsedEdges = new Map<string, { startId: string; endId: string; sourceEdgeIds: string[] }>()
+ 
+         for (const sn of srcN) {
+             if (valveIds.has(sn.id)) continue  // 起点必须是非阀室
+ 
+-            const queue = [...(adj.get(sn.id) || [])]
++            const queue = (adj.get(sn.id) || []).map(item => ({
++                nodeId: item.nodeId,
++                pathEdgeIds: [item.edgeId],
++            }))
+             const visited = new Set<string>([sn.id])
+ 
+             while (queue.length > 0) {
+-                const curr = queue.shift()!
+-                if (visited.has(curr)) continue
+-                visited.add(curr)
++                const current = queue.shift()!
++                if (visited.has(current.nodeId)) continue
++                visited.add(current.nodeId)
+ 
+-                if (valveIds.has(curr)) {
+-                    // 当前是阀室→继续穿越
+-                    for (const next of adj.get(curr) || []) {
+-                        if (!visited.has(next)) queue.push(next)
++                if (valveIds.has(current.nodeId)) {
++                    // 当前是阀室，继续穿越并保留走过的原始边链路
++                    for (const next of adj.get(current.nodeId) || []) {
++                        if (!visited.has(next.nodeId)) {
++                            queue.push({
++                                nodeId: next.nodeId,
++                                pathEdgeIds: [...current.pathEdgeIds, next.edgeId],
++                            })
++                        }
+                     }
+                 } else {
+-                    // 找到了另一个非阀室节点→生成合并边
+-                    const ids = [sn.id, curr].sort()
++                    // 找到了另一个非阀室节点，记录显示边可回溯的原始边 IDs
++                    const ids = [sn.id, current.nodeId].sort()
+                     const key = `${ids[0]}_${ids[1]}`
+-                    if (!collapsedEdges.has(key)) {
+-                        collapsedEdges.add(key)
+-                        edgePairs.push([sn.id, curr])
++                    const existing = collapsedEdges.get(key)
++                    if (existing) {
++                        existing.sourceEdgeIds = [...new Set([...existing.sourceEdgeIds, ...current.pathEdgeIds])]
++                    } else {
++                        collapsedEdges.set(key, {
++                            startId: sn.id,
++                            endId: current.nodeId,
++                            sourceEdgeIds: [...new Set(current.pathEdgeIds)],
++                        })
+                     }
+                 }
+             }
+         }
+@@
+-        for (const [startId, endId] of edgePairs) {
++        for (const { startId, endId, sourceEdgeIds } of collapsedEdges.values()) {
+             const sNode = importedMap.get(startId)
+             const eNode = importedMap.get(endId)
+             if (!sNode || !eNode) continue
+             const edgeId = `ce-${startId.slice(-4)}-${endId.slice(-4)}`
+-            importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} → ${eNode.name}` })
++            importedEdges.push({
++                id: edgeId,
++                startNodeId: startId,
++                endNodeId: endId,
++                name: `${sNode.name} → ${eNode.name}`,
++                sourceEdgeIds,
++            })
+         }
+@@
+                                 {steadyOverlay ? (
+                                     <div className="space-y-3">
+                                         <div className="grid grid-cols-2 gap-2">
+@@
+                                                 <div>2. 这一轮只收场景、运行、快照和摘要，不做地图边线着色。</div>
+                                                 <div>3. 下一阶段才处理节点、枢纽、显示边和 overlay 原始 ID 的映射。</div>
+                                             </div>
+                                         </div>
++
++                                        <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/20 p-3">
++                                            <div className="mb-2 text-[10px] uppercase tracking-wider text-emerald-300">映射覆盖检查</div>
++                                            {mappingSummary ? (
++                                                <div className="space-y-2 text-[11px] leading-5 text-gray-300">
++                                                    <div className="grid grid-cols-2 gap-2">
++                                                        <div className="rounded bg-black/15 px-3 py-2">
++                                                            <div className="text-gray-500">显示节点命中</div>
++                                                            <div className="mt-1 text-white">
++                                                                {mappingSummary.displayNodesWithMatchedOverlay}/{mappingSummary.displayNodeCount}
++                                                            </div>
++                                                        </div>
++                                                        <div className="rounded bg-black/15 px-3 py-2">
++                                                            <div className="text-gray-500">显示边命中</div>
++                                                            <div className="mt-1 text-white">
++                                                                {mappingSummary.displayEdgesWithMatchedOverlay}/{mappingSummary.displayEdgeCount}
++                                                            </div>
++                                                        </div>
++                                                    </div>
++                                                    <div className="rounded bg-black/15 px-3 py-2">
++                                                        <div>未命中 overlay 节点：{mappingSummary.unmatchedOverlayNodeIds.length} 个；未命中 overlay 边：{mappingSummary.unmatchedOverlayEdgeIds.length} 条。</div>
++                                                        {unmatchedNodePreview.length > 0 && (
++                                                            <div className="mt-1 text-[10px] text-gray-400">
++                                                                节点示例：{unmatchedNodePreview.join(', ')}
++                                                            </div>
++                                                        )}
++                                                        {unmatchedEdgePreview.length > 0 && (
++                                                            <div className="mt-1 text-[10px] text-gray-400">
++                                                                边示例：{unmatchedEdgePreview.join(', ')}
++                                                            </div>
++                                                        )}
++                                                    </div>
++                                                    <div className="text-[10px] text-gray-500">
++                                                        失败先查：主入口状态 -> 显示对象 source IDs -> overlay 命中统计 -> 后端主链。
++                                                    </div>
++                                                </div>
++                                            ) : (
++                                                <div className="text-[11px] leading-5 text-gray-400">
++                                                    先运行 WE1 主链后，才会生成显示对象到 overlay 的命中统计。
++                                                </div>
++                                            )}
++                                        </div>
+                                     </div>
+                                 ) : (
+                                     <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-[11px] leading-5 text-gray-400">
+@@
+                             ) : (
+-                                <div className="rounded-lg border border-gray-700/40 bg-white/5 p-3">
+-                                    <p className="text-xs text-gray-300 leading-5">
+-                                        这里保留站点查看和点位编辑。枢纽关系由后台按交汇规则运行时生成，不再在这个面板里手工捏合。
+-                                    </p>
+-                                </div>
++                                <>
++                                    <div className="rounded-lg border border-gray-700/40 bg-white/5 p-3">
++                                        <p className="text-xs text-gray-300 leading-5">
++                                            这里保留站点查看和点位编辑。枢纽关系由后台按交汇规则运行时生成，不再在这个面板里手工捏合。
++                                        </p>
++                                    </div>
++                                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/20 p-3 space-y-2">
++                                        <p className="text-xs text-emerald-300 uppercase tracking-wider">仿真映射</p>
++                                        <div className="text-xs text-gray-300">
++                                            sourceNodeIds：{(selectedNodeSimulationMatch?.sourceNodeIds ?? selectedNode.sourceNodeIds ?? [selectedNode.id]).join(', ')}
++                                        </div>
++                                        <div className="text-xs text-gray-300">
++                                            matched overlay 节点：{selectedNodeSimulationMatch?.matchedNodeIds.length ?? 0} 个
++                                        </div>
++                                        <div className="text-xs text-gray-300">
++                                            平均压力：{selectedNodeSimulationMatch?.averagePressureMpa != null ? `${selectedNodeSimulationMatch.averagePressureMpa.toFixed(4)} MPa` : '未命中'}
++                                        </div>
++                                        <div className="text-xs text-gray-300">
++                                            最高告警：{selectedNodeSimulationMatch?.highestAlertLevel ?? 'normal'}
++                                        </div>
++                                        {!!selectedNodeSimulationMatch?.missingSourceNodeIds.length && (
++                                            <div className="rounded bg-black/15 px-2 py-2 text-[11px] leading-5 text-amber-200">
++                                                未命中节点：{selectedNodeSimulationMatch.missingSourceNodeIds.join(', ')}
++                                            </div>
++                                        )}
++                                        <div className="text-[10px] text-gray-500">
++                                            如果这里未命中，先查节点 source IDs，再查 overlay 节点 ID 是否一致。
++                                        </div>
++                                    </div>
++                                </>
+                             )}
+                         </div>
+                     </div>
+*** End Patch

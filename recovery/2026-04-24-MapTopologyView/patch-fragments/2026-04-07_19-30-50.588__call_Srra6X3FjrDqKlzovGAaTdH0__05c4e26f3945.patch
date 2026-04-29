@@ -1,0 +1,16 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                                        </div>
+-                                    </>
+-                            </div>
++                                        </div>
++                                    </>
++                                ) : (
++                                    <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-[11px] leading-5 text-gray-400">
++                                        先选择 WE1 场景，再点击“运行仿真”。当前会把命中结果直接落到第一张图上，并保留快照和映射诊断。
++                                    </div>
++                                )}
++                            </div>
+                         )}
+*** End Patch

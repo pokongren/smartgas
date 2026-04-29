@@ -1,0 +1,50 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                             {selectedNode.isJunction ? (
+                                 <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 space-y-3">
+                                     <div>
+                                         <p className="text-xs text-purple-300 uppercase tracking-wider">底层站点</p>
+                                         <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+@@
+                                             })}
+                                         </div>
+                                     </div>
++                                    <div className="rounded-lg bg-black/15 px-3 py-2 text-xs text-gray-300 space-y-1">
++                                        <div className="flex items-center justify-between gap-3">
++                                            <span>来源</span>
++                                            <span className="text-[10px] text-gray-400">
++                                                {selectedJunctionGroup && isRuntimeReadonlyGroup(selectedJunctionGroup)
++                                                    ? '运行时重编'
++                                                    : '手工捏合覆盖'}
++                                            </span>
++                                        </div>
++                                        {selectedNode.junctionKind && (
++                                            <div className="flex items-center justify-between gap-3">
++                                                <span>枢纽类型</span>
++                                                <span className="text-[10px] text-gray-400">{selectedNode.junctionKind}</span>
++                                            </div>
++                                        )}
++                                    </div>
+                                     {!manualJunctionEditingEnabled && (
+                                         <div className="rounded-lg border border-sky-500/20 bg-sky-950/20 px-3 py-2.5 text-xs text-gray-300 leading-5">
+                                             当前枢纽来自运行时重编影子表，继续作为拓扑枢纽参与展示和计算，但这里不再把手工拆分当主流程。
+                                         </div>
+                                     )}
+@@
+                                     >
+                                         <span className="material-symbols-outlined text-sm">show_chart</span>查看枢纽历史
+                                     </button>
++                                    {canDeleteSelectedJunction && selectedJunctionGroup && (
++                                        <button
++                                            onClick={() => void handleDeleteManualJunction(selectedJunctionGroup)}
++                                            disabled={deletingJunctionId === selectedJunctionGroup.id}
++                                            className="w-full bg-red-900/60 hover:bg-red-800 text-red-200 py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1 disabled:opacity-40"
++                                        >
++                                            <span className="material-symbols-outlined text-sm">account_tree_off</span>
++                                            {deletingJunctionId === selectedJunctionGroup.id ? '拆分中...' : '拆分这个手工捏合'}
++                                        </button>
++                                    )}
+                                 </div>
+                             ) : (
+*** End Patch

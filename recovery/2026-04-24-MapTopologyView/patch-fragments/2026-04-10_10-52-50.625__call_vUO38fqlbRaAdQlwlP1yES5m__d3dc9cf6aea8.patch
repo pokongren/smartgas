@@ -1,0 +1,159 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
+ import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+ import type { CutoffResult } from '@/utils/cutoff-simulator'
+ import { clearSimulationShowcaseSyncContext, writeSimulationShowcaseSyncContext } from '@/utils/simulationShowcaseSync'
++import { setAssistantRuntimeContext } from '@/components/ai-assistant/runtimeAssistantContext'
+ import { MAINLINE_SCENARIOS } from '@/types/simulation'
+@@
+ function estimateTemperatureByPressure(pressureMpa: number): number {
+     return Number((13 + pressureMpa * 1.7).toFixed(1))
+ }
++
++function clamp01(value: number): number {
++    if (!Number.isFinite(value)) return 0
++    if (value <= 0) return 0
++    if (value >= 1) return 1
++    return value
++}
+@@
+     const steadyMetricCards = steadyOverlay ? [
+         { label: '总供给', value: steadyOverlay.summary.total_supply.toFixed(2), tone: 'text-cyan-100' },
+         { label: '总需求', value: steadyOverlay.summary.total_demand.toFixed(2), tone: 'text-sky-100' },
+         { label: '平均利用率', value: steadyOverlay.summary.avg_utilization.toFixed(3), tone: 'text-emerald-100' },
+         { label: '告警数', value: String(steadyOverlay.summary.alert_count), tone: 'text-amber-100' },
+@@
+         { label: '基线快照', value: selectedBaselineSnapshotSummary ? selectedBaselineSnapshotSummary.scenario_id : '未选择', tone: 'text-violet-100' },
+         { label: '快照数量', value: `${steadySnapshots.length} 条`, tone: 'text-sky-100' },
+     ]
++    const simulationSignalCards = useMemo(() => {
++        if (!steadyOverlay) {
++            return [
++                { label: '供需平衡度', percent: 0, tone: 'from-cyan-500 to-sky-500', text: '等待仿真结果' },
++                { label: '管网活跃度', percent: 0, tone: 'from-emerald-500 to-lime-500', text: '等待仿真结果' },
++                { label: '风险热度', percent: 0, tone: 'from-amber-500 to-red-500', text: '等待仿真结果' },
++            ]
++        }
++
++        const supply = steadyOverlay.summary.total_supply
++        const demand = steadyOverlay.summary.total_demand
++        const balance = supply > 0 ? clamp01(1 - Math.abs(supply - demand) / Math.max(supply, demand, 1)) : 0
++        const utilization = clamp01(steadyOverlay.summary.avg_utilization)
++        const risk = clamp01(steadyOverlay.summary.alert_count / 8)
++
++        return [
++            {
++                label: '供需平衡度',
++                percent: Math.round(balance * 100),
++                tone: 'from-cyan-500 to-sky-500',
++                text: `供给 ${supply.toFixed(1)} / 需求 ${demand.toFixed(1)}`,
++            },
++            {
++                label: '管网活跃度',
++                percent: Math.round(utilization * 100),
++                tone: 'from-emerald-500 to-lime-500',
++                text: `平均利用率 ${steadyOverlay.summary.avg_utilization.toFixed(3)}`,
++            },
++            {
++                label: '风险热度',
++                percent: Math.round(risk * 100),
++                tone: 'from-amber-500 to-red-500',
++                text: `告警数 ${steadyOverlay.summary.alert_count}`,
++            },
++        ]
++    }, [steadyOverlay])
++    const simulationNarrative = useMemo(() => {
++        const title = `WE1 主仿真简报（${steadyScenarioOption?.label ?? steadyScenarioId}）`
++        if (!steadyOverlay) {
++            return `${title}\n当前还没有主仿真结果。请先运行主仿真，再生成文字解读。`
++        }
++
++        const status = SOLVER_STATUS_LABELS[steadyOverlay.solver_status]
++        const summaryLine = `本次 run_id=${steadyOverlay.run_id.slice(0, 12)}，状态=${status}，总供给=${steadyOverlay.summary.total_supply.toFixed(2)}，总需求=${steadyOverlay.summary.total_demand.toFixed(2)}，平均利用率=${steadyOverlay.summary.avg_utilization.toFixed(3)}，告警数=${steadyOverlay.summary.alert_count}。`
++        const coverageLine = `显示映射命中：节点 ${coverageResultSummary.matchedNodeText}，连线 ${coverageResultSummary.matchedEdgeText}。`
++        const compareLine = steadyComparison
++            ? `相对基线：供给差值 ${formatSignedNumber(steadyComparison.summary_delta.total_supply.delta, 2)}，需求差值 ${formatSignedNumber(steadyComparison.summary_delta.total_demand.delta, 2)}，利用率差值 ${formatSignedNumber(steadyComparison.summary_delta.avg_utilization.delta, 3)}，告警差值 ${formatSignedNumber(steadyComparison.summary_delta.alert_count.delta, 0)}。`
++            : '当前未选择基线快照，暂不输出差值分析。'
++        const actionLine = `建议动作：${coverageResultSummary.riskSummary}`
++        return [title, summaryLine, coverageLine, compareLine, actionLine].join('\n')
++    }, [
++        coverageResultSummary.matchedEdgeText,
++        coverageResultSummary.matchedNodeText,
++        coverageResultSummary.riskSummary,
++        steadyComparison,
++        steadyOverlay,
++        steadyScenarioId,
++        steadyScenarioOption?.label,
++    ])
++    const copySimulationNarrative = useCallback(async () => {
++        try {
++            await navigator.clipboard.writeText(simulationNarrative)
++            setStatusMsg('仿真简报已复制，可直接粘贴给 AI 助手')
++        } catch (error) {
++            setStatusMsg(error instanceof Error ? error.message : '复制仿真简报失败')
++        }
++    }, [simulationNarrative])
++    useEffect(() => {
++        setAssistantRuntimeContext({
++            selection: {
++                we1_simulation_narrative: simulationNarrative,
++                we1_scenario_id: steadyScenarioId,
++                we1_run_id: steadyOverlay?.run_id ?? '',
++                we1_solver_status: steadyOverlay?.solver_status ?? 'idle',
++            },
++            filters: {
++                we1_baseline_run_id: steadyBaselineSnapshotRunId,
++                we1_selected_snapshot_run_id: steadySelectedSnapshotRunId,
++            },
++        })
++    }, [
++        simulationNarrative,
++        steadyBaselineSnapshotRunId,
++        steadyOverlay?.run_id,
++        steadyOverlay?.solver_status,
++        steadyScenarioId,
++        steadySelectedSnapshotRunId,
++    ])
+@@
+                                     <div className="mt-3 grid grid-cols-2 gap-2">
+                                         {steadyMetricCards.map((item, index) => (
+                                             <div key={`steady-metric-${item.label}`} className={`rounded-xl border border-white/10 bg-black/15 px-3 py-2 transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-300/30 ${steadyOverlay ? 'animate-[pulse_2.8s_ease-in-out_infinite]' : ''}`} style={steadyOverlay ? { animationDelay: `${index * 180}ms` } : undefined}>
+                                                 <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">{item.label}</div>
+                                                 <div className={`mt-1 text-sm font-semibold ${item.tone}`}>{item.value}</div>
+                                             </div>
+                                         ))}
+                                     </div>
++                                    <div className="mt-3 rounded-xl border border-white/10 bg-black/15 px-3 py-3 space-y-2">
++                                        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">动态体征（第1次迭代）</div>
++                                        {simulationSignalCards.map(item => (
++                                            <div key={`signal-${item.label}`} className="space-y-1">
++                                                <div className="flex items-center justify-between text-[11px]">
++                                                    <span className="text-slate-300">{item.label}</span>
++                                                    <span className="text-slate-200">{item.percent}%</span>
++                                                </div>
++                                                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
++                                                    <div className={`h-full bg-gradient-to-r ${item.tone} transition-all duration-700`} style={{ width: `${item.percent}%` }} />
++                                                </div>
++                                                <div className="text-[10px] text-slate-400">{item.text}</div>
++                                            </div>
++                                        ))}
++                                    </div>
+                                 </div>
+                                 <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 p-3 space-y-3">
+@@
+                                     <div className="grid grid-cols-2 gap-2">
+                                         <button onClick={async () => { try { await runSteadySimulation(); setStatusMsg(`WE1 主仿真已运行：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 主仿真运行失败') } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '运行中...' : '运行主仿真'}</button>
+                                         <button onClick={async () => { try { await saveSteadySnapshot(); setStatusMsg(`已保存快照：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '保存快照失败') } }} disabled={!steadyOverlay || steadySnapshotLoading} className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40">{steadySnapshotLoading ? '保存中...' : '保存快照'}</button>
+                                         <button onClick={async () => { try { await refreshSteadySnapshots(); setStatusMsg('快照列表已刷新') } catch (error) { setStatusMsg(error instanceof Error ? error.message : '刷新快照失败') } }} disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40">刷新快照</button>
+                                         <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('已清空当前主仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空主仿真</button>
++                                        <button onClick={copySimulationNarrative} className="col-span-2 rounded-lg border border-cyan-400/30 bg-cyan-950/30 px-3 py-2 text-xs font-medium text-cyan-100">复制仿真文字简报（第2次迭代）</button>
+                                         <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">导出演示清单</button>
+                                     </div>
++                                    <div className="rounded-lg border border-cyan-500/20 bg-black/10 px-3 py-2">
++                                        <div className="text-[10px] uppercase tracking-wider text-cyan-200">仿真自动解读（可给 AI）</div>
++                                        <div className="mt-1 text-[11px] text-slate-300 whitespace-pre-line leading-5">{simulationNarrative}</div>
++                                    </div>
+                                 </div>
+*** End Patch

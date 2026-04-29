@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                const allowFancyNodeEffect = renderSafetyMode === 'full' && !isMapInteracting
++                const allowFancyNodeEffect = renderSafetyMode === 'full' && !isMapInteracting && !isLargeGraphMode
+*** End Patch

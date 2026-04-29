@@ -1,0 +1,161 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                        {activeTab === 'simulation' && (
+-                            <div className="space-y-3">
+-                                <div className="rounded-xl border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_45%),linear-gradient(135deg,rgba(8,47,73,0.65),rgba(15,23,42,0.92))] p-3 shadow-[0_0_30px_rgba(8,145,178,0.12)] transition-all duration-300">
+-                                    <div className="flex items-start justify-between gap-3">
+-                                        <div className="min-w-0">
+-                                            <div className="text-[10px] uppercase tracking-[0.24em] text-cyan-200/80">Simulation Live</div>
+-                                            <div className="mt-2 flex items-center gap-2">
+-                                                <span className={`h-2.5 w-2.5 rounded-full ${steadySimLoading ? 'bg-amber-300 animate-pulse' : steadyOverlay ? (steadyOverlay.solver_status === 'converged' ? 'bg-emerald-300 shadow-[0_0_12px_rgba(110,231,183,0.9)]' : steadyOverlay.solver_status === 'max_iter' ? 'bg-amber-300 shadow-[0_0_12px_rgba(253,230,138,0.8)]' : 'bg-red-300 shadow-[0_0_12px_rgba(252,165,165,0.8)]') : 'bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.8)]'}`} />
+-                                                <div className="truncate text-sm font-semibold text-white">{steadyOverlayStatusText}</div>
+-                                            </div>
+-                                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-300">
+-                                                <span className={`rounded-full border px-2.5 py-1 transition-all duration-300 ${steadyStatusToneClass}`}>{steadySimLoading ? '姹傝В涓? : steadyOverlay ? SOLVER_STATUS_LABELS[steadyOverlay.solver_status] : '绛夊緟杩愯'}</span>
+-                                                <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-200">鍦烘櫙锛歿steadyScenarioOption?.label ?? steadyScenarioId}</span>
+-                                                {steadyOverlay && <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-200">run_id锛歿steadyOverlay.run_id.slice(0, 12)}</span>}
+-                                                {steadyOverlay && <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-200">鐢熸垚锛歿formatDateTimeLabel(steadyOverlay.generated_at)}</span>}
+-                                            </div>
+-                                        </div>
+-                                        <div className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-cyan-100">Gas Flow</div>
+-                                    </div>
+-                                    <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+-                                        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">杩愯杞ㄨ抗</div>
+-                                        <div className="mt-2 grid grid-cols-4 gap-2">
+-                                            {simulationRunTimeline.map(item => (
+-                                                <div key={item.key} className={`rounded-md border px-2 py-1.5 text-center text-[10px] transition-all duration-300 ${item.active ? 'border-cyan-300/30 bg-cyan-500/10 text-cyan-100' : 'border-white/10 bg-white/5 text-slate-500'} ${item.pulse ? 'animate-pulse' : ''}`}>
+-                                                    {item.label}
+-                                                </div>
+-                                            ))}
+-                                        </div>
+-                                    </div>
+-                                    <div className="mt-3 grid grid-cols-2 gap-2">
+-                                        {steadyMetricCards.map((item, index) => (
+-                                            <div key={`steady-metric-${item.label}`} className={`rounded-xl border border-white/10 bg-black/15 px-3 py-2 transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-300/30 ${steadyOverlay ? 'animate-[pulse_2.8s_ease-in-out_infinite]' : ''}`} style={steadyOverlay ? { animationDelay: `${index * 180}ms` } : undefined}>
+-                                                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">{item.label}</div>
+-                                                <div className={`mt-1 text-sm font-semibold ${item.tone}`}>{item.value}</div>
+-                                            </div>
+-                                        ))}
+-                                    </div>
+-                                    <div className="mt-3 rounded-xl border border-white/10 bg-black/15 px-3 py-3 space-y-2">
+-                                        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">鍔ㄦ€佷綋寰侊紙绗?娆¤凯浠ｏ級</div>
+-                                        {simulationSignalCards.map(item => (
+-                                            <div key={`signal-${item.label}`} className="space-y-1">
+-                                                <div className="flex items-center justify-between text-[11px]">
+-                                                    <span className="text-slate-300">{item.label}</span>
+-                                                    <span className="text-slate-200">{item.percent}%</span>
+-                                                </div>
+-                                                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+-                                                    <div className={`relative h-full bg-gradient-to-r ${item.tone} transition-all duration-700`} style={{ width: `${item.percent}%` }}>
+-                                                        {item.percent > 0 && <div className="absolute inset-y-0 right-0 w-5 bg-white/30 blur-sm animate-pulse" />}
+-                                                    </div>
+-                                                </div>
+-                                                <div className="text-[10px] text-slate-400">{item.text}</div>
+-                                            </div>
+-                                        ))}
+-                                    </div>
+-                                </div>
+-                                <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 p-3 space-y-3">
+-                                    <div className="text-[10px] uppercase tracking-wider text-cyan-200">涓讳豢鐪熸搷浣?/div>
+-                                    <div className="grid grid-cols-1 gap-2">
+-                                        <div>
+-                                            <div className="mb-1 text-[10px] text-gray-500">褰撳墠鍦烘櫙</div>
+-                                            <select value={steadyScenarioId} onChange={event => setSteadyScenario(event.target.value)} className="w-full rounded-lg border border-cyan-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">{MAINLINE_SCENARIOS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+-                                        </div>
+-                                        <div>
+-                                            <div className="mb-1 text-[10px] text-gray-500">缁撴灉蹇収</div>
+-                                            <div className="flex gap-2">
+-                                                <select value={steadySelectedSnapshotRunId} onChange={event => setSteadySelectedSnapshotRunId(event.target.value)} className="flex-1 rounded-lg border border-cyan-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
+-                                                    <option value="">璇烽€夋嫨涓€鏉″揩鐓?/option>
+-                                                    {steadySnapshots.map(item => <option key={item.run_id} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
+-                                                </select>
+-                                                <button onClick={async () => { try { await loadSteadySelectedSnapshot(); setStatusMsg(`宸插姞杞藉揩鐓э細${selectedSnapshotSummary?.scenario_id ?? steadySelectedSnapshotRunId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '鍔犺浇蹇収澶辫触') } }} disabled={!steadySelectedSnapshotRunId || steadySnapshotLoading} className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs text-cyan-100 disabled:opacity-40">{steadySnapshotLoading ? '鍔犺浇涓?..' : '鍔犺浇'}</button>
+-                                            </div>
+-                                        </div>
+-                                        <div>
+-                                            <div className="mb-1 text-[10px] text-gray-500">鍩虹嚎蹇収</div>
+-                                            <select value={steadyBaselineSnapshotRunId} onChange={event => setSteadyBaselineSnapshotRunId(event.target.value)} className="w-full rounded-lg border border-violet-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
+-                                                <option value="">璇烽€夋嫨鍩虹嚎蹇収</option>
+-                                                {steadySnapshots.map(item => <option key={`baseline-${item.run_id}`} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
+-                                            </select>
+-                                        </div>
+-                                    </div>
+-                                    <div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2 space-y-2">
+-                                        <div className="text-[10px] uppercase tracking-wider text-slate-300">蹇嵎鎿嶄綔</div>
+-                                        <div className="grid grid-cols-1 gap-2">
+-                                            <button onClick={applyRecommendedScenarioQuickSwitch} disabled={!recommendedCoverageScenario} className="rounded-lg border border-emerald-500/30 bg-emerald-900/10 px-3 py-2 text-xs text-emerald-100 disabled:opacity-40">
+-                                                涓€閿垏鍒版帹鑽愬満鏅細{recommendedCoverageScenario?.label ?? '鏆傛棤'}
+-                                            </button>
+-                                            <div className="grid grid-cols-2 gap-2">
+-                                                <button onClick={applySelectedSnapshotAsBaseline} disabled={!steadySelectedSnapshotRunId} className="rounded-lg border border-violet-500/30 bg-violet-900/10 px-3 py-2 text-xs text-violet-100 disabled:opacity-40">褰撳墠蹇収璁惧熀绾?/button>
+-                                                <button onClick={applyLatestCoveredSnapshotAsBaseline} disabled={!latestCoveredSnapshotSummary} className="rounded-lg border border-sky-500/30 bg-sky-900/10 px-3 py-2 text-xs text-sky-100 disabled:opacity-40">鏈€杩戠暀妗ｈ鍩虹嚎</button>
+-                                            </div>
+-                                        </div>
+-                                    </div>
+-                                    <div className="grid grid-cols-2 gap-2">
+-                                        <button onClick={async () => { try { await runSteadySimulation(); setStatusMsg(`WE1 涓讳豢鐪熷凡杩愯锛?{steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 涓讳豢鐪熻繍琛屽け璐?) } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '杩愯涓?..' : '杩愯涓讳豢鐪?}</button>
+-                                        <button onClick={async () => { try { await saveSteadySnapshot(); setStatusMsg(`宸蹭繚瀛樺揩鐓э細${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '淇濆瓨蹇収澶辫触') } }} disabled={!steadyOverlay || steadySnapshotLoading} className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40">{steadySnapshotLoading ? '淇濆瓨涓?..' : '淇濆瓨蹇収'}</button>
+-                                        <button onClick={async () => { try { await refreshSteadySnapshots(); setStatusMsg('蹇収鍒楄〃宸插埛鏂?) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '鍒锋柊蹇収澶辫触') } }} disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40">鍒锋柊蹇収</button>
+-                                        <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('宸叉竻绌哄綋鍓嶄富浠跨湡缁撴灉') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">娓呯┖涓讳豢鐪?/button>
+-                                        <button onClick={copySimulationNarrative} className="col-span-2 rounded-lg border border-cyan-400/30 bg-cyan-950/30 px-3 py-2 text-xs font-medium text-cyan-100">澶嶅埗浠跨湡鏂囧瓧绠€鎶ワ紙绗?娆¤凯浠ｏ級</button>
+-                                        <button onClick={copySimulationStructuredBrief} className="col-span-2 rounded-lg border border-violet-400/30 bg-violet-950/30 px-3 py-2 text-xs font-medium text-violet-100">澶嶅埗缁撴瀯鍖栫畝鎶ワ紙缁橝I锛?/button>
+-                                        <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">瀵煎嚭婕旂ず娓呭崟</button>
+-                                    </div>
+-                                    <div className="rounded-lg border border-cyan-500/20 bg-black/10 px-3 py-2">
+-                                        <div className="text-[10px] uppercase tracking-wider text-cyan-200">浠跨湡鑷姩瑙ｈ锛堝彲缁?AI锛?/div>
+-                                        <div className="mt-1 text-[11px] text-slate-300 whitespace-pre-line leading-5">{simulationNarrative}</div>
+-                                    </div>
+-                                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-3 py-2">
+-                                        <div className="text-[10px] uppercase tracking-wider text-emerald-200">浜鸿瘽瑙ｉ噴锛堝€肩彮鍙锛?/div>
+-                                        <div className="mt-1 text-[11px] text-slate-300 whitespace-pre-line leading-5">{simulationNarrativePlain}</div>
+-                                    </div>
+-                                </div>
+-                                {(steadySimError || steadySnapshotError) && <div className="rounded-lg border border-red-900/40 bg-red-950/20 p-3 text-[11px] text-red-200">{steadySimError || steadySnapshotError}</div>}
+-                            </div>
+-                        )}
++                        {activeTab === 'simulation' && (
++                            <div className="space-y-3">
++                                <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 p-3 space-y-3">
++                                    <div className="text-[10px] uppercase tracking-wider text-cyan-200">主仿真操作</div>
++                                    <div className="grid grid-cols-1 gap-2">
++                                        <div>
++                                            <div className="mb-1 text-[10px] text-gray-500">当前场景</div>
++                                            <select value={steadyScenarioId} onChange={event => setSteadyScenario(event.target.value)} className="w-full rounded-lg border border-cyan-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
++                                                {MAINLINE_SCENARIOS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
++                                            </select>
++                                        </div>
++                                        <div>
++                                            <div className="mb-1 text-[10px] text-gray-500">结果快照</div>
++                                            <div className="flex gap-2">
++                                                <select value={steadySelectedSnapshotRunId} onChange={event => setSteadySelectedSnapshotRunId(event.target.value)} className="flex-1 rounded-lg border border-cyan-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
++                                                    <option value="">请选择一条快照</option>
++                                                    {steadySnapshots.map(item => <option key={item.run_id} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
++                                                </select>
++                                                <button onClick={async () => { try { await loadSteadySelectedSnapshot(); setStatusMsg(`已加载快照：${selectedSnapshotSummary?.scenario_id ?? steadySelectedSnapshotRunId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '加载快照失败') } }} disabled={!steadySelectedSnapshotRunId || steadySnapshotLoading} className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs text-cyan-100 disabled:opacity-40">{steadySnapshotLoading ? '加载中...' : '加载'}</button>
++                                            </div>
++                                        </div>
++                                        <div>
++                                            <div className="mb-1 text-[10px] text-gray-500">基线快照</div>
++                                            <select value={steadyBaselineSnapshotRunId} onChange={event => setSteadyBaselineSnapshotRunId(event.target.value)} className="w-full rounded-lg border border-violet-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
++                                                <option value="">请选择基线快照</option>
++                                                {steadySnapshots.map(item => <option key={`baseline-${item.run_id}`} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
++                                            </select>
++                                        </div>
++                                    </div>
++                                    <div className="grid grid-cols-2 gap-2">
++                                        <button onClick={async () => { try { await runSteadySimulation(); setStatusMsg(`WE1 主仿真已运行：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 主仿真运行失败') } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '运行中...' : '运行主仿真'}</button>
++                                        <button onClick={async () => { try { await saveSteadySnapshot(); setStatusMsg(`已保存快照：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '保存快照失败') } }} disabled={!steadyOverlay || steadySnapshotLoading} className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40">{steadySnapshotLoading ? '保存中...' : '保存快照'}</button>
++                                        <button onClick={async () => { try { await refreshSteadySnapshots(); setStatusMsg('快照列表已刷新') } catch (error) { setStatusMsg(error instanceof Error ? error.message : '刷新快照失败') } }} disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40">刷新快照</button>
++                                        <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('已清空当前主仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空主仿真</button>
++                                    </div>
++                                    <div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-[11px] text-slate-300">
++                                        <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] mr-2 ${steadyStatusToneClass}`}>{steadySimLoading ? '求解中' : steadyOverlay ? SOLVER_STATUS_LABELS[steadyOverlay.solver_status] : '等待运行'}</span>
++                                        <span>状态：{steadyOverlayStatusText}</span>
++                                        {steadyOverlay && <span className="ml-2 text-slate-400">run_id: {steadyOverlay.run_id.slice(0, 12)}</span>}
++                                    </div>
++                                </div>
++                                {(steadySimError || steadySnapshotError) && <div className="rounded-lg border border-red-900/40 bg-red-950/20 p-3 text-[11px] text-red-200">{steadySimError || steadySnapshotError}</div>}
++                            </div>
++                        )}
+*** End Patch

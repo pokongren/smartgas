@@ -1,0 +1,33 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+                                     <div className="grid grid-cols-1 gap-2">
+                                         <div>
+                                             <div className="mb-1 text-[10px] text-gray-500">当前场景</div>
+                                             <select value={steadyScenarioId} onChange={event => setSteadyScenario(event.target.value)} className="w-full rounded-lg border border-cyan-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">{MAINLINE_SCENARIOS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+                                         </div>
+@@
+                                             <select value={steadyBaselineSnapshotRunId} onChange={event => setSteadyBaselineSnapshotRunId(event.target.value)} className="w-full rounded-lg border border-violet-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
+                                                 <option value="">请选择基线快照</option>
+                                                 {steadySnapshots.map(item => <option key={`baseline-${item.run_id}`} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
+                                             </select>
+                                         </div>
+                                     </div>
++                                    <div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2 space-y-2">
++                                        <div className="text-[10px] uppercase tracking-wider text-slate-300">演示快捷操作</div>
++                                        <div className="grid grid-cols-1 gap-2">
++                                            <button onClick={applyRecommendedScenarioQuickSwitch} disabled={!recommendedCoverageScenario} className="rounded-lg border border-emerald-500/30 bg-emerald-900/10 px-3 py-2 text-xs text-emerald-100 disabled:opacity-40">
++                                                一键切到推荐场景：{recommendedCoverageScenario?.label ?? '暂无'}
++                                            </button>
++                                            <div className="grid grid-cols-2 gap-2">
++                                                <button onClick={applySelectedSnapshotAsBaseline} disabled={!steadySelectedSnapshotRunId} className="rounded-lg border border-violet-500/30 bg-violet-900/10 px-3 py-2 text-xs text-violet-100 disabled:opacity-40">当前快照设基线</button>
++                                                <button onClick={applyLatestCoveredSnapshotAsBaseline} disabled={!latestCoveredSnapshotSummary} className="rounded-lg border border-sky-500/30 bg-sky-900/10 px-3 py-2 text-xs text-sky-100 disabled:opacity-40">最近留档设基线</button>
++                                            </div>
++                                        </div>
++                                        <div className="text-[10px] leading-5 text-gray-400">
++                                            最近留档：{latestCoveredSnapshotSummary ? `${latestCoveredSnapshotSummary.scenario_id} | ${formatDateTimeLabel(latestCoveredSnapshotSummary.saved_at)}` : '暂无可用快照'}
++                                        </div>
++                                    </div>
+                                     <div className="grid grid-cols-2 gap-2">
+                                         <button onClick={async () => { try { await runSteadySimulation(); setStatusMsg(`WE1 主仿真已运行：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 主仿真运行失败') } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '运行中...' : '运行主仿真'}</button>
+*** End Patch

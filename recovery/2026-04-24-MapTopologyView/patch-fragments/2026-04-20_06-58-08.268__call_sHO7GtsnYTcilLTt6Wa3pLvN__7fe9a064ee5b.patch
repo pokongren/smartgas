@@ -1,0 +1,11 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                                    <div className="grid grid-cols-2 gap-2">
+-                                        <button onClick={sendSimulationToAiAnalysis} disabled={!steadyOverlay} className="col-span-2 rounded-lg border border-emerald-400/30 bg-emerald-950/30 px-3 py-2 text-xs font-medium text-emerald-100 disabled:opacity-40">发送仿真结果到AI分析</button>
+-                                        <button onClick={copySimulationStructuredBrief} disabled={!steadyOverlay} className="col-span-2 rounded-lg border border-violet-400/30 bg-violet-950/30 px-3 py-2 text-xs font-medium text-violet-100 disabled:opacity-40">复制结构化简报（给AI）</button>
+-                                    </div>
++                                    <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 px-3 py-2 text-[11px] text-cyan-100">
++                                        AI分析已迁移到 AI 助手界面，这里只展示拓扑与仿真结果。
++                                    </div>
+*** End Patch

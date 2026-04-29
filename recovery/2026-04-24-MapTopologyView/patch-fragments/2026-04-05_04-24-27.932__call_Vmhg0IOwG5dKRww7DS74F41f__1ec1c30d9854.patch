@@ -1,0 +1,23 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ ## 2026-04-05 10:24:16 +08:00
+ 
+ - 这轮没有继续扩写完整巡检，只补独立复核准备结论，基线仍然只看 `F:\smartgas-grid`。
+ - 独立复核先卡 3 个边界：别把 `src/views/MapTopologyView.tsx` 说成已经并入统一 LOD；别沿用旧 memory 的 `junction_groups` 老数字；别把 AI 未跟踪文件链路说成正式基线能力。
+ - 这轮运行时间：`2026-04-05 10:24:16 +08:00`
++
++## 2026-04-05 12:23:51 +08:00
++
++- 本轮先按入口规则落到主目录执行：初始 `cwd=C:\Users\Administrator\.codex\worktrees\7485\smartgas-grid`，切换后 `cwd=F:\smartgas-grid`，`git rev-parse --show-toplevel=F:/smartgas-grid`。结论只基于 `F:\smartgas-grid`，没有拿 detached worktree 当事实来源。
++- 当前不是 `automation env mismatch / worktree-path blockage`，也不是空壳 worktree。`F:\smartgas-grid\.git` 是真实目录；`src/`、`backend/`、`docs/`、`backend/data/smartgas.db` 和本轮点名关键文件都在；`git worktree list` 里主目录停在 `eaf6ac4`，大量 `.codex/worktrees/*` 仍在 `6410a10` detached，只能算背景噪音。
++- 本轮主要是主目录里的未提交代码变化 + 数据库内容变化 + 本地实验混合推进，同时明确带着 AI 模块链路变化。`git diff --stat` 现在是 `46 files changed, 4589 insertions(+), 2543 deletions(-)`；`docs/TOPOLOGY_COMPUTATION_USAGE.md` 和 `docs/TOPOLOGY_SETUP_GUIDE.md` 合计 `181 insertions / 587 deletions`，属于把当前真实链路和端口口径收回来，不是装饰性改文档。
++- 地图缩放与层级显示：`src/utils/hierarchyRenderer.ts` 里的统一阈值还是 `critical/high/medium=6/10/14`，并保留 `valveMinZoom=11`、`expandClusterZoom=12`；`src/utils/mapRenderer.ts` 已实际接入 `getNodeLODStrategy()` / `shouldShowNodeAtZoom()`；`src/views/GlobalPipelineView.tsx` 通过 `MapView -> mapRenderer` 吃到这套规则；但 `src/views/MapTopologyView.tsx` 仍保留自己的 `TOPO_SIZES`、collapsed graph 和“底图-only MapView”逻辑，没有并入统一 zoom/LOD 口径。以后不要再复用“地图和拓扑视图已经完全统一缩放规则”这种旧说法。
++- 枢纽/runtime 规则：`backend/app/services/junction_groups.py` 现在是 `junction_groups_rebuilt` 优先，旧 `junction_groups` 只做兼容兜底，`manual_overlay` 单独叠层，并支持展开 `JUNCTION-x/junction-x`；`backend/app/routers/topology_editor.py` 的 `/api/topology/junctions` 直接返回 `load_runtime_junction_groups()`，还会带 `manual_editing_enabled` 和 `mode=runtime_readonly|legacy_editable`。这说明运行时口径已经往 rebuilt + overlay 收，但旧表没有退出。
++- 数据库实测要覆盖旧 memory：`backend/data/smartgas.db` 当前是 `stations=1256`、`pipelines=1251`、`pipeline_systems=13`、`junction_groups=25`、`junction_groups_backup_20260404=16`、`junction_groups_rebuilt=7`、`manual_overlay_rows=9`。`pipeline_systems.ids=we1,we2,cred,pt,zg,zm,gn,gs,ncsh,jxlz,sj4,sj2,sj3`；`WE3` 当前缺失，`SJ2/SJ3` 前缀实测分别是 `70/69`、`71/70`（站/段）；`layers_config` 仍是 `pipeline_systems.layers_config` 字段，不是独立表。
++- 导入脚本口径也要修正：`backend/scripts/add_sj2.py`、`backend/scripts/add_we3.py`、`backend/scripts/reimport_sj23.py` 都会直接写 `pipeline_systems` 和 `layers_config`，其中 `reimport_sj23.py` 现在更像正式重导 `SJ2/SJ3` 的主链路；但 `backend/scripts/rebuild_junctions.py`、`backend/scripts/verify_junctions.py`、`backend/data/smartgas.rebuild-preview.db`、`backend/data/junction-rebuild-*.json` 这批未跟踪文件仍按本地重编/校验实验处理，不能抬成正式基线。旧 memory 里“WE3 已经在主库”“pipeline_systems=14”“junction_groups=18/24”等数字，这轮都不要再沿用。
++- AI 链路：前端入口仍在 `src/components/ai-assistant/AiAssistant.tsx`；`src/components/ai-assistant/useAiAssistantChat.ts` 会把 `context + analysis_mode=subagents` 发到 `/api/ai-assistant/chat`，并通过 `useAiAssistantPageContext.ts` 注入 `route/module/summary`；后端 `backend/app/routers/ai_assistant.py` 会按 `context/analysis_mode` 分流到 legacy 或 `ai_analysis_orchestrator.py -> analysis_validator.py -> fix_task_router.py`；`backend/app/services/ai_client.py` 默认还是 `AI_BASE_URL=https://api.openai.com/v1`、`AI_DEFAULT_MODEL=gpt-3.5-turbo`，缺 `AI_API_KEY` 时直接 fallback。口径继续保守：这是一条主目录里的本地未提交半接线链路，不是正式入基线能力，因为 orchestrator / validator / router 和前端两个 hook 目前仍是未跟踪文件。
++- docs 现在明确把端口和路由写实：`docs/TOPOLOGY_COMPUTATION_USAGE.md`、`docs/TOPOLOGY_SETUP_GUIDE.md` 都把默认后端端口收口到 `8080`，并明确区分普通 `/api/...`、拓扑编辑 `/api/topology/...`、拓扑计算 `/topology/...`；`src/services/api.ts` 走 `/api/...` 与部分 `/topology/...` 并存，`src/hooks/useTopology.ts` 直连 `/topology/...`，`src/services/apiBase.ts` 从 `VITE_API_BASE_URL` 推出 `API_BASE_URL` / `BACKEND_BASE_URL`。以后别再拿旧的 `8000` 或“全都走 /api/topology”套现状。
++- 本轮独立复核边界继续沿用 4 条：1) 不把 detached worktree 当主目录事实；2) 不把 `MapTopologyView.tsx` 的本地渲染逻辑说成已经完全并到统一 LOD；3) 不沿用旧 memory 的过期数据库数字；4) 不把未跟踪 AI / rebuild / shadow 文件直接说成正式基线。
++- 本轮运行时间：`2026-04-05 12:23:51 +08:00`
+*** End Patch

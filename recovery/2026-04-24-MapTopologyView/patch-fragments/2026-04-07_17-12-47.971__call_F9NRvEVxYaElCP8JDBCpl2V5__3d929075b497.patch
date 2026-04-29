@@ -1,0 +1,84 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    // 浠跨湡鐘舵€?(Sim Status)
+-    const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
+-    const [historyChartTarget, setHistoryChartTarget] = useState<null | {
+-        stationName?: string
+-        junctionId?: string
+-        displayName?: string
+-    }>(null)
+-    const {
+-        overlay: steadyOverlay,
+-        isLoading: steadySimLoading,
+-        error: steadySimError,
+-        currentScenario: steadyScenarioId,
+-        snapshots: steadySnapshots,
+-        snapshotLoading: steadySnapshotLoading,
+-        snapshotError: steadySnapshotError,
+-        selectedSnapshotRunId: steadySelectedSnapshotRunId,
+-        setScenario: setSteadyScenario,
+-        setSelectedSnapshotRunId: setSteadySelectedSnapshotRunId,
+-        runSimulation: runSteadySimulation,
+-        saveSnapshot: saveSteadySnapshot,
+-        refreshSnapshots: refreshSteadySnapshots,
+-        loadSelectedSnapshot: loadSteadySelectedSnapshot,
+-        clearOverlay: clearSteadyOverlay,
+-    } = useSimulation({
+-        pilotId: 'mainline_zhongwei_jingbian',
+-        scenarios: MAINLINE_SCENARIOS,
+-    })
++    // 浠跨湡鐘舵€?(Sim Status)
++    const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
++    const [historyChartTarget, setHistoryChartTarget] = useState<null | {
++        stationName?: string
++        junctionId?: string
++        displayName?: string
++    }>(null)
+@@
+-    // 淇濆瓨鏈哄埗锛氳窡韪嫋鎷戒慨鏀圭殑鍧愭爣
+-    const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
+-    const [isSaving, setIsSaving] = useState(false)
+-    const {
+-        overlay: simulationOverlay,
+-        isLoading: simulationLoading,
+-        error: simulationError,
+-        currentScenario,
+-        setScenario,
+-        runSimulation,
+-        clearOverlay,
+-    } = useSimulation({
+-        pilotId: 'mainline_zhongwei_jingbian',
+-        scenarios: MAINLINE_SCENARIOS,
+-    })
++    // 淇濆瓨鏈哄埗锛氳窡韪嫋鎷戒慨鏀圭殑鍧愭爣
++    const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
++    const [isSaving, setIsSaving] = useState(false)
++    const {
++        overlay: simulationOverlay,
++        isLoading: simulationLoading,
++        error: simulationError,
++        currentScenario,
++        snapshots,
++        snapshotLoading,
++        baselineSnapshotLoading,
++        snapshotError,
++        selectedSnapshotRunId,
++        baselineSnapshotRunId,
++        comparison,
++        setScenario,
++        setSelectedSnapshotRunId,
++        setBaselineSnapshotRunId,
++        runSimulation,
++        saveSnapshot,
++        refreshSnapshots,
++        loadSelectedSnapshot,
++        clearOverlay,
++    } = useSimulation({
++        pilotId: WE1_PRIMARY_PILOT_ID,
++        scenarios: MAINLINE_SCENARIOS,
++    })
+     const [cascadeValves, setCascadeValves] = useState(true)
+     const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
+     const [isPreviewing, setIsPreviewing] = useState(false)
+*** End Patch

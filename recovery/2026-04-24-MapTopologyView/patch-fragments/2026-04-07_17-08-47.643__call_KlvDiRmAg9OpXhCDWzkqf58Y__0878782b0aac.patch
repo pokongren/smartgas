@@ -1,0 +1,31 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    // 仿真状态(Sim Status)
+-    const [simDrawerVisible, setSimDrawerVisible] = useState(false)
+-    const [isSimulating, setIsSimulating] = useState(false)
+-    const [simResults, setSimResults] = useState<SimulationResult[]>([])
+-    const [currentSimStep, setCurrentSimStep] = useState(0)
++    // 正式 WE1 仿真状态
+     const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
+     const [historyChartTarget, setHistoryChartTarget] = useState<null | {
+         stationName?: string
+         junctionId?: string
+         displayName?: string
+@@
+     // 保存机制：跟踪拖拽修改的坐标
+     const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
+     const [isSaving, setIsSaving] = useState(false)
++    const {
++        overlay: simulationOverlay,
++        isLoading: simulationLoading,
++        error: simulationError,
++        currentScenario,
++        setScenario,
++        runSimulation,
++        clearOverlay,
++    } = useSimulation({
++        pilotId: 'mainline_zhongwei_jingbian',
++        scenarios: MAINLINE_SCENARIOS,
++    })
+*** End Patch

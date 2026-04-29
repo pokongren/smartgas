@@ -1,0 +1,201 @@
+*** Begin Patch
+*** Add File: C:\Users\Administrator\.codex\automations\automation\memory.md
++# automation memory
++
++- 运行时间：2026-04-07 05:12:54 +08:00
++- 本轮固定在 `F:\smartgas-grid` 主目录巡检，只认主目录事实，不拿 detached worktree 顶结论。
++- 主目录是 Git 主仓实体目录，`.git` 为目录而不是 worktree 指针文件；当前 `HEAD=f75536d`，分支相对远端 `ahead 3`。
++- detached worktree `C:\Users\Administrator\.codex\worktrees\07b8\smartgas-grid` 仍停在 `6410a10`，且当前沙箱用户对该 worktree 有 dubious ownership 提示，所以后续巡检仍以 `F:\smartgas-grid` 为准。
++- 当前未提交业务改动集中在两块：前端地图侧 `src/utils/hierarchyRenderer.ts`、`src/views/MapTopologyView.tsx`；后端 WE1 求解侧 `backend/app/routers/pipeline_packages.py`、`backend/app/routers/topology_simulation.py`、`backend/app/services/topology_simulation.py`，另有 4 个未跟踪的 WE1 service/script 文件。
++- 地图链路结论：全国地图主链仍是 `GlobalPipelineView -> MapView -> mapRenderer -> hierarchyRenderer`；本轮只把 LOD 阈值收紧到 `highZoom=9`、`mediumZoom=12`，并补了 `showFlowArrows` 字段。`MapTopologyView` 新增了一个直接调 `topologyAPI.simulate()` 的试验性仿真页签，但它不是全国地图主链。
++- 枢纽规则结论：运行时仍是 `junction_groups_rebuilt` 优先，缺失时回退 `junction_groups`，最后叠加 `manual overlay`；代码入口在 `backend/app/services/junction_groups.py::load_runtime_junction_groups`。
++- 数据库口径：`backend/data/smartgas.db` 当前 `pipeline_systems=13`、`junction_groups=25`、`junction_groups_rebuilt=7`、`stations=1270`；`junction_groups_rebuilt` 目前全是 `junction`，还没有 `major_junction`；系统 ID 仍缺 `we3`。
++- 导入/求解结论：传统导入脚本边界没变，仍以 `backend/scripts/sync_frontend_data.py`、`rebuild_junctions.py`、`verify_junctions.py` 为主；本轮真实推进点是 WE1 `solver input` 装配层，`pipeline_packages` 和 `topology_simulation` 都改为先构建统一 solver input，再求 steady/failure/overlay。
++- AI 链路结论：后端入口仍是 `main.py -> ai_assistant router`；问答仍是 direct raw-excel、orchestrated、legacy 三路并存，并继续挂载 `/mcp`。这轮未见 AI 主链新增 diff。
++- 验证结果：`python backend/scripts/verify_we1_phase3.py` 与 `python backend/scripts/verify_we1_phase4.py` 均通过；主样板 steady/failure 契约、辅样板 overlay/meta 契约、前端 `useSimulation` 消费契约都通过。
++- 文档状态：巡检前 `docs` 工作区无未提交 diff；本轮只新增 1 份巡检总结文档，不改业务代码。
+*** Add File: F:/smartgas-grid/docs/2026-04-07-项目心跳巡检总结_人话版.md
++# 2026-04-07 项目心跳巡检总结（人话版）
++
++## 主目标
++
++固定在 `F:\smartgas-grid` 主目录做一次真实仓库巡检，先校验主目录落点和 Git 事实，再检查 git 现场、地图缩放与层级显示、枢纽规则与数据库口径、导入脚本、AI 模块链路，最后把当前进展写成人话。
++
++## 上下文与已知信息
++
++- automation 上次记忆停在 2026-04-07 02:11:20 +08:00，当时主目录 `HEAD=5ec5af0`。
++- 本轮用户明确要求只认 `F:\smartgas-grid` 主目录事实，不拿 detached worktree 顶结论。
++- 本轮限制是不改业务代码，只更新 automation memory 和必要文档。
++
++## 主代理与子代理分工
++
++- 主代理：收敛巡检目标、整理上下文、决定侦察顺序、汇总结论、落 memory 和总结文档。
++- 侦察代理 A：核验主目录、`.git`、`git worktree list`、`git status`、`git log`、未提交 diff、docs 变化。
++- 侦察代理 B：检查地图缩放与层级显示链路，确认改动是不是落在全国地图主链。
++- 侦察代理 C：检查枢纽规则、数据库表口径、导入/求解脚本边界。
++- 验证代理：独立运行 `verify_we1_phase3.py`、`verify_we1_phase4.py`，只做回归验证，不参与代码修改。
++
++## 修改逻辑
++
++这轮不动业务代码，只做两件事：
++
++1. 新建 automation memory，把本轮主目录事实、链路判断和验证结果写进去，供下次增量巡检直接复用。
++2. 新增这份人话总结，替代零散命令输出，方便直接看当前状态。
++
++## 执行顺序
++
++1. 校验 `F:\smartgas-grid` 是否为主目录事实。
++2. 核验 `.git` 形态、`git worktree list`、主目录与 detached worktree HEAD 差异。
++3. 查看 `git status`、`git diff --stat`、最近 5 条 `git log`、docs 状态。
++4. 定点检查地图层级链路、枢纽运行时规则、数据库口径、导入脚本、AI 链路。
++5. 独立运行阶段 3/4 验证脚本，确认当前未提交主线自洽。
++6. 更新 memory 与巡检总结文档。
++
++## 当前进展摘要
++
++### 1. 主目录与 Git 事实
++
++- `F:\smartgas-grid` 是唯一挂在分支上的主 worktree，当前分支是 `拓扑设想`，`HEAD=f75536d`。
++- 当前 detached worktree `C:\Users\Administrator\.codex\worktrees\07b8\smartgas-grid` 停在 `6410a10`，而且当前沙箱用户访问它会碰到 dubious ownership 提示，所以它不能代表主目录现状。
++- 主目录相对远端是 `ahead 3`。
++
++### 2. Git 现场
++
++- 最近 5 条提交都还是数据更新提交，最新一条是 `f75536d`，时间是 2026-04-07 02:21:28 +08:00。
++- 当前已跟踪未提交文件 5 个：
++
++| 文件 | 方向 |
++| --- | --- |
++| `backend/app/routers/pipeline_packages.py` | WE1 solver input 入口 |
++| `backend/app/routers/topology_simulation.py` | steady/failure/overlay 路由改造 |
++| `backend/app/services/topology_simulation.py` | solver input 归一化与求解兼容 |
++| `src/utils/hierarchyRenderer.ts` | 地图 LOD 阈值收紧 |
++| `src/views/MapTopologyView.tsx` | 新增试验性仿真页签 |
++
++- 当前未跟踪文件 4 个，全部在 WE1 求解/验证链路：
++
++| 文件 | 作用 |
++| --- | --- |
++| `backend/app/services/we1_solver_input_service.py` | 统一 solver input 装配 |
++| `backend/app/services/we1_steady_validation_service.py` | steady 验证服务 |
++| `backend/scripts/verify_we1_phase3.py` | 阶段 3 链路验证 |
++| `backend/scripts/verify_we1_phase4.py` | 阶段 4 验收验证 |
++
++### 3. docs 变化
++
++- 巡检前 `docs` 工作区没有未提交 diff。
++- `docs` 最近一次 Git 历史提交停在 2026-04-06 12:07:39 +08:00。
++- 文件系统里 2026-04-07 新增了一批 WE1 阶段总结文档，说明最近工作节奏主要围绕 WE1 推进。
++
++### 4. 地图缩放与层级显示
++
++- 全国地图主链没有换，还是 `GlobalPipelineView -> MapView -> mapRenderer -> hierarchyRenderer`。
++- 这轮地图侧真改动很集中：
++
++| 项目 | 之前 | 现在 |
++| --- | --- | --- |
++| `highZoom` | 7 | 9 |
++| `mediumZoom` | 13 | 12 |
++| `showFlowArrows` | 无 | `zoom >= 10` |
++
++- 结论：这不是“地图主链重构”，而是把压气站/分输站展示时机继续后移，减少中低缩放级别的信息密度。
++- `MapTopologyView` 新增了一个调用 `topologyAPI.simulate()` 的“仿真”页签，但它是独立页的试验性入口，不应当被写成全国地图层级链路已经并入仿真主链。
++
++### 5. 枢纽规则与数据库口径
++
++- 运行时枢纽入口仍在 `backend/app/services/junction_groups.py::load_runtime_junction_groups`。
++- 当前规则顺序没变：
++
++| 顺序 | 来源 |
++| --- | --- |
++| 1 | `junction_groups_rebuilt` |
++| 2 | `junction_groups` 回退 |
++| 3 | `manual overlay` 叠加覆盖 |
++
++- 数据库实况来自 `backend/data/smartgas.db`：
++
++| 项目 | 数值 |
++| --- | --- |
++| `pipeline_systems` | 13 |
++| `junction_groups` | 25 |
++| `junction_groups_rebuilt` | 7 |
++| `stations` | 1270 |
++
++- `junction_groups_rebuilt` 当前 7 条全部是 `junction`，还没有 `major_junction`。
++- `pipeline_systems` 仍缺 `we3`，这点和上轮结论一致。
++
++### 6. 导入脚本与 WE1 求解主线
++
++- 传统导入边界没变，仍是离线脚本体系：
++
++| 脚本 | 角色 |
++| --- | --- |
++| `backend/scripts/sync_frontend_data.py` | 前端静态素材回灌数据库 |
++| `backend/scripts/rebuild_junctions.py` | 按新规则重编枢纽 |
++| `backend/scripts/verify_junctions.py` | 校验旧表或影子表 |
++
++- 本轮真正推进的是 WE1 求解装配层：
++  - `pipeline_packages` 新增 `/pipeline-packages/pilots/we1/{pilot_id}/solver-input`
++  - `topology_simulation` 的 steady/failure/overlay 三个入口统一先构建 solver input，再调用 `solve_steady`
++  - `topology_simulation.py` 新增一层 normalized solver input 结构，开始兼容显式 `id`、`source_id`、`target_id`
++
++- 结论：当前未提交主线已经从“只看 seed”推进到“先装配统一 solver input，再跑 steady/failure/overlay”。
++
++### 7. AI 模块链路
++
++- 后端入口没变，还是 `main.py -> ai_assistant router`。
++- AI 主链仍是三路并存：
++
++| 路径 | 说明 |
++| --- | --- |
++| direct | `raw_excel_ai_direct` 直接答复简单查询 |
++| orchestrated | `AiAnalysisOrchestrator` 编排分析 |
++| legacy | `_legacy_event_generator` 保底链路 |
++
++- 同时继续挂载 `/mcp`，工具和资源仍由 `app/mcp` 暴露。
++- 结论：这轮没有发现 AI 主链新增 diff，AI 口径基本稳定。
++
++## 验证方式
++
++- 验证 1：运行 `python backend/scripts/verify_we1_phase3.py`
++  - 看点：solver input 构建、steady/failure、overlay 契约是否可用
++  - 结果：通过
++
++- 验证 2：运行 `python backend/scripts/verify_we1_phase4.py`
++  - 看点：主样板故障压降、辅样板 overlay/meta 契约、前端 `useSimulation` 消费契约
++  - 结果：通过
++
++- 验证结果摘录：
++
++| 校验项 | 结果 |
++| --- | --- |
++| 阶段 3 链路验证 | 通过 |
++| 阶段 4 验收验证 | 通过 |
++| 主样板 steady/failure API 契约 | 通过 |
++| 辅样板 overlay + meta 契约 | 通过 |
++| 前端 `useSimulation` / `SimPanel` 契约 | 通过 |
++
++## 风险与回退点
++
++- 风险 1：`MapTopologyView` 的仿真按钮直接调用 `topologyAPI.simulate()`，而 WE1 主验证链路消费的是 `/api/pipeline-packages/simulation-overlay`；两个入口不是同一条线，后续很容易在口径上分叉。
++- 风险 2：`junction_groups_rebuilt` 虽然已有 7 条数据，但全是 `junction`，还没有 `major_junction`，如果后续要强调“大枢纽”显示，数据库事实还不够。
++- 风险 3：主目录领先 detached worktree 3 个提交，后续任何“在 detached worktree 上复盘现状”的结论都可能过期。
++- 回退点：本轮没有改业务代码，只新增文档和 memory，不涉及代码回退。
++
++## 最终交付物
++
++- automation memory：记录本轮巡检事实和验证结果，供下次增量巡检使用。
++- 本文档：给人直接看的项目心跳巡检总结。
++
++## 前后对比
++
++无截图。本轮不是 UI 改版，也没有业务代码落地，截图信息量低，改用事实对比表。
++
++| 对比项 | 上轮 memory | 本轮巡检 |
++| --- | --- | --- |
++| 主目录 `HEAD` | `5ec5af0` | `f75536d` |
++| 主目录相对远端 | `ahead 2` | `ahead 3` |
++| 主线判断 | 已转向拓扑模拟链路 | 继续收口到统一 solver input |
++| docs 工作区 | 无未提交 diff | 仍无未提交 diff，新增本次巡检总结 |
++| 验证状态 | 以前轮结论为主 | 阶段 3/4 验证脚本本轮实跑通过 |
+*** End Patch

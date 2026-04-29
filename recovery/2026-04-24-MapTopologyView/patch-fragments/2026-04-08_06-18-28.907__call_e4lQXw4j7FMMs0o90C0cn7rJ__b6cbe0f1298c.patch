@@ -1,0 +1,53 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round9-legacy-entry-guard-summary.md
++一、主目标
++1. 本轮只做维护模式第9轮巡检补强，把“第一张图不能回退到旧 emergency simulate-failure 链”补成固定守卫，不进入新阶段，不改求解公式，不扩新试点，不新造第三套仿真页面。
++
++二、上下文与已知信息
++1. automation memory 显示 WE1 第一张图五阶段已封板，当前处于维护模式第8轮，后续运行只允许做巡检、回归和修复。
++2. 并行侦察后确认，`/map-topology` 仍是正式入口，`/topology` 仍是调试页，AI 助手页面语义也仍区分“正式主仿真入口”和“调试画布”。
++3. 当前维护脚本已经守住了入口文案、快照回归和第5阶段验收口径，但还没有显式验证第一张图和 `useSimulation` 没有重新引用旧 `/api/emergency/simulate-failure` 语义。
++
++三、主代理与子代理分工
++1. 主代理先读两份五阶段方案、现有总结和 automation memory，确认当前只能按维护模式推进。
++2. 侦察子代理A只看 [src/App.tsx](/F:/smartgas-grid/src/App.tsx)、[src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)、[src/views/TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)、[src/components/ai-assistant/useAiAssistantPageContext.ts](/F:/smartgas-grid/src/components/ai-assistant/useAiAssistantPageContext.ts)，确认正式入口语义没有回退。
++3. 侦察子代理B只看 [backend/scripts/verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)、[backend/scripts/verify_we1_map_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_map_phase5.py)、[backend/scripts/verify_we1_phase34_final.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase34_final.py)、[backend/scripts/verify_we1_snapshot_archive.py](/F:/smartgas-grid/backend/scripts/verify_we1_snapshot_archive.py)，定位维护巡检最薄的守卫口。
++4. 实施子代理只改 [backend/scripts/verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)，不碰页面主链、映射层和 solver。
++5. 验证子代理独立复跑维护总脚本、第3到4阶段联合回归、第5阶段验收和快照归档验证，确认主链仍稳定。
++
++四、修改逻辑
++1. 在 [backend/scripts/verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py) 新增 `map_view_rejects_legacy_failure_entry` 守卫，同时读取 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 和 [src/hooks/useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)，明确禁止重新出现 `/api/emergency/simulate-failure`、`emergencyAPI.simulate`、`failure_node_id`、`failed_node_id` 这组旧链标记。
++2. 这么改的原因是当前最真实的维护风险不是主链坏掉，而是以后有人在第一张图或 `useSimulation` 里顺手接回旧故障推演接口；这类回退只看“按钮还在不在”抓不住，必须补成反向守卫。
++
++五、执行顺序
++1. 第1阶段第1轮读取 memory 和最近收口总结，确认当前处于维护模式第8轮，本轮不能推进新阶段。
++2. 第1阶段第2轮并行侦察前端入口语义和维护脚本守卫口径，只收敛一个实施方向。
++3. 第1阶段第3轮单点修改 [backend/scripts/verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)。
++4. 第1阶段第4轮独立运行 `python F:\\smartgas-grid\\backend\\scripts\\verify_we1_maintenance.py`、`python F:\\smartgas-grid\\backend\\scripts\\verify_we1_phase34_final.py`，并由维护总脚本内部再次校验第5阶段验收和快照归档链路。
++
++六、验证方式
++1. 验证什么：验证维护模式脚本是否能抓住旧入口回退风险，验证第3到4阶段联合回归、第5阶段验收和快照归档仍然通过。
++2. 怎么验证：运行 `python F:\\smartgas-grid\\backend\\scripts\\verify_we1_maintenance.py` 和 `python F:\\smartgas-grid\\backend\\scripts\\verify_we1_phase34_final.py`。
++3. 结果怎么看：维护总脚本输出 `status=passed`、`mode=maintenance`，新增 `map_view_rejects_legacy_failure_entry` 检查通过；同时 `verify_we1_map_phase5.py` 在维护总脚本内返回 `next_mode=maintenance`、`all_mainline_scenarios_covered=true`，`verify_we1_snapshot_archive.py` 返回 `list_count=10`，说明主链、封板口径和快照归档都没被误伤。
++4. 失败时先查哪层：先查第一张图入口和 `useSimulation` 消费层，再查映射层与 source IDs 命中关系，再查快照归档层，最后才查 backend solver input 与稳态求解主链。
++
++七、风险与回退点
++1. 当前风险仍然是入口语义被日后修改时悄悄带回旧故障接口，而不是求解主链本身错误。
++2. 回退点很小，只涉及 [backend/scripts/verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py) 一处；如果后续发现守卫口径需要调整，优先继续修维护脚本，不动页面业务链。
++
++八、最终交付物
++1. 代码交付：[backend/scripts/verify_we1_maintenance.py](/F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py)。
++2. 文档交付：[2026-04-08-WE1-maintenance-round9-legacy-entry-guard-summary.md](/F:/smartgas-grid/docs/2026-04-08-WE1-maintenance-round9-legacy-entry-guard-summary.md)。
++3. memory 已更新到维护模式第9轮。
++
++九、前后对比
++| 项目 | 这轮之前 | 这轮之后 |
++| --- | --- | --- |
++| 维护入口守卫 | 只验证正式入口文案和动作存在 | 额外验证第一张图与 `useSimulation` 没有回退到旧 emergency 接口 |
++| 巡检定位能力 | 能发现“入口丢了” | 还能发现“入口还在，但内部偷偷接回旧链” |
++| 阶段状态 | 维护模式第8轮 | 维护模式第9轮，继续只做巡检回归和修复 |
++
++十、截图与替代
++1. 本轮没有合适截图，因为改动点是维护脚本守卫，不是页面视觉改动。
++2. 这次用“前后对比表 + 验证结果”代替截图，更适合记录维护巡检口径。
+*** End Patch

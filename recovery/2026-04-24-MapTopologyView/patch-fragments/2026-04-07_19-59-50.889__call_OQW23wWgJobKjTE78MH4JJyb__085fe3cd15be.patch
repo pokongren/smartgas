@@ -1,0 +1,22 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+         snapshotError: steadySnapshotError,
+         selectedSnapshotRunId: steadySelectedSnapshotRunId,
+         baselineSnapshotRunId: steadyBaselineSnapshotRunId,
++        trialRunScenarioId: steadyTrialRunScenarioId,
++        bulkTrialRunActive: steadyBulkTrialRunActive,
+         comparison: steadyComparison,
++        trialRunItems: steadyTrialRunItems,
+         setScenario: setSteadyScenario,
+         setSelectedSnapshotRunId: setSteadySelectedSnapshotRunId,
+         setBaselineSnapshotRunId: setSteadyBaselineSnapshotRunId,
+         runSimulation: runSteadySimulation,
+         saveSnapshot: saveSteadySnapshot,
+         refreshSnapshots: refreshSteadySnapshots,
+         loadSelectedSnapshot: loadSteadySelectedSnapshot,
++        runTrialScenario: runSteadyTrialScenario,
++        runMissingTrialScenarios: runSteadyMissingTrialScenarios,
+         clearOverlay: clearSteadyOverlay,
+     } = useSimulation({
+*** End Patch

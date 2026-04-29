@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const doNodeClick = (nodeId: string) => {
++    const doNodeClick = (nodeId: string, _event?: any) => {
+*** End Patch

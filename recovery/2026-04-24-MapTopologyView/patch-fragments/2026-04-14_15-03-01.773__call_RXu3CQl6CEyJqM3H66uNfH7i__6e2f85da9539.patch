@@ -1,0 +1,31 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     useEffect(() => {
+         if (!mapInstance) return
+         const onClick = (e: any) => {
+             if (modeRef.current === 'draw-point') doAddNode(e.lnglat, ptRef.current)
+@@
+             edgesRef.current.forEach(e => e.poly?.setMap(null))
+         }
+     }, [mapInstance])
++    useEffect(() => {
++        if (!mapInstance) return
++        const startInteraction = () => setIsMapInteracting(true)
++        const endInteraction = () => setIsMapInteracting(false)
++        mapInstance.on('zoomstart', startInteraction)
++        mapInstance.on('movestart', startInteraction)
++        mapInstance.on('dragstart', startInteraction)
++        mapInstance.on('zoomend', endInteraction)
++        mapInstance.on('moveend', endInteraction)
++        mapInstance.on('dragend', endInteraction)
++        return () => {
++            mapInstance.off('zoomstart', startInteraction)
++            mapInstance.off('movestart', startInteraction)
++            mapInstance.off('dragstart', startInteraction)
++            mapInstance.off('zoomend', endInteraction)
++            mapInstance.off('moveend', endInteraction)
++            mapInstance.off('dragend', endInteraction)
++        }
++    }, [mapInstance])
+*** End Patch

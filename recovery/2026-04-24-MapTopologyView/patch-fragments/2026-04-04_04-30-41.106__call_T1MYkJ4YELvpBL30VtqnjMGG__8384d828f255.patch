@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ - Docs/API line: topology docs now consistently describe backend `8080` and openly document the mixed `/api/topology/...` plus `/topology/...` contract instead of the older single-prefix story. `src/services/api.ts` still mixes proxied `/api/topology/...` graph/stats with direct `/topology/correct/...`, while `src/hooks/useTopology.ts` stays on direct `/topology/...` through `BACKEND_BASE_URL`.
+ - No business code was modified by this heartbeat run. Memory updated only. Run completed at `2026-04-04 12:29:32 +08:00`.
++
++2026-04-04 12:30 CST
++
++- Follow-up review only checked wording discipline, not the full heartbeat report again.
++- Conclusion of the wording review: no evidence that the current main conclusion treated detached worktrees as the fact source; no evidence that script existence alone was presented as already applied to the live DB; the only place that still needs tighter wording is the map/type line, where claims should stay scoped to the inspected files (`hierarchyRenderer.ts`, `mapRenderer.ts`, `GlobalPipelineView.tsx`, `MapTopologyView.tsx`) rather than sounding like every topology rendering path in the repo is already covered.
++- Reminder for future phrasing: when describing DB/script relation, keep saying "script churn" or "local import scripts" unless the live DB counts or data rows independently confirm the result; when describing map consistency, say "national-map chain" or "these inspected files" instead of implying full-repo unification. Run completed at `2026-04-04 12:30:29 +08:00`.
+*** End Patch

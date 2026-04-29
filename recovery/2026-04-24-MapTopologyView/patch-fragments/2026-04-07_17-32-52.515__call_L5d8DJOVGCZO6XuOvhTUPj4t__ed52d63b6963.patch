@@ -1,0 +1,23 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const isSimulating = simulationLoading
+-    const setIsSimulating = (_value: boolean) => {}
+-    const simResults = useMemo<SimulationResult[]>(
+-        () =>
+-            simulationOverlay
+-                ? [{
+-                    step: 1,
+-                    affected_nodes: simulationOverlay.nodes
+-                        .filter(node => node.alert_level !== 'normal')
+-                        .map(node => node.id),
+-                    pressure_drops: Object.fromEntries(
+-                        simulationOverlay.nodes.map(node => [node.id, node.pressure_mpa])
+-                    ),
+-                    is_stable: simulationOverlay.solver_status === 'converged',
+-                }]
+-                : [],
+-        [simulationOverlay]
+-    )
+-    const setSimResults = (_results: SimulationResult[]) => {}
+*** End Patch

@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Add File: C:\Users\Administrator\.codex\automations\automation\memory.md
++## 2026-04-04 18:26:39 +08:00
++
++- 本轮先做了入口落点修正。初始 cwd 是 `C:\Users\Administrator\.codex\worktrees\ea6b\smartgas-grid`，切到 `F:\smartgas-grid` 后，cwd 与 `git rev-parse --show-toplevel` 都落在 `F:\smartgas-grid`，因此不是 `automation env mismatch / worktree-path blockage`。
++- 主目录 `F:\smartgas-grid` 不是空壳 worktree。根目录有 `src`、`backend`、`docs`，`.git` 是目录；`git worktree list --porcelain` 显示 `F:\smartgas-grid` 是主工作树，`.codex/worktrees/*` 是 detached worktree，只能当旁证，不能当主结论来源。
++- 本轮巡检结论应归为“代码变化 + 数据库变化 + docs 收口”，不要误记成纯本地实验，也不要误记成路径阻塞。
++- 地图层级这条线重点看 `src/utils/hierarchyRenderer.ts` 和 `src/utils/mapRenderer.ts`。当前已存在统一的 zoom 阈值与 `shouldShowNodeAtZoom` 过滤，阀室最早在 zoom 11 显示，聚合点在 zoom 12 展开。
++- 枢纽规则这条线重点看 `backend/app/services/junction_groups.py`、`backend/app/routers/topology_editor.py`、`src/views/MapTopologyView.tsx`、`src/services/topologyEditorApi.ts`。当前已存在 `JUNCTION-x` 展开、重叠枢纽合并，以及前端对临时节点/已入组节点的限制。
++- 数据库本轮实测 counts：`stations=1256`、`pipelines=1253`、`pipeline_systems=13`、`junction_groups=16`。注意：`pipeline_systems` 表里没有 `system_id` 列；`stations`/`pipelines` 也不是“新结构已完全落库”的状态，不要把前端 `rawType` 或 docs 收口误记成数据库 schema 已升级完成。
++- API 口径本轮仍是双前缀并存：`/api/topology/...` 与 `/topology/...` 同时存在。联调风险点优先看 `src/services/api.ts`、`src/hooks/useTopology.ts`、`src/services/apiBase.ts`、`vite.config.ts`。
++- docs 本轮有明显收口，尤其是 `docs/TOPOLOGY_COMPUTATION_USAGE.md` 与 `docs/TOPOLOGY_SETUP_GUIDE.md`，内容已经改到 `8080` 和双前缀并存的现状；但 docs 只能算说明同步，不能单独当成业务或数据库事实。
+*** End Patch

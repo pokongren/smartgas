@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ - Meaningful work completed this run: updated `F:\smartgas-grid\backend\check_db.py` to recognize current table names (`pipeline_systems`, `junction_groups`) and verified it against the live database successfully.
++
++2026-04-02 21:43 CST
++
++- This run used the current cwd/git root `C:\Users\Administrator\.codex\worktrees\5c28\smartgas-grid` as instructed instead of relying on the historical live-repo path from prior memory.
++- The current worktree is effectively empty: only `.git` (pointing at `F:/smartgas-grid/.git/worktrees/smartgas-grid10`) and `README.md` exist, `git status` is clean, `git log -5` only shows `6410a10 Initial commit`, and there are no `docs` files or uncommitted diffs under this root.
++- All required inspection targets are absent in this worktree, including `src/utils/mapRenderer.ts`, `src/utils/hierarchyRenderer.ts`, `src/views/MapTopologyView.tsx`, `src/views/GlobalPipelineView.tsx`, `backend/app/models.py`, `backend/app/services/junction_groups.py`, `backend/app/routers/topology_editor.py`, `backend/data/smartgas.db`, `backend/check_db.py`, `backend/scripts/add_sj2.py`, `backend/scripts/add_we3.py`, `backend/scripts/reimport_sj23.py`, `src/services/api.ts`, and `src/hooks/useTopology.ts`.
++- Conclusion for this run: no current code change, DB change, or local experiment can be validated from the active git root because the requested project content is missing from the checked-out worktree; this is a path/sync blockage rather than a newly observed functional regression.
+*** End Patch

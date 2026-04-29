@@ -1,0 +1,44 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-            // 缁戝畾鎮诞妗嗕簨浠?            poly.on('mouseover', (e: any) => {
+-                setHoveredEdgeId(edge.id)
+-                const clientX = e?.originEvent?.clientX
+-                const clientY = e?.originEvent?.clientY
+-                if (typeof clientX === 'number' && typeof clientY === 'number') {
+-                    setTooltipPos({ x: clientX, y: clientY })
+-                }
+-            })
+-            poly.on('mousemove', (e: any) => {
+-                const clientX = e?.originEvent?.clientX
+-                const clientY = e?.originEvent?.clientY
+-                if (typeof clientX === 'number' && typeof clientY === 'number') {
+-                    setTooltipPos({ x: clientX, y: clientY })
+-                }
+-            })
+-            poly.on('mouseout', () => {
+-                setHoveredEdgeId(null)
+-                setTooltipPos(null)
+-            })
++            if (!isLargeGraph) {
++                poly.on('mouseover', (e: any) => {
++                    setHoveredEdgeId(edge.id)
++                    const clientX = e?.originEvent?.clientX
++                    const clientY = e?.originEvent?.clientY
++                    if (typeof clientX === 'number' && typeof clientY === 'number') {
++                        setTooltipPos({ x: clientX, y: clientY })
++                    }
++                })
++                poly.on('mousemove', (e: any) => {
++                    const clientX = e?.originEvent?.clientX
++                    const clientY = e?.originEvent?.clientY
++                    if (typeof clientX === 'number' && typeof clientY === 'number') {
++                        setTooltipPos({ x: clientX, y: clientY })
++                    }
++                })
++                poly.on('mouseout', () => {
++                    setHoveredEdgeId(null)
++                    setTooltipPos(null)
++                })
++            }
+*** End Patch

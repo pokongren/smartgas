@@ -1,0 +1,20 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                     <span className="text-emerald-100 font-medium">
+                                         {selectedNodeSimulationMetrics?.pressure != null
+-                                            ? `${selectedNodeSimulationMetrics.pressure.toFixed(2)} MPa`
++                                            ? `${selectedNodeSimulationMetrics.pressure.toFixed(2)} MPa${selectedNodeSimulationMetrics.preSimulation ? '（仿真前预置）' : ''}`
+                                             : '未运行仿真'}
+                                     </span>
+                                 </div>
+                                 <div className="flex items-center justify-between gap-3 text-xs">
+                                     <span className="text-gray-400">当前温度</span>
+                                     <span className="text-emerald-100 font-medium">
+                                         {selectedNodeSimulationMetrics?.temperatureC != null
+-                                            ? `${selectedNodeSimulationMetrics.temperatureC.toFixed(1)}°C${selectedNodeSimulationMetrics.estimated ? '（估算）' : ''}`
++                                            ? `${selectedNodeSimulationMetrics.temperatureC.toFixed(1)}°C${selectedNodeSimulationMetrics.preSimulation ? '（仿真前预置）' : selectedNodeSimulationMetrics.estimated ? '（估算）' : ''}`
+                                             : '未运行仿真'}
+                                     </span>
+                                 </div>
+*** End Patch

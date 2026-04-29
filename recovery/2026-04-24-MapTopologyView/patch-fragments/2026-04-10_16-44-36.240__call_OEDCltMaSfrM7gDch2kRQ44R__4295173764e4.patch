@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    }, [simulationNarrative])
++    }, [simulationNarrative])
++    const copySimulationStructuredBrief = useCallback(async () => {
++        try {
++            await navigator.clipboard.writeText(JSON.stringify(simulationStructuredBrief, null, 2))
++            setStatusMsg('仿真结构化简报已复制，可直接贴给 AI 继续分析')
++        } catch (error) {
++            setStatusMsg(error instanceof Error ? error.message : '复制结构化简报失败')
++        }
++    }, [simulationStructuredBrief])
+     useEffect(() => {
+*** End Patch

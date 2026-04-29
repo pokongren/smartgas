@@ -1,0 +1,76 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const selectedSnapshotSummary = useMemo(() => {
+         if (!steadySelectedSnapshotRunId) return null
+         return steadySnapshots.find(item => item.run_id === steadySelectedSnapshotRunId) ?? null
+     }, [steadySelectedSnapshotRunId, steadySnapshots])
++
++    useEffect(() => {
++        if (!mapInstance || editMode === 'merge' || highlightedMarkersRef.current.size > 0) return
++
++        topoNodes.forEach(node => {
++            if (!node.marker) return
++
++            const match = simulationMapping?.nodeMatchesByDisplayId.get(node.id) ?? null
++            const hasNodeMatch = Boolean(match && match.matchedNodeIds.length > 0)
++            const hasInternalEdgeMatch = Boolean(match && match.matchedInternalEdgeIds.length > 0)
++            const hasSimulation = hasNodeMatch || hasInternalEdgeMatch
++            const alertLevel = match
++                ? (match.highestAlertLevel === 'critical' || match.highestInternalEdgeAlertLevel === 'critical'
++                    ? 'critical'
++                    : match.highestAlertLevel === 'warning' || match.highestInternalEdgeAlertLevel === 'warning'
++                        ? 'warning'
++                        : 'normal')
++                : 'normal'
++            const isSelected = selectedNode?.id === node.id
++            const fillColor = hasSimulation
++                ? (alertLevel === 'normal' ? TOPO_COLORS[node.type] : SIMULATION_ALERT_COLORS[alertLevel])
++                : TOPO_COLORS[node.type]
++            const borderColor = isSelected
++                ? '#ffffff'
++                : hasSimulation
++                    ? (alertLevel === 'normal' ? SIMULATION_NEUTRAL_COLOR : SIMULATION_ALERT_COLORS[alertLevel])
++                    : 'rgba(255,255,255,0.5)'
++            const glowColor = isSelected
++                ? '#ffffff'
++                : hasSimulation
++                    ? (alertLevel === 'normal' ? SIMULATION_NEUTRAL_COLOR : SIMULATION_ALERT_COLORS[alertLevel])
++                    : undefined
++            const labelColor = hasSimulation
++                ? (alertLevel === 'normal' ? '#e2f8ff' : '#ffffff')
++                : '#ffffff'
++
++            node.marker.setContent(
++                createTopoMarkerContent(node.type, node.name, isSelected, !!node.isJunction, {
++                    fillColor,
++                    borderColor,
++                    glowColor,
++                    labelColor,
++                }),
++            )
++        })
++
++        topoEdges.forEach(edge => {
++            if (!edge.poly) return
++
++            const match = simulationMapping?.edgeMatchesByDisplayId.get(edge.id) ?? null
++            const hasSimulation = Boolean(match && match.matchedEdgeIds.length > 0)
++            const strokeColor = hasSimulation
++                ? (match?.matchedEdges[0]?.color ?? SIMULATION_ALERT_COLORS[match?.highestAlertLevel ?? 'normal'])
++                : LINE_COLOR
++            const strokeWeight = hasSimulation
++                ? Math.max(LINE_WEIGHT, Math.min(6, LINE_WEIGHT + (match?.averageUtilization ?? 0) * 3))
++                : LINE_WEIGHT
++
++            edge.poly.setOptions({
++                strokeColor,
++                strokeWeight,
++                strokeOpacity: hasSimulation ? 0.95 : 0.75,
++                zIndex: hasSimulation ? 130 : 100,
++            })
++        })
++    }, [editMode, mapInstance, selectedNode?.id, simulationMapping, topoEdges, topoNodes])
+ 
+     // ================== 渲染 ==================
+*** End Patch

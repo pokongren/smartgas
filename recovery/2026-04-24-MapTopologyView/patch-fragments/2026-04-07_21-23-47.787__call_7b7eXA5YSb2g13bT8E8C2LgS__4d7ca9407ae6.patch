@@ -1,0 +1,63 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+     const selectedBaselineSnapshotSummary = useMemo(() => {
+         if (!steadyBaselineSnapshotRunId) return null
+         return steadySnapshots.find(item => item.run_id === steadyBaselineSnapshotRunId) ?? null
+     }, [steadyBaselineSnapshotRunId, steadySnapshots])
+@@
+     const recommendedCoverageScenario = useMemo(() => {
+         const itemMap = new Map(steadyTrialRunItems.map(item => [item.scenario_id, item]))
+         for (const scenarioId of [steadyScenarioId, ...COVERAGE_RECOMMENDATION_ORDER]) {
+             const matched = itemMap.get(scenarioId)
+             if (matched?.covered) {
+@@
+         }
+         return steadyTrialRunItems.find(item => item.covered) ?? steadyTrialRunItems[0] ?? null
+     }, [steadyScenarioId, steadyTrialRunItems])
++    const latestCoveredSnapshotSummary = useMemo(() => {
++        if (!latestCoveredTrialItem?.scenario_id) return null
++        return [...steadySnapshots]
++            .filter(item => item.scenario_id === latestCoveredTrialItem.scenario_id)
++            .sort((left, right) => (right.saved_at ?? '').localeCompare(left.saved_at ?? ''))[0] ?? null
++    }, [latestCoveredTrialItem?.scenario_id, steadySnapshots])
+@@
+     const demoGuideSteps = useMemo(() => {
+         return [
+             `1. 先在场景下拉里选 ${recommendedCoverageScenario?.label ?? '常规稳态'}。`,
+             '2. 点“运行正式仿真”，确认运行结果摘要里出现 run_id、生成时间和求解状态。',
+             '3. 点“保存快照”，把这次结果留档；如果要讲异常，记得先选一条基线快照。',
+             '4. 看“基线对比”和“覆盖结果清单”，确认差值、覆盖状态和最近留档时间。',
+             `5. 如果现场出问题，先按“${failureInvestigationLayerLabel}”这条线往下查。`,
+         ]
+     }, [failureInvestigationLayerLabel, recommendedCoverageScenario?.label])
++
++    function applyRecommendedScenarioQuickSwitch() {
++        if (!recommendedCoverageScenario) {
++            setStatusMsg('当前还没有可用的推荐演示场景')
++            return
++        }
++        setSteadyScenario(recommendedCoverageScenario.scenario_id)
++        setStatusMsg(`已切到推荐演示场景：${recommendedCoverageScenario.label}`)
++    }
++
++    function applySelectedSnapshotAsBaseline() {
++        if (!steadySelectedSnapshotRunId) {
++            setStatusMsg('先选一条结果快照，再把它设为基线')
++            return
++        }
++        setSteadyBaselineSnapshotRunId(steadySelectedSnapshotRunId)
++        setStatusMsg(`已把当前选中快照设为基线：${selectedSnapshotSummary?.scenario_id ?? steadySelectedSnapshotRunId}`)
++    }
++
++    function applyLatestCoveredSnapshotAsBaseline() {
++        if (!latestCoveredSnapshotSummary) {
++            setStatusMsg('当前还没有最近留档快照，先跑一条场景再设基线')
++            return
++        }
++        setSteadyBaselineSnapshotRunId(latestCoveredSnapshotSummary.run_id)
++        setStatusMsg(`已把最近留档快照设为基线：${latestCoveredSnapshotSummary.scenario_id}`)
++    }
+ 
+     // ================== 渲染 ==================
+*** End Patch

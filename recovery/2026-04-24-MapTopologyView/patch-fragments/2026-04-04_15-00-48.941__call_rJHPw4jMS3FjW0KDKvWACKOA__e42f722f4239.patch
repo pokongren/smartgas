@@ -1,0 +1,31 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    }, [editMode, pointType, mapInstance])
++    }, [editMode, pointType, mapInstance])
++
++    useEffect(() => {
++        if (editMode !== 'merge') return
++        setConnectFrom(null)
++        setStatusMsg('手工捏合：点击底层站点加入/移除，再在左侧创建枢纽')
++    }, [editMode])
++
++    const paintMergeSelection = useCallback((selectedIds: Set<string>) => {
++        for (const node of nodesRef.current) {
++            if (!node.marker) continue
++            const isSelected = !node.isJunction && selectedIds.has(node.id)
++            node.marker.setContent(createTopoMarkerContent(node.type, node.name, isSelected, !!node.isJunction))
++        }
++    }, [])
++
++    useEffect(() => {
++        if (editMode !== 'merge') {
++            if (selectedMergeNodeIds.length > 0) {
++                setSelectedMergeNodeIds([])
++            }
++            paintMergeSelection(new Set())
++            return
++        }
++        paintMergeSelection(selectedMergeNodeSet)
++    }, [editMode, paintMergeSelection, selectedMergeNodeIds.length, selectedMergeNodeSet, topoNodes])
+*** End Patch

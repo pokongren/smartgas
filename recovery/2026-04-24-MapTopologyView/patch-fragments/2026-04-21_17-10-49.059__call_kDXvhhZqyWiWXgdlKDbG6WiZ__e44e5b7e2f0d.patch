@@ -1,0 +1,28 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const runMainSteadySimulation = useCallback(async () => {
+         const error = validateSimulationParams()
+         setParamValidationError(error)
+         if (error) {
+             setStatusMsg(`鍙傛暟鏍￠獙澶辫触锛?{error}`)
+             throw new Error(error)
+         }
+         const initialInput = buildSimulationInitialInput()
+         await runSteadySimulation(initialInput ? { initialInput } : undefined)
+     }, [buildSimulationInitialInput, runSteadySimulation, validateSimulationParams])
++    const runLivePressureSteadySimulation = useCallback(async () => {
++        const error = validateSimulationParams()
++        setParamValidationError(error)
++        if (error) {
++            setStatusMsg(`参数校验失败：${error}`)
++            throw new Error(error)
++        }
++        setStatusMsg('正在读取当前压力并启动仿真...')
++        const latestSeedMap = await fetchLatestSeedNodePressureMap()
++        const initialInput = buildLivePressureInitialInput(latestSeedMap)
++        await runSteadySimulation(initialInput ? { initialInput } : undefined)
++        setStatusMsg('已按当前压力完成仿真并刷新动画结果')
++    }, [buildLivePressureInitialInput, fetchLatestSeedNodePressureMap, runSteadySimulation, validateSimulationParams])
+     useEffect(() => {
+*** End Patch

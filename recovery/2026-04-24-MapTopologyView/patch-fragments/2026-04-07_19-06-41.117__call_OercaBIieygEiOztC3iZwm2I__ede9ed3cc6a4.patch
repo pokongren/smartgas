@@ -1,0 +1,267 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ const LINE_COLOR = '#34d399'
+ const LINE_WEIGHT = 2
++const SIM_DIMMED_OPACITY = 0.18
++const SIM_ALERT_COLORS: Record<'normal' | 'warning' | 'critical', string> = {
++    normal: '#22c55e',
++    warning: '#f59e0b',
++    critical: '#ef4444',
++}
++
++interface SimulationNodeVisualMatch {
++    matchedNodeIds: string[]
++    matchedInternalEdgeIds: string[]
++    averagePressureMpa: number | null
++    highestAlertLevel: 'normal' | 'warning' | 'critical'
++    highestInternalEdgeAlertLevel: 'normal' | 'warning' | 'critical'
++}
++
++interface SimulationEdgeVisualMatch {
++    matchedEdges: Array<{
++        color: string
++        width_factor: number
++        utilization: number
++    }>
++    highestAlertLevel: 'normal' | 'warning' | 'critical'
++    averageUtilization: number | null
++}
++
++interface SimulationEdgeVisualStyle {
++    strokeColor: string
++    strokeWeight: number
++    strokeStyle: 'solid' | 'dashed'
++    strokeOpacity: number
++    zIndex: number
++}
++
++function hasNodeSimulationMatch(match: SimulationNodeVisualMatch | null | undefined): boolean {
++    return Boolean(match && (match.matchedNodeIds.length > 0 || match.matchedInternalEdgeIds.length > 0))
++}
++
++function formatPressureBadge(value: number | null): string {
++    if (value === null) return '未接入'
++    return `${value.toFixed(2)} MPa`
++}
++
++function buildSimulationMarkerContent(
++    node: TopoNode,
++    match: SimulationNodeVisualMatch | null | undefined,
++    dimmed: boolean,
++): string {
++    const baseSize = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
++    const hasMatch = hasNodeSimulationMatch(match)
++    const alertLevel = match?.matchedNodeIds.length
++        ? match.highestAlertLevel
++        : match?.matchedInternalEdgeIds.length
++            ? match.highestInternalEdgeAlertLevel
++            : 'normal'
++    const accentColor = hasMatch ? SIM_ALERT_COLORS[alertLevel] : TOPO_COLORS[node.type]
++    const fillColor = hasMatch ? accentColor : `${TOPO_COLORS[node.type]}cc`
++    const opacity = dimmed ? 0.35 : 1
++    const size = hasMatch ? baseSize + 4 : baseSize
++    const pressureLabel = hasMatch ? formatPressureBadge(match?.averagePressureMpa ?? null) : '未命中'
++    const badgeLabel = hasMatch ? ALERT_LEVEL_LABELS[alertLevel] : '待映射'
++    const badgeBackground = hasMatch ? `${accentColor}cc` : 'rgba(15, 23, 42, 0.88)'
++    const badgeColor = hasMatch ? '#041014' : '#cbd5e1'
++    const shadow = hasMatch ? `0 0 14px ${accentColor}` : 'none'
++    const shapeStyle = node.isJunction
++        ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 4px;background:${fillColor};border:2px solid rgba(255,255,255,0.92);box-shadow:${shadow};opacity:${opacity}; pointer-events: auto;`
++        : `width:${size}px;height:${size}px;border-radius:50%;background:${fillColor};border:2px solid rgba(255,255,255,0.92);box-shadow:${shadow};opacity:${opacity}; pointer-events: auto;`
++
++    return `
++        <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
++            <div style="${shapeStyle}"></div>
++            <div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10; opacity:${opacity};">${node.name}</div>
++            <div style="position: absolute; top: ${size + 20}px; white-space: nowrap; font-size: 10px; color: #e2e8f0; text-shadow: 0 0 2px #020617, 0 0 2px #020617; z-index: 10; opacity:${opacity};">${pressureLabel}</div>
++            <div style="position: absolute; top: -12px; white-space: nowrap; font-size: 9px; font-weight: 700; color:${badgeColor}; background:${badgeBackground}; border:1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 1px 6px; z-index: 11; opacity:${opacity};">${badgeLabel}</div>
++        </div>
++    `
++}
++
++function resolveSimulationEdgeVisualStyle(
++    match: SimulationEdgeVisualMatch | null | undefined,
++    dimmed: boolean,
++): SimulationEdgeVisualStyle {
++    if (!match || match.matchedEdges.length === 0) {
++        return {
++            strokeColor: LINE_COLOR,
++            strokeWeight: LINE_WEIGHT,
++            strokeStyle: 'dashed',
++            strokeOpacity: dimmed ? 0.06 : 0.22,
++            zIndex: 90,
++        }
++    }
++
++    const strongestEdge = [...match.matchedEdges].sort((a, b) => b.utilization - a.utilization)[0]
++    const widthFactor = Math.max(...match.matchedEdges.map(item => item.width_factor))
++    const strokeOpacity = dimmed ? SIM_DIMMED_OPACITY : 0.96
++
++    return {
++        strokeColor: strongestEdge.color,
++        strokeWeight: Math.max(3, Math.min(10, Number((LINE_WEIGHT + widthFactor * 4).toFixed(2)))),
++        strokeStyle: match.highestAlertLevel === 'critical' ? 'dashed' : 'solid',
++        strokeOpacity,
++        zIndex: match.highestAlertLevel === 'critical' ? 145 : 130,
++    }
++}
+@@
+     const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
+     const [isPreviewing, setIsPreviewing] = useState(false)
++    const [simulationHitFocus, setSimulationHitFocus] = useState(true)
+@@
+     const mappingSummary = simulationMapping?.summary ?? null
+     const unmatchedNodePreview = mappingSummary?.unmatchedOverlayNodeIds.slice(0, 5) ?? []
+     const unmatchedEdgePreview = mappingSummary?.unmatchedOverlayEdgeIds.slice(0, 5) ?? []
++    const simulationVisualSummary = useMemo(() => {
++        if (!simulationMapping) return null
++
++        const highlightedNodes = topoNodes.filter(node => {
++            const match = simulationMapping.nodeMatchesByDisplayId.get(node.id) ?? null
++            return hasNodeSimulationMatch(match)
++        })
++        const highlightedEdges = topoEdges.filter(edge => {
++            const match = simulationMapping.edgeMatchesByDisplayId.get(edge.id) ?? null
++            return Boolean(match && match.matchedEdges.length > 0)
++        })
++        const criticalNodes = highlightedNodes.filter(node => {
++            const match = simulationMapping.nodeMatchesByDisplayId.get(node.id) ?? null
++            const nodeAlert = match?.highestAlertLevel ?? 'normal'
++            const internalAlert = match?.highestInternalEdgeAlertLevel ?? 'normal'
++            return nodeAlert === 'critical' || internalAlert === 'critical'
++        })
++        const warningEdges = highlightedEdges.filter(edge => {
++            const match = simulationMapping.edgeMatchesByDisplayId.get(edge.id) ?? null
++            return match?.highestAlertLevel === 'warning' || match?.highestAlertLevel === 'critical'
++        })
++
++        return {
++            highlightedNodeCount: highlightedNodes.length,
++            highlightedEdgeCount: highlightedEdges.length,
++            criticalNodeCount: criticalNodes.length,
++            warningEdgeCount: warningEdges.length,
++        }
++    }, [simulationMapping, topoEdges, topoNodes])
+     const steadyScenarioOption = useMemo(() => {
+         return MAINLINE_SCENARIOS.find(item => item.id === steadyScenarioId) ?? null
+     }, [steadyScenarioId])
+@@
+     const selectedSnapshotSummary = useMemo(() => {
+         if (!steadySelectedSnapshotRunId) return null
+         return steadySnapshots.find(item => item.run_id === steadySelectedSnapshotRunId) ?? null
+     }, [steadySelectedSnapshotRunId, steadySnapshots])
++    const shouldApplySimulationVisuals = Boolean(
++        steadyOverlay &&
++        simulationMapping &&
++        editMode === 'view' &&
++        activeTab === 'simulation'
++    )
++
++    useEffect(() => {
++        topoNodes.forEach(node => {
++            if (!node.marker) return
++
++            const match = simulationMapping?.nodeMatchesByDisplayId.get(node.id) ?? null
++            const dimmed = Boolean(
++                shouldApplySimulationVisuals &&
++                simulationHitFocus &&
++                !hasNodeSimulationMatch(match)
++            )
++            const content = shouldApplySimulationVisuals
++                ? buildSimulationMarkerContent(node, match, dimmed)
++                : createTopoMarkerContent(node.type, node.name, false, !!node.isJunction)
++            node.marker.setContent(content)
++            if (typeof node.marker.setOpacity === 'function') {
++                node.marker.setOpacity(1)
++            }
++        })
++
++        topoEdges.forEach(edge => {
++            if (!edge.poly) return
++
++            const match = simulationMapping?.edgeMatchesByDisplayId.get(edge.id) ?? null
++            const dimmed = Boolean(
++                shouldApplySimulationVisuals &&
++                simulationHitFocus &&
++                (!match || match.matchedEdges.length === 0)
++            )
++            const style = shouldApplySimulationVisuals
++                ? resolveSimulationEdgeVisualStyle(match, dimmed)
++                : {
++                    strokeColor: LINE_COLOR,
++                    strokeWeight: LINE_WEIGHT,
++                    strokeStyle: 'solid' as const,
++                    strokeOpacity: 0.9,
++                    zIndex: 100,
++                }
++
++            edge.poly.setOptions(style)
++        })
++    }, [
++        shouldApplySimulationVisuals,
++        simulationHitFocus,
++        simulationMapping,
++        topoEdges,
++        topoNodes,
++    ])
+ 
+     // ================== 渲染 ==================
+@@
+                                         <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 space-y-3">
+                                             <div className="flex items-center justify-between gap-3">
+                                                 <div>
+                                                     <div className="text-[10px] uppercase tracking-wider text-cyan-200">正式仿真主链</div>
+@@
+                                                     <button
+                                                         onClick={() => void clearSteadyOverlay()}
+                                                         className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] text-gray-300 transition hover:bg-white/10"
+                                                     >
+                                                         清空结果
+                                                     </button>
+                                                 </div>
+                                             </div>
++                                            <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-3 py-3 text-[11px] text-gray-300">
++                                                <div className="flex items-center justify-between gap-3">
++                                                    <div>
++                                                        <div className="text-[10px] uppercase tracking-wider text-emerald-200">地图覆盖层</div>
++                                                        <div className="mt-1 text-gray-400">当前仅在“仿真”页签下把命中结果落到地图，不改旧拓扑编辑规则。</div>
++                                                    </div>
++                                                    <button
++                                                        onClick={() => setSimulationHitFocus(prev => !prev)}
++                                                        className={`rounded-full px-3 py-1 text-[10px] font-semibold transition ${
++                                                            simulationHitFocus
++                                                                ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30'
++                                                                : 'bg-white/5 text-gray-300 border border-white/10'
++                                                        }`}
++                                                    >
++                                                        {simulationHitFocus ? '只看仿真命中段' : '显示全部拓扑'}
++                                                    </button>
++                                                </div>
++                                                <div className="mt-3 grid grid-cols-2 gap-2">
++                                                    <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                        <div className="text-[10px] text-gray-500">高亮节点</div>
++                                                        <div className="mt-1 font-semibold text-white">{simulationVisualSummary?.highlightedNodeCount ?? 0}</div>
++                                                    </div>
++                                                    <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                        <div className="text-[10px] text-gray-500">高亮连线</div>
++                                                        <div className="mt-1 font-semibold text-white">{simulationVisualSummary?.highlightedEdgeCount ?? 0}</div>
++                                                    </div>
++                                                    <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                        <div className="text-[10px] text-gray-500">严重节点</div>
++                                                        <div className="mt-1 font-semibold text-rose-300">{simulationVisualSummary?.criticalNodeCount ?? 0}</div>
++                                                    </div>
++                                                    <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                        <div className="text-[10px] text-gray-500">预警连线</div>
++                                                        <div className="mt-1 font-semibold text-amber-300">{simulationVisualSummary?.warningEdgeCount ?? 0}</div>
++                                                    </div>
++                                                </div>
++                                                <div className="mt-3 text-[11px] leading-5 text-gray-400">
++                                                    节点会直接显示压力和告警级别，连线会按 overlay 颜色与线宽落图；若显示异常，先查“映射命中”再查 overlay 契约。
++                                                </div>
++                                            </div>
+                                             <div className="grid grid-cols-2 gap-2">
+                                                 <button
+                                                     onClick={() => void runSteadySimulation()}
+                                                     disabled={steadySimLoading}
+*** End Patch

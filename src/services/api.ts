@@ -132,6 +132,7 @@ export interface SeedNodePressure {
     operating_pressure_out?: number
     target_pressure_mpa?: number
     min_pressure_mpa?: number
+    temperature_c?: number
 }
 
 // ============ 管线数据包 API（替代前端硬编码） ============

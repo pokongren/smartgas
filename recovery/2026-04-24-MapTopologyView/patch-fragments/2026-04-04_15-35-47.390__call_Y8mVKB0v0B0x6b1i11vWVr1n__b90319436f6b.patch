@@ -1,0 +1,114 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\docs\topology-pinch-stability-fix-summary-2026-04-04.md
++# 拓扑捏合稳定性修复总结
++
++## 这次做了什么
++
++这轮把两条“捏合”相关链路一起收了：
++
++1. 地图拓扑里的“手工捏合站点成枢纽”
++2. Canvas 拓扑视图里的触摸捏合缩放
++
++前者之前的问题是：前端还留着入口，但运行时优先读 `junction_groups_rebuilt`，手工创建的捏合结果很容易被盖掉；而且地图编辑器里虽然有“兼容手工捏合”按钮，实际工作流并不完整。
++
++后者的问题是：[`src/views/TopologyView.tsx`](/F:/smartgas-grid/src/views/TopologyView.tsx) 里重复声明了一组触摸处理函数，直接把前端构建打挂，捏合缩放这条线也就谈不上稳定。
++
++## 为什么这么改
++
++这次没有把手工捏合重新抬成主事实，而是改成“运行时重编结果之上的覆盖层”。
++
++这样做的好处是：
++
++- 默认还是走后端重编出来的稳定结果
++- 真遇到错误归并、漏归并时，手工捏合还能补
++- 手工修正只覆盖冲突站点，不会把整张拓扑图拖乱
++
++如果继续维持原来的状态，就会出现很别扭的情况：
++
++- 用户点了“手工捏合”，接口返回成功
++- 但运行时展示依旧只看 rebuilt 结果
++- 页面看起来像“点了没生效”，实际是两套事实来源在打架
++
++## 改动范围
++
++### 后端
++
++- [`backend/app/services/junction_groups.py`](/F:/smartgas-grid/backend/app/services/junction_groups.py)
++  - 给手工捏合加了明确的 overlay 标记
++  - 运行时读取时改成“基础层 + 手工覆盖层”
++  - 手工覆盖和重编结果冲突时，手工覆盖优先，但只影响冲突站点
++- [`backend/app/routers/topology_editor.py`](/F:/smartgas-grid/backend/app/routers/topology_editor.py)
++  - `POST /api/topology/junctions` 创建手工捏合时统一打标
++  - 创建前拦截冲突的手工覆盖，避免重复叠同一批站点
++  - `merge-stations` 创建关联记录时也走同一套标记策略
++
++### 前端
++
++- [`src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx)
++  - 补齐 merge 模式下的站点选择、命名、备注、创建、拆分入口
++  - 区分“运行时重编”与“手工捏合覆盖”
++  - 选中的手工捏合枢纽可以直接拆分，运行时重编结果不允许误删
++- [`src/views/TopologyView.tsx`](/F:/smartgas-grid/src/views/TopologyView.tsx)
++  - 删除重复声明的触摸处理函数
++  - 保留已有那套更完整的触摸/捏合逻辑，恢复构建稳定性
++
++## 验证怎么做的
++
++### 1. 前端构建
++
++- 命令：`npm run build`
++- 看什么：确认 `MapTopologyView.tsx` 和 `TopologyView.tsx` 都能通过编译，尤其是触摸捏合相关逻辑不再重复声明
++- 结果：通过
++
++### 2. 后端语法检查
++
++- 命令：`python -m compileall backend/app/services/junction_groups.py backend/app/routers/topology_editor.py`
++- 看什么：确认 overlay 相关逻辑没有语法错误
++- 结果：通过
++
++### 3. 运行时枢纽读取
++
++- 用内联 Python 直接调用 `load_runtime_junction_groups(session)`
++- 看什么：运行时枢纽能正常读出来，来源字段可识别
++- 结果：
++
++| 项目 | 结果 |
++| --- | --- |
++| runtime groups 总数 | 12 |
++| `junction_groups_rebuilt` | 12 |
++| `junction_groups_manual_overlay` | 0 |
++
++当前库里暂时没有手工覆盖层，这个结果是正常的，说明至少没把 runtime 读取链路改坏。
++
++## 前后对比
++
++因为这轮主要是编辑器交互和运行时逻辑修复，没有额外产出合适截图，这里用表格代替。
++
++| 对比项 | 修改前 | 修改后 |
++| --- | --- | --- |
++| 手工捏合写入后是否稳定显示 | 不稳定，容易被 rebuilt 结果盖掉 | 稳定，作为 overlay 参与运行时读取 |
++| 地图拓扑编辑器里的手工捏合入口 | 有按钮，但工作流不完整 | 可选站、可命名、可创建、可拆分 |
++| 运行时枢纽来源是否可区分 | 不清楚 | 可区分 rebuilt / manual overlay |
++| Canvas 拓扑触摸捏合 | 构建被重复声明卡住 | 构建恢复，通过现有触摸逻辑运行 |
++
++## 影响范围
++
++- 直接影响：
++  - 地图拓扑编辑器里的手工捏合能力
++  - 运行时枢纽读取与展示
++  - 拓扑视图触摸捏合构建稳定性
++- 这次先不动：
++  - 枢纽重编算法本身
++  - 全国地图的层级显示策略
++  - 历史脏数据的批量清理
++
++## 风险和回退点
++
++- 现在库里还没有新的手工 overlay 样本，所以“创建后再读取”的完整链路我做的是代码级验证，还没在这次执行里往库里真的写一条再拆回去。
++- `merge-stations` 这条旧接口本身语义还是偏老流程，这次只是让它的标记体系别再游离出去，没有把它改造成主入口。
++- 如果需要回退，优先回退这三个文件：
++  - [`backend/app/services/junction_groups.py`](/F:/smartgas-grid/backend/app/services/junction_groups.py)
++  - [`backend/app/routers/topology_editor.py`](/F:/smartgas-grid/backend/app/routers/topology_editor.py)
++  - [`src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx)
++
+*** End Patch

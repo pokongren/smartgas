@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-function buildOpsSuggestion(alertCount: number, avgUtilization: number, solverStatus: 'converged' | 'max_iter' | 'error'): string {
++/*function buildOpsSuggestion(alertCount: number, avgUtilization: number, solverStatus: 'converged' | 'max_iter' | 'error'): string {
+@@
+-function safeSetMarkerContent(marker: any, content: string): void {
++*/
++function buildOpsSuggestion(alertCount: number, avgUtilization: number, solverStatus: 'converged' | 'max_iter' | 'error'): string {
++    if (solverStatus === 'error') return '本次求解失败，先检查场景参数和边界条件。'
++    if (solverStatus === 'max_iter') return '达到迭代上限，建议先降低扰动幅度后重试。'
++    if (alertCount >= 5) return '告警较多，优先排查主干高负荷区段。'
++    if (avgUtilization >= 0.82) return '利用率偏高，建议先做限流对比场景。'
++    return '运行平稳，可作为后续对比基线。'
++}
++
++function safeSetMarkerContent(marker: any, content: string): void {
+*** End Patch

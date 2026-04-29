@@ -1,0 +1,86 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
+     converged: '已收敛',
+     max_iter: '达到迭代上限',
+     error: '求解失败',
+ }
++
++const MAPPING_FAILURE_LAYER_LABELS: Record<
++    'frontend-consumption' | 'mapping-source-ids' | 'overlay-contract' | 'rendering-style',
++    string
++> = {
++    'frontend-consumption': '前端消费层',
++    'mapping-source-ids': '映射层 source IDs',
++    'overlay-contract': 'overlay 契约层',
++    'rendering-style': '地图渲染层',
++}
+@@
+     const mappingSummary = simulationMapping?.summary ?? null
+     const unmatchedNodePreview = mappingSummary?.unmatchedOverlayNodeIds.slice(0, 5) ?? []
+     const unmatchedEdgePreview = mappingSummary?.unmatchedOverlayEdgeIds.slice(0, 5) ?? []
++    const missingSourceNodePreview = mappingSummary?.missingSourceNodeIdsPreview ?? []
++    const missingSourceEdgePreview = mappingSummary?.missingSourceEdgeIdsPreview ?? []
++    const missingInternalEdgePreview = mappingSummary?.missingInternalSourceEdgeIdsPreview ?? []
+     const steadyScenarioOption = useMemo(() => {
+         return MAINLINE_SCENARIOS.find(item => item.id === steadyScenarioId) ?? null
+     }, [steadyScenarioId])
+@@
+                                         <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 p-3 space-y-2">
+                                             <div className="text-[10px] uppercase tracking-wider text-cyan-200">映射覆盖摘要</div>
+                                             <div className="grid grid-cols-2 gap-2 text-xs">
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+                                                     <div className="text-[10px] text-gray-500">显示节点命中</div>
+                                                     <div className="mt-1 font-semibold text-white">{mappingSummary?.displayNodesWithMatchedOverlay ?? 0} / {mappingSummary?.displayNodeCount ?? 0}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+                                                     <div className="text-[10px] text-gray-500">显示连线命中</div>
+                                                     <div className="mt-1 font-semibold text-white">{mappingSummary?.displayEdgesWithMatchedOverlay ?? 0} / {mappingSummary?.displayEdgeCount ?? 0}</div>
+                                                 </div>
++                                                <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
++                                                    <div className="text-[10px] text-gray-500">节点全命中/部分/未命中</div>
++                                                    <div className="mt-1 font-semibold text-white">
++                                                        {mappingSummary?.displayNodesFullyMatched ?? 0} / {mappingSummary?.displayNodesPartiallyMatched ?? 0} / {mappingSummary?.displayNodesUnmatched ?? 0}
++                                                    </div>
++                                                </div>
++                                                <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
++                                                    <div className="text-[10px] text-gray-500">连线全命中/部分/未命中</div>
++                                                    <div className="mt-1 font-semibold text-white">
++                                                        {mappingSummary?.displayEdgesFullyMatched ?? 0} / {mappingSummary?.displayEdgesPartiallyMatched ?? 0} / {mappingSummary?.displayEdgesUnmatched ?? 0}
++                                                    </div>
++                                                </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+                                                     <div className="text-[10px] text-gray-500">枢纽内部边命中</div>
+                                                     <div className="mt-1 font-semibold text-cyan-200">{mappingSummary?.displayNodesWithMatchedInternalEdges ?? 0}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+@@
+                                                     <div className="text-[10px] text-gray-500">未命中 overlay 边</div>
+                                                     <div className="mt-1 font-semibold text-amber-300">{mappingSummary?.unmatchedOverlayEdgeIds.length ?? 0}</div>
+                                                 </div>
++                                                <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
++                                                    <div className="text-[10px] text-gray-500">缺失 source 节点 ID</div>
++                                                    <div className="mt-1 font-semibold text-amber-300">{mappingSummary?.missingSourceNodeIdCount ?? 0}</div>
++                                                </div>
++                                                <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
++                                                    <div className="text-[10px] text-gray-500">缺失 source 边/内部边 ID</div>
++                                                    <div className="mt-1 font-semibold text-amber-300">
++                                                        {(mappingSummary?.missingSourceEdgeIdCount ?? 0) + (mappingSummary?.missingInternalSourceEdgeIdCount ?? 0)}
++                                                    </div>
++                                                </div>
+                                             </div>
+                                             <div className="rounded-lg bg-black/15 px-3 py-2 text-[11px] leading-5 text-gray-300">
+                                                 <div>未命中节点预览：{unmatchedNodePreview.join(', ') || '无'}</div>
+                                                 <div>未命中边预览：{unmatchedEdgePreview.join(', ') || '无'}</div>
++                                                <div>缺失 source 节点预览：{missingSourceNodePreview.join(', ') || '无'}</div>
++                                                <div>缺失 source 边预览：{missingSourceEdgePreview.join(', ') || '无'}</div>
++                                                <div>缺失枢纽内部边预览：{missingInternalEdgePreview.join(', ') || '无'}</div>
++                                                <div>
++                                                    验证失败先查：
++                                                    {mappingSummary ? MAPPING_FAILURE_LAYER_LABELS[mappingSummary.failureInvestigationLayer] : '-'}
++                                                </div>
+                                                 <div>这块只说明映射是否接住，不代表已经把结果落到地图样式上。</div>
+                                             </div>
+                                         </div>
+*** End Patch

@@ -1,0 +1,20 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                     <button
+                                         onClick={runCutoffSimulation}
+                                         disabled={!cutoffNodeId || topoNodes.length === 0}
+                                         className="flex-1 bg-red-800/50 hover:bg-red-700 text-red-300 py-2 rounded-lg text-xs border border-red-700/40 transition-colors disabled:opacity-40 flex items-center justify-center gap-1">
+                                         <span className="material-symbols-outlined text-sm">play_arrow</span>杩愯浠跨湡
+                                     </button>
++                                    <button
++                                        onClick={() => setShowCutoffAiModal(true)}
++                                        disabled={!cutoffResult}
++                                        className="flex-1 bg-cyan-900/40 hover:bg-cyan-800 text-cyan-200 py-2 rounded-lg text-xs border border-cyan-600/40 transition-colors disabled:opacity-40 flex items-center justify-center gap-1">
++                                        <span className="material-symbols-outlined text-sm">auto_awesome</span>AI解读
++                                    </button>
+                                     <button
+                                         onClick={clearCutoffHighlight}
+                                         disabled={!cutoffNodeId}
+                                         className="bg-gray-800/60 hover:bg-gray-700 text-gray-400 py-2 px-3 rounded-lg text-xs border border-gray-700/40 transition-colors disabled:opacity-40">
+*** End Patch

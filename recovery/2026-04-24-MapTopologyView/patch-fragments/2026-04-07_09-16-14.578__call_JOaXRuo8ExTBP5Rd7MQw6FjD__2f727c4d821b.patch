@@ -1,0 +1,143 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/automation/project-heartbeat-2026-04-07-171419.md
++# 项目心跳巡检总结（2026-04-07 17:14:19）
++
++## 主目标
++
++固定在 `F:\smartgas-grid` 主目录做项目心跳巡检，只认主目录事实，不拿 detached worktree 顶结论；覆盖 git/docs、地图缩放与层级显示、甪直 AI 分析、拓扑仿真、枢纽规则与数据库口径、导入脚本、AI 模块链路。
++
++## 上下文与已知信息
++
++- 主目录事实：`F:\smartgas-grid`
++- 当前分支：`拓扑设想`
++- 当前 HEAD：`f75536d67424e7fd48dbfc34d3d9223f986836b4`
++- 主目录领先远端：`ahead 3`
++- 当前 detached worktree：`C:\Users\Administrator\.codex\worktrees\58bc\smartgas-grid`
++- `.git` 形态：主目录是目录型真实仓库；detached worktree 不能作为主结论来源
++
++## 主代理与子代理分工
++
++- 主代理：锁定主目录事实，汇总证据，做最终判断
++- 侦察代理A：git/worktree/docs 变化线
++- 侦察代理B：甪直 AI 分析链路线
++- 侦察代理C：拓扑仿真链路线
++- 验证：主代理独立跑脚本回归，交叉复核链路是否真通
++
++## 修改逻辑
++
++本轮不改业务代码，只补巡检文档与 automation memory。
++
++## 执行顺序
++
++### 第1阶段第1轮
++
++先校验 `F:\smartgas-grid` 才是主目录，再看 `.git`、`git worktree list`、`git status`、`git log`。
++
++### 第1阶段第2轮
++
++并行侦察三条线：
++
++| 巡检项 | 结论 | 证据 |
++| --- | --- | --- |
++| 主目录落点 | 通过 | 主仓库在 `F:\smartgas-grid`，分支 `拓扑设想`，worktree 列表里只有主目录是分支态 |
++| git 状态 | 通过但工作树较脏 | 业务改动集中在 AI/WE1/拓扑文件；docs 当前没有未提交 diff |
++| docs 变化 | 通过 | `docs` 最近写入集中在 2026-04-07 的 WE1/甪直总结文档；`git status -- docs` 为空 |
++| 地图缩放与层级显示 | 通过 | [`F:/smartgas-grid/src/utils/hierarchyRenderer.ts`](F:/smartgas-grid/src/utils/hierarchyRenderer.ts) 定义 zoom-LOD 阈值；[`F:/smartgas-grid/src/views/GlobalPipelineView.tsx`](F:/smartgas-grid/src/views/GlobalPipelineView.tsx) 用 `visibleLayers`/`toggleLayer` 控制层级显示 |
++| 甪直 AI 分析 | 通过 | [`F:/smartgas-grid/backend/app/routers/ai_assistant.py`](F:/smartgas-grid/backend/app/routers/ai_assistant.py) 提供 `luzhi-pilot/trace|summary|report`；[`F:/smartgas-grid/src/views/GlobalPipelineView.tsx`](F:/smartgas-grid/src/views/GlobalPipelineView.tsx) 注入页面与运行时上下文 |
++| 拓扑仿真主链 | 通过 | [`F:/smartgas-grid/src/views/TopologyView.tsx`](F:/smartgas-grid/src/views/TopologyView.tsx) + [`F:/smartgas-grid/src/hooks/useSimulation.ts`](F:/smartgas-grid/src/hooks/useSimulation.ts) 命中 `/api/pipeline-packages/simulation-overlay` |
++| MapTopologyView 独立仿真入口 | 未通过一致性检查 | [`F:/smartgas-grid/src/views/MapTopologyView.tsx`](F:/smartgas-grid/src/views/MapTopologyView.tsx) 仍走旧的 `topologyAPI.simulate` `/api/emergency/simulate-failure` 和本地 `simulateCutoff`，没接到 WE1 steady solver 主链 |
++| 枢纽规则与数据库口径 | 通过 | [`F:/smartgas-grid/backend/app/routers/pipeline_packages.py`](F:/smartgas-grid/backend/app/routers/pipeline_packages.py) 通过 `load_runtime_junction_groups(session)` 按数据库运行时重编；[`F:/smartgas-grid/src/views/MapTopologyView.tsx`](F:/smartgas-grid/src/views/MapTopologyView.tsx) 默认 `runtime_readonly` |
++| 导入脚本 | 部分通过 | 前端拓扑导入走 [`F:/smartgas-grid/src/views/MapTopologyView.tsx`](F:/smartgas-grid/src/views/MapTopologyView.tsx) 的 `importTopology`；甪直脚本 [`F:/smartgas-grid/scripts/parse_luzhi.py`](F:/smartgas-grid/scripts/parse_luzhi.py) 仍绑死本机下载路径 |
++| AI 模块链路 | 通过 | [`F:/smartgas-grid/src/components/ai-assistant/useAiAssistantChat.ts`](F:/smartgas-grid/src/components/ai-assistant/useAiAssistantChat.ts) 会带 `context + analysis_mode=subagents`；[`F:/smartgas-grid/backend/app/services/ai_analysis_orchestrator.py`](F:/smartgas-grid/backend/app/services/ai_analysis_orchestrator.py) 命中 orchestration 判定 |
++
++## 修改前后对比
++
++没有业务界面截图，因为本轮未改前端，只做只读巡检；改用巡检前后状态表说明。
++
++| 对比项 | 巡检前 | 巡检后 |
++| --- | --- | --- |
++| 主目录基线 | detached worktree 可能干扰判断 | 已确认只以 `F:\smartgas-grid` 为准 |
++| 甪直 AI 命中链路 | 分支优先级未明确 | 已确认为 `direct -> luzhi-pilot -> orchestrated -> legacy` |
++| 甪直 trace 状态 | 更新时间未确认 | 已确认 trace 文件为 `backend/data/ai_traces/luzhi_pilot_trace.jsonl`，最后写入 `2026-04-07 14:06:00` |
++| WE1 主链与独立入口 | 是否一致未确认 | 已确认主链通过，但 `MapTopologyView` 独立入口仍是旧链路 |
++
++## 验证方式
++
++### 甪直 AI 分析
++
++- 接口检查：看 [`F:/smartgas-grid/backend/app/routers/ai_assistant.py`](F:/smartgas-grid/backend/app/routers/ai_assistant.py) 是否暴露 `trace`、`summary`、`report`
++- 运行时上下文：看 [`F:/smartgas-grid/src/views/GlobalPipelineView.tsx`](F:/smartgas-grid/src/views/GlobalPipelineView.tsx)、[`F:/smartgas-grid/src/components/ai-assistant/runtimeAssistantContext.ts`](F:/smartgas-grid/src/components/ai-assistant/runtimeAssistantContext.ts)、[`F:/smartgas-grid/src/components/ai-assistant/useAiAssistantPageContext.ts`](F:/smartgas-grid/src/components/ai-assistant/useAiAssistantPageContext.ts)
++- 分支判定：看 `chat()` 内顺序与 [`F:/smartgas-grid/backend/app/services/ai_analysis_orchestrator.py`](F:/smartgas-grid/backend/app/services/ai_analysis_orchestrator.py)
++- 脚本回归：
++  - `python backend/scripts/verify_luzhi_pilot_phase6.py` 通过
++  - `python backend/scripts/verify_luzhi_pilot_phase7.py` 通过
++
++通过标准：
++
++- 三个接口都存在
++- `GlobalPipelineView` 能注入 `pilot_enabled`、`pilot_station_name`、`luzhi_snapshot`
++- 聊天请求会带 `context`
++- `trace/summary/report` 验收脚本通过
++
++失败时先查哪层：
++
++1. 页面上下文注入层
++2. `useAiAssistantChat` 请求层
++3. `ai_assistant.py` 分支判定层
++4. trace 文件读写层
++
++### 拓扑仿真
++
++- 主链检查：[`F:/smartgas-grid/src/views/TopologyView.tsx`](F:/smartgas-grid/src/views/TopologyView.tsx) -> [`F:/smartgas-grid/src/hooks/useSimulation.ts`](F:/smartgas-grid/src/hooks/useSimulation.ts) -> [`F:/smartgas-grid/backend/app/routers/topology_simulation.py`](F:/smartgas-grid/backend/app/routers/topology_simulation.py) -> [`F:/smartgas-grid/backend/app/services/we1_solver_input_service.py`](F:/smartgas-grid/backend/app/services/we1_solver_input_service.py) -> [`F:/smartgas-grid/backend/app/services/topology_simulation.py`](F:/smartgas-grid/backend/app/services/topology_simulation.py)
++- 独立入口检查：[`F:/smartgas-grid/src/views/MapTopologyView.tsx`](F:/smartgas-grid/src/views/MapTopologyView.tsx) 是否接入同一主链
++- WE1 校验脚本：
++  - `python backend/scripts/verify_we1_phase34_final.py` 通过
++  - `python backend/scripts/verify_we1_phase4.py` 通过
++  - `python backend/scripts/verify_we1_snapshot_archive.py` 通过
++
++通过标准：
++
++- `simulation-overlay` 返回统一 overlay 契约
++- `TopologyView` 与 `SimPanel` 消费统一契约
++- WE1 验收脚本通过
++- `MapTopologyView` 若宣称独立仿真入口，也应接到同一 solver 主链
++
++失败时先查哪层：
++
++1. 前端入口层
++2. router 层
++3. solver input 层
++4. steady solver 层
++
++## 风险与回退点
++
++- 当前最大风险不是 WE1 主链，而是 `MapTopologyView` 还挂在旧仿真入口；如果用户从地图拓扑页点“仿真”，看到的不是 WE1 当前主链结果
++- `scripts/parse_luzhi.py` 仍绑死本机下载目录，适合人工一次性导入，不适合作为稳定巡检链路
++- 本轮跑 `verify_we1_snapshot_archive.py` 时生成了一个临时快照文件 `backend/data/we1_snapshots/mainline_zhongwei_jingbian/we1-17eb6d5238ef.json`；因为环境策略阻止删除命令，我只能保留并在这里记账
++
++## 最终交付物
++
++- 本文档
++- automation memory 更新
++- 当前进展摘要：
++  - 主目录基线已锁定，git/docs 事实已核清
++  - 甪直 AI 分析链路已跑通并有 trace/summary/report 验证
++  - WE1 主链仿真已通过联合回归与快照归档验证
++  - 唯一明确偏差是 `MapTopologyView` 独立仿真入口还没切到 WE1 主链
+*** Add File: C:/Users/Administrator/.codex/automations/automation/memory.md
++# automation memory
++
++## 2026-04-07 17:14:19
++
++- 运行位置已按要求锁定为 `F:\smartgas-grid`，确认主目录是分支工作树 `拓扑设想`，HEAD `f75536d67424e7fd48dbfc34d3d9223f986836b4`，不能用 detached worktree 顶结论。
++- git 事实：主目录领先远端 3 个提交，工作树有大量 AI/WE1/拓扑相关改动；`docs` 当前无未提交 diff，但 `docs` 在 2026-04-07 有多份新总结文档落地。
++- 甪直 AI 分析链路已核清：`/api/ai-assistant/luzhi-pilot/trace|summary|report` 在 `backend/app/routers/ai_assistant.py`，trace 文件 `backend/data/ai_traces/luzhi_pilot_trace.jsonl` 最后更新时间为 2026-04-07 14:06:00；页面和运行时上下文由 `GlobalPipelineView.tsx` + `runtimeAssistantContext.ts` + `useAiAssistantPageContext.ts` 注入，请求由 `useAiAssistantChat.ts` 带 `context + analysis_mode=subagents` 发送。
++- 甪直分支命中顺序已确认：`direct -> luzhi-pilot -> orchestrated -> legacy`。若命中甪直试点上下文且问题像分析问题，会先走 `try_luzhi_pilot_reply`；否则有上下文时通常走 orchestration。
++- 甪直验证结果：`python backend/scripts/verify_luzhi_pilot_phase6.py` 通过，`python backend/scripts/verify_luzhi_pilot_phase7.py` 通过。
++- 拓扑仿真主链已核清：`TopologyView.tsx` -> `useSimulation.ts` -> `/api/pipeline-packages/simulation-overlay` -> `topology_simulation.py` -> `build_we1_solver_input()` -> `solve_steady()`。
++- WE1 验证结果：`verify_we1_phase34_final.py`、`verify_we1_phase4.py`、`verify_we1_snapshot_archive.py` 全通过；主链 steady/failure 与 branch overlay 契约一致，快照归档可读回。
++- 明确偏差：`MapTopologyView.tsx` 独立仿真入口仍走旧的 `/api/emergency/simulate-failure` 和本地 `simulateCutoff`，没有接到 WE1 steady solver 主链；这是本轮最需要继续盯的点。
++- 枢纽规则与数据库口径当前一致：`pipeline_packages.py` 通过 `load_runtime_junction_groups(session)` 用数据库运行时枢纽重编，`MapTopologyView.tsx` 默认 `runtime_readonly`，前端不再把手工捏合作为主流程。
++- 导入脚本现状：前端拓扑导入在 `MapTopologyView.tsx` 的 `importTopology`；甪直导入脚本 `scripts/parse_luzhi.py` 仍依赖固定本机下载路径，不适合直接当自动化链路。
++- 临时副作用：运行 `verify_we1_snapshot_archive.py` 生成了 `backend/data/we1_snapshots/mainline_zhongwei_jingbian/we1-17eb6d5238ef.json`；尝试删除时被环境策略拦截，下轮如果还在需要继续记账。
+*** End Patch

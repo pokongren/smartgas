@@ -1,0 +1,121 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                                    <div className="grid grid-cols-2 gap-2">
+-                                        <button
+-                                            onClick={async () => {
+-                                                try {
+-                                                    await runSteadySimulation()
+-                                                    setStatusMsg(`WE1 主仿真已运行：${steadyScenarioOption?.label ?? steadyScenarioId}`)
+-                                                } catch (error) {
+-                                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 主仿真运行失败')
+-                                                }
+-                                            }}
+-                                            disabled={steadySimLoading}
+-                                            className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white transition-all hover:bg-cyan-600 disabled:opacity-50"
+-                                        >
+-                                            {steadySimLoading ? '运行中...' : '运行仿真'}
+-                                        <button
+-                                            onClick={async () => {
+-                                                try {
+-                                                    await loadSteadySelectedSnapshot()
+-                                                    setStatusMsg(`??????${selectedSnapshotSummary?.scenario_id ?? steadySelectedSnapshotRunId}`)
+-                                                } catch (error) {
+-                                                    setStatusMsg(error instanceof Error ? error.message : '??????')
+-                                                }
+-                                            }}
+-                                            disabled={!steadySelectedSnapshotRunId || steadySnapshotLoading}
+-                                            className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs font-medium text-cyan-100 transition-all hover:bg-cyan-800/30 disabled:opacity-50"
+-                                        >
+-                                            ????
+-                                        </button>
+-                                        <button
+-                                            onClick={() => {
+-                                                clearSteadyOverlay()
+-                                                setStatusMsg('?????????')
+-                                            }}
+-                                            className="col-span-2 rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 transition-all hover:bg-slate-700/80"
+-                                        >
+-                                            ??????
+-                                        </button>
+-                                    </div>
+-                                    <div className="rounded-lg bg-black/15 px-3 py-2 text-[11px] leading-5 text-gray-300">
+-                                        <div>?????{steadyScenarioOption?.label ?? steadyScenarioId}</div>
+-                                        <div>?????{steadySnapshots.length} ?{selectedSnapshotSummary ? `????? ${formatDateTimeLabel(selectedSnapshotSummary.saved_at)}` : ''}</div>
+-                                        <div>?????{selectedBaselineSnapshotSummary ? `${selectedBaselineSnapshotSummary.scenario_id} ? ${formatDateTimeLabel(selectedBaselineSnapshotSummary.saved_at)}` : '???'}</div>
+-                                        <div>???????????????????????????????????????4????????</div>
+-                                    </div>
++                                    <div className="grid grid-cols-2 gap-2">
++                                        <button
++                                            onClick={async () => {
++                                                try {
++                                                    await runSteadySimulation()
++                                                    setStatusMsg(`WE1 主仿真已运行：${steadyScenarioOption?.label ?? steadyScenarioId}`)
++                                                } catch (error) {
++                                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 主仿真运行失败')
++                                                }
++                                            }}
++                                            disabled={steadySimLoading}
++                                            className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white transition-all hover:bg-cyan-600 disabled:opacity-50"
++                                        >
++                                            {steadySimLoading ? '运行中...' : '运行仿真'}
++                                        </button>
++                                        <button
++                                            onClick={async () => {
++                                                try {
++                                                    await saveSteadySnapshot()
++                                                    setStatusMsg(`已保存快照：${steadyScenarioOption?.label ?? steadyScenarioId}`)
++                                                } catch (error) {
++                                                    setStatusMsg(error instanceof Error ? error.message : '保存快照失败')
++                                                }
++                                            }}
++                                            disabled={!steadyOverlay || steadySnapshotLoading}
++                                            className="rounded-lg bg-emerald-700/80 px-3 py-2 text-xs font-medium text-white transition-all hover:bg-emerald-600 disabled:opacity-50"
++                                        >
++                                            {steadySnapshotLoading ? '处理中...' : '保存快照'}
++                                        </button>
++                                        <button
++                                            onClick={async () => {
++                                                try {
++                                                    await refreshSteadySnapshots()
++                                                    setStatusMsg(`历史快照已刷新，共 ${steadySnapshots.length} 条`)
++                                                } catch (error) {
++                                                    setStatusMsg(error instanceof Error ? error.message : '刷新快照失败')
++                                                }
++                                            }}
++                                            disabled={steadySnapshotLoading}
++                                            className="rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 transition-all hover:bg-slate-700/80 disabled:opacity-50"
++                                        >
++                                            刷新快照
++                                        </button>
++                                        <button
++                                            onClick={async () => {
++                                                try {
++                                                    await loadSteadySelectedSnapshot()
++                                                    setStatusMsg(`已加载快照：${selectedSnapshotSummary?.scenario_id ?? steadySelectedSnapshotRunId}`)
++                                                } catch (error) {
++                                                    setStatusMsg(error instanceof Error ? error.message : '加载快照失败')
++                                                }
++                                            }}
++                                            disabled={!steadySelectedSnapshotRunId || steadySnapshotLoading}
++                                            className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs font-medium text-cyan-100 transition-all hover:bg-cyan-800/30 disabled:opacity-50"
++                                        >
++                                            加载快照
++                                        </button>
++                                        <button
++                                            onClick={() => {
++                                                clearSteadyOverlay()
++                                                setStatusMsg('已清空当前仿真结果')
++                                            }}
++                                            className="col-span-2 rounded-lg border border-slate-700 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 transition-all hover:bg-slate-700/80"
++                                        >
++                                            清空当前结果
++                                        </button>
++                                    </div>
++                                    <div className="rounded-lg bg-black/15 px-3 py-2 text-[11px] leading-5 text-gray-300">
++                                        <div>当前场景：{steadyScenarioOption?.label ?? steadyScenarioId}</div>
++                                        <div>历史快照：{steadySnapshots.length} 条{selectedSnapshotSummary ? `，当前已选 ${formatDateTimeLabel(selectedSnapshotSummary.saved_at)}` : ''}</div>
++                                        <div>基线快照：{selectedBaselineSnapshotSummary ? `${selectedBaselineSnapshotSummary.scenario_id} | ${formatDateTimeLabel(selectedBaselineSnapshotSummary.saved_at)}` : '未选择'}</div>
++                                        <div>当前这页已经会把仿真命中结果落到第一张图上，下一轮继续补点线联动解释。</div>
++                                    </div>
+*** End Patch

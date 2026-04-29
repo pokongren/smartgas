@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\we1\memory.md
+@@
+ ## 2026-04-07 15:54:39 +08:00 frontend/backend reconnaissance
+@@
+ - Decision:
+   - Treat the “Round 3 largest gap” as none/closed for the current source of truth.
+   - If future work continues on this line, it should be framed as post-Round-4 closeout, verification hardening, or a new follow-up track, not a missing Round 3 implementation.
++
++## 2026-04-07 15:54:39 +08:00 refined gap note
++
++- Refinement:
++  - The topology-page chain is already beyond Round 3, but the map page is not.
++  - `F:\smartgas-grid\src\views\MapTopologyView.tsx` still uses the legacy `topologyAPI.simulate()` flow from `F:\smartgas-grid\src\services\api.ts` and renders `/api/emergency/simulate-failure` step results, instead of consuming the unified WE1 overlay/snapshot contract.
++- Updated decision:
++  - The most credible remaining Round 3 gap is now: unify `MapTopologyView` onto the same `useSimulation` + overlay/snapshot data path already used by `TopologyView`.
++  - Best future implementation boundary: `src\views\MapTopologyView.tsx` as the primary edit point, with optional reuse of `src\hooks\useSimulation.ts` and minimal contract confirmation in `backend\app\routers\topology_simulation.py`.
+*** End Patch

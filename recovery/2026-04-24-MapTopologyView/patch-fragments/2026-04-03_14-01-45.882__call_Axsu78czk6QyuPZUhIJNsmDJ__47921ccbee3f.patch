@@ -1,0 +1,276 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\data\pipelines\types.ts
+@@
+ export interface PipelineLayer {
++    id?: string             // 稳定层级 ID，优先用于状态管理和跨视图引用
+     name: string            // 层级名称 (如 "西二线干线", "丽江支线")
+     type: 'trunk' | 'branch'
+     nodes: PipelineNode[]
+*** Add File: F:\smartgas-grid\src\data\pipelines\transform.ts
++import type { PipelineData, PipelineLine, PipelineNode } from '@/types'
++import type { PipelineLayer, PipelinePackage } from './types'
++
++export function getPipelineLayerId(
++    pkg: Pick<PipelinePackage, 'id'>,
++    layer: Pick<PipelineLayer, 'id' | 'name' | 'type'>,
++    index: number
++): string {
++    if (layer.id && layer.id.trim()) {
++        return layer.id
++    }
++    const safeName = layer.name.trim().replace(/\s+/g, '-')
++    return `${pkg.id}:${layer.type}:${safeName || index}`
++}
++
++export function normalizePipelinePackages(packages: PipelinePackage[]): PipelinePackage[] {
++    return packages.map((pkg) => ({
++        ...pkg,
++        layers: pkg.layers.map((layer, index) => ({
++            ...layer,
++            id: getPipelineLayerId(pkg, layer, index),
++        })),
++    }))
++}
++
++export function buildInitialLayerVisibility(packages: PipelinePackage[]): Record<string, boolean> {
++    const visibility: Record<string, boolean> = {}
++
++    packages.forEach((pkg) => {
++        pkg.layers.forEach((layer, index) => {
++            visibility[getPipelineLayerId(pkg, layer, index)] = layer.visible ?? true
++        })
++    })
++
++    return visibility
++}
++
++export function buildPipelineDataFromPackages(
++    packages: PipelinePackage[],
++    visibleLayerIds?: Record<string, boolean>
++): PipelineData {
++    const nodes: PipelineNode[] = []
++    const lines: PipelineLine[] = []
++
++    packages.forEach((pkg) => {
++        pkg.layers.forEach((layer, index) => {
++            const layerId = getPipelineLayerId(pkg, layer, index)
++            if (visibleLayerIds && !visibleLayerIds[layerId]) {
++                return
++            }
++
++            nodes.push(...layer.nodes)
++            lines.push(...layer.lines)
++        })
++    })
++
++    return { nodes, lines, devices: [] }
++}
+*** Update File: F:\smartgas-grid\src\data\pipelines\index.ts
+@@
+ import { PipelinePackage } from './types'
+ import { pipelinePackageAPI } from '@/services/api'
++import { normalizePipelinePackages } from './transform'
+ 
+ export * from './types'
++export * from './transform'
+@@
+             console.log('[Pipelines] 从后端 API 加载管线数据...')
+             const resp = await pipelinePackageAPI.getAll()
+-            const packages: PipelinePackage[] = resp.data
++            const packages: PipelinePackage[] = normalizePipelinePackages(resp.data)
+*** Update File: F:\smartgas-grid\src\views\GlobalPipelineView.tsx
+@@
+-import { loadAllPipelines, PipelinePackage, PipelineLayer } from '@/data/pipelines'
++import {
++    buildInitialLayerVisibility,
++    buildPipelineDataFromPackages,
++    getPipelineLayerId,
++    loadAllPipelines,
++    PipelinePackage,
++    PipelineLayer
++} from '@/data/pipelines'
+@@
+     const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({})
+     useEffect(() => {
+         if (!pipelinesLoaded || pipelines.length === 0) return
+-        const initial: Record<string, boolean> = {}
+-        for (let i = 0; i < pipelines.length; i++) {
+-            const pkg = pipelines[i]
+-            for (let j = 0; j < pkg.layers.length; j++) {
+-                const layer = pkg.layers[j]
+-                initial[layer.name] = layer.visible ?? true
+-            }
+-        }
+-        setVisibleLayers(initial)
++        setVisibleLayers(buildInitialLayerVisibility(pipelines))
+     }, [pipelinesLoaded, pipelines])
+@@
+-    const toggleLayer = (layerName: string) => {
+-        setVisibleLayers(prev => ({ ...prev, [layerName]: !prev[layerName] }))
++    const toggleLayer = (layerId: string) => {
++        setVisibleLayers(prev => ({ ...prev, [layerId]: !prev[layerId] }))
+     }
+@@
+     const togglePackageVisibility = (pkg: PipelinePackage) => {
+-        const layerNames = pkg.layers.map(l => l.name)
+-        const allVisible = layerNames.every(name => visibleLayers[name])
++        const layerIds = pkg.layers.map((layer, index) => getPipelineLayerId(pkg, layer, index))
++        const allVisible = layerIds.every(id => visibleLayers[id])
+ 
+         const newState = { ...visibleLayers }
+-        for (let i = 0; i < layerNames.length; i++) {
+-            newState[layerNames[i]] = !allVisible
++        for (let i = 0; i < layerIds.length; i++) {
++            newState[layerIds[i]] = !allVisible
+         }
+         setVisibleLayers(newState)
+     }
+@@
+         const newState: Record<string, boolean> = {}
+         for (let i = 0; i < pipelines.length; i++) {
+             const pkg = pipelines[i]
+             for (let j = 0; j < pkg.layers.length; j++) {
+-                newState[pkg.layers[j].name] = visible
++                newState[getPipelineLayerId(pkg, pkg.layers[j], j)] = visible
+             }
+         }
+         setVisibleLayers(newState)
+     }
+ 
+     // 璁＄畻褰撳墠鏄剧ず鐨勭閬撴暟鎹?- 鎬ц兘浼樺寲鐗?
+     const pipelineData = useMemo<PipelineData>(() => {
+-        const allNodes: PipelineNode[] = []
+-        const allLines: PipelineLine[] = []
+-
+-        // 浣跨敤 for 寰幆鏇夸唬 forEach + 灞曞紑杩愮畻绗︼紝鍑忓皯鍐呭瓨鍒嗛厤
+-        for (let i = 0; i < pipelines.length; i++) {
+-            const pkg = pipelines[i]
+-            for (let j = 0; j < pkg.layers.length; j++) {
+-                const layer = pkg.layers[j]
+-                if (visibleLayers[layer.name]) {
+-                    // 鎵嬪姩 push 鑰屼笉鏄娇鐢ㄥ睍寮€杩愮畻绗?
+-                    const nodes = layer.nodes
+-                    const lines = layer.lines
+-                    for (let k = 0; k < nodes.length; k++) {
+-                        allNodes.push(nodes[k])
+-                    }
+-                    for (let k = 0; k < lines.length; k++) {
+-                        allLines.push(lines[k])
+-                    }
+-                }
+-            }
+-        }
+-
+-        return { nodes: allNodes, lines: allLines, devices: [] }
++        return buildPipelineDataFromPackages(pipelines, visibleLayers)
+     }, [visibleLayers, pipelines])
+@@
+-                        const layerNames = pkg.layers.map(l => l.name)
+-                        const isAllVisible = layerNames.every(n => visibleLayers[n])
+-                        const isPartialVisible = !isAllVisible && layerNames.some(n => visibleLayers[n])
++                        const layerIds = pkg.layers.map((layer, index) => getPipelineLayerId(pkg, layer, index))
++                        const isAllVisible = layerIds.every(id => visibleLayers[id])
++                        const isPartialVisible = !isAllVisible && layerIds.some(id => visibleLayers[id])
+@@
+-                                    {pkg.layers.map((layer: PipelineLayer) => (
++                                    {pkg.layers.map((layer: PipelineLayer, layerIndex: number) => {
++                                        const layerId = getPipelineLayerId(pkg, layer, layerIndex)
++                                        return (
+                                         <div
+-                                            key={layer.name}
++                                            key={layerId}
+                                             className="group/item flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-[#1c2430] cursor-pointer"
+-                                            onClick={() => toggleLayer(layer.name)}
++                                            onClick={() => toggleLayer(layerId)}
+                                         >
+                                             <div className="flex items-center gap-2 min-w-0">
+                                                 <div className="relative w-3.5 h-3.5 flex items-center justify-center">
+-                                                    <div className={`absolute inset-0 rounded-[3px] border ${visibleLayers[layer.name] ? 'border-[#137fec] bg-[#137fec]' : 'border-gray-500 bg-[#1c2430] group-hover/item:border-gray-400'} transition-colors`}></div>
+-                                                    {visibleLayers[layer.name] && (
++                                                    <div className={`absolute inset-0 rounded-[3px] border ${visibleLayers[layerId] ? 'border-[#137fec] bg-[#137fec]' : 'border-gray-500 bg-[#1c2430] group-hover/item:border-gray-400'} transition-colors`}></div>
++                                                    {visibleLayers[layerId] && (
+                                                         <svg className="absolute w-2.5 h-2.5 text-white z-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                                             <polyline points="20 6 9 17 4 12"></polyline>
+                                                         </svg>
+                                                     )}
+                                                 </div>
+@@
+-                                                <span className={`text-sm transition-colors ${visibleLayers[layer.name] ? 'text-gray-200 font-medium' : 'text-gray-400'}`}>
++                                                <span className={`text-sm transition-colors ${visibleLayers[layerId] ? 'text-gray-200 font-medium' : 'text-gray-400'}`}>
+                                                     {layer.type === 'trunk' ? '骞茬嚎' : layer.name.replace('鏀嚎', '')}
+                                                 </span>
+                                             </div>
+                                         </div>
+-                                    ))}
++                                        )
++                                    })}
+                                 )}
+                             </div>
+                         )
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-import { loadAllPipelines } from '@/data/pipelines'
++import { buildPipelineDataFromPackages, loadAllPipelines } from '@/data/pipelines'
+@@
+     // ================== 收集全部管线原始数据（不传给 MapView，仅供导入用） ==================
+     const rawPipelineData = useMemo(() => {
+-        const nodes: PipelineNode[] = []
+-        const lines: PipelineLine[] = []
+-        for (const pkg of pipelines) {
+-            for (const layer of pkg.layers) {
+-                for (const n of layer.nodes) nodes.push(n)
+-                for (const l of layer.lines) lines.push(l)
+-            }
+-        }
+-        return { nodes, lines }
++        const { nodes, lines } = buildPipelineDataFromPackages(pipelines)
++        return { nodes, lines }
+     }, [pipelines])
+*** Update File: F:\smartgas-grid\src\utils\mapRenderer.ts
+@@
+ function groupNodesByCoordinate(nodes: PipelineNode[]): Map<string, ClusterGroup> {
+@@
+-        const name = node.name
+-        if (name.includes('压气站')) {
++        if (isCompressorNode(node)) {
+             group.typeStats.compressor++
+             group.hasImportantStation = true
+-        } else if (name.includes('分输站') || name.includes('门站')) {
++        } else if (isDistributionNode(node)) {
+             group.typeStats.distribution++
+             group.hasImportantStation = true
+-        } else if (name.includes('阀室') || name.includes('阀门')) {
++        } else if (isValveRoom(node)) {
+             group.typeStats.valve++
+         } else {
+             group.typeStats.other++
+@@
+ }
++
++function getRawStationType(node: PipelineNode): string {
++    const rawType = node.properties?.rawType
++    return typeof rawType === 'string' ? rawType : ''
++}
++
++function isCompressorNode(node: PipelineNode): boolean {
++    return (
++        getRawStationType(node) === 'compressor' ||
++        node.properties?.isCompressor === true ||
++        node.name.includes('压气站')
++    )
++}
++
++function isDistributionNode(node: PipelineNode): boolean {
++    return (
++        getRawStationType(node) === 'distribution' ||
++        node.type === NodeType.METERING ||
++        node.name.includes('分输站') ||
++        node.name.includes('门站')
++    )
++}
+@@
+-    const isCompressor = node.name.includes('压气站')
+-    const isDistribution = node.name.includes('分输站') || node.name.includes('门站')
++    const isCompressor = isCompressorNode(node)
++    const isDistribution = isDistributionNode(node)
+*** End Patch

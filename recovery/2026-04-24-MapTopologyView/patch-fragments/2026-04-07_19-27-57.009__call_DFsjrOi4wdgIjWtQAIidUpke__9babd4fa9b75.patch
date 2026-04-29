@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+             while (queue.length > 0) {
+                 const curr = queue.shift()!
+-                if (visited.has(curr)) continue
+-                visited.add(curr)
++                if (visited.has(curr.nodeId)) continue
++                visited.add(curr.nodeId)
+ 
+-                if (valveIds.has(curr)) {
++                if (valveIds.has(curr.nodeId)) {
+*** End Patch

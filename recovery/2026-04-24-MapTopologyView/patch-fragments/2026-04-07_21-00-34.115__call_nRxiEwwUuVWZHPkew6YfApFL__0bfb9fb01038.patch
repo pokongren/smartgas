@@ -1,0 +1,41 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const [activeTab, setActiveTab] = useState<PanelTab>('edit')
++    const [activeTab, setActiveTab] = useState<PanelTab>('simulation')
+@@
+     // 保存机制：跟踪拖拽修改的坐标
+     const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
+     const [isSaving, setIsSaving] = useState(false)
++    const {
++        overlay: steadyOverlay,
++        baselineOverlay: steadyBaselineOverlay,
++        isLoading: steadySimLoading,
++        error: steadySimError,
++        currentScenario: steadyScenarioId,
++        snapshots: steadySnapshots,
++        snapshotLoading: steadySnapshotLoading,
++        baselineSnapshotLoading: steadyBaselineSnapshotLoading,
++        snapshotError: steadySnapshotError,
++        selectedSnapshotRunId: steadySelectedSnapshotRunId,
++        baselineSnapshotRunId: steadyBaselineSnapshotRunId,
++        trialRunScenarioId: steadyTrialRunScenarioId,
++        bulkTrialRunActive: steadyBulkTrialRunActive,
++        comparison: steadyComparison,
++        trialRunItems: steadyTrialRunItems,
++        setScenario: setSteadyScenario,
++        setSelectedSnapshotRunId: setSteadySelectedSnapshotRunId,
++        setBaselineSnapshotRunId: setSteadyBaselineSnapshotRunId,
++        runSimulation: runSteadySimulation,
++        saveSnapshot: saveSteadySnapshot,
++        refreshSnapshots: refreshSteadySnapshots,
++        loadSelectedSnapshot: loadSteadySelectedSnapshot,
++        runTrialScenario: runSteadyTrialScenario,
++        runMissingTrialScenarios: runSteadyMissingTrialScenarios,
++        clearOverlay: clearSteadyOverlay,
++    } = useSimulation({
++        pilotId: WE1_PRIMARY_PILOT_ID,
++        scenarios: MAINLINE_SCENARIOS,
++    })
+     const [cascadeValves, setCascadeValves] = useState(true)
+*** End Patch

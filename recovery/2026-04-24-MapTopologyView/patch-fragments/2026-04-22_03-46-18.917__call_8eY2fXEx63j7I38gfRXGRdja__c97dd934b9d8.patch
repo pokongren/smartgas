@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                                return
++                                                setStatusMsg('请先读取起始压力或先运行一次主仿真')
++                                                return
+*** End Patch

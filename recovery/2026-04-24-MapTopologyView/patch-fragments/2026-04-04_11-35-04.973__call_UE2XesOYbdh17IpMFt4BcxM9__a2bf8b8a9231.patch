@@ -1,0 +1,48 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ // ================== 类型 ==================
+-type PointType = 'station' | 'valve' | 'distribution' | 'compressor'
++type PointType = 'station' | 'valve' | 'distribution' | 'compressor' | 'junction'
+ type EditMode = 'view' | 'draw-point' | 'connect' | 'merge'
+ type PanelTab = 'edit' | 'validate' | 'search' | 'centrality' | 'cutoff'
+@@
+ const TOPO_COLORS: Record<PointType, string> = {
+     compressor: '#FF9800',
+     distribution: '#2196F3',
++    junction: '#00e5ff',
+     station: '#F44336',
+     valve: '#9E9E9E',
+ }
+ 
+ const TOPO_LABELS: Record<PointType, string> = {
+     compressor: '压气站',
+     distribution: '分输站',
++    junction: '交汇枢纽',
+     station: '站场',
+     valve: '阀室',
+ }
+ 
+ const TOPO_SIZES: Record<PointType, number> = {
+     compressor: 10,
+     distribution: 8,
++    junction: 9,
+     station: 8,
+     valve: 5,
+ }
++
++const MANUAL_JUNCTION_EDIT_ENABLED_BY_DEFAULT =
++    String(import.meta.env.VITE_TOPOLOGY_MANUAL_JUNCTION_EDIT ?? '').trim() === '1'
++const JUNCTION_READONLY_HINT = '当前枢纽由运行时重编结果维护，编辑器仅支持只读查看，不再以手工捏合作为主流程。'
+@@
+ const TYPE_MAP: Record<string, PointType> = {
+     regulator: 'compressor',
+     metering: 'distribution',
+     valve: 'valve',
+-    junction: 'station',
++    junction: 'junction',
+     // NOTE: sj4 等新数据文件直接使用 compressor/distribution 等值
+     compressor: 'compressor',
+     distribution: 'distribution',
+ }
+*** End Patch

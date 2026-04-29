@@ -1,0 +1,54 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-            node.marker.setContent(createTopoMarkerContent(node.type, node.name, isSelected, !!node.isJunction))
++            safeSetMarkerContent(node.marker, createTopoMarkerContent(node.type, node.name, isSelected, !!node.isJunction))
+@@
+-                    node.marker.setContent(
++                    safeSetMarkerContent(node.marker,
+                         `<div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+                             <div style="width:18px;height:18px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 10px #ef4444; pointer-events: auto; transition: all 0.3s;"></div>
+                             <div style="position: absolute; top: 22px; white-space: nowrap; font-size: 11px; color: #ef4444; font-weight: bold; text-shadow: 0 0 2px #fff, 0 0 2px #fff; z-index: 10;">${node.name}</div>
+                         </div>`
+-                    )
++                    )
+@@
+-                        node.marker.setContent(
++                        safeSetMarkerContent(node.marker,
+                             `<div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+                                 <div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:1.5px solid #fff; pointer-events: auto; transition: all 0.3s;"></div>
+                                 <div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: ${color}; font-weight: bold; text-shadow: 0 0 2px #fff, 0 0 2px #fff; z-index: 10;">${node.name}</div>
+                             </div>`
+-                        )
++                        )
+@@
+-                    node.marker.setContent(createTopoMarkerContent(node.type, node.name, false, !!node.isJunction))
++                    safeSetMarkerContent(node.marker, createTopoMarkerContent(node.type, node.name, false, !!node.isJunction))
+@@
+-                    edge.poly.setOptions({ strokeColor: LINE_COLOR, strokeWeight: LINE_WEIGHT, strokeStyle: 'solid', showDir: false })
++                    safeSetPolylineOptions(edge.poly, { strokeColor: LINE_COLOR, strokeWeight: LINE_WEIGHT, strokeStyle: 'solid', showDir: false })
+@@
+-                    node.marker.setContent(
++                    safeSetMarkerContent(node.marker,
+                         `<div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+                             <div style="width:18px;height:18px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 10px #ef4444; pointer-events: auto; transition: all 0.3s;"></div>
+                             <div style="position: absolute; top: 22px; white-space: nowrap; font-size: 11px; color: #ef4444; font-weight: bold; text-shadow: 0 0 2px #fff, 0 0 2px #fff; z-index: 10;">${node.name}</div>
+                         </div>`
+-                    )
++                    )
+@@
+-                        node.marker.setContent(
++                        safeSetMarkerContent(node.marker,
+                             `<div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+                                 <div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:1.5px solid #fff; pointer-events: auto; transition: all 0.3s;"></div>
+                                 <div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: ${color}; font-weight: bold; text-shadow: 0 0 2px #fff, 0 0 2px #fff; z-index: 10;">${node.name}</div>
+                             </div>`
+-                        )
++                        )
+@@
+-            node.marker.setContent(content)
++            safeSetMarkerContent(node.marker, content)
+@@
+-            edge.poly.setOptions(edgeOptions)
++            safeSetPolylineOptions(edge.poly, edgeOptions)
+*** End Patch

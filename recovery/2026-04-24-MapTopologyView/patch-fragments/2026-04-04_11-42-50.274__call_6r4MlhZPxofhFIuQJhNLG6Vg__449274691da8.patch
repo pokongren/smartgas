@@ -1,0 +1,39 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                                    <div className="grid grid-cols-4 gap-1.5">
++                                    <div className="grid grid-cols-3 gap-1.5">
+                                         {([
+                                             { m: 'view' as EditMode, label: '娴忚', icon: 'pan_tool' },
+                                             { m: 'draw-point' as EditMode, label: '娣荤偣', icon: 'add_location' },
+                                             { m: 'connect' as EditMode, label: '杩炵嚎', icon: 'timeline' },
+-                                            { m: 'merge' as EditMode, label: '鎹忓悎', icon: 'hub' },
+                                         ]).map(item => (
+                                             <button key={item.m} onClick={() => setEditMode(item.m)}
+                                                 className={`py-2 rounded-lg text-[11px] transition-all flex flex-col items-center gap-0.5
+                                                     ${editMode === item.m ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/20' : 'bg-gray-800/60 text-gray-400 hover:bg-gray-700'}`}>
+                                                 <span className="material-symbols-outlined text-base">{item.icon}</span>{item.label}
+                                             </button>
+                                         ))}
+                                     </div>
++                                    {manualJunctionEditingEnabled ? (
++                                        <button
++                                            onClick={() => setEditMode('merge')}
++                                            className={`mt-2 w-full py-2 rounded-lg text-[11px] transition-all flex items-center justify-center gap-1.5
++                                                ${editMode === 'merge' ? 'bg-purple-700/80 text-white' : 'bg-purple-900/40 text-purple-200 hover:bg-purple-800/50'}`}
++                                        >
++                                            <span className="material-symbols-outlined text-sm">hub</span>
++                                            鍏煎妯″紡锛氭墜宸ユ崗鍚?
++                                        </button>
++                                    ) : (
++                                        <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200 leading-5">
++                                            <p>{JUNCTION_READONLY_HINT}</p>
++                                            <p className="text-[10px] text-amber-300/90 mt-1">褰撳墠妯″紡锛?{junctionMode}</p>
++                                        </div>
++                                    )}
+                                 </div>
+@@
+-                                {(editMode === 'merge' || selectedMergeNodeIds.length > 0) && (
++                                {manualJunctionEditingEnabled && (editMode === 'merge' || selectedMergeNodeIds.length > 0) && (
+                                     <div className="border border-purple-500/20 bg-purple-950/20 rounded-lg p-2.5 space-y-2">
+*** End Patch

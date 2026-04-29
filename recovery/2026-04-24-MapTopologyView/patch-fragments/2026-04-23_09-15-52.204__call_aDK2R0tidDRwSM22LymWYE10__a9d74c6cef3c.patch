@@ -1,0 +1,62 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const [nodeParamOverrides, setNodeParamOverrides] = useState<Record<string, { target_pressure_mpa?: number; min_pressure_mpa?: number; temperature_c?: number }>>({})
++    const [nodeParamOverrides, setNodeParamOverrides] = useState<Record<string, { target_pressure_mpa?: number; min_pressure_mpa?: number }>>({})
+@@
+     const [globalParamDefaults, setGlobalParamDefaults] = useState<{
+         default_pressure_mpa?: number
+-        default_temperature_c?: number
+         default_flow_rate?: number
+         apply_to_sources?: boolean
+     }>({})
+@@
+-        for (const [nodeId, value] of Object.entries(nodeParamOverrides) as Array<[string, { target_pressure_mpa?: number; min_pressure_mpa?: number; temperature_c?: number }]>) {
++        for (const [nodeId, value] of Object.entries(nodeParamOverrides) as Array<[string, { target_pressure_mpa?: number; min_pressure_mpa?: number }]>) {
+             const targetErr = checkRange(value.target_pressure_mpa, 0.1, 20, `节点${nodeId}目标压力`)
+             if (targetErr) return targetErr
+             const minErr = checkRange(value.min_pressure_mpa, 0.1, 20, `节点${nodeId}最小压力`)
+             if (minErr) return minErr
+-            const tempErr = checkRange(value.temperature_c, -50, 120, `节点${nodeId}温度`)
+-            if (tempErr) return tempErr
+             if (value.target_pressure_mpa != null && value.min_pressure_mpa != null && value.min_pressure_mpa > value.target_pressure_mpa) {
+                 return `节点${nodeId}最小压力不能大于目标压力`
+             }
+@@
+         }
+         const pErr = checkRange(globalParamDefaults.default_pressure_mpa, 0.1, 20, '全网默认压力')
+         if (pErr) return pErr
+-        const tErr = checkRange(globalParamDefaults.default_temperature_c, -50, 120, '全网默认温度')
+-        if (tErr) return tErr
+         const fErr = checkRange(globalParamDefaults.default_flow_rate, 0.01, 100000, '全网默认流量')
+         if (fErr) return fErr
+         return null
+-    }, [edgeLengthOverrides, globalParamDefaults.default_flow_rate, globalParamDefaults.default_pressure_mpa, globalParamDefaults.default_temperature_c, nodeParamOverrides])
++    }, [edgeLengthOverrides, globalParamDefaults.default_flow_rate, globalParamDefaults.default_pressure_mpa, nodeParamOverrides])
+     const buildSimulationInitialInput = useCallback((): SimulationInitialInput | undefined => {
+-        const nodeEntries = (Object.entries(nodeParamOverrides) as Array<[string, { target_pressure_mpa?: number; min_pressure_mpa?: number; temperature_c?: number }]>)
++        const nodeEntries = (Object.entries(nodeParamOverrides) as Array<[string, { target_pressure_mpa?: number; min_pressure_mpa?: number }]>)
+             .map(([nodeId, value]) => ({
+                 node_id: nodeId,
+                 target_pressure_mpa: value.target_pressure_mpa,
+                 min_pressure_mpa: value.min_pressure_mpa,
+-                temperature_c: value.temperature_c,
+             }))
+-            .filter(item => item.target_pressure_mpa != null || item.min_pressure_mpa != null || item.temperature_c != null)
++            .filter(item => item.target_pressure_mpa != null || item.min_pressure_mpa != null)
+@@
+         const hasDefaults = globalParamDefaults.default_pressure_mpa != null
+-            || globalParamDefaults.default_temperature_c != null
+             || globalParamDefaults.default_flow_rate != null
+             || globalParamDefaults.apply_to_sources === true
+@@
+             node_overrides: nodeEntries.length > 0 ? nodeEntries : undefined,
+             edge_overrides: edgeEntries.length > 0 ? edgeEntries : undefined,
+             default_pressure_mpa: globalParamDefaults.default_pressure_mpa,
+-            default_temperature_c: globalParamDefaults.default_temperature_c,
+             default_flow_rate: globalParamDefaults.default_flow_rate,
+             apply_to_sources: globalParamDefaults.apply_to_sources,
+         }
+-    }, [edgeLengthOverrides, globalParamDefaults.apply_to_sources, globalParamDefaults.default_flow_rate, globalParamDefaults.default_pressure_mpa, globalParamDefaults.default_temperature_c, nodeParamOverrides])
++    }, [edgeLengthOverrides, globalParamDefaults.apply_to_sources, globalParamDefaults.default_flow_rate, globalParamDefaults.default_pressure_mpa, nodeParamOverrides])
+*** End Patch

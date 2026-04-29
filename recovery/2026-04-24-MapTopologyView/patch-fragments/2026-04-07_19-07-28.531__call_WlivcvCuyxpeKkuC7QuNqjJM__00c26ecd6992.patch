@@ -1,0 +1,107 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ const LINE_COLOR = '#34d399'
+ const LINE_WEIGHT = 2
++const SIM_DIMMED_OPACITY = 0.18
++const SIM_ALERT_COLORS: Record<'normal' | 'warning' | 'critical', string> = {
++    normal: '#22c55e',
++    warning: '#f59e0b',
++    critical: '#ef4444',
++}
++
++interface SimulationNodeVisualMatch {
++    matchedNodeIds: string[]
++    matchedInternalEdgeIds: string[]
++    averagePressureMpa: number | null
++    highestAlertLevel: 'normal' | 'warning' | 'critical'
++    highestInternalEdgeAlertLevel: 'normal' | 'warning' | 'critical'
++}
++
++interface SimulationEdgeVisualMatch {
++    matchedEdges: Array<{
++        color: string
++        width_factor: number
++        utilization: number
++    }>
++    highestAlertLevel: 'normal' | 'warning' | 'critical'
++}
++
++interface SimulationEdgeVisualStyle {
++    strokeColor: string
++    strokeWeight: number
++    strokeStyle: 'solid' | 'dashed'
++    strokeOpacity: number
++    zIndex: number
++}
++
++function hasNodeSimulationMatch(match: SimulationNodeVisualMatch | null | undefined): boolean {
++    return Boolean(match && (match.matchedNodeIds.length > 0 || match.matchedInternalEdgeIds.length > 0))
++}
++
++function formatPressureBadge(value: number | null): string {
++    if (value === null) return '未接入'
++    return `${value.toFixed(2)} MPa`
++}
++
++function buildSimulationMarkerContent(
++    node: TopoNode,
++    match: SimulationNodeVisualMatch | null | undefined,
++    dimmed: boolean,
++): string {
++    const baseSize = node.isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[node.type]
++    const hasMatch = hasNodeSimulationMatch(match)
++    const alertLevel = match?.matchedNodeIds.length
++        ? match.highestAlertLevel
++        : match?.matchedInternalEdgeIds.length
++            ? match.highestInternalEdgeAlertLevel
++            : 'normal'
++    const accentColor = hasMatch ? SIM_ALERT_COLORS[alertLevel] : TOPO_COLORS[node.type]
++    const fillColor = hasMatch ? accentColor : `${TOPO_COLORS[node.type]}cc`
++    const opacity = dimmed ? 0.35 : 1
++    const size = hasMatch ? baseSize + 4 : baseSize
++    const pressureLabel = hasMatch ? formatPressureBadge(match?.averagePressureMpa ?? null) : '未命中'
++    const badgeLabel = hasMatch ? ALERT_LEVEL_LABELS[alertLevel] : '待映射'
++    const badgeBackground = hasMatch ? `${accentColor}cc` : 'rgba(15, 23, 42, 0.88)'
++    const badgeColor = hasMatch ? '#041014' : '#cbd5e1'
++    const shadow = hasMatch ? `0 0 14px ${accentColor}` : 'none'
++    const shapeStyle = node.isJunction
++        ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 4px;background:${fillColor};border:2px solid rgba(255,255,255,0.92);box-shadow:${shadow};opacity:${opacity}; pointer-events: auto;`
++        : `width:${size}px;height:${size}px;border-radius:50%;background:${fillColor};border:2px solid rgba(255,255,255,0.92);box-shadow:${shadow};opacity:${opacity}; pointer-events: auto;`
++
++    return `
++        <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
++            <div style="${shapeStyle}"></div>
++            <div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10; opacity:${opacity};">${node.name}</div>
++            <div style="position: absolute; top: ${size + 20}px; white-space: nowrap; font-size: 10px; color: #e2e8f0; text-shadow: 0 0 2px #020617, 0 0 2px #020617; z-index: 10; opacity:${opacity};">${pressureLabel}</div>
++            <div style="position: absolute; top: -12px; white-space: nowrap; font-size: 9px; font-weight: 700; color:${badgeColor}; background:${badgeBackground}; border:1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 1px 6px; z-index: 11; opacity:${opacity};">${badgeLabel}</div>
++        </div>
++    `
++}
++
++function resolveSimulationEdgeVisualStyle(
++    match: SimulationEdgeVisualMatch | null | undefined,
++    dimmed: boolean,
++): SimulationEdgeVisualStyle {
++    if (!match || match.matchedEdges.length === 0) {
++        return {
++            strokeColor: LINE_COLOR,
++            strokeWeight: LINE_WEIGHT,
++            strokeStyle: 'dashed',
++            strokeOpacity: dimmed ? 0.06 : 0.22,
++            zIndex: 90,
++        }
++    }
++
++    const strongestEdge = [...match.matchedEdges].sort((a, b) => b.utilization - a.utilization)[0]
++    const widthFactor = Math.max(...match.matchedEdges.map(item => item.width_factor))
++
++    return {
++        strokeColor: strongestEdge.color,
++        strokeWeight: Math.max(3, Math.min(10, Number((LINE_WEIGHT + widthFactor * 4).toFixed(2)))),
++        strokeStyle: match.highestAlertLevel === 'critical' ? 'dashed' : 'solid',
++        strokeOpacity: dimmed ? SIM_DIMMED_OPACITY : 0.96,
++        zIndex: match.highestAlertLevel === 'critical' ? 145 : 130,
++    }
++}
+*** End Patch

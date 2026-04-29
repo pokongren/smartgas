@@ -1,0 +1,468 @@
+*** Begin Patch
+*** Delete File: F:\smartgas-grid\docs\2026-04-04-统一整改方案_枢纽重编版.md
+*** Add File: F:\smartgas-grid\docs\2026-04-04-统一整改方案_枢纽重编版.md
++# 统一整改落实方案：枢纽重编 + 渲染链路收口
++
++编制时间：2026-04-04
++
++## 1. 主目标
++
++这次不是补几个零碎 bug。
++
++主目标只有一个：
++
++把“枢纽”的定义、数据库、拓扑编辑器、全国地图、导入脚本和验收口径收成同一套规则，彻底结束“前端一套、后端一套、库里再一套”的状态。
++
++这次统一口径按下面执行：
++
++- 两条不同管线在同一站点或同一交叉点汇交，就认定为 `junction`。
++- 三条及以上不同管线汇交，认定为 `major_junction`。
++- “两个站点合并才算枢纽”这条旧规则，废弃。
++
++一句话说清：
++
++从“按站点捏合定义枢纽”，改成“按管线交叉事实定义枢纽”。
++
++## 2. 上下文与已知信息
++
++当前已经确认的事实，不只是业务定义变了，代码里也确实还留着旧口径。
++
++### 2.1 已确认的问题
++
++1. 全国地图渲染链路 [`src/utils/hierarchyRenderer.ts`](/F:/smartgas-grid/src/utils/hierarchyRenderer.ts) -> [`src/utils/mapRenderer.ts`](/F:/smartgas-grid/src/utils/mapRenderer.ts) -> [`src/views/GlobalPipelineView.tsx`](/F:/smartgas-grid/src/views/GlobalPipelineView.tsx) 仍在单独维护缩放和节点显隐规则，之前已经出现过“配置写 11，实际更像 14”这种口径漂移。
++
++2. 拓扑编辑器链路 [`src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx) -> [`src/services/topologyEditorApi.ts`](/F:/smartgas-grid/src/services/topologyEditorApi.ts) -> [`backend/app/routers/topology_editor.py`](/F:/smartgas-grid/backend/app/routers/topology_editor.py) 还保留明显的“捏合成枢纽”思路。
++证据很直接：
++- 前端还有 `merge` 模式。
++- 前端把 `junction` 映射回 `station`。
++- 后端还保留 `/merge-stations` 和手工创建 `/junctions` 的写库逻辑。
++
++3. [`backend/app/services/junction_groups.py`](/F:/smartgas-grid/backend/app/services/junction_groups.py) 还在处理 `JUNCTION-x` / `junction-x` 的嵌套引用，并自动合并重叠 group。
++这说明 live DB 里仍然存在 nested junction、single-station junction 一类旧脏数据和旧兼容逻辑。
++
++4. [`backend/app/services/topology.py`](/F:/smartgas-grid/backend/app/services/topology.py) 当前会直接把 `junction_groups` 收缩成超级节点，再参与全国联合拓扑图计算。
++也就是说，枢纽定义一旦改，拓扑图算法、路径分析、关键节点识别都会一起受影响，不是只改个前端展示就能收口。
++
++5. 全国地图和拓扑编辑器现在都通过 `PipelinePackage` 中间层吃数据，相关入口至少包括：
++- [`src/data/pipelines/index.ts`](/F:/smartgas-grid/src/data/pipelines/index.ts)
++- [`src/data/pipelines/transform.ts`](/F:/smartgas-grid/src/data/pipelines/transform.ts)
++- [`src/data/pipelines/types.ts`](/F:/smartgas-grid/src/data/pipelines/types.ts)
++
++这说明整改不能只看单页组件，必须把“统一数据出口”纳入范围。
++
++6. 导入与验收闭环还没做实。
++相关文件包括：
++- [`backend/scripts/add_sj2.py`](/F:/smartgas-grid/backend/scripts/add_sj2.py)
++- [`backend/scripts/add_we3.py`](/F:/smartgas-grid/backend/scripts/add_we3.py)
++- [`backend/scripts/reimport_sj23.py`](/F:/smartgas-grid/backend/scripts/reimport_sj23.py)
++- [`backend/check_db.py`](/F:/smartgas-grid/backend/check_db.py)
++
++尤其 `WE3` 这类脚本改动，不能再停在“脚本写了，但 DB 没证据”的状态。
++
++### 2.2 当前口径 vs 目标口径
++
++这次不适合放传统截图对比。
++
++原因很简单：现在编的是落实方案，不是某个界面改版稿。这里更关键的是“规则、数据结构、消费方式怎么变”，不是一张图长什么样。
++
++所以这里先用前后对比表替代：
++
++| 项目 | 当前口径 | 目标口径 |
++| --- | --- | --- |
++| 枢纽定义 | 多站点捏合后才算枢纽 | 两条不同管线交叉即 `junction`，三条及以上是 `major_junction` |
++| 枢纽来源 | 编辑器人工捏合、DB 兼容脏数据 | 后端按统一规则重编，前端只消费结果 |
++| `junction_groups` | 混有 nested / single-station 旧记录 | 清成真实交叉关系，不再保留脏兼容结构 |
++| 拓扑编辑器 | `junction` 仍部分按 `station` 处理 | `junction` / `major_junction` 语义独立 |
++| 全国地图 | 缩放规则和节点重要性容易漂移 | 统一从一套 hierarchy / marker 规则出结果 |
++| 导入脚本 | 脚本改动和 DB 验收脱节 | 每次导入都能被 DB 和校验脚本证明 |
++
++## 3. 子代理拆分
++
++这次默认采用：
++
++**主代理统筹 + 并行侦察 + 单点实施 + 独立验证**
++
++原则先说死：
++
++- 轻侦察不要滥用高档模型。
++- 涉及跨层规则收敛、数据库重编、跨文件实施的任务，才上高难度模型。
++- 真正落代码时，只允许一个实施代理动主链路文件。
++
++### 3.1 主代理
++
++| 角色 | 建议模型 | 推理强度 | 负责内容 |
++| --- | --- | --- | --- |
++| 主代理 | `gpt-5.3-codex` | `high` | 定规则、拆任务、收敛证据、选实施方向、控制边界、审最终结果 |
++
++主代理不负责大面积并行改代码。
++
++主代理负责这几件事：
++
++- 把整改目标固定成一套统一口径
++- 并行派发侦察任务
++- 汇总侦察证据，只选一个最可信方向进入实施
++- 卡住范围，不让实施阶段顺手继续扩
++- 指定验证标准和封板条件
++
++### 3.2 侦察代理拆分
++
++| 代理 | 角色类型 | 建议模型 | 推理强度 | 负责范围 | 难度说明 |
++| --- | --- | --- | --- | --- | --- |
++| 侦察代理 A | 规则/数据库侦察 | `gpt-5.3-codex` | `high` | [`backend/app/models.py`](/F:/smartgas-grid/backend/app/models.py), [`backend/app/services/junction_groups.py`](/F:/smartgas-grid/backend/app/services/junction_groups.py), [`backend/app/services/topology.py`](/F:/smartgas-grid/backend/app/services/topology.py), [`backend/app/services/topology_computation.py`](/F:/smartgas-grid/backend/app/services/topology_computation.py), [`backend/data/smartgas.db`](/F:/smartgas-grid/backend/data/smartgas.db) | 牵涉业务定义、历史脏数据、图算法入口，判断错了会带偏全局 |
++| 侦察代理 B | 编辑器链路侦察 | `gpt-5.3-codex` | `high` | [`src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx), [`src/services/topologyEditorApi.ts`](/F:/smartgas-grid/src/services/topologyEditorApi.ts), [`backend/app/routers/topology_editor.py`](/F:/smartgas-grid/backend/app/routers/topology_editor.py), [`backend/app/services/position_commit.py`](/F:/smartgas-grid/backend/app/services/position_commit.py) | 既有前端交互，又有后端写库，改错容易造成行为回归 |
++| 侦察代理 C | 全国地图/导入闭环侦察 | `gpt-5.1-codex-mini` | `medium` | [`src/utils/hierarchyRenderer.ts`](/F:/smartgas-grid/src/utils/hierarchyRenderer.ts), [`src/utils/mapRenderer.ts`](/F:/smartgas-grid/src/utils/mapRenderer.ts), [`src/views/GlobalPipelineView.tsx`](/F:/smartgas-grid/src/views/GlobalPipelineView.tsx), [`src/components/map-view/MapView.tsx`](/F:/smartgas-grid/src/components/map-view/MapView.tsx), [`backend/scripts/add_sj2.py`](/F:/smartgas-grid/backend/scripts/add_sj2.py), [`backend/scripts/add_we3.py`](/F:/smartgas-grid/backend/scripts/add_we3.py), [`backend/scripts/reimport_sj23.py`](/F:/smartgas-grid/backend/scripts/reimport_sj23.py), [`backend/check_db.py`](/F:/smartgas-grid/backend/check_db.py) | 主要是边界梳理和闭环核对，复杂但偏规则盘点，不一定需要最高档模型 |
++| 侦察代理 D | 统一消费边界侦察 | `gpt-5.1-codex-mini` | `medium` | [`src/data/pipelines/index.ts`](/F:/smartgas-grid/src/data/pipelines/index.ts), [`src/data/pipelines/transform.ts`](/F:/smartgas-grid/src/data/pipelines/transform.ts), [`src/data/pipelines/types.ts`](/F:/smartgas-grid/src/data/pipelines/types.ts), [`src/views/TopologyView.tsx`](/F:/smartgas-grid/src/views/TopologyView.tsx), [`src/hooks/useTopology.ts`](/F:/smartgas-grid/src/hooks/useTopology.ts), [`src/utils/swarmAnalysis.ts`](/F:/smartgas-grid/src/utils/swarmAnalysis.ts), [`src/components/ClusterDetailPanel.tsx`](/F:/smartgas-grid/src/components/ClusterDetailPanel.tsx) | 重点是找遗漏消费口和显示辅助模块，工作量大但单点推理压力较低 |
++
++所有侦察代理统一输出：
++
++- 发现了什么
++- 证据是什么
++- 建议怎么处理
++- 涉及哪些文件或模块
++- 风险点和未确认项
++
++### 3.3 实施代理
++
++| 角色 | 建议模型 | 推理强度 | 负责内容 |
++| --- | --- | --- | --- |
++| 实施代理 | `gpt-5.3-codex` | `high` | 按主代理确认后的唯一方向改代码、改脚本、补校验 |
++
++实施代理只允许一个。
++
++原因很现实：
++
++- 这轮会同时动数据库定义、后端服务、前端消费、导入脚本
++- 多个实施代理一起改，很容易把“统一口径”又改散
++- 这次最怕的不是改得慢，是改成几套半对半错的逻辑
++
++实施边界固定为：
++
++- 枢纽重编脚本或迁移脚本
++- 后端枢纽计算与输出
++- 拓扑编辑器语义收口
++- 全国地图渲染消费收口
++- 导入脚本验收闭环
++
++### 3.4 验证代理
++
++| 角色 | 建议模型 | 推理强度 | 负责内容 |
++| --- | --- | --- | --- |
++| 验证代理 | `gpt-5.3-codex` | `high` | 独立回归、边界检查、数据核验、风险复核 |
++
++验证代理不参与实施。
++
++它只负责确认三件事：
++
++- 这次是不是按新口径真的修到了
++- 有没有把旧脏数据重新带回来
++- 有没有引入编辑器、地图、导入链路的新回归
++
++## 4. 执行顺序
++
++这次建议严格按下面顺序推进，不要跳。
++
++### 第一步：主代理先锁死统一规则
++
++先明确四个不可再漂移的定义：
++
++1. 什么叫 `junction`
++2. 什么叫 `major_junction`
++3. 什么样的数据必须从库里清掉
++4. 前端哪些地方只能消费后端结果，不能再自行定义枢纽
++
++没有这一步，后面侦察和实施都会各讲各话。
++
++### 第二步：并行侦察，不改代码
++
++由主代理同时启动 4 个侦察代理：
++
++- A 看规则和数据库
++- B 看拓扑编辑器链路
++- C 看全国地图和导入闭环
++- D 看统一消费边界和漏网模块
++
++这一轮只收证据，不动文件。
++
++这一轮的目标不是把问题全列完，而是把最可能的根因缩到 2 到 4 个。
++
++本轮最可能收敛出来的根因候选，优先看下面几类：
++
++- `junction_groups` 承载了旧“站点捏合”含义，导致库和服务都被拖偏
++- 编辑器仍把“人工捏合”当主流程，导致 `junction` 语义始终没独立
++- 全国地图显示规则虽然抽到了工具层，但数据输入仍不够统一
++- 导入脚本写库、校验脚本、live DB 三者之间没有真正闭环
++
++### 第三步：主代理收敛唯一实施方向
++
++侦察结束后，主代理只选一个最可信方向进入实施。
++
++这次最推荐的唯一方向是：
++
++**先重编枢纽事实层，再收后端统一输出，最后收前端和脚本闭环。**
++
++顺序不要反：
++
++1. 先重编枢纽事实层
++2. 再改后端服务和接口
++3. 再改前端消费
++4. 最后补导入脚本和验收闭环
++
++原因很直接：
++
++- 枢纽定义已经变了，旧库本身不再可靠
++- 如果先动前端，只会把旧脏口径包装得更漂亮
++- 如果先动编辑器，不先改事实层，会继续把“人工捏合”误当主事实
++
++### 第四步：实施代理单点落地
++
++实施阶段按 4 个子阶段推进。
++
++#### 阶段 4.1：重编枢纽事实层
++
++目标：
++
++- 从“旧 `junction_groups` 兼容层”切到“真实交叉事实层”
++
++建议动作：
++
++1. 新增重编脚本，例如：
++   - `backend/scripts/rebuild_junctions.py`
++   - `backend/scripts/verify_junctions.py`
++2. 明确 `junction` / `major_junction` 的持久化表达
++3. 清理 nested junction、single-station junction 旧记录
++4. 先写入影子结果或新字段，验证通过后再切主读口
++
++#### 阶段 4.2：收后端统一口
++
++目标：
++
++- 后端成为唯一事实来源
++
++建议动作：
++
++1. 收 [`backend/app/services/junction_groups.py`](/F:/smartgas-grid/backend/app/services/junction_groups.py)
++2. 收 [`backend/app/services/topology.py`](/F:/smartgas-grid/backend/app/services/topology.py)
++3. 收 [`backend/app/routers/topology_editor.py`](/F:/smartgas-grid/backend/app/routers/topology_editor.py)
++4. 如有必要，同步收 [`backend/app/services/topology_computation.py`](/F:/smartgas-grid/backend/app/services/topology_computation.py)
++
++结果要求：
++
++- `junction` / `major_junction` 明确输出
++- 旧“捏合成枢纽即写库”的主流程降级为例外修正或标注能力
++- 拓扑图计算、编辑器读取、后端接口都走同一份枢纽结果
++
++#### 阶段 4.3：收前端两条消费链
++
++目标：
++
++- 前端不再自行定义枢纽，只消费统一结果
++
++改动范围：
++
++- 全国地图链：
++  - [`src/utils/hierarchyRenderer.ts`](/F:/smartgas-grid/src/utils/hierarchyRenderer.ts)
++  - [`src/utils/mapRenderer.ts`](/F:/smartgas-grid/src/utils/mapRenderer.ts)
++  - [`src/views/GlobalPipelineView.tsx`](/F:/smartgas-grid/src/views/GlobalPipelineView.tsx)
++  - [`src/components/map-view/MapView.tsx`](/F:/smartgas-grid/src/components/map-view/MapView.tsx)
++- 编辑器链：
++  - [`src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx)
++  - [`src/services/topologyEditorApi.ts`](/F:/smartgas-grid/src/services/topologyEditorApi.ts)
++- 统一消费层：
++  - [`src/data/pipelines/index.ts`](/F:/smartgas-grid/src/data/pipelines/index.ts)
++  - [`src/data/pipelines/transform.ts`](/F:/smartgas-grid/src/data/pipelines/transform.ts)
++
++结果要求：
++
++- `junction` 不再被映射回 `station`
++- `major_junction` 有独立展示策略
++- 全国地图缩放阈值、重要性判断、聚合策略只认一套规则
++- 编辑器里如保留人工操作，语义改成“确认交叉点 / 标注大枢纽 / 修正误归并”，不再叫“手工创造枢纽”
++
++#### 阶段 4.4：补导入脚本闭环
++
++目标：
++
++- 每次脚本改动都能被 DB 和校验脚本证明
++
++改动范围：
++
++- [`backend/scripts/add_sj2.py`](/F:/smartgas-grid/backend/scripts/add_sj2.py)
++- [`backend/scripts/add_we3.py`](/F:/smartgas-grid/backend/scripts/add_we3.py)
++- [`backend/scripts/reimport_sj23.py`](/F:/smartgas-grid/backend/scripts/reimport_sj23.py)
++- [`backend/check_db.py`](/F:/smartgas-grid/backend/check_db.py)
++
++结果要求：
++
++- 每个脚本执行完，都能查到对应系统、站点、管线、枢纽结果
++- `WE3` 不再停留在“脚本存在，但落库证据不足”
++- 校验脚本直接输出新增了哪些 `system / station / pipeline / junction / major_junction`
++
++### 第五步：验证代理独立回归
++
++验证代理必须独立跑完下面几类检查：
++
++1. 数据库事实检查
++2. 后端接口一致性检查
++3. 编辑器语义检查
++4. 全国地图显示检查
++5. 导入脚本闭环检查
++6. 关键页面回归检查
++
++没跑完这轮，不算整改完成。
++
++### 第六步：阶段封板与总结
++
++每个实施阶段完成后，都要产出一份人话版总结 Markdown。
++
++默认要求：
++
++- 讲清做了什么
++- 讲清为什么这么做
++- 讲清影响范围
++- 讲清验证结果
++- 必带前后对比素材
++
++如果该阶段没有自然的截图素材，也不能空着，改用：
++
++- 前后对比表
++- 关键 SQL / JSON 对比片段
++- 关键接口返回差异
++- 关键代码片段前后对比
++
++## 5. 验证方式
++
++验证不要只看“能不能跑起来”。
++
++这次至少按下面 6 类验收。
++
++### 5.1 数据库验收
++
++- `junction_groups` 或新事实表里不再存在 nested junction
++- 不再存在 single-station junction
++- 每个 `junction` 至少关联 2 条不同管线
++- 每个 `major_junction` 至少关联 3 条不同管线
++- 重编前后总量变化有解释，不能只给数字不给原因
++
++### 5.2 后端接口验收
++
++- `/api/topology/junctions`、`/api/topology/graph`、编辑器相关接口对同一枢纽返回一致类型
++- `junction` / `major_junction` 返回语义明确，不再混成 `station`
++- 拓扑图计算结果和编辑器读取结果基于同一份事实源
++
++### 5.3 前端编辑器验收
++
++- [`src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 中不再把 `junction` 映射成 `station`
++- “捏合”不再是默认主流程
++- 编辑器展示的枢纽类型与后端返回一致
++- undo / redo 或删除逻辑不会把新语义又改回旧逻辑
++
++### 5.4 全国地图验收
++
++- 约定缩放级别下显示行为可解释、可复现
++- 不再出现“配置一个值，实际表现又是另一个值”
++- 普通枢纽和大枢纽在 marker、聚合、层级显示上有明确区别
++- 同一枢纽在全国地图、聚合面板、详情展示里名称和类型一致
++
++### 5.5 导入脚本验收
++
++- `add_sj2.py` 执行后，`SJ2` 相关数据能在 DB 查到
++- `add_we3.py` 执行后，`WE3` 相关数据能在 DB 查到
++- `reimport_sj23.py` 执行后，`SJ2 / SJ3` 相关枢纽被正确重编
++- [`backend/check_db.py`](/F:/smartgas-grid/backend/check_db.py) 能直接输出可核对结果
++
++### 5.6 回归验收
++
++- 不影响非枢纽普通站点渲染
++- 不影响基础拓扑构图
++- 不影响 SCADA / 历史查询等依赖站点信息的页面基本可用性
++- 不新增新的“临时兼容入口”
++
++## 6. 风险与回退点
++
++### 6.1 主要风险
++
++1. 枢纽定义变化会直接改写 [`backend/app/models.py`](/F:/smartgas-grid/backend/app/models.py) 和 [`backend/app/services/topology.py`](/F:/smartgas-grid/backend/app/services/topology.py) 的业务含义，历史接口和页面都可能被波及。
++
++2. 如果交叉判定容差定得不好，可能把近邻站点误识别成交叉点，或者漏掉真实交叉点。
++
++3. 如果先改前端、后改后端，会出现短期“页面看起来更新了，事实层还是旧的”的假一致状态。
++
++4. 如果导入脚本先宣称支持新规则，但 DB 验收和校验脚本没跟上，后面很难追到底哪一步错了。
++
++### 6.2 回退点
++
++1. 重编前先备份旧 `junction_groups`，至少保留导出文件或备份表。
++
++2. 新枢纽结果优先落影子表 / 新字段 / 新结果集，验证通过后再切主读取口径。
++
++3. 前端先兼容 `junction` / `major_junction` 双口径输出，再删旧分支，避免硬切导致全页异常。
++
++4. `WE3` 如验证不过，不对外宣称落库完成，先回退到“脚本存在但结果未验收”的状态，继续补闭环，不强行上线。
++
++## 7. 最终交付物
++
++这次整改完成后，建议至少交付下面这些东西。
++
++1. 一份统一规则文档
++   - 讲清 `junction` / `major_junction` 的定义
++   - 讲清容差、归并、例外处理原则
++
++2. 一套枢纽重编与校验脚本
++   - 重编脚本
++   - 清理旧数据脚本
++   - 校验脚本
++
++3. 一套后端统一输出
++   - 编辑器接口
++   - 拓扑图计算服务
++   - 枢纽查询接口
++
++4. 一套前端消费收口结果
++   - 全国地图统一显示规则
++   - 编辑器统一语义
++   - `PipelinePackage` 消费链保持一致
++
++5. 一套导入脚本验收闭环
++   - `SJ2`
++   - `WE3`
++   - `SJ2 / SJ3` 重导
++
++6. 一组人话版总结 Markdown
++   - 每个实施阶段各 1 份
++   - 最终总总结 1 份
++
++建议命名统一成：
++
++- `docs/2026-04-04-阶段1-枢纽重编总结_人话版.md`
++- `docs/2026-04-04-阶段2-后端收口总结_人话版.md`
++- `docs/2026-04-04-阶段3-前端收口总结_人话版.md`
++- `docs/2026-04-04-阶段4-导入闭环总结_人话版.md`
++- `docs/2026-04-04-统一整改最终总结_人话版.md`
++
++每份总结默认包含：
++
++- 改动目标
++- 改动前的问题
++- 改动后的结果
++- 验证方式
++- 影响范围
++- 风险点
++- 前后对比图或替代对比材料
++
++## 推荐推进顺序
++
++如果现在就开工，建议严格按这个顺序推进：
++
++1. 主代理锁规则，派侦察
++2. 并行侦察收证据
++3. 主代理选唯一实施方向
++4. 实施代理先重编枢纽事实层
++5. 再收后端统一口
++6. 再收前端两条消费链
++7. 最后补导入脚本和验收闭环
++8. 验证代理独立复核后封板
++
++一句话总结：
++
++先改“定义和事实层”，再改“服务和前端消费”，最后补“脚本和验收闭环”。
+*** End Patch

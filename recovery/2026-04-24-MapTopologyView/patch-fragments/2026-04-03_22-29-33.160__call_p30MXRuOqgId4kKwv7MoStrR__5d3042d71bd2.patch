@@ -1,0 +1,16 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     // 合建站：合并模式状态
+     const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+     // 已高亮的 marker 原始 content，用于恢复
+     const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
+-    const focusedNodeIdRef = useRef<string | null>(null)
+@@
+     useEffect(() => { nodesRef.current = topoNodes; edgesRef.current = topoEdges }, [topoNodes, topoEdges])
+     useEffect(() => { modeRef.current = editMode; ptRef.current = pointType }, [editMode, pointType])
+     useEffect(() => { cfRef.current = connectFrom }, [connectFrom])
+-    useEffect(() => {
+-        focusedNodeIdRef.current = new URLSearchParams(location.search).get('focus')
+-    }, [location.search])
+*** End Patch

@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-import { useLocation } from 'react-router-dom'
++import { useLocation, useNavigate } from 'react-router-dom'
+@@
+ import type { ValidationReport } from '@/utils/topology-validator'
+ import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
+ import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+ import type { CutoffResult } from '@/utils/cutoff-simulator'
++import { writeSimulationShowcaseSyncContext } from '@/utils/simulationShowcaseSync'
+ import { MAINLINE_SCENARIOS } from '@/types/simulation'
+@@
+ const MapTopologyView: React.FC = () => {
+     const location = useLocation()
++    const navigate = useNavigate()
+     const [mapInstance, setMapInstance] = useState<any>(null)
+*** End Patch

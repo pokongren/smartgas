@@ -1,0 +1,27 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const baselineSimulationMapping = useMemo(() => {
+         return buildSimulationOverlayMapping(topoNodes, topoEdges, steadyBaselineOverlay)
+     }, [steadyBaselineOverlay, topoEdges, topoNodes])
++    const selectedNodeSimulationMetrics = useMemo(() => {
++        if (!selectedNode || !simulationMapping) return null
++        const match = simulationMapping.nodeMatchesByDisplayId.get(selectedNode.id)
++        if (!match || match.matchedNodes.length === 0) return null
++
++        const tempItems = match.matchedNodes
++            .map(item => item.temperature_c)
++            .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
++        const realAvgTemp = tempItems.length > 0
++            ? tempItems.reduce((sum, value) => sum + value, 0) / tempItems.length
++            : null
++        const pressure = match.averagePressureMpa
++
++        return {
++            pressure,
++            temperatureC: realAvgTemp ?? (pressure != null ? estimateTemperatureByPressure(pressure) : null),
++            estimated: realAvgTemp == null,
++        }
++    }, [selectedNode, simulationMapping])
+     const mappingSummary = simulationMapping?.summary ?? null
+*** End Patch

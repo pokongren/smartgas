@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const mappingSummary = simulationMapping?.summary ?? null
+     const unmatchedNodePreview = mappingSummary?.unmatchedOverlayNodeIds.slice(0, 5) ?? []
+     const unmatchedEdgePreview = mappingSummary?.unmatchedOverlayEdgeIds.slice(0, 5) ?? []
++    const steadyScenarioOption = useMemo(() => {
++        return MAINLINE_SCENARIOS.find(item => item.id === steadyScenarioId) ?? null
++    }, [steadyScenarioId])
++    const selectedSnapshotSummary = useMemo(() => {
++        if (!steadySelectedSnapshotRunId) return null
++        return steadySnapshots.find(item => item.run_id === steadySelectedSnapshotRunId) ?? null
++    }, [steadySelectedSnapshotRunId, steadySnapshots])
+*** End Patch

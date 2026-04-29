@@ -1,0 +1,51 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ const LINE_COLOR = '#34d399'
+ const LINE_WEIGHT = 2
++const TOPO_RENDER_BUDGET = {
++    full: { maxNodes: 900, maxEdges: 1400 },
++    lite: { maxNodes: 500, maxEdges: 800 },
++}
+@@
+-        if (!steadyOverlay || isMapInteracting || tooManyOverlays || renderSafetyMode === 'lite') return
++        if (!steadyOverlay || isMapInteracting || tooManyOverlays || renderSafetyMode === 'lite') return
+@@
+-        const tooManyOverlays = topoNodes.length > 140 || topoEdges.length > 180
++        const tooManyOverlays = topoNodes.length > TOPO_RENDER_BUDGET.full.maxNodes || topoEdges.length > TOPO_RENDER_BUDGET.full.maxEdges
+         if (tooManyOverlays || isMapInteracting) {
+             if (renderSafetyMode !== 'lite') {
+                 setRenderSafetyMode('lite')
+@@
+-    const renderCollapsedGraph = useCallback((graphNodes: TopoNode[], graphEdges: TopoEdge[]) => {
++    const renderCollapsedGraph = useCallback((graphNodes: TopoNode[], graphEdges: TopoEdge[]) => {
+         if (!mapInstance) return
+         const AMap = (window as any).AMap
+         if (!AMap) return
+ 
+         clearRenderedTopology()
++
++        const budget = renderSafetyMode === 'lite'
++            ? TOPO_RENDER_BUDGET.lite
++            : TOPO_RENDER_BUDGET.full
++        const cappedNodes = graphNodes.slice(0, budget.maxNodes)
++        const allowedNodeIds = new Set(cappedNodes.map(node => node.id))
++        const cappedEdges = graphEdges
++            .filter(edge => allowedNodeIds.has(edge.startNodeId) && allowedNodeIds.has(edge.endNodeId))
++            .slice(0, budget.maxEdges)
++
++        if (cappedNodes.length < graphNodes.length || cappedEdges.length < graphEdges.length) {
++            setStatusMsg(
++                `拓扑过大，已启用${renderSafetyMode === 'lite' ? '轻量' : '标准'}预算：节点 ${cappedNodes.length}/${graphNodes.length}，连线 ${cappedEdges.length}/${graphEdges.length}`,
++            )
++        }
+ 
+-        const renderedNodes: TopoNode[] = graphNodes.map(node => {
++        const renderedNodes: TopoNode[] = cappedNodes.map(node => {
+@@
+-        const renderedEdges: TopoEdge[] = graphEdges.map(edge => {
++        const renderedEdges: TopoEdge[] = cappedEdges.map(edge => {
+@@
+-    }, [clearRenderedTopology, mapInstance])
++    }, [clearRenderedTopology, mapInstance, renderSafetyMode])
+*** End Patch

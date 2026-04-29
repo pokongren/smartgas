@@ -1,0 +1,41 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ const TOPO_COLORS: Record<PointType, string> = {
+-    compressor: '#FF9800',
+-    distribution: '#2196F3',
+-    junction: '#00e5ff',
+-    station: '#F44336',
+-    valve: '#9E9E9E',
++    compressor: '#fb923c',
++    distribution: '#60a5fa',
++    junction: '#22d3ee',
++    station: '#f87171',
++    valve: '#94a3b8',
+ }
+@@
+-const LINE_COLOR = '#34d399'
++const LINE_COLOR = '#2dd4bf'
+ const LINE_WEIGHT = 2
+@@
+ function createTopoMarkerContent(type: PointType, name: string = '', isHighlight = false, isJunction = false): string {
+     const color = TOPO_COLORS[type]
+     const size = isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[type]
+-    const border = isHighlight ? '2px solid #fff' : '1px solid rgba(255,255,255,0.5)'
+-    const shadow = isHighlight ? '0 0 8px rgba(255,255,255,0.5)' : 'none'
++    const border = isHighlight ? '2px solid rgba(255,255,255,0.9)' : '1px solid rgba(255,255,255,0.35)'
++    const shadow = isHighlight ? '0 0 10px rgba(255,255,255,0.45)' : '0 1px 6px rgba(0,0,0,0.35)'
+     const shapeStyle = isJunction
+-        ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 3px;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
++        ? `width:${size}px;height:${size}px;border-radius: 4px;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
+         : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
+     
+     return `
+         <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+             <div style="${shapeStyle}"></div>
+-            ${name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10;">${name}</div>` : ''}
++            ${name ? `<div style="position: absolute; top: ${size + 7}px; white-space: nowrap; font-size: 11px; line-height: 1.2; color: #e2e8f0; background: rgba(10,18,28,0.75); border: 1px solid rgba(148,163,184,0.35); border-radius: 6px; padding: 1px 6px; z-index: 10;">${name}</div>` : ''}
+         </div>
+     `
+ }
+*** End Patch

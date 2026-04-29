@@ -1,0 +1,68 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\GlobalPipelineView.tsx
+@@
+-import { useNavigate } from 'react-router-dom'
+@@
+-import type { ScadaRecord } from '@/views/global-pipeline/scadaConfig'
+-import { useNavigate } from 'react-router-dom'
++import type { ScadaRecord } from '@/views/global-pipeline/scadaConfig'
++import { useNavigate } from 'react-router-dom'
+@@
+-import { getNodeMarkerMap } from '@/utils/mapRenderer'
+-import { useNewWindow, usePopoutSync } from '@/hooks/useNewWindow'
+-import { getNodeRawType } from '@/utils/pipelineDomain'
+-import { getNodeRawType } from '@/utils/pipelineDomain'
++import { getNodeMarkerMap } from '@/utils/mapRenderer'
++import { useNewWindow, usePopoutSync } from '@/hooks/useNewWindow'
++import { getNodeRawType } from '@/utils/pipelineDomain'
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ interface BaseTopoEdge {
+     id: string
+     startNodeId: string
+     endNodeId: string
+     name?: string
+ }
++
++function resolveFocusTarget(nodes: TopoNode[], focusNodeId: string): TopoNode | null {
++    const directNode = nodes.find(node => node.id === focusNodeId)
++    if (directNode) return directNode
++
++    const sourceNode = nodes.find(node => node.sourceNodeIds?.includes(focusNodeId))
++    if (sourceNode) return sourceNode
++
++    if (focusNodeId.startsWith('JUNCTION-')) {
++        const junctionId = Number.parseInt(focusNodeId.slice('JUNCTION-'.length), 10)
++        if (Number.isFinite(junctionId)) {
++            return nodes.find(node => node.junctionId === junctionId) || null
++        }
++    }
++
++    return null
++}
+@@
+ const MapTopologyView: React.FC = () => {
+     const location = useLocation()
+     const [mapInstance, setMapInstance] = useState<any>(null)
+     const handleMapLoad = useCallback((map: any) => setMapInstance(map), [])
+     const importedOnceRef = useRef(false)
++    const appliedFocusNodeRef = useRef<string | null>(null)
+@@
+     useEffect(() => {
+         const params = new URLSearchParams(location.search)
+         const focusNodeId = params.get('focusNode')
+         if (!focusNodeId || topoNodes.length === 0) return
++        if (appliedFocusNodeRef.current === focusNodeId) return
+ 
+-        const targetNode = topoNodes.find(node =>
+-            node.id === focusNodeId || node.sourceNodeIds?.includes(focusNodeId)
+-        )
++        const targetNode = resolveFocusTarget(topoNodes, focusNodeId)
+         if (!targetNode) return
+ 
++        appliedFocusNodeRef.current = focusNodeId
+         flyTo(targetNode)
+         setSelectedNode(targetNode)
+         setStatusMsg(`已从地图联动定位到拓扑节点：${targetNode.name}`)
+     }, [flyTo, location.search, topoNodes])
+*** End Patch

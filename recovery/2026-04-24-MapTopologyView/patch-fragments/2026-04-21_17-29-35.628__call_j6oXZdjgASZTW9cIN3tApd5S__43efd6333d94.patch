@@ -1,0 +1,8 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-        setShowSnapshotPressureOverlay(true)
+-        setShowSnapshotPressureOverlay(true)
++        setShowSnapshotPressureOverlay(true)
+         const latestSeedMap = await fetchLatestSeedNodePressureMap()
+*** End Patch

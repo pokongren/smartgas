@@ -1,0 +1,321 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\backend\scripts\verify_we1_phase5.py
++"""
++WE1 phase-5 acceptance verification script for map-first simulation entry.
++
++Run:
++    python backend/scripts/verify_we1_phase5.py
++"""
++
++from __future__ import annotations
++
++import json
++import sys
++from pathlib import Path
++from typing import Any, Dict, Iterable, List
++
++from sqlmodel import Session
++
++
++BACKEND_ROOT = Path(__file__).resolve().parents[1]
++REPO_ROOT = BACKEND_ROOT.parent
++if str(BACKEND_ROOT) not in sys.path:
++    sys.path.insert(0, str(BACKEND_ROOT))
++
++from app.database import engine  # noqa: E402
++from app.routers.topology_simulation import (  # noqa: E402
++    SaveSnapshotRequest,
++    create_simulation_snapshot,
++    get_simulation_overlay,
++    get_simulation_snapshot,
++    list_simulation_snapshots,
++)
++
++
++PILOT_ID = "mainline_zhongwei_jingbian"
++SCENARIO_ID = "steady_base"
++
++
++def _check(check_id: str, passed: bool, message: str, details: Dict[str, Any] | None = None) -> Dict[str, Any]:
++    return {
++        "id": check_id,
++        "passed": bool(passed),
++        "message": message,
++        "details": details or {},
++    }
++
++
++def _has_keys(data: Dict[str, Any], keys: Iterable[str]) -> tuple[bool, List[str]]:
++    missing = [key for key in keys if key not in data]
++    return (len(missing) == 0, missing)
++
++
++def _read_text(path: Path) -> str:
++    return path.read_text(encoding="utf-8")
++
++
++def main() -> int:
++    checks: List[Dict[str, Any]] = []
++    try:
++        print("=== WE1 phase-5 acceptance verification start ===")
++
++        with Session(engine) as session:
++            overlay = get_simulation_overlay(
++                pilot_id=PILOT_ID,
++                scenario_id=SCENARIO_ID,
++                session=session,
++            )
++
++            created_snapshot = create_simulation_snapshot(
++                SaveSnapshotRequest(pilot_id=PILOT_ID, scenario_id=SCENARIO_ID),
++                session=session,
++            )
++
++        overlay_required = {
++            "pilot_id",
++            "scenario_id",
++            "run_id",
++            "generated_at",
++            "solver_status",
++            "iterations",
++            "nodes",
++            "edges",
++            "summary",
++            "meta",
++        }
++        summary_required = {
++            "total_supply",
++            "total_demand",
++            "unserved_demand",
++            "avg_utilization",
++            "alert_count",
++        }
++        meta_required = {
++            "pilot_id",
++            "scenario_id",
++            "available_scenarios",
++            "node_count",
++            "edge_count",
++            "solver_input_version",
++        }
++
++        ok_overlay_keys, missing_overlay_keys = _has_keys(overlay, overlay_required)
++        checks.append(
++            _check(
++                "overlay_contract_top_level",
++                ok_overlay_keys,
++                "steady_base overlay top-level contract is complete",
++                {
++                    "missing_keys": missing_overlay_keys,
++                    "run_id": overlay.get("run_id"),
++                },
++            )
++        )
++        checks.append(
++            _check(
++                "overlay_has_nodes_edges",
++                bool(overlay.get("nodes")) and bool(overlay.get("edges")),
++                "steady_base overlay contains non-empty nodes and edges",
++                {
++                    "node_count": len(overlay.get("nodes") or []),
++                    "edge_count": len(overlay.get("edges") or []),
++                },
++            )
++        )
++
++        summary = overlay.get("summary") if isinstance(overlay.get("summary"), dict) else {}
++        ok_summary_keys, missing_summary_keys = _has_keys(summary, summary_required)
++        checks.append(
++            _check(
++                "overlay_contract_summary",
++                ok_summary_keys,
++                "overlay.summary contract is complete",
++                {"missing_keys": missing_summary_keys},
++            )
++        )
++
++        meta = overlay.get("meta") if isinstance(overlay.get("meta"), dict) else {}
++        ok_meta_keys, missing_meta_keys = _has_keys(meta, meta_required)
++        checks.append(
++            _check(
++                "overlay_contract_meta",
++                ok_meta_keys,
++                "overlay.meta contract is complete",
++                {"missing_keys": missing_meta_keys},
++            )
++        )
++
++        run_id = str(created_snapshot.get("run_id") or "")
++        checks.append(
++            _check(
++                "snapshot_create",
++                bool(run_id),
++                "snapshot create returns run_id",
++                {
++                    "run_id": run_id,
++                    "snapshot_version": created_snapshot.get("snapshot_version"),
++                },
++            )
++        )
++
++        checks.append(
++            _check(
++                "snapshot_create_payload",
++                created_snapshot.get("snapshot_version") == "we1-snapshot-v1"
++                and isinstance(created_snapshot.get("result"), dict)
++                and "input_summary" in created_snapshot
++                and "output_summary" in created_snapshot
++                and bool(created_snapshot.get("key_nodes"))
++                and bool(created_snapshot.get("key_edges")),
++                "snapshot create payload includes required archive fields",
++                {
++                    "has_result": isinstance(created_snapshot.get("result"), dict),
++                    "has_input_summary": "input_summary" in created_snapshot,
++                    "has_output_summary": "output_summary" in created_snapshot,
++                    "key_nodes_count": len(created_snapshot.get("key_nodes") or []),
++                    "key_edges_count": len(created_snapshot.get("key_edges") or []),
++                },
++            )
++        )
++
++        fetched_snapshot: Dict[str, Any] | None = None
++        listing: Dict[str, Any] | None = None
++        if run_id:
++            fetched_snapshot = get_simulation_snapshot(run_id, pilot_id=PILOT_ID)
++            listing = list_simulation_snapshots(pilot_id=PILOT_ID, scenario_id=SCENARIO_ID, limit=20)
++
++        checks.append(
++            _check(
++                "snapshot_get",
++                bool(fetched_snapshot)
++                and fetched_snapshot.get("run_id") == run_id
++                and isinstance(fetched_snapshot.get("result"), dict),
++                "snapshot get returns the created snapshot record",
++                {
++                    "run_id_match": bool(fetched_snapshot) and fetched_snapshot.get("run_id") == run_id,
++                },
++            )
++        )
++
++        checks.append(
++            _check(
++                "snapshot_list",
++                bool(listing)
++                and isinstance(listing, dict)
++                and int(listing.get("count") or 0) >= 1
++                and any(item.get("run_id") == run_id for item in listing.get("items", [])),
++                "snapshot list contains the newly created run",
++                {
++                    "count": int((listing or {}).get("count") or 0),
++                },
++            )
++        )
++
++        map_path = REPO_ROOT / "src" / "views" / "MapTopologyView.tsx"
++        app_path = REPO_ROOT / "src" / "App.tsx"
++        ai_context_path = REPO_ROOT / "src" / "components" / "ai-assistant" / "useAiAssistantPageContext.ts"
++
++        map_text = _read_text(map_path)
++        app_text = _read_text(app_path)
++        ai_context_text = _read_text(ai_context_path)
++
++        checks.append(
++            _check(
++                "map_phase5_coverage_checklist",
++                "coverageChecklistItems" in map_text and "coverageResultSummary" in map_text,
++                "MapTopologyView includes coverage checklist and summary consumption",
++                {
++                    "file": str(map_path),
++                },
++            )
++        )
++        checks.append(
++            _check(
++                "map_phase5_playbook",
++                "MAINLINE_SCENARIO_PLAYBOOK" in map_text and "demoGuideSteps" in map_text,
++                "MapTopologyView includes scenario playbook and demo guide consumption",
++                {
++                    "file": str(map_path),
++                },
++            )
++        )
++        checks.append(
++            _check(
++                "map_phase5_failure_triage",
++                "FAILURE_LAYER_LABELS" in map_text and "failureInvestigationLayerLabel" in map_text,
++                "MapTopologyView includes failure triage layer labels",
++                {
++                    "file": str(map_path),
++                },
++            )
++        )
++        checks.append(
++            _check(
++                "map_phase5_baseline_compare",
++                "steadyComparison" in map_text
++                and "baselineSimulationMapping" in map_text
++                and "steadyBaselineSnapshotRunId" in map_text,
++                "MapTopologyView includes baseline comparison consumption points",
++                {
++                    "file": str(map_path),
++                },
++            )
++        )
++        checks.append(
++            _check(
++                "app_routes_map_vs_topology",
++                '<Route path="/map-topology"' in app_text and '<Route path="/topology"' in app_text,
++                "App routes expose both /map-topology and /topology",
++                {
++                    "file": str(app_path),
++                },
++            )
++        )
++        checks.append(
++            _check(
++                "ai_context_map_vs_topology",
++                "'/map-topology':" in ai_context_text and "'/topology':" in ai_context_text,
++                "AI assistant page context differentiates /map-topology and /topology",
++                {
++                    "file": str(ai_context_path),
++                },
++            )
++        )
++
++        passed = all(item["passed"] for item in checks)
++        output: Dict[str, Any] = {
++            "status": "passed" if passed else "failed",
++            "pilot_id": PILOT_ID,
++            "scenario_id": SCENARIO_ID,
++            "checks": checks,
++            "triage_order": [
++                "map entry and frontend consumption layer",
++                "mapping source-id to overlay-id layer",
++                "simulation overlay contract layer",
++                "snapshot create/list/get archive layer",
++                "solver input and steady solve backend layer",
++            ],
++        }
++
++        print(json.dumps(output, ensure_ascii=False, indent=2))
++        return 0 if passed else 1
++    except Exception as exc:
++        output = {
++            "status": "failed",
++            "error": str(exc),
++            "checks": checks,
++            "triage_order": [
++                "map entry and frontend consumption layer",
++                "mapping source-id to overlay-id layer",
++                "simulation overlay contract layer",
++                "snapshot create/list/get archive layer",
++                "solver input and steady solve backend layer",
++            ],
++        }
++        print(json.dumps(output, ensure_ascii=False, indent=2))
++        return 1
++
++
++if __name__ == "__main__":
++    raise SystemExit(main())
+*** End Patch

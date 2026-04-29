@@ -1,0 +1,116 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                                 {steadyOverlay ? (
+                                     <>
+                                         <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-3 space-y-2">
+-                                            <div className="text-[10px] uppercase tracking-wider text-emerald-200">??????</div>
++                                            <div className="text-[10px] uppercase tracking-wider text-emerald-200">运行结果摘要</div>
+                                             <div className="rounded-lg bg-black/15 px-3 py-2 text-[11px] leading-5 text-gray-300">
+-                                                <div>???{steadyScenarioOption?.label ?? steadyOverlay.scenario_id}</div>
+-                                                <div>?????{steadyOverlay.run_id}</div>
+-                                                <div>?????{formatDateTimeLabel(steadyOverlay.generated_at)}</div>
+-                                                <div>?????{SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}</div>
++                                                <div>场景：{steadyScenarioOption?.label ?? steadyOverlay.scenario_id}</div>
++                                                <div>运行批次：{steadyOverlay.run_id}</div>
++                                                <div>生成时间：{formatDateTimeLabel(steadyOverlay.generated_at)}</div>
++                                                <div>求解状态：{SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}</div>
+                                             </div>
+                                             <div className="grid grid-cols-2 gap-2 text-xs">
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">???</div>
++                                                    <div className="text-[10px] text-gray-500">总供给</div>
+                                                     <div className="mt-1 font-semibold text-white">{steadyOverlay.summary.total_supply.toFixed(2)}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">???</div>
++                                                    <div className="text-[10px] text-gray-500">总需求</div>
+                                                     <div className="mt-1 font-semibold text-white">{steadyOverlay.summary.total_demand.toFixed(2)}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">?????</div>
++                                                    <div className="text-[10px] text-gray-500">平均利用率</div>
+                                                     <div className="mt-1 font-semibold text-white">{steadyOverlay.summary.avg_utilization.toFixed(3)}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">???</div>
++                                                    <div className="text-[10px] text-gray-500">告警数</div>
+                                                     <div className="mt-1 font-semibold text-amber-300">{steadyOverlay.summary.alert_count}</div>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                         <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 p-3 space-y-2">
+-                                            <div className="text-[10px] uppercase tracking-wider text-cyan-200">??????</div>
++                                            <div className="text-[10px] uppercase tracking-wider text-cyan-200">映射覆盖摘要</div>
+                                             <div className="grid grid-cols-2 gap-2 text-xs">
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">??????</div>
++                                                    <div className="text-[10px] text-gray-500">显示节点命中</div>
+                                                     <div className="mt-1 font-semibold text-white">{mappingSummary?.displayNodesWithMatchedOverlay ?? 0} / {mappingSummary?.displayNodeCount ?? 0}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">??????</div>
++                                                    <div className="text-[10px] text-gray-500">显示连线命中</div>
+                                                     <div className="mt-1 font-semibold text-white">{mappingSummary?.displayEdgesWithMatchedOverlay ?? 0} / {mappingSummary?.displayEdgeCount ?? 0}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">??????</div>
+-                                                    <div className="mt-1 text-[11px] text-gray-100">?? {mappingSummary?.displayNodesFullyMatched ?? 0} / ?? {mappingSummary?.displayNodesPartiallyMatched ?? 0} / ?? {mappingSummary?.displayNodesUnmatched ?? 0}</div>
++                                                    <div className="text-[10px] text-gray-500">节点匹配分层</div>
++                                                    <div className="mt-1 text-[11px] text-gray-100">全中 {mappingSummary?.displayNodesFullyMatched ?? 0} / 半中 {mappingSummary?.displayNodesPartiallyMatched ?? 0} / 未中 {mappingSummary?.displayNodesUnmatched ?? 0}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">??????</div>
+-                                                    <div className="mt-1 text-[11px] text-gray-100">?? {mappingSummary?.displayEdgesFullyMatched ?? 0} / ?? {mappingSummary?.displayEdgesPartiallyMatched ?? 0} / ?? {mappingSummary?.displayEdgesUnmatched ?? 0}</div>
++                                                    <div className="text-[10px] text-gray-500">连线匹配分层</div>
++                                                    <div className="mt-1 text-[11px] text-gray-100">全中 {mappingSummary?.displayEdgesFullyMatched ?? 0} / 半中 {mappingSummary?.displayEdgesPartiallyMatched ?? 0} / 未中 {mappingSummary?.displayEdgesUnmatched ?? 0}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">???????</div>
++                                                    <div className="text-[10px] text-gray-500">枢纽内部边命中</div>
+                                                     <div className="mt-1 font-semibold text-cyan-200">{mappingSummary?.displayNodesWithMatchedInternalEdges ?? 0}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">overlay ???</div>
++                                                    <div className="text-[10px] text-gray-500">overlay 边命中</div>
+                                                     <div className="mt-1 font-semibold text-white">{mappingSummary?.matchedOverlayEdgeCount ?? 0} / {steadyOverlay.edges.length}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">?? source ?? IDs</div>
++                                                    <div className="text-[10px] text-gray-500">缺失 source 节点 ID</div>
+                                                     <div className="mt-1 font-semibold text-amber-300">{mappingSummary?.missingSourceNodeIdCount ?? 0}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">?? source ? IDs</div>
++                                                    <div className="text-[10px] text-gray-500">缺失 source 边 ID</div>
+                                                     <div className="mt-1 font-semibold text-amber-300">{mappingSummary?.missingSourceEdgeIdCount ?? 0}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">??? overlay ??</div>
++                                                    <div className="text-[10px] text-gray-500">未命中 overlay 节点</div>
+                                                     <div className="mt-1 font-semibold text-amber-300">{mappingSummary?.unmatchedOverlayNodeIds.length ?? 0}</div>
+                                                 </div>
+                                                 <div className="rounded-lg bg-black/15 px-3 py-2 text-gray-300">
+-                                                    <div className="text-[10px] text-gray-500">??? overlay ?</div>
++                                                    <div className="text-[10px] text-gray-500">未命中 overlay 边</div>
+                                                     <div className="mt-1 font-semibold text-amber-300">{mappingSummary?.unmatchedOverlayEdgeIds.length ?? 0}</div>
+                                                 </div>
+                                             </div>
+                                             <div className="rounded-lg bg-black/15 px-3 py-2 text-[11px] leading-5 text-gray-300">
+-                                                <div>?? source ?????{missingSourceNodePreview.join(', ') || '?'}</div>
+-                                                <div>?? source ????{missingSourceEdgePreview.join(', ') || '?'}</div>
+-                                                <div>????????{missingInternalSourceEdgePreview.join(', ') || '?'}</div>
+-                                                <div>??? overlay ?????{unmatchedNodePreview.join(', ') || '?'}</div>
+-                                                <div>??? overlay ????{unmatchedEdgePreview.join(', ') || '?'}</div>
+-                                                <div>??????{failureInvestigationLayerLabel}</div>
+-                                                <div>???????????????????????????????</div>
++                                                <div>缺失 source 节点预览：{missingSourceNodePreview.join(', ') || '无'}</div>
++                                                <div>缺失 source 边预览：{missingSourceEdgePreview.join(', ') || '无'}</div>
++                                                <div>枢纽内部缺失边预览：{missingInternalSourceEdgePreview.join(', ') || '无'}</div>
++                                                <div>未命中 overlay 节点预览：{unmatchedNodePreview.join(', ') || '无'}</div>
++                                                <div>未命中 overlay 边预览：{unmatchedEdgePreview.join(', ') || '无'}</div>
++                                                <div>排查优先层：{failureInvestigationLayerLabel}</div>
++                                                <div>这块只说明映射有没有接住，以及当前结果和基线是否可继续做稳定对比。</div>
+                                             </div>
+                                         </div>
+*** End Patch

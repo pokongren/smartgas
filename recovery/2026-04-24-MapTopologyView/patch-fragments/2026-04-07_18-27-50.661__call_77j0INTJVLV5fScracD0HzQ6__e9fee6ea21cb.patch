@@ -1,0 +1,25 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ const TOPO_LABELS: Record<PointType, string> = {
+-    compressor: '鍘嬫皵绔?,
+-    distribution: '鍒嗚緭绔?,
+-    junction: '浜ゆ眹鏋㈢航',
+-    station: '绔欏満',
+-    valve: '闃€瀹?,
++    compressor: '压气站',
++    distribution: '分输站',
++    junction: '交汇枢纽',
++    station: '站场',
++    valve: '阀室',
+ }
+@@
+-const JUNCTION_READONLY_HINT = '褰撳墠鏋㈢航鐢辫繍琛屾椂閲嶇紪缁撴灉缁存姢锛岀紪杈戝櫒浠呮敮鎸佸彧璇绘煡鐪嬶紝涓嶅啀浠ユ墜宸ユ崗鍚堜綔涓轰富娴佺▼銆?
++const JUNCTION_READONLY_HINT = '当前枢纽由运行时重编结果维护，编辑器这里只支持只读查看，不再以手工捏合作为主流程。'
+ const JUNCTION_MODE_LABELS: Record<string, string> = {
+-    runtime_readonly: '鍙妯″紡',
+-    legacy_editable: '鏃ф祦绋嬪吋瀹?,
++    runtime_readonly: '只读模式',
++    legacy_editable: '旧流程兼容',
+ }
+*** End Patch

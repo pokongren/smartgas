@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                                             <option value="">閫夋嫨鍘嗗彶蹇収</option>
+                                             {steadySnapshots.map((item) => (
+                                                 <option key={item.run_id} value={item.run_id}>
+-                                                    {`${item.scenario_id} | ${item.run_id.slice(0, 12)} | ${item.saved_at.slice(11, 19)}`}
++                                                    {formatSnapshotOption(item.run_id, item.scenario_id, item.saved_at)}
+                                                 </option>
+                                             ))}
+                                         </select>
+*** End Patch

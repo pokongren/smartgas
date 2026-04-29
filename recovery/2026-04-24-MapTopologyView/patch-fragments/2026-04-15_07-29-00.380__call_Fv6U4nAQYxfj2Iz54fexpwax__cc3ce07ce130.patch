@@ -1,0 +1,21 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                     <button
+                                         onClick={saveConnectedEdges}
+                                         disabled={unsavedEdgeIds.size === 0 || isSaving}
+                                         className="w-full bg-emerald-700/80 hover:bg-emerald-600 text-white py-2 rounded-lg text-xs transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+                                     >
+                                         <span className="material-symbols-outlined text-sm">timeline</span>
+                                         保存连线（JSON）
+                                     </button>
++                                    <button
++                                        onClick={() => void restoreSavedDraft(false)}
++                                        disabled={!hasSavedDraft || isSaving}
++                                        className="w-full bg-slate-700/80 hover:bg-slate-600 text-white py-2 rounded-lg text-xs transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
++                                    >
++                                        <span className="material-symbols-outlined text-sm">restore</span>
++                                        恢复已保存连线
++                                    </button>
+                                 </div>
+*** End Patch

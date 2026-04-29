@@ -1,0 +1,659 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/AI前端联动数据分析方案.md
++# SmartGas AI 前端联动数据分析方案
++
++> 目标：
++> 让 AI 机器人不再只是“聊天问答框”，而是能够感知当前前端页面、当前选中对象、当前图面状态、当前分析结果，并据此发起数据分析、拓扑推理、历史趋势判断和场景解释。
++
++---
++
++## 1. 方案目标
++
++AI 机器人要做到和前端真正联动，核心不是把一个输入框放到页面里，而是要建立这条链路：
++
++`前端页面状态 -> 页面上下文摘要 -> AI 分析编排 -> 后端工具执行 -> 结构化结果 -> 前端回显/高亮/图表联动`
++
++最终要达到的体验是：
++
++1. 用户不需要重复描述“我现在正在看哪个站、哪条线、哪个枢纽、哪个图表”。
++2. AI 能基于当前页面状态自动理解分析对象。
++3. AI 回答不只是一段话，还能驱动前端做高亮、弹面板、打开历史曲线、切换到拓扑页、展示路径结果。
++4. 分析结果既可读，也可回放、可复核。
++
++---
++
++## 2. 当前现状
++
++从当前仓库实现看，AI 助手已经有基础，但还没有真正和前端页面联动起来。
++
++### 2.1 已有基础
++
++- [AiAssistant.tsx](F:/smartgas-grid/src/components/ai-assistant/AiAssistant.tsx)
++  - 已有独立 AI 助手面板和流式交互 UI。
++- [useAiAssistantChat.ts](F:/smartgas-grid/src/components/ai-assistant/useAiAssistantChat.ts)
++  - 当前请求体只发送 `message` 和 `history`。
++- [ai_assistant.py](F:/smartgas-grid/backend/app/routers/ai_assistant.py)
++  - 后端已支持流式返回和工具调用。
++- [assistant_tools.py](F:/smartgas-grid/backend/app/services/assistant_tools.py)
++  - 已封装查询站场、查询管线、拓扑概览、路径、影响分析、故障推演、趋势预测、相关性分析等工具。
++- [GlobalPipelineView.tsx](F:/smartgas-grid/src/views/GlobalPipelineView.tsx)
++  - 已有站点点击、指标点击、历史曲线面板。
++- [MapTopologyView.tsx](F:/smartgas-grid/src/views/MapTopologyView.tsx)
++  - 已有选中节点、枢纽捏合、校验、中心性、截断仿真、历史曲线入口。
++- [TopologyView.tsx](F:/smartgas-grid/src/views/TopologyView.tsx)
++  - 已有节点选择、过滤、详情面板、多选、局部拓扑操作。
++- [ScadaHistoryChart.tsx](F:/smartgas-grid/src/components/scada/ScadaHistoryChart.tsx)
++  - 已支持站点或枢纽维度的历史曲线查询。
++
++### 2.2 当前主要问题
++
++#### 问题一：AI 不知道用户“正在看什么”
++
++当前聊天接口请求体大致只有：
++
++```json
++{
++  "message": "帮我分析一下",
++  "history": []
++}
++```
++
++这意味着 AI 并不知道：
++
++- 当前在哪个页面
++- 当前选中了哪个站
++- 当前打开的是哪个历史曲线
++- 当前做了哪次拓扑分析
++- 当前图面过滤条件是什么
++
++#### 问题二：AI 输出主要是文本，不能驱动前端动作
++
++当前 AI 返回以文本为主，前端虽然能显示工具名，但还不能稳定执行这类动作：
++
++- 高亮某条路径
++- 打开某个站场详情
++- 弹出某个枢纽的历史曲线
++- 切到拓扑页并选中节点
++- 把分析结果回填到图面侧栏
++
++#### 问题三：前端已有很多状态，但没有统一上下文层
++
++目前多个页面已经维护了自己的局部状态：
++
++- `GlobalPipelineView` 有历史曲线目标、图层显示、站点交互
++- `MapTopologyView` 有选中节点、枢纽、校验结果、截断结果
++- `TopologyView` 有选中节点、过滤条件、分析面板
++
++但这些状态没有沉淀成统一的 AI 可消费上下文。
++
++#### 问题四：后端工具是“可调用”的，但不是“上下文感知”的
++
++目前工具更像是：
++
++- 用户说一句话
++- AI 猜一个工具
++- 后端执行工具
++
++还没有形成：
++
++- 读取当前前端上下文
++- 判断分析意图
++- 补齐隐式参数
++- 返回结构化分析结果和前端动作建议
++
++---
++
++## 3. 目标能力设计
++
++建议把 AI 联动能力拆成四层：
++
++### 3.1 页面上下文感知
++
++AI 要知道用户当前处于什么分析场景。
++
++### 3.2 分析意图识别
++
++AI 要能识别用户是要：
++
++- 查数据
++- 看趋势
++- 找路径
++- 做影响分析
++- 做截断推演
++- 解释当前图表
++- 比较多个对象
++
++### 3.3 工具编排执行
++
++AI 不只调用一个工具，而是可以按上下文自动串联多步：
++
++- 先识别对象
++- 再查基础信息
++- 再查拓扑
++- 再查历史曲线
++- 最后生成结论
++
++### 3.4 前端动作联动
++
++AI 的输出应该包含可执行动作，而不是只有文字。
++
++例如：
++
++- `highlight_nodes`
++- `highlight_path`
++- `open_history_chart`
++- `open_station_panel`
++- `switch_view`
++- `set_topology_filter`
++
++---
++
++## 4. 总体架构
++
++```mermaid
++flowchart LR
++    A["前端页面状态<br/>地图/拓扑/SCADA/筛选/选中对象"] --> B["前端上下文管理层<br/>AiPageContext Store"]
++    B --> C["AI 请求编排层<br/>message + history + page context + analysis snapshot"]
++    C --> D["后端 AI 编排器<br/>intent + tool planning + context-aware execution"]
++    D --> E["数据与工具层<br/>SQL / SCADA / Topology / Simulation / Knowledge Base"]
++    D --> F["结构化 AI 响应<br/>reply + insights + actions + payloads"]
++    F --> G["前端联动执行器<br/>高亮/弹窗/切页/图表/结果面板"]
++```
++
++---
++
++## 5. 核心方案
++
++## 5.1 建立统一前端上下文层
++
++建议新增一个前端 AI 上下文模块，例如：
++
++- `src/contexts/aiPageContext.ts`
++- `src/hooks/useAiPageContext.ts`
++- `src/services/aiActionBus.ts`
++
++用于把分散在各页面里的状态收拢成统一结构。
++
++### 建议的上下文结构
++
++```ts
++export interface AiPageContext {
++  page:
++    | 'global-pipeline'
++    | 'map-topology'
++    | 'topology'
++    | 'topology-demo'
++    | 'workflow'
++
++  selection: {
++    stationId?: string
++    stationName?: string
++    pipelineId?: string
++    pipelineName?: string
++    junctionId?: string
++    nodeIds?: string[]
++  }
++
++  viewport?: {
++    center?: [number, number]
++    zoom?: number
++  }
++
++  filters?: {
++    selectedPipeline?: string
++    nodeTypes?: string[]
++    showIsolated?: boolean
++  }
++
++  analysis?: {
++    analysisType?: 'topology' | 'history' | 'cutoff' | 'centrality' | 'validation'
++    summary?: string
++    metrics?: Record<string, number | string>
++    rawRefId?: string
++  }
++
++  chart?: {
++    chartType?: 'pressure-history' | 'temperature-history'
++    targetType?: 'station' | 'junction'
++    targetId?: string
++    targetName?: string
++    hours?: number
++  }
++}
++```
++
++### 页面接入建议
++
++#### `GlobalPipelineView`
++
++应上报：
++
++- 当前点击站场
++- 当前点击指标类型
++- 当前打开的历史曲线目标
++- 当前展开的管线图层
++
++#### `MapTopologyView`
++
++应上报：
++
++- 当前选中节点
++- 当前是否为枢纽
++- 当前校验报告摘要
++- 当前中心性结果摘要
++- 当前截断仿真结果摘要
++- 当前正在查看的历史图对象
++
++#### `TopologyView`
++
++应上报：
++
++- 当前选中节点
++- 当前过滤条件
++- 当前选中管线
++- 当前是否多选
++- 当前详情面板对象
++
++这样 AI 不用猜“你说的这个站”到底是哪一个。
++
++---
++
++## 5.2 扩展 AI 聊天接口协议
++
++当前接口只收 `message` 和 `history`，建议升级为：
++
++```json
++{
++  "message": "帮我分析一下这个站最近为什么压力异常",
++  "history": [],
++  "context": {
++    "page": "global-pipeline",
++    "selection": {
++      "stationName": "甪直分输站"
++    },
++    "chart": {
++      "chartType": "pressure-history",
++      "targetType": "station",
++      "targetName": "甪直分输站",
++      "hours": 6
++    },
++    "analysis": {
++      "analysisType": "history"
++    }
++  }
++}
++```
++
++建议修改入口：
++
++- [useAiAssistantChat.ts](F:/smartgas-grid/src/components/ai-assistant/useAiAssistantChat.ts)
++- [ai_assistant.py](F:/smartgas-grid/backend/app/routers/ai_assistant.py)
++
++### 后端请求模型建议
++
++```py
++class FrontendContext(BaseModel):
++    page: str
++    selection: dict = {}
++    filters: dict = {}
++    analysis: dict = {}
++    chart: dict = {}
++    viewport: dict = {}
++
++
++class ChatRequest(BaseModel):
++    message: str
++    history: list[ChatMessage] = []
++    context: FrontendContext | None = None
++```
++
++---
++
++## 5.3 把“聊天”升级成“上下文感知分析编排”
++
++后端 AI 路由不应只把用户文本塞给模型，而应先做一层分析编排。
++
++建议新增：
++
++- `backend/app/services/ai_analysis_orchestrator.py`
++
++职责如下：
++
++1. 读取前端上下文
++2. 识别用户意图
++3. 补齐缺失参数
++4. 按需串联工具
++5. 组织结构化返回
++
++### 编排逻辑示例
++
++#### 场景 A：用户说“帮我分析一下”
++
++如果当前上下文是：
++
++- 页面：`global-pipeline`
++- 已选对象：`甪直分输站`
++- 当前打开图表：压力历史曲线
++
++则编排器自动理解为：
++
++1. 查询站点详情
++2. 查询 6 小时压力趋势
++3. 做趋势预测
++4. 做压力/温度相关性判断
++5. 返回结论
++
++#### 场景 B：用户说“这个站停输会影响哪里”
++
++如果当前上下文来自 `MapTopologyView` 选中节点：
++
++1. 识别当前节点
++2. 调用拓扑影响分析
++3. 必要时调用截断推演
++4. 返回受影响下游、关键路径、建议动作
++
++#### 场景 C：用户说“有没有替代路径”
++
++如果当前上下文包含：
++
++- 当前选中站点
++- 当前目标站点
++- 当前断开边
++
++则直接调用路径工具并返回前端路径高亮动作。
++
++---
++
++## 5.4 统一结构化 AI 返回格式
++
++当前 AI 返回基本是文本流。建议增加结构化响应层，让前端能执行动作。
++
++### 建议返回结构
++
++```json
++{
++  "reply": "甪直分输站最近 6 小时进站压力整体缓慢下降，结合历史斜率，约 2 小时 40 分后接近安全下限。",
++  "insights": [
++    {
++      "type": "trend",
++      "title": "压力持续下行",
++      "value": "-0.18 MPa/6h"
++    },
++    {
++      "type": "risk",
++      "title": "逼近下限时间",
++      "value": "2h 40m"
++    }
++  ],
++  "actions": [
++    {
++      "type": "open_history_chart",
++      "target": {
++        "stationName": "甪直分输站",
++        "metricType": "pressure"
++      }
++    },
++    {
++      "type": "highlight_station",
++      "target": {
++        "stationName": "甪直分输站"
++      }
++    }
++  ],
++  "tool_calls": [],
++  "context_echo": {
++    "page": "global-pipeline",
++    "stationName": "甪直分输站"
++  }
++}
++```
++
++### 动作类型建议
++
++- `highlight_station`
++- `highlight_nodes`
++- `highlight_path`
++- `open_history_chart`
++- `open_station_detail`
++- `open_junction_detail`
++- `switch_view`
++- `show_analysis_panel`
++- `apply_topology_filter`
++
++---
++
++## 5.5 建立前端 AI 动作执行器
++
++建议新增：
++
++- `src/services/aiActionBus.ts`
++- `src/hooks/useAiActions.ts`
++
++让各页面订阅 AI 动作。
++
++### 示例
++
++#### `GlobalPipelineView` 监听：
++
++- `open_history_chart`
++- `highlight_station`
++
++#### `MapTopologyView` 监听：
++
++- `highlight_nodes`
++- `open_junction_detail`
++- `show_analysis_panel`
++
++#### `TopologyView` 监听：
++
++- `highlight_path`
++- `apply_topology_filter`
++- `open_station_detail`
++
++这样 AI 回答就不是“说完就完了”，而是能带动画面变化。
++
++---
++
++## 5.6 将分析结果沉淀为“可回显卡片”
++
++AI 分析不建议只显示在聊天气泡里，建议同时输出到一个“分析结果卡片区”。
++
++建议新增：
++
++- `src/components/ai-assistant/AiAnalysisCard.tsx`
++- `src/components/ai-assistant/AiInsightPanel.tsx`
++
++卡片内容建议包含：
++
++- 分析对象
++- 分析类型
++- 关键结论
++- 风险等级
++- 时间范围
++- 工具来源
++- 可执行操作
++
++例如：
++
++- `趋势分析卡`
++- `影响范围卡`
++- `替代路径卡`
++- `截断推演卡`
++- `枢纽对比卡`
++
++---
++
++## 5.7 明确 AI 在本项目中的三类联动模式
++
++建议把 AI 联动分成三种模式。
++
++### 模式一：被动问答型
++
++用户主动提问，AI 结合前端上下文回答。
++
++适用场景：
++
++- “这个站怎么了”
++- “这条线压力为什么低”
++- “这个枢纽受哪些站影响”
++
++### 模式二：主动建议型
++
++前端检测到异常后，主动给 AI 一个分析入口。
++
++适用场景：
++
++- 历史曲线突然下跌
++- 校验发现孤立节点
++- 截断推演结果异常大
++
++前端可显示：
++
++- “AI 帮你分析原因”
++- “生成影响摘要”
++
++### 模式三：动作驱动型
++
++用户不一定说完整问题，而是点按钮让 AI 基于当前对象执行固定分析。
++
++适用场景：
++
++- “分析当前选中站点”
++- “分析当前截断结果”
++- “解释当前中心性结果”
++
++---
++
++## 6. 推荐实施路径
++
++## 第一阶段：上下文接入（1 到 2 周）
++
++### 目标
++
++先让 AI 知道用户在看什么。
++
++### 任务
++
++1. 建立 `AiPageContext` Store
++2. `GlobalPipelineView` 接入上下文上报
++3. `MapTopologyView` 接入上下文上报
++4. `TopologyView` 接入上下文上报
++5. 聊天请求体增加 `context`
++
++### 验收标准
++
++- 用户在不同页面发同一句“帮我分析一下”，AI 能基于当前页面给出不同分析。
++
++---
++
++## 第二阶段：结构化分析结果（1 到 2 周）
++
++### 目标
++
++让 AI 返回的不只是文本。
++
++### 任务
++
++1. 后端增加 `insights` 和 `actions`
++2. 前端增加 AI 动作执行器
++3. 前端增加分析卡片渲染
++
++### 验收标准
++
++- AI 可以打开历史曲线、切页、高亮节点或路径。
++
++---
++
++## 第三阶段：分析编排增强（2 到 4 周）
++
++### 目标
++
++让 AI 从单工具调用升级成多步数据分析。
++
++### 任务
++
++1. 增加 `ai_analysis_orchestrator`
++2. 对趋势、相关性、拓扑、截断等场景建立模板
++3. 统一工具参数补全逻辑
++
++### 验收标准
++
++- 用户输入“这个站为什么异常”时，AI 能自动串联多步分析，而不只是调用一个工具。
++
++---
++
++## 第四阶段：主动分析与报告化（持续推进）
++
++### 目标
++
++让 AI 成为页面中的分析伙伴，而不是一个问答框。
++
++### 任务
++
++1. 前端异常事件触发 AI 分析建议
++2. 一键生成分析摘要
++3. 输出可复核的分析报告块
++
++### 验收标准
++
++- AI 可围绕当前页面形成“问题 -> 分析 -> 结论 -> 动作”的闭环。
++
++---
++
++## 7. 最推荐的落地切入点
++
++如果你要最快见效果，我建议先从这条链路开始做：
++
++### 场景：`GlobalPipelineView` + 历史曲线分析
++
++原因：
++
++1. 这个页面已经有明确的站点点击和历史曲线入口。
++2. 用户场景最直观，容易演示。
++3. AI 可以很快做出“站点趋势分析”这种有感知的能力。
++
++### 第一批最小闭环
++
++1. 在 `GlobalPipelineView` 点击某站压力指标
++2. 页面把 `stationName + metricType + hours` 写入 `AiPageContext`
++3. 用户问“为什么这个站压力在降”
++4. 后端自动调用：
++   - 站点详情
++   - 历史曲线
++   - 趋势预测
++   - 相关性分析
++5. AI 返回：
++   - 文字结论
++   - 风险卡片
++   - 继续查看历史曲线/切到拓扑页的动作
++
++这条链路做通后，再扩展到 `MapTopologyView` 和 `TopologyView` 会很顺。
++
++---
++
++## 8. 结论
++
++AI 机器人要做到和前端联动做数据分析，关键不是“模型更强”，而是把下面四件事做完整：
++
++1. 前端把当前页面上下文结构化地交给 AI。
++2. 后端把 AI 从聊天接口升级成分析编排器。
++3. AI 返回结构化结论和可执行动作。
++4. 前端能消费这些动作并改变图面、图表和面板状态。
++
++对这个项目来说，最适合的路线是：
++
++`先做上下文接入 -> 再做动作联动 -> 再做多步分析编排 -> 最后做主动分析和报告化`
++
++这条路线和你现有仓库结构是兼容的，也最容易分阶段验收。
++
++---
++
++## 9. 下一步建议
++
++建议下一步直接落两个最小改动：
++
++1. 扩展 [useAiAssistantChat.ts](F:/smartgas-grid/src/components/ai-assistant/useAiAssistantChat.ts)，给聊天接口增加 `context`
++2. 在 [GlobalPipelineView.tsx](F:/smartgas-grid/src/views/GlobalPipelineView.tsx) 里先把当前历史图目标接入统一 AI 上下文
++
++只要这两步做完，AI 就可以先在“历史曲线分析”场景里真正和前端联动起来。
+*** End Patch

@@ -1,0 +1,26 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     useEffect(() => {
+-        if (!steadyOverlay || isMapInteracting) return
++        const tooManyOverlays = topoNodes.length > 140 || topoEdges.length > 180
++        if (!steadyOverlay || isMapInteracting || tooManyOverlays || renderSafetyMode === 'lite') return
+         const timer = window.setInterval(() => {
+             setLineFlowPhase(prev => (prev + 2) % 1000)
+         }, 180)
+         return () => window.clearInterval(timer)
+-    }, [steadyOverlay?.run_id, isMapInteracting])
++    }, [steadyOverlay?.run_id, isMapInteracting, topoEdges.length, topoNodes.length, renderSafetyMode])
++    useEffect(() => {
++        const tooManyOverlays = topoNodes.length > 140 || topoEdges.length > 180
++        if (tooManyOverlays || isMapInteracting) {
++            if (renderSafetyMode !== 'lite') {
++                setRenderSafetyMode('lite')
++            }
++            return
++        }
++        if (renderSafetyMode !== 'full') {
++            setRenderSafetyMode('full')
++        }
++    }, [topoNodes.length, topoEdges.length, isMapInteracting, renderSafetyMode])
+*** End Patch

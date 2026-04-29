@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Add File: C:\Users\Administrator\.codex\automations\automation\memory.md
++## 2026-04-04 18:22:19 +08:00
++
++- 本轮先在 `F:\smartgas-grid` 落点校验；初始 cwd 是 `C:\Users\Administrator\.codex\worktrees\ea6b\smartgas-grid`，切换后 cwd 与 `git rev-parse --show-toplevel` 都落到 `F:\smartgas-grid`，所以不是 `automation env mismatch / worktree-path blockage`。
++- 主目录不是空壳 worktree：`.git` 是目录，根下有 `src`、`backend`、`docs`；`git worktree list --porcelain` 显示 `F:\smartgas-grid` 是主工作树，很多 `.codex/worktrees/*` 是 detached worktree，只能当旁证，不能替代主目录结论。
++- 当前主要是代码变化 + 数据库变化 + docs 收口，不是单纯本地实验。未提交内容覆盖地图层级显示、拓扑编辑 API、AI assistant、SCADA、docs，以及 `backend/data/smartgas.db`。
++- 地图缩放/层级主线：`src/utils/hierarchyRenderer.ts` 新增统一的 LOD 阈值与 `shouldShowNodeAtZoom`，`src/utils/mapRenderer.ts` 已接入；气源/枢纽/压气站/分输站/阀室的过滤逻辑开始统一。`src/views/MapTopologyView.tsx` 这轮重点更偏枢纽编辑和 focusNode 联动，不是再定义一套独立 zoom 规则。`src/views/GlobalPipelineView.tsx` 本轮更像大重构与 SCADA 拆分，暂未看到它自己重写另一套 LOD 判断。
++- 枢纽规则主线：后端 `backend/app/services/junction_groups.py` 已支持展开 `JUNCTION-x` 引用并做重叠组归一；`backend/app/routers/topology_editor.py` 的 `/api/topology/junctions` 会先调用 `expand_station_ids_for_request`。前端 `src/views/MapTopologyView.tsx` 也改成统一走 `src/services/topologyEditorApi.ts`，并补了“临时节点不可捏合”“已占用节点不可重复入组”的校验。
++- 数据库口径主线：`smartgas.db` 当前计数是 `stations=1256`、`pipelines=1253`、`pipeline_systems=13`、`junction_groups=16`。`stations` / `pipelines` 表里没有 `system_id`、`layer_id`、`station_type` 字段，仍主要靠 ID 前缀和 `pipeline_systems.layers_config` 管系统/图层；这和部分脚本/排查直觉不一样，后续别再假设这些列已经落库。
++- API 口径主线：前端现在是双前缀并存。`src/hooks/useTopology.ts` 直连 `BACKEND_BASE_URL + /topology/...`；`src/services/topologyEditorApi.ts` 继续走 `/api/topology/...`；`src/services/api.ts` 同时保留 `/api/topology/...` 和少量 `/topology/correct/...`。`vite.config.ts` 已新增 `/topology`、`/docs`、`/openapi.json` 代理；`backend/run.py` 端口是 `8080`。docs 这轮就是在把这件事说清楚。
++- 需要记住的边界：数据库 `junction_groups` 里已有一些“单站枢纽”记录（例如中卫/广州枢纽样本只展开成一个站点），这说明“名称像枢纽”不等于“当前库里一定是多站组”；下轮巡检如果继续看枢纽质量，要单独核这些组是不是导入脚本遗留。
++- 当前未做业务代码修改；本轮只做主目录巡检并更新 automation memory。运行时间：`2026-04-04T18:22:19.5352913+08:00`。
+*** End Patch

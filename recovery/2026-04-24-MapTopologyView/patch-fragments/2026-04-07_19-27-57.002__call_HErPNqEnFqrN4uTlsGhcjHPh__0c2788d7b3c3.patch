@@ -1,0 +1,31 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     } = useSimulation({
+         pilotId: WE1_PRIMARY_PILOT_ID,
+         scenarios: MAINLINE_SCENARIOS,
+     })
++    const steadyOverlay = simulationOverlay
++    const steadySimLoading = simulationLoading
++    const steadySimError = simulationError
++    const steadyScenarioId = currentScenario
++    const steadySnapshots = snapshots
++    const steadySnapshotLoading = snapshotLoading
++    const steadySnapshotError = snapshotError
++    const steadySelectedSnapshotRunId = selectedSnapshotRunId
++    const setSteadyScenario = setScenario
++    const setSteadySelectedSnapshotRunId = setSelectedSnapshotRunId
++    const runSteadySimulation = runSimulation
++    const saveSteadySnapshot = saveSnapshot
++    const refreshSteadySnapshots = refreshSnapshots
++    const loadSteadySelectedSnapshot = loadSelectedSnapshot
++    const clearSteadyOverlay = clearOverlay
++    const [isSimulating, setIsSimulating] = useState(false)
++    const [simResults, setSimResults] = useState<Array<{
++        step: number
++        affected_nodes: string[]
++        pressure_drops: Record<string, number>
++        is_stable: boolean
++    }>>([])
+     const [cascadeValves, setCascadeValves] = useState(true)
+*** End Patch

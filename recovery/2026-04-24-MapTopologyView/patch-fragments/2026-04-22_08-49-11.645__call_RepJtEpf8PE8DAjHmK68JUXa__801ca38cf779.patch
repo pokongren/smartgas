@@ -1,0 +1,90 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                    <div className="text-[10px] uppercase tracking-wider text-cyan-200">主仿真操作</div>
++                                    <div className="text-[10px] uppercase tracking-wider text-cyan-200">主仿真</div>
+                                     <div className="grid grid-cols-1 gap-2">
+                                         <div>
+-                                            <div className="mb-1 text-[10px] text-gray-500">当前场景</div>
++                                            <div className="mb-1 text-[10px] text-gray-500">场景选择</div>
+                                             <select value={steadyScenarioId} onChange={event => setSteadyScenario(event.target.value)} className="w-full rounded-lg border border-cyan-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">{MAINLINE_SCENARIOS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+                                         </div>
+                                         <div>
+-                                            <div className="mb-1 text-[10px] text-gray-500">结果快照</div>
++                                            <div className="mb-1 text-[10px] text-gray-500">载入历史结果</div>
+                                             <div className="flex gap-2">
+                                                 <select value={steadySelectedSnapshotRunId} onChange={event => setSteadySelectedSnapshotRunId(event.target.value)} className="flex-1 rounded-lg border border-cyan-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
+-                                                    <option value="">请选择一条快照</option>
++                                                    <option value="">请选择一条历史结果</option>
+                                                     {steadySnapshots.map(item => <option key={item.run_id} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
+                                                 </select>
+-                                                <button onClick={async () => { try { await loadSteadySelectedSnapshot(); setStatusMsg(`已加载快照：${selectedSnapshotSummary?.scenario_id ?? steadySelectedSnapshotRunId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '加载快照失败') } }} disabled={!steadySelectedSnapshotRunId || steadySnapshotLoading} className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs text-cyan-100 disabled:opacity-40">{steadySnapshotLoading ? '加载中...' : '加载'}</button>
++                                                <button onClick={async () => { try { await loadSteadySelectedSnapshot(); setStatusMsg(`已载入结果：${selectedSnapshotSummary?.scenario_id ?? steadySelectedSnapshotRunId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '载入结果失败') } }} disabled={!steadySelectedSnapshotRunId || steadySnapshotLoading} className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs text-cyan-100 disabled:opacity-40">{steadySnapshotLoading ? '载入中...' : '载入'}</button>
+                                             </div>
+                                         </div>
+                                         <div>
+-                                            <div className="mb-1 text-[10px] text-gray-500">基线快照</div>
++                                            <div className="mb-1 text-[10px] text-gray-500">对比基线</div>
+                                             <select value={steadyBaselineSnapshotRunId} onChange={event => setSteadyBaselineSnapshotRunId(event.target.value)} className="w-full rounded-lg border border-violet-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
+-                                                <option value="">请选择基线快照</option>
++                                                <option value="">不做基线对比</option>
+                                                 {steadySnapshots.map(item => <option key={`baseline-${item.run_id}`} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
+                                             </select>
+                                         </div>
+                                     </div>
+                                     <div className="flex justify-end">
+@@
+                                             onClick={() => setShowSimParamEditor(prev => !prev)}
+                                             className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-900/35"
+                                         >
+-                                            {showSimParamEditor ? '收起站场参数与管段长度' : '展开站场参数与管段长度'}
++                                            {showSimParamEditor ? '收起参数设置' : '展开参数设置'}
+                                         </button>
+                                     </div>
+@@
+-                                        <button onClick={async () => { try { await runMainSteadySimulation(); setStatusMsg(`WE1 主仿真已运行：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 主仿真运行失败') } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '运行中...' : '运行主仿真'}</button>
+-                                        <button onClick={async () => { try { await saveSteadySnapshot(); setStatusMsg(`已保存快照：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '保存快照失败') } }} disabled={!steadyOverlay || steadySnapshotLoading} className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40">{steadySnapshotLoading ? '保存中...' : '保存快照'}</button>
+-                                        <button onClick={async () => { try { await refreshSteadySnapshots(); setStatusMsg('快照列表已刷新') } catch (error) { setStatusMsg(error instanceof Error ? error.message : '刷新快照失败') } }} disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40">刷新快照</button>
+-                                        <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('已清空当前主仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空主仿真</button>
++                                        <button onClick={async () => { try { await runMainSteadySimulation(); setStatusMsg(`WE1 主仿真已运行：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 主仿真运行失败') } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '运行中...' : '开始仿真'}</button>
++                                        <button onClick={async () => { try { await saveSteadySnapshot(); setStatusMsg(`已保存结果：${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '保存结果失败') } }} disabled={!steadyOverlay || steadySnapshotLoading} className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40">{steadySnapshotLoading ? '保存中...' : '保存结果'}</button>
++                                        <button onClick={async () => { try { await refreshSteadySnapshots(); setStatusMsg('历史结果列表已更新') } catch (error) { setStatusMsg(error instanceof Error ? error.message : '更新结果列表失败') } }} disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40">更新结果列表</button>
++                                        <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('已清空当前仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空结果</button>
+                                     </div>
+@@
+-                                                setStatusMsg(error instanceof Error ? error.message : '读取当前压力仿真失败')
++                                                setStatusMsg(error instanceof Error ? error.message : '按当前压力运行失败')
+                                             }
+                                         }}
+                                         disabled={steadySimLoading}
+                                         className="w-full rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100 disabled:opacity-40"
+                                     >
+-                                        {steadySimLoading ? '读取并仿真中...' : '读取当前压力并仿真（带动画）'}
++                                        {steadySimLoading ? '运行中...' : '按当前压力运行'}
+                                     </button>
+                                     <button
+                                         onClick={() => {
+                                             if (!steadyOverlay && seedNodePressures.size === 0) {
+-                                                setStatusMsg('请先加载或运行一条快照结果，再上图显示压力')
+-                                                setStatusMsg('请先读取起始压力或先运行一次主仿真')
++                                                setStatusMsg('请先运行一次仿真，或先载入一条历史结果')
+                                                 return
+                                             }
+                                             setShowSnapshotPressureOverlay(prev => !prev)
+                                         }}
+                                         className="w-full rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs font-medium text-cyan-100"
+                                     >
+-                                        {showSnapshotPressureOverlay ? '隐藏快照压力上图' : '快照压力上图'}
++                                        {showSnapshotPressureOverlay ? '隐藏图上压力' : '显示图上压力'}
+                                     </button>
+                                     <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 px-3 py-2 text-[11px] text-cyan-100">
+-                                        AI分析已迁移到 AI 助手界面，这里只展示拓扑与仿真结果。
++                                        AI分析请到助手面板，这里只保留仿真和上图。
+                                     </div>
+                                     <div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-[11px] text-slate-300">
+                                         <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] mr-2 ${steadyStatusToneClass}`}>{steadySimLoading ? '求解中' : steadyOverlay ? SOLVER_STATUS_LABELS[steadyOverlay.solver_status] : '等待运行'}</span>
+-                                        <span>状态：{steadyOverlayStatusText}</span>
++                                        <span>当前状态：{steadyOverlayStatusText}</span>
+                                         {steadyOverlay && <span className="ml-2 text-slate-400">run_id: {steadyOverlay.run_id.slice(0, 12)}</span>}
+                                     </div>
+*** End Patch

@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    // 保存机制：跟踪拖拽修改的坐标
++    // 保存机制：跟踪拖拽修改的坐标
+     const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
++    const [unsavedEdgeIds, setUnsavedEdgeIds] = useState<Set<string>>(new Set())
+     const [isSaving, setIsSaving] = useState(false)
+*** End Patch

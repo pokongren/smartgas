@@ -1,0 +1,154 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     useEffect(() => {
+         if (!mapInstance) return
+         mapInstance.setDefaultCursor(editMode === 'view' ? 'grab' : 'crosshair')
+         if (editMode === 'draw-point') setStatusMsg(`缁樺埗锛氱偣鍑诲湴鍥炬坊鍔犮€?{TOPO_LABELS[pointType]}銆峘)
+         else if (editMode === 'connect') { setStatusMsg('杩炵嚎锛氱偣鍑昏捣鐐硅妭鐐?); setConnectFrom(null) }
++        else if (editMode === 'merge') {
++            setConnectFrom(null)
++            setStatusMsg('手工捏合：点击底层站点加入/移除，再在左侧创建枢纽')
++        }
+         else setStatusMsg('娴忚妯″紡')
+     }, [editMode, pointType, mapInstance])
++
++    const paintMergeSelection = useCallback((selectedIds: Set<string>) => {
++        for (const node of nodesRef.current) {
++            if (!node.marker) continue
++            const isSelected = !node.isJunction && selectedIds.has(node.id)
++            node.marker.setContent(createTopoMarkerContent(node.type, node.name, isSelected, !!node.isJunction))
++        }
++    }, [])
++
++    useEffect(() => {
++        if (editMode !== 'merge') {
++            if (selectedMergeNodeIds.length > 0) {
++                setSelectedMergeNodeIds([])
++            }
++            paintMergeSelection(new Set())
++            return
++        }
++        paintMergeSelection(selectedMergeNodeSet)
++    }, [editMode, paintMergeSelection, selectedMergeNodeIds.length, selectedMergeNodeSet, topoNodes])
+@@
+     const doNodeClick = (nodeId: string) => {
+         if (modeRef.current === 'connect') {
+             const from = cfRef.current
+             if (!from) {
+                 setConnectFrom(nodeId)
+@@
+             }
+             return
+         }
+ 
+         const clickedNode = nodesRef.current.find(n => n.id === nodeId) || null
++
++        if (modeRef.current === 'merge') {
++            if (!clickedNode) return
++            if (clickedNode.isJunction) {
++                setStatusMsg('手工捏合请选底层站点，枢纽节点不能直接捏合')
++                setSelectedNode(clickedNode)
++                return
++            }
++
++            setSelectedNode(clickedNode)
++            setSelectedMergeNodeIds(prev => {
++                const next = prev.includes(nodeId)
++                    ? prev.filter(id => id !== nodeId)
++                    : [...prev, nodeId]
++                setStatusMsg(`已选择 ${next.length} 个站点用于手工捏合`)
++                return next
++            })
++            return
++        }
++
+         setSelectedNode(clickedNode)
+@@
+     const doAddEdge = (startId: string, endId: string) => {
+         const s = baseTopoNodes.find(n => n.id === startId)
+         const e = baseTopoNodes.find(n => n.id === endId)
+         if (!s || !e) return
+         const id = `te-${Date.now()}`
+         setBaseTopoEdges(prev => [...prev, { id, startNodeId: startId, endNodeId: endId, name: '鏂板缓绠＄嚎' }])
+         setUndoStack(prev => [...prev, { type: 'add-edge', edgeId: id }])
+     }
++
++    const createManualJunction = useCallback(async () => {
++        if (!manualJunctionEditingEnabled) {
++            setStatusMsg('当前后端处于只读模式，不能创建手工捏合')
++            return
++        }
++        if (selectedMergeNodeIds.length < 2) {
++            setStatusMsg('至少选择 2 个底层站点才能创建手工捏合')
++            return
++        }
++        if (isMerging) return
++
++        const fallbackName = `手工枢纽-${new Date().toISOString().slice(0, 10)}`
++        const payloadName = mergeJunctionName.trim() || fallbackName
++
++        setIsMerging(true)
++        try {
++            const result = await topologyEditorApi.createJunctionGroup({
++                name: payloadName,
++                description: mergeJunctionDescription.trim() || undefined,
++                station_ids: selectedMergeNodeIds,
++            })
++            setUndoStack(prev => [...prev, { type: 'create-junction', junctionId: result.id, name: payloadName }])
++            setSelectedMergeNodeIds([])
++            setMergeJunctionName('')
++            setMergeJunctionDescription('')
++            invalidatePipelineCache()
++            await loadJunctionGroups()
++            setStatusMsg(`手工捏合已创建：${payloadName}`)
++        } catch (error) {
++            console.error(error)
++            setStatusMsg(error instanceof Error ? `创建手工捏合失败：${error.message}` : '创建手工捏合失败')
++        } finally {
++            setIsMerging(false)
++        }
++    }, [
++        isMerging,
++        loadJunctionGroups,
++        manualJunctionEditingEnabled,
++        mergeJunctionDescription,
++        mergeJunctionName,
++        selectedMergeNodeIds,
++    ])
++
++    const removeManualJunction = useCallback(async (group: JunctionGroup) => {
++        if (!manualJunctionEditingEnabled) {
++            setStatusMsg('当前后端处于只读模式，不能删除手工捏合')
++            return
++        }
++        if (isRuntimeReadonlyGroup(group)) {
++            setStatusMsg('这是运行时重编枢纽，不能在这里删除')
++            return
++        }
++        if (deletingJunctionId === group.id) return
++
++        setDeletingJunctionId(group.id)
++        try {
++            await topologyEditorApi.deleteJunctionGroup(group.id)
++            setUndoStack(prev => [...prev, { type: 'delete-junction', group }])
++            invalidatePipelineCache()
++            await loadJunctionGroups()
++            if (selectedNode?.junctionId === group.id) {
++                setSelectedNode(null)
++            }
++            setStatusMsg(`已拆分手工捏合：${group.name}`)
++        } catch (error) {
++            console.error(error)
++            setStatusMsg(error instanceof Error ? `拆分手工捏合失败：${error.message}` : '拆分手工捏合失败')
++        } finally {
++            setDeletingJunctionId(null)
++        }
++    }, [
++        deletingJunctionId,
++        isRuntimeReadonlyGroup,
++        loadJunctionGroups,
++        manualJunctionEditingEnabled,
++        selectedNode?.junctionId,
++    ])
+*** End Patch

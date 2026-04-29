@@ -1,0 +1,116 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+ import { useLocation } from 'react-router-dom'
+ import MapView from '@/components/map-view/MapView'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
++import { SimPanel } from '@/components/topology/SimPanel'
+ import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+ import type { PipelinePackage } from '@/data/pipelines/types'
+-import { topologyAPI, type SimulationResult } from '@/services/api'
++import { useSimulation } from '@/hooks/useSimulation'
+ import {
+     topologyEditorApi,
+     type JunctionGroup,
+     type PositionPreviewResult,
+ } from '@/services/topologyEditorApi'
+@@
+     computeBetweennessCentrality,
+     findIsolatedNodes,
+ } from '@/utils/topology-validator'
+ import type { ValidationReport } from '@/utils/topology-validator'
++import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
+ import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+ import type { CutoffResult } from '@/utils/cutoff-simulator'
++import { MAINLINE_SCENARIOS } from '@/types/simulation'
+@@
+ interface TopoNode {
+     id: string
+     type: PointType
+     name: string
+     position: [number, number]
+     sourceNodeIds?: string[]
++    internalSourceEdgeIds?: string[]
+     junctionId?: number
+     isJunction?: boolean
+     junctionKind?: string
+     sourceTable?: string
+     marker?: any
+@@
+ interface BaseTopoEdge {
+     id: string
+     startNodeId: string
+     endNodeId: string
+     name?: string
++    sourceEdgeIds?: string[]
+ }
++
++const WE1_PRIMARY_PILOT_ID = 'mainline_zhongwei_jingbian'
++
++function formatDateTimeLabel(value?: string): string {
++    if (!value) return '-'
++
++    const date = new Date(value)
++    if (Number.isNaN(date.getTime())) return value
++
++    return date.toLocaleString('zh-CN', { hour12: false })
++}
++
++function formatSignedNumber(value: number, digits = 2): string {
++    const sign = value > 0 ? '+' : ''
++    return `${sign}${value.toFixed(digits)}`
++}
++
++const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
++    converged: '已收敛',
++    max_iter: '达到迭代上限',
++    error: '求解失败',
++}
++
++const FAILURE_LAYER_LABELS: Record<'frontend-consumption' | 'mapping-source-ids' | 'overlay-contract' | 'rendering-style', string> = {
++    'frontend-consumption': '先查前端消费层（MapTopologyView / 面板）',
++    'mapping-source-ids': '再查 source IDs 到 overlay IDs 的映射',
++    'overlay-contract': '再查 simulation-overlay 契约',
++    'rendering-style': '最后再查地图样式和渲染对象',
++}
++
++const MAINLINE_SCENARIO_PLAYBOOK: Record<string, {
++    focus: string
++    success: string
++    risk: string
++    talk: string
++}> = {
++    steady_base: {
++        focus: '先看主干压力和流量是不是平顺，确认第一张图能稳定跑通。',
++        success: '总供给、总需求、平均利用率都能正常落出来，告警数不要突然升高。',
++        risk: '如果常规稳态都没有结果，后面的异常场景先别讲，先把正式仿真跑通。',
++        talk: '先用常规稳态把主链打通，证明拓扑、稳态求解和页面都已经连上。',
++    },
++    zhongwei_compressor_offline: {
++        focus: '重点看中卫压气站停运后，上下游压力有没有明显掉落。',
++        success: '基线对比里能看出节点压差，命中节点和告警数会比常规稳态更明显。',
++        risk: '如果没选基线快照，这个场景只能看到当前值，看不出停运前后差异。',
++        talk: '这一幕主要讲压气站异常后，主干压力是怎么往上下游传递的。',
++    },
++    zhongwei_trunk_break: {
++        focus: '重点看中卫附近主干中断后，连线流量和下游供给怎么变化。',
++        success: '基线对比里的连线流量变化会很突出，下游命中点线和告警会一起抬头。',
++        risk: '如果映射覆盖摘要里命中不足，这个场景会看不清楚断点影响先传到哪。',
++        talk: '这一幕讲主干故障传播，最适合拿来演示第一张图的核心价值。',
++    },
++    yanchi_jingbian_limited: {
++        focus: '重点看盐池到靖边限流后，利用率和关键段负载有没有抬升。',
++        success: '运行结果摘要里平均利用率会变化，连线详情里的利用率差值能看出来。',
++        risk: '如果当前场景没留快照，只靠一次运行结果，不适合拿来做稳定验收。',
++        talk: '这一幕讲限流，不是断输，而是主干还能跑但运行边界开始变紧。',
++    },
++}
++
++const COVERAGE_RECOMMENDATION_ORDER = [
++    'zhongwei_trunk_break',
++    'zhongwei_compressor_offline',
++    'yanchi_jingbian_limited',
++    'steady_base',
++]
+*** End Patch

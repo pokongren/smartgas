@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ - docs 已有同步收口迹象：`docs/TOPOLOGY_COMPUTATION_USAGE.md`、`docs/TOPOLOGY_SETUP_GUIDE.md` 在强调 `8080` 端口，以及 `/api/topology/...` 和 `/topology/...` 并存的现状。
+ - 下次巡检先复用这几个判断，避免重复卡在“主目录是不是对的”和“数据库 schema 是否已经升级完”这两类老问题。
++
++## 2026-04-04 18:24:28 +08:00
++
++- 本轮最终收口仍以 `F:\smartgas-grid` 为唯一事实来源。主仓 `HEAD=eaf6ac4`，分支是 `拓扑设想`；Codex 那批 detached worktree 都停在 `6410a10`，只能当旁证，不能替代主目录结论。
++- 三条主线里至少两条有实质变化：前端地图/拓扑在收敛统一的 LOD 和 `rawType` 口径，后端枢纽规则在收敛 `JUNCTION-x` 展开和重叠枢纽合并；数据库本体则还是“内容变更 + 导入脚本实验”为主，不是 schema 已升级完成。
++- `backend/data/smartgas.db` 当前计数稳定在 `stations=1256`、`pipelines=1253`、`pipeline_systems=13`、`junction_groups=16`。`sj2/sj3` 已在库里，`we3` 仍未落库，所以 `backend/scripts/add_we3.py` 现在更像本地实验脚本，不要当成正式数据已导入。
++- 这轮没有修改业务代码，只更新了 automation memory。下次继续先做主目录落点校验，再看 `git status/diff` 里这些文件有没有继续推进：`src/utils/hierarchyRenderer.ts`、`src/utils/mapRenderer.ts`、`src/views/MapTopologyView.tsx`、`backend/app/services/junction_groups.py`、`backend/data/smartgas.db`。
+*** End Patch

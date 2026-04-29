@@ -1,0 +1,29 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/automation/project-heartbeat-2026-04-06-081142.md
++# 项目心跳巡检纪要（2026-04-06 08:11 +08:00）
++
++## 主目标
++只认 `F:\smartgas-grid` 主目录事实，巡检 git/doc 与地图、枢纽、导入、AI 四条链路；本轮不改业务代码。
++
++## 当前结论
++
++- 地图主链没变：`src/views/GlobalPipelineView.tsx -> src/components/map-view/MapView.tsx -> src/utils/mapRenderer.ts + src/utils/hierarchyRenderer.ts`。
++- 当前 LOD 阈值仍是 `critical/high/medium = 6/10/14`、`valveMinZoom = 11`、`expandClusterZoom = 12`。
++- 但阀室不是 `11` 级就稳定可见，因为阀室重要性是 `LOW`，`zoom < 14` 时最大可见级别仍只到 `MEDIUM`，所以更接近 `zoom >= 14` 才稳定出现。
++- `src/views/MapTopologyView.tsx` 仍是独立口径。它明确不给 `MapView` 传 `pipelineData`，地图只当底图用，真实拓扑节点和边由页面自己导入、折叠、绘制。
++- 主目录事实继续成立：`F:\smartgas-grid` 是实际主仓，`.git` 是实体目录，不是 worktree 指针；其余 Codex worktree 仍是 detached，不能顶主结论。
++- docs 方向没变：`docs/TOPOLOGY_SETUP_GUIDE.md` 和 `docs/TOPOLOGY_COMPUTATION_USAGE.md` 继续把端口收口到 `8080`，并明确 `/api/topology/...` 与 `/topology/...` 双链并存。
++- 枢纽运行时口径没变：`backend/app/services/junction_groups.py::load_runtime_junction_groups()` 仍是 rebuilt 优先、旧表回退、manual overlay 补丁。
++- 数据库只读复核结果没变：`pipeline_systems=13`，`we3` 缺失，`SJ2=70/69`，`SJ3=71/70`，`junction_groups=25`，`junction_groups_rebuilt=7`。
++
++## 前后对比
++
++| 项 | 上轮 | 本轮 |
++| --- | --- | --- |
++| 地图主链 | `GlobalPipelineView -> MapView -> hierarchy/mapRenderer` | 不变 |
++| LOD 阈值 | `6/10/14, 11, 12` | 不变 |
++| 阀室显隐口径 | 容易被写成 `zoom >= 11` | 已收敛为“约 `zoom >= 14` 才稳定显现” |
++| MapTopologyView | 独立口径 | 不变 |
++
++未附截图，因为本轮是仓库和链路巡检，没有新增 UI 视觉改动；以上用代码链路和前后对比表替代。
+*** End Patch

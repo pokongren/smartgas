@@ -1,0 +1,29 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-10-WE1第三张图仿真展示专页第5阶段第2轮总结_人话版.md
++一、主目标
++1. 让前端直接看到节点压力和温度，并且在仿真运行后能显示仿真结果里的压力温度。
++
++二、上下文与已知信息
++1. 现有仿真节点结果只有压力字段，温度字段未强制提供。2. 第三张图画布此前只显示压力文本。3. 第一张图和第三张图节点详情此前没有统一展示“仿真温度”。
++
++三、主代理与子代理分工
++1. 主代理实施本轮代码改造并完成构建验证。2. 本轮无需额外拆分实施子代理，改动集中在仿真类型、仿真 mock 和两个视图展示层。
++
++四、修改逻辑
++1. 在 [simulation.ts](/F:/smartgas-grid/src/types/simulation.ts) 给 `SimNodeResult` 和 `key_nodes` 增加可选字段 `temperature_c`，允许后端后续直接回传温度。2. 在 [useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts) 的 mock 节点数据补充 `temperature_c`，保证本地仿真也有温度可显示。3. 在 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx) 新增温度估算函数，并把画布节点标签从“仅压力”改为“压力+温度”；同时在节点详情新增“仿真状态”块，显示当前压力与当前温度。4. 在 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 基于 `simulationMapping` 计算当前选中节点的仿真压力与温度，并在节点详情增加“仿真状态”卡展示。5. 温度展示策略统一为“真实值优先，缺失则按压力估算并标注（估算）”。
++
++五、执行顺序
++1. 先改类型定义，确保温度字段可贯通。2. 再改仿真 mock，确保开发态可见。3. 然后改第三张图画布与详情。4. 最后改第一张图详情并做构建验证。
++
++六、验证方式
++1. 已执行 `npm run build`，构建通过。2. 运行仿真后，第三张图节点上方会显示 `MPa` 和 `T:xx.x°C`。3. 点选节点后，第一张图和第三张图详情面板都能看到“当前压力”“当前温度”两行。
++
++七、风险与回退点
++1. 当前后端若不回传温度，前端会显示估算值并带“（估算）”标记，避免误认为实测。2. 若后续后端接入真实温度，前端无需改结构，只需保持字段名 `temperature_c` 即可自动优先显示真实值。
++
++八、前后对比
++1. 修改前，仿真后主要看压力，温度不统一且不在关键节点详情里。2. 修改后，压力温度在画布和节点详情都可看，且仿真后会随结果刷新。
++
++九、最终交付物
++1. 代码文件改动为 [simulation.ts](/F:/smartgas-grid/src/types/simulation.ts)、[useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)、[TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)、[MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)。2. 本轮总结文件为 [2026-04-10-WE1第三张图仿真展示专页第5阶段第2轮总结_人话版.md](/F:/smartgas-grid/docs/2026-04-10-WE1第三张图仿真展示专页第5阶段第2轮总结_人话版.md)。
+*** End Patch

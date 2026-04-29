@@ -1,0 +1,19 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const [editMode, setEditMode] = useState<EditMode>('view')
+     const [pointType, setPointType] = useState<PointType>('station')
+     const [connectFrom, setConnectFrom] = useState<string | null>(null)
++    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
++    const [mergeJunctionName, setMergeJunctionName] = useState('')
++    const [mergeJunctionDescription, setMergeJunctionDescription] = useState('')
++    const [isMerging, setIsMerging] = useState(false)
++    const [deletingJunctionId, setDeletingJunctionId] = useState<number | null>(null)
+     const [statusMsg, setStatusMsg] = useState('鐐瑰嚮銆屽鍏ユ嫇鎵戙€嶅姞杞藉凡鏈夌绾?)
+@@
+     type UndoAction =
+         | { type: 'add-node'; nodeId: string }
+         | { type: 'add-edge'; edgeId: string }
++        | { type: 'create-junction'; junctionId: number; name: string }
++        | { type: 'delete-junction'; group: JunctionGroup }
+*** End Patch

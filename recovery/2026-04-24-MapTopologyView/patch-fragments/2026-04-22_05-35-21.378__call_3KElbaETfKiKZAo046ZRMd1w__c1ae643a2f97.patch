@@ -1,0 +1,23 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                        const shapeStyle = node.isJunction
+-                            ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 3px;background:${color};border:${border};box-shadow:none; pointer-events: auto;`
+-                            : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:none; pointer-events: auto;`
++                        const shapeStyle = node.isJunction
++                            ? `width:${size}px;height:${size}px;border-radius:4px;background:${color};border:${border};box-shadow:0 1px 6px rgba(0,0,0,0.32); pointer-events: auto;`
++                            : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:0 1px 6px rgba(0,0,0,0.32); pointer-events: auto;`
+@@
+-                                ${node.name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10; display: flex; flex-direction: column; align-items: center;">${node.name}${startPressureLabel}</div>` : ''}
++                                ${node.name ? `<div style="position: absolute; top: ${size + 7}px; white-space: nowrap; font-size: 11px; color: #e2e8f0; background: rgba(10,18,28,0.75); border: 1px solid rgba(148,163,184,0.35); border-radius: 6px; padding: 1px 6px; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 2px;">${node.name}${startPressureLabel}</div>` : ''}
+@@
+-                    const shapeStyle = node.isJunction
+-                        ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 3px;background:${color};border:${border};box-shadow:${glow}; pointer-events: auto; transition: all 0.5s;`
+-                        : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${glow}; pointer-events: auto; transition: all 0.5s;`
++                    const shapeStyle = node.isJunction
++                        ? `width:${size}px;height:${size}px;border-radius:4px;background:${color};border:${border};box-shadow:${glow === 'none' ? '0 1px 6px rgba(0,0,0,0.32)' : glow}; pointer-events: auto; transition: all 0.5s;`
++                        : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${glow === 'none' ? '0 1px 6px rgba(0,0,0,0.32)' : glow}; pointer-events: auto; transition: all 0.5s;`
+@@
+-                            ${node.name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: ${isCriticalAlert ? '#f87171' : isWarningAlert ? '#fbbf24' : '#fff'}; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10; display: flex; flex-direction: column; align-items: center;">${node.name}${snapshotPressureLabelV3}${baselinePressureLabelV3}</div>` : ''}
++                            ${node.name ? `<div style="position: absolute; top: ${size + 7}px; white-space: nowrap; font-size: 11px; color: ${isCriticalAlert ? '#f87171' : isWarningAlert ? '#fbbf24' : '#e2e8f0'}; background: rgba(10,18,28,0.78); border: 1px solid rgba(148,163,184,0.35); border-radius: 6px; padding: 1px 6px; z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 2px;">${node.name}${snapshotPressureLabelV3}${baselinePressureLabelV3}</div>` : ''}
+*** End Patch

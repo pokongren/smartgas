@@ -1,0 +1,209 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/近期整改与两轮架构对比说明.md
++# 近期整改与两轮架构对比说明
++
++## 1. 这几次到底改了什么
++
++这几次修改可以分成两轮：
++
++1. 第一轮是“先把功能修正到能稳定跑”。
++   重点处理了拓扑计算接口漂移、拓扑失败回退坐标错误、节点按站名误去重、API 访问方式不统一、AI 助手发送逻辑重复等问题。
++
++2. 第二轮是“在功能恢复后，把最重的页面拆一刀”。
++   重点处理了 `GlobalPipelineView.tsx` 的 SCADA 配置和浮层渲染，把大块重复代码从主页面里抽出去，避免后面一改就牵一大片。
++
++---
++
++## 2. 第一轮：功能修复与契约收敛
++
++### 2.1 做了哪些事
++
++- 修正了拓扑计算接口地址漂移。
++  前端原来把基址写成带 `/api` 的形式，然后又请求 `/topology/...`，实际会打到错误地址。
++- 修正了拓扑页面失败回退时的坐标读取方式。
++  原来把对象坐标当数组读，后端一不可用就会把节点画错位置。
++- 修正了全局节点按“站名”去重的问题。
++  现在不再用站名硬合并，避免同名异点被错误合并。
++- 补了 API 基址统一能力。
++  把相对路径、后端直连路径、Vite 代理路径的关系理顺了。
++- 把 AI 助手主窗 / 独立窗的重复发送逻辑抽成共享 hook。
++
++### 2.2 涉及的主要文件
++
++- `src/hooks/useTopology.ts`
++- `src/views/TopologyDemoView.tsx`
++- `src/views/TopologyView.tsx`
++- `src/views/MapTopologyView.tsx`
++- `src/services/api.ts`
++- `src/services/apiBase.ts`
++- `src/data/pipelines/index.ts`
++- `src/components/ai-assistant/AiAssistant.tsx`
++- `src/components/ai-assistant/useAiAssistantChat.ts`
++- `vite.config.ts`
++
++### 2.3 架构对比图（一）：修改前
++
++```mermaid
++flowchart LR
++    A["Topology / Demo / AI 页面"] --> B["各自拼 URL"]
++    B --> C["/api/topology/..."]
++    B --> D["http://localhost:8080/..."]
++    B --> E["/api/..."]
++
++    C -.经常 404.-> F["后端 topology 路由<br/>/topology/..."]
++    D --> G["后端 API"]
++    E --> H["Vite /api 代理"]
++
++    I["TopologyView 失败回退"] --> J["n.coordinate[0] / [1]"]
++    J -.坐标错误.-> K["错误节点位置"]
++
++    L["全局节点去重"] --> M["按站名合并"]
++    M -.误合并同名异点.-> N["地图 / 拓扑污染"]
++
++    O["AiAssistant 主窗"]
++    P["AiAssistant 独立窗"]
++    O --> Q["重复发送逻辑 A"]
++    P --> R["重复发送逻辑 B"]
++```
++
++### 2.4 架构对比图（一）：修改后
++
++```mermaid
++flowchart LR
++    A["Topology / Demo / AI 页面"] --> B["统一基址解析"]
++    B --> C["resolveApiPath('/api/...')"]
++    B --> D["BACKEND_BASE_URL + /topology/..."]
++
++    C --> E["Vite 代理"]
++    D --> F["真实 topology 路由<br/>/topology/..."]
++    E --> G["后端 API"]
++
++    H["TopologyView 失败回退"] --> I["coordinate.longitude / latitude"]
++    I --> J["兜底位置正确"]
++
++    K["全局节点去重"] --> L["按稳定节点键处理"]
++    L --> M["避免同名异点误合并"]
++
++    N["AiAssistant.tsx"] --> O["useAiAssistantChat"]
++    P["独立窗"] --> O
++    O --> Q["共享发送 / 状态管理"]
++```
++
++### 2.5 这一轮的结果
++
++- 拓扑接口不再因为前后端契约漂移而直接 404。
++- 拓扑失败回退至少能画在正确位置，而不是“后端挂了连图也错”。
++- 地图和拓扑不再因为站名重复而直接污染节点结果。
++- API 切环境时更可控。
++- AI 助手逻辑不再两份一起维护。
++
++---
++
++## 3. 第二轮：`GlobalPipelineView` 结构拆分
++
++### 3.1 做了哪些事
++
++- 把 SCADA 数据和配置从 `GlobalPipelineView.tsx` 中抽到独立文件：
++  `src/views/global-pipeline/scadaConfig.ts`
++- 补建了通用 SCADA 浮层组件：
++  `src/views/global-pipeline/ScadaFloatingPanel.tsx`
++- 把固定 5 个 SCADA 面板和额外面板的公共外壳统一收口。
++- 同时修复了上一次批量替换造成的 JSX 断裂、乱码字符串断标签、空态标签缺失等问题。
++- 重新跑通构建，确保拆分后还能正常打包。
++
++### 3.2 涉及的主要文件
++
++- `src/views/GlobalPipelineView.tsx`
++- `src/views/global-pipeline/scadaConfig.ts`
++- `src/views/global-pipeline/ScadaFloatingPanel.tsx`
++
++### 3.3 架构对比图（二）：修改前
++
++```mermaid
++flowchart TD
++    A["GlobalPipelineView.tsx<br/>超大单文件"] --> B["SCADA 数据常量"]
++    A --> C["SCADA 面板配置"]
++    A --> D["5 个固定浮层 JSX"]
++    A --> E["额外管线浮层 JSX"]
++    A --> F["拖拽状态"]
++    A --> G["历史图表逻辑"]
++    A --> H["地图 / 图层目录"]
++
++    D --> I["重复标题栏"]
++    D --> J["重复边框 / 渐变 / 关闭按钮"]
++    D --> K["重复 ScadaTableContent 接线"]
++
++    E --> L["另一套相似外壳"]
++
++    B -.和页面强耦合.-> A
++    C -.和页面强耦合.-> A
++```
++
++### 3.4 架构对比图（二）：修改后
++
++```mermaid
++flowchart TD
++    A["GlobalPipelineView.tsx"] --> B["页面编排 / 状态"]
++    A --> C["fixedScadaPanels 配置"]
++    A --> D["EXTRA_SCADA_PANELS 渲染"]
++
++    E["scadaConfig.ts"] --> F["SCADA 数据"]
++    E --> G["面板配置"]
++    E --> H["SCADA_DATA_MAP / WE1_FULL_STATIONS"]
++
++    I["ScadaFloatingPanel.tsx"] --> J["通用浮层外壳"]
++    I --> K["EmptyScadaState"]
++
++    C --> I
++    D --> I
++    F --> L["ScadaTableContent"]
++    G --> I
++
++    B --> M["地图 / 图层目录 / 拖拽状态"]
++    B --> N["历史曲线 / 甪直历史 / 趋势图"]
++```
++
++### 3.5 这一轮的结果
++
++- `GlobalPipelineView.tsx` 里最重复、最容易误伤的 SCADA 浮层外壳已经被抽掉一层。
++- SCADA 数据和页面渲染职责已经开始分离。
++- 后面如果要改面板标题栏、关闭按钮、空态、渐变、弹出按钮，不需要再改 5 到 10 处。
++- 这一步也顺带把前一次重构留下的编译错误彻底修通了。
++
++---
++
++## 4. 当前结构可以怎么理解
++
++现在可以把这块代码简单理解成三层：
++
++1. 数据层
++   `scadaConfig.ts` 负责提供 SCADA 数据和面板配置。
++
++2. 组件层
++   `ScadaFloatingPanel.tsx` 负责提供统一的浮层壳子和空态壳子。
++
++3. 页面编排层
++   `GlobalPipelineView.tsx` 负责状态、位置、显示隐藏、拖拽、图层控制和图表联动。
++
++这比之前“所有东西全堆一个页面文件里”更容易继续拆。
++
++---
++
++## 5. 还没做完，但下一步最适合做什么
++
++下一步最值得继续拆的是：
++
++- 左侧“管线目录 + 显隐按钮”区域
++- `GlobalPipelineView` 里的拖拽状态管理
++- `ScadaTableContent` 也单独抽成文件
++
++原因是这三块现在还留在主页面里，仍然偏重；但和这次已经拆出去的 SCADA 配置 / 浮层外壳相比，它们已经更容易继续往外移。
++
++---
++
++## 6. 本次验证
++
++- 已执行：`npm run build`
++- 结果：通过
++
+*** End Patch

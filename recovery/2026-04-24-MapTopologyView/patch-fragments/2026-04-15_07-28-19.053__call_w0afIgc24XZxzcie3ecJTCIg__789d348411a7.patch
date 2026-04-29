@@ -1,0 +1,10 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     useEffect(() => {
+         setPositionPreview(null)
+     }, [cascadeValves, dirtyPositions])
++    useEffect(() => {
++        setHasSavedDraft(Boolean(localStorage.getItem(TOPOLOGY_DRAFT_STORAGE_KEY)))
++    }, [])
+*** End Patch

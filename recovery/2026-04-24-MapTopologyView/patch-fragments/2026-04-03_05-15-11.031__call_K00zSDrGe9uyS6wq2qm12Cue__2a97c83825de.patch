@@ -1,0 +1,52 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ import MapView from '@/components/map-view/MapView'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
+ import { invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+ import type { PipelinePackage } from '@/data/pipelines/types'
+-import { resolveApiPath } from '@/services/apiBase'
++import type { SimulationResult } from '@/services/api'
++import {
++    topologyEditorApi,
++    type JunctionGroup,
++    type PositionPreviewResult,
++} from '@/services/topologyEditorApi'
+ import type { PipelineNode, PipelineLine } from '@/types'
+ import {
+     validateTopology,
+     computeBetweennessCentrality,
+     findIsolatedNodes,
+@@
+ import type { ValidationReport } from '@/utils/topology-validator'
+ import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+ import type { CutoffResult } from '@/utils/cutoff-simulator'
+-import type { SimulationResult } from '../services/api'
+@@
+ interface BaseTopoEdge {
+     id: string
+     startNodeId: string
+     endNodeId: string
+     name?: string
+ }
+-
+-interface JunctionGroup {
+-    id: number
+-    name: string
+-    description?: string | null
+-    station_ids: string[]
+-}
+-
+-interface PositionPreviewResult {
+-    updated_station_ids: string[]
+-    updated_valve_ids: string[]
+-    affected_layers: string[]
+-    impacted_segments: Array<{
+-        start_id: string
+-        end_id: string
+-        valve_ids: string[]
+-    }>
+-    errors: Array<{ id?: string | null; error: string }>
+-    preview_only?: boolean
+-}
+*** End Patch

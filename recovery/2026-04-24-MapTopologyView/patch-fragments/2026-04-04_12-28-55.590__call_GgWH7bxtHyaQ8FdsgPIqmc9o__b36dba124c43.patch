@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
++# 2026-04-04 20:27:03 +08:00
++
++- 本轮先纠偏入口，再做业务判断。初始 cwd 是 `C:\Users\Administrator\.codex\worktrees\868b\smartgas-grid`，切到 `F:\smartgas-grid` 后，`Get-Location` 和 `git rev-parse --show-toplevel` 都落在主目录，所以这轮不是 `automation env mismatch / worktree-path blockage`。
++- 以后不要再把 `F:\smartgas-grid` 误判成空壳 worktree。这里 `.git` 是实体目录，根下有 `src`、`backend`、`docs`，`git worktree list` 也明确主工作树就是 `F:\smartgas-grid`；`.codex/worktrees/*` 那批 detached 只能当背景，不能当事实来源。
++- 本轮主结论是“代码变化 + 数据库变化 + docs 收口 + 少量本地实验/缓存噪音并存”。`git status --short` 里既有正式改动，也有 `.npm-cache`、若干调试文件和 shadow/preview DB 这类本地痕迹，收口时要拆开说，别一锅端。
++- 地图层级这轮能确认的是：`src/utils/hierarchyRenderer.ts` 新增统一 LOD 阈值，`critical/high/medium = 6/10/14`，阀室最早 `11` 显示，聚合点 `12` 展开；`src/utils/mapRenderer.ts` 已接入 `getNodeLODStrategy()` 和 `shouldShowNodeAtZoom()`。但不要说“地图页和拓扑页完全共用同一套缩放渲染逻辑”；更稳的说法是“地图节点显示阈值做了统一，`GlobalPipelineView.tsx` 到 `MapTopologyView.tsx` 新增了 `focusNode` 联动”。
++- 枢纽规则已经切到运行时只读口径。`backend/app/routers/topology_editor.py` 的 `/api/topology/junctions` 已返回 `load_runtime_junction_groups()`、`manual_editing_enabled` 和 `mode`；默认 `mode=runtime_readonly`。创建/合并/删除枢纽前都要过 `ensure_manual_junction_edit_enabled()`，所以手工 merge 已不是主流程。
++- 数据库现状和上一条 memory 不一样，不能沿用旧判断。当前实测是 `stations=1272`、`pipelines=1268`、`pipeline_systems=14`、`junction_groups=16`；`pipeline_systems` 里已有 `we3/sj2/sj3`，其中 `WE3` 当前是 `stations=16`、`pipelines=15`。同时要分清两层口径：基础表 `junction_groups=16`，但运行时优先消费的 shadow 表 `junction_groups_rebuilt=12`。
++- `pipeline_systems` 表字段口径没变，仍只有 `id/name/color/sort_order/layers_config`，不要写成已经新增了 `system_id` 字段落库。`backend/scripts/add_sj2.py`、`backend/scripts/add_we3.py`、`backend/scripts/reimport_sj23.py` 这轮主要是把导入脚本的 DB 路径和 `pipelines.category` 收紧到 `trunk/branch`，并补了导入后验收打印。
++- API 仍然是双轨并存，不要写成已经完全统一。`src/services/topologyEditorApi.ts` 和 `src/services/api.ts` 还在走 `/api/topology/...`；`src/hooks/useTopology.ts` 和 `src/services/api.ts` 的纠偏/计算链路仍会直连 `/topology/...`；`src/services/apiBase.ts` 负责从 `VITE_API_BASE_URL` 拆出 `API_BASE_URL` 和 `BACKEND_BASE_URL`。docs 这轮主要是在补这个现状。
++
+*** End Patch

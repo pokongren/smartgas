@@ -1,0 +1,115 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const [activeTab, setActiveTab] = useState<PanelTab>('edit')
++    const [activeTab, setActiveTab] = useState<PanelTab>('simulation')
+@@
+-    const simulationVisualSummary = useMemo(() => {
++    const simulationVisualSummary = useMemo(() => {
+         if (!simulationMapping) return null
+@@
+     const trialCoverageSummary = useMemo(() => {
+         const coveredCount = steadyTrialRunItems.filter(item => item.covered).length
+         return {
+             coveredCount,
+             pendingCount: Math.max(steadyTrialRunItems.length - coveredCount, 0),
+         }
+     }, [steadyTrialRunItems])
++    const steadyOverlayStatusText = steadyOverlay
++        ? `已加载 ${steadyScenarioOption?.label ?? steadyOverlay.scenario_id} · ${SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}`
++        : '未运行正式主仿真'
++    const simulationEntryHint = steadyOverlay
++        ? '第一张图已接管当前主仿真结果，切到其他标签也保留 overlay 覆盖层。'
++        : '当前默认进入主仿真模式，先运行正式主链，再看地图上的点线变化。'
+@@
+-    const shouldApplySimulationVisuals = activeTab === 'simulation' && editMode !== 'merge' && highlightedMarkersRef.current.size === 0
++    const shouldApplySimulationVisuals = Boolean(steadyOverlay) && editMode !== 'merge' && highlightedMarkersRef.current.size === 0
+@@
+-        activeTab,
+         editMode,
+         mapInstance,
+         selectedEdgeId,
+         selectedNode?.id,
+         shouldApplySimulationVisuals,
+@@
+                     <div>
+                         <h1 className="text-lg font-bold text-white flex items-center gap-2">
+                             <span className="material-symbols-outlined text-xl text-cyan-400">conversion_path</span>
+-                            智脉平台 · 地图拓扑管理
++                            智脉平台 · 第一张图主仿真入口
+                         </h1>
+                         <p className="text-[11px] text-gray-400 mt-0.5">
+-                            节点 <b className="text-cyan-400">{stats.nodes}</b> · 连线 <b className="text-green-400">{stats.edges}</b> · 孤立 <b className="text-red-400">{stats.isolated}</b>
++                            节点 <b className="text-cyan-400">{stats.nodes}</b> · 连线 <b className="text-green-400">{stats.edges}</b> · 孤立 <b className="text-red-400">{stats.isolated}</b> · {steadyOverlayStatusText}
+                         </p>
+                     </div>
+                     <div className="flex items-center gap-2">
++                        <button
++                            onClick={() => setActiveTab('simulation')}
++                            className="px-3 py-1.5 border border-cyan-500/30 bg-cyan-900/30 hover:bg-cyan-800/40 text-cyan-100 text-xs rounded-lg transition-colors flex items-center gap-1"
++                        >
++                            <span className="material-symbols-outlined text-sm">science</span>主仿真面板
++                        </button>
++                        <button
++                            onClick={async () => {
++                                setActiveTab('simulation')
++                                try {
++                                    await runSteadySimulation()
++                                    setStatusMsg(`WE1 主仿真已运行：${steadyScenarioOption?.label ?? steadyScenarioId}`)
++                                } catch (error) {
++                                    setStatusMsg(error instanceof Error ? error.message : 'WE1 主仿真运行失败')
++                                }
++                            }}
++                            disabled={steadySimLoading}
++                            className="px-3 py-1.5 bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs rounded-lg transition-colors flex items-center gap-1 disabled:opacity-40"
++                        >
++                            <span className="material-symbols-outlined text-sm">play_arrow</span>{steadySimLoading ? '运行中...' : '运行主仿真'}
++                        </button>
++                        {steadyOverlay && (
++                            <button
++                                onClick={() => {
++                                    clearSteadyOverlay()
++                                    setStatusMsg('已清空当前仿真结果')
++                                }}
++                                className="px-3 py-1.5 border border-slate-600 bg-slate-800/70 hover:bg-slate-700/80 text-slate-200 text-xs rounded-lg transition-colors flex items-center gap-1"
++                            >
++                                <span className="material-symbols-outlined text-sm">layers_clear</span>清空覆盖层
++                            </button>
++                        )}
+                         <button onClick={importTopology} className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-500 text-white text-xs rounded-lg transition-colors flex items-center gap-1">
+                             <span className="material-symbols-outlined text-sm">download</span>导入拓扑
+                         </button>
+@@
+ 
+             {/* 纯底图 —— 不传 pipelineData，不渲染任何站场/阀室 */}
+             <MapView onLoad={handleMapLoad} />
++
++            <div className="absolute top-[76px] left-1/2 z-20 w-[min(760px,calc(100vw-2rem))] -translate-x-1/2 px-4">
++                <div className="rounded-2xl border border-cyan-500/20 bg-[#081019]/88 px-4 py-3 shadow-2xl backdrop-blur-md">
++                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-gray-300">
++                        <div className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-cyan-100">
++                            第一张图正式主链
++                        </div>
++                        <div>
++                            当前场景：<span className="font-semibold text-white">{steadyScenarioOption?.label ?? steadyScenarioId}</span>
++                        </div>
++                        <div>
++                            覆盖层：<span className={steadyOverlay ? 'font-semibold text-emerald-300' : 'font-semibold text-gray-400'}>{steadyOverlay ? '已落图' : '未运行'}</span>
++                        </div>
++                        <div>
++                            命中节点：<span className="font-semibold text-white">{simulationVisualSummary?.highlightedNodeCount ?? 0}</span>
++                        </div>
++                        <div>
++                            命中连线：<span className="font-semibold text-white">{simulationVisualSummary?.highlightedEdgeCount ?? 0}</span>
++                        </div>
++                    </div>
++                    <div className="mt-2 text-[11px] leading-5 text-gray-400">
++                        {simulationEntryHint}
++                    </div>
++                </div>
++            </div>
+ 
+             {/* 左侧面板 */}
+-            <div className="absolute top-[68px] left-4 bottom-4 z-20 w-72 flex flex-col">
++            <div className="absolute top-[150px] left-4 bottom-4 z-20 w-72 flex flex-col">
+*** End Patch

@@ -1,0 +1,159 @@
+*** Begin Patch
+*** Add File: docs/automation/project-heartbeat-2026-04-08-111427.md
++一、主目标
++
++1. 固定在 `F:\smartgas-grid` 主目录做项目心跳巡检，只认主目录事实，核对 git、固定必查项、验证脚本结果，并给出当前进展摘要。
++
++二、上下文与已知信息
++
++1. 主目录与 worktree 事实
++
++(1) 当前巡检以 `F:\smartgas-grid` 为准，`.git` 直接落在主目录，不是 `.git` 文件转指向。
++(2) `git worktree list --porcelain` 显示主目录 worktree HEAD 为 `f75536d`，分支为 `拓扑设想`；大量 detached worktree 停在 `6410a10`，不能拿 detached worktree 顶主目录结论。
++(3) `git log --oneline --decorate -5` 显示主目录分支相对 `origin/拓扑设想` ahead 3。
++
++2. git 现场
++
++(1) `git status --short --branch` 显示本轮改动集中在 AI、WE1 仿真、MapTopologyView、全局地图和层级渲染链。
++(2) `git diff --stat` 显示主要增量在 [`/F:/smartgas-grid/backend/app/routers/ai_assistant.py`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py)、[`/F:/smartgas-grid/src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx)、[`/F:/smartgas-grid/src/views/GlobalPipelineView.tsx`](/F:/smartgas-grid/src/views/GlobalPipelineView.tsx)、[`/F:/smartgas-grid/src/hooks/useSimulation.ts`](/F:/smartgas-grid/src/hooks/useSimulation.ts)。
++(3) `docs` 当前无未提交 diff；本轮新增的巡检文档只有本文件。
++
++三、主代理与子代理分工
++
++1. 主代理负责
++
++(1) 锁定主目录事实。
++(2) 汇总 git、源码链路、验证脚本和数据库口径。
++(3) 输出巡检文档与 automation memory。
++
++2. 子代理分工
++
++(1) 侦察代理A：核对地图缩放与层级显示、拓扑仿真主链与独立入口。
++(2) 侦察代理B：核对甪直 AI 分析、枢纽规则与数据库口径、导入脚本、AI 模块链路。
++(3) 验证代理：独立运行甪直 AI 与 WE1 相关验收脚本，确认不是“只看代码觉得没问题”。
++
++四、修改逻辑
++
++1. 本轮不改业务代码，只做巡检落盘。
++
++2. 巡检判断规则
++
++(1) 先看主目录事实是否成立。
++(2) 再看固定必查链路是否仍对齐当前源码。
++(3) 最后用独立脚本复核，避免旧文档结论覆盖现状。
++
++五、执行顺序
++
++1. 第1阶段第1轮：主目录落点校验
++
++(1) 确认 `F:\smartgas-grid` 为主目录。
++(2) 确认 `.git` 是主目录内实体目录。
++(3) 确认 worktree 主头与 detached worktree 头已分叉。
++
++2. 第1阶段第2轮：并行侦察
++
++(1) 核对 `git log`、`git status`、`git diff --stat`、`git worktree list`。
++(2) 核对地图层级显示链、甪直 AI 链、WE1 仿真链、枢纽与数据库口径、导入脚本、AI 模块链。
++
++3. 第2阶段第1轮：独立验证
++
++(1) 运行 `python backend/scripts/verify_luzhi_pilot_phase7.py`。
++(2) 运行 `python backend/scripts/verify_we1_phase34_final.py`。
++(3) 运行 `python backend/scripts/verify_we1_map_phase5.py`。
++(4) 运行 `python backend/scripts/verify_we1_maintenance.py`。
++(5) 运行 `python backend/scripts/verify_we1_map_phase2.py`。
++(6) 运行 `python backend/check_db.py`。
++(7) 运行 `python backend/scripts/verify_junctions.py --table junction_groups_rebuilt`。
++(8) 运行 `python backend/scripts/verify_junctions.py --table junction_groups`。
++
++六、验证方式
++
++1. 地图缩放与层级显示
++
++(1) 当前链路是 [`/F:/smartgas-grid/src/utils/hierarchyRenderer.ts`](/F:/smartgas-grid/src/utils/hierarchyRenderer.ts) 定义阈值，再由 [`/F:/smartgas-grid/src/utils/mapRenderer.ts`](/F:/smartgas-grid/src/utils/mapRenderer.ts) 真正消费。
++(2) 关键阈值仍是 `critical=4`、`high=9`、`medium=12`、`valveMinZoom=11`，对应行见 [`/F:/smartgas-grid/src/utils/hierarchyRenderer.ts#L15`](/F:/smartgas-grid/src/utils/hierarchyRenderer.ts#L15)。
++(3) 通过标准：`mapRenderer` 仍真实调用 `getNodeImportance` 和 hierarchy 策略，而不是只保留工具文件未接线，见 [`/F:/smartgas-grid/src/utils/mapRenderer.ts#L5`](/F:/smartgas-grid/src/utils/mapRenderer.ts#L5)、[`/F:/smartgas-grid/src/utils/mapRenderer.ts#L333`](/F:/smartgas-grid/src/utils/mapRenderer.ts#L333)。
++(4) 失败时先查层：先查全国地图渲染消费层，再查 hierarchy 阈值本身，不先查拓扑编辑页。
++
++2. 甪直 AI 分析
++
++(1) 三个接口都在 [`/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L166`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L166)、[`/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L180`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L180)、[`/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L194`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L194)。
++(2) trace 文件路径写死在 [`/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L55`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L55)，本轮实际文件 `backend/data/ai_traces/luzhi_pilot_trace.jsonl` 更新时间仍是 2026-04-08 02:16:43 +08:00。
++(3) 页面上下文与运行时上下文注入链在 [`/F:/smartgas-grid/src/components/ai-assistant/useAiAssistantPageContext.ts#L38`](/F:/smartgas-grid/src/components/ai-assistant/useAiAssistantPageContext.ts#L38) 和 [`/F:/smartgas-grid/src/components/ai-assistant/useAiAssistantPageContext.ts#L52`](/F:/smartgas-grid/src/components/ai-assistant/useAiAssistantPageContext.ts#L52)，其中 `/map-topology` 已被标成 “Primary WE1 simulation entry on the first map”。
++(4) 实际命中分支顺序仍是 `direct -> luzhi pilot -> orchestrated -> legacy`，对应判断点见 [`/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L122`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L122)、[`/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L146`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L146)、[`/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L156`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L156)、[`/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L161`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py#L161)。
++(5) 通过标准：`verify_luzhi_pilot_phase7.py` 直接 PASS，而且 trace、summary、report 三接口与上下文注入链都还在。
++(6) 失败时先查层：先查页面上下文是否打到甪直场景，再查 `try_luzhi_pilot_reply` 分支判断，再查 trace 持久化，最后才查 orchestrated/legacy 回退。
++
++3. 拓扑仿真功能
++
++(1) `simulation-overlay -> build_we1_solver_input -> solve_steady` 主链仍成立，入口见 [`/F:/smartgas-grid/backend/app/routers/topology_simulation.py#L215`](/F:/smartgas-grid/backend/app/routers/topology_simulation.py#L215)、[`/F:/smartgas-grid/backend/app/services/we1_solver_input_service.py#L242`](/F:/smartgas-grid/backend/app/services/we1_solver_input_service.py#L242)、[`/F:/smartgas-grid/backend/app/services/topology_simulation.py#L1056`](/F:/smartgas-grid/backend/app/services/topology_simulation.py#L1056)。
++(2) `MapTopologyView` 已通过 `useSimulation` 接入独立 WE1 主仿真入口，不再沿用上轮记忆里“仍走旧链”的结论，证据见 [`/F:/smartgas-grid/src/views/MapTopologyView.tsx#L14`](/F:/smartgas-grid/src/views/MapTopologyView.tsx#L14)、[`/F:/smartgas-grid/src/views/MapTopologyView.tsx#L312`](/F:/smartgas-grid/src/views/MapTopologyView.tsx#L312)、[`/F:/smartgas-grid/src/hooks/useSimulation.ts#L220`](/F:/smartgas-grid/src/hooks/useSimulation.ts#L220)。
++(3) 路由入口仍在 [`/F:/smartgas-grid/src/App.tsx#L136`](/F:/smartgas-grid/src/App.tsx#L136)，导航按钮也仍在 [`/F:/smartgas-grid/src/App.tsx#L54`](/F:/smartgas-grid/src/App.tsx#L54)。
++(4) `WE1` 校验脚本与主链当前一致，`verify_we1_phase34_final.py`、`verify_we1_map_phase5.py`、`verify_we1_maintenance.py`、`verify_we1_map_phase2.py` 全部 PASS。
++(5) 通过标准：主样板 `steady_base` overlay 契约完整，求解收敛，快照归档可用，MapTopologyView 已消费 coverage summary、snapshot actions、baseline comparison。
++(6) 失败时先查层：先查前端入口与状态层，再查 router 契约，再查 solver input，再查 steady solver 本体。
++
++4. 枢纽规则与数据库口径
++
++(1) 运行时统一读取 `load_runtime_junction_groups()`，优先 `junction_groups_rebuilt`，再叠 manual overlay，证据见 [`/F:/smartgas-grid/backend/app/services/junction_groups.py#L453`](/F:/smartgas-grid/backend/app/services/junction_groups.py#L453)。
++(2) `pipeline_packages` 和 `topology_editor` 都已走运行时口径，而不是直接裸读旧表，见 [`/F:/smartgas-grid/backend/app/routers/pipeline_packages.py#L113`](/F:/smartgas-grid/backend/app/routers/pipeline_packages.py#L113)、[`/F:/smartgas-grid/backend/app/routers/topology_editor.py#L972`](/F:/smartgas-grid/backend/app/routers/topology_editor.py#L972)。
++(3) 影子表口径通过：`junction_groups_rebuilt.count=7`、`issue_count=0`。
++(4) 主表口径仍不通过：`junction_groups.count=25`、`issue_count=15`，问题包括单成员组、非跨系统组、嵌套引用和缺失站点。
++(5) 通过标准：只把 `junction_groups_rebuilt + manual overlay` 当运行时主口径；不能把旧表 `junction_groups` 现状直接写成“数据库已通过”。
++(6) 失败时先查层：先查运行时读取口径，再查 manual overlay 标记，再查旧表脏数据，不先改前端显示。
++
++5. 导入脚本
++
++(1) 项目里保留多套导入脚本说明，推荐主入口仍是 `import_ultimate.py`，证据见 [`/F:/smartgas-grid/backend/Excel导入工具总结.md#L6`](/F:/smartgas-grid/backend/Excel导入工具总结.md#L6)。
++(2) 枢纽口径相关重导脚本仍在 [`/F:/smartgas-grid/backend/scripts/reimport_sj23.py`](/F:/smartgas-grid/backend/scripts/reimport_sj23.py)。
++(3) 通过标准：导入脚本与当前“运行时读 rebuilt 表”口径不冲突，且 SJ2/SJ3 重导链仍存在。
++(4) 失败时先查层：先查导入脚本是否仍写旧表，再查重建脚本是否补齐 rebuilt 表，再查前端消费。
++
++6. AI 模块链路
++
++(1) AI 主路由仍由 [`/F:/smartgas-grid/backend/app/routers/ai_assistant.py`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py) 承担。
++(2) 基础模型参数默认还在 [`/F:/smartgas-grid/backend/app/services/ai_client.py#L23`](/F:/smartgas-grid/backend/app/services/ai_client.py#L23)，RAG 仍在 [`/F:/smartgas-grid/backend/app/services/rag_enhanced.py`](/F:/smartgas-grid/backend/app/services/rag_enhanced.py)。
++(3) 通过标准：direct、pilot、orchestrated、legacy 四层都还存在，且甪直 pilot 验证脚本通过。
++(4) 失败时先查层：先查 direct 分支短路，再查 pilot 专线，再查 orchestrated 工具链，最后查 legacy 兜底。
++
++七、验证结果
++
++1. 独立脚本结果
++
++| 项目 | 命令 | 结果 | 关键结论 |
++| --- | --- | --- | --- |
++| 甪直 AI 第7阶段 | `python backend/scripts/verify_luzhi_pilot_phase7.py` | PASS | 三接口、上下文注入、pilot 专线正常 |
++| WE1 阶段3-4联合回归 | `python backend/scripts/verify_we1_phase34_final.py` | PASS | 主辅样板 overlay 契约统一，steady 与 failure 收敛 |
++| WE1 第5阶段地图验收 | `python backend/scripts/verify_we1_map_phase5.py` | PASS | MapTopologyView 已消费快照、覆盖率、基线对比 |
++| WE1 维护模式验证 | `python backend/scripts/verify_we1_maintenance.py` | PASS | 主仿真入口、路由、AI 页面语义都已连通 |
++| WE1 第一张图第2阶段映射校验 | `python backend/scripts/verify_we1_map_phase2.py` | PASS | overlay 映射层 source IDs 命中关系成立 |
++| DB 基础验收 | `python backend/check_db.py` | 部分通过 | rebuilt 表通过，但 `we3` 缺失，旧表仍脏 |
++| rebuilt 口径校验 | `python backend/scripts/verify_junctions.py --table junction_groups_rebuilt` | PASS | `issue_count=0` |
++| 旧表口径校验 | `python backend/scripts/verify_junctions.py --table junction_groups` | FAIL | `issue_count=15`，不能写整体 PASS |
++
++2. 前后对比
++
++| 对比项 | 上轮记忆 | 本轮事实 |
++| --- | --- | --- |
++| MapTopologyView 独立仿真入口 | 记忆里仍写“走旧链” | 当前源码与 `verify_we1_maintenance.py` 证明已接入 `useSimulation` 主链 |
++| 甪直 trace 更新时间 | 2026-04-08 02:16:43 +08:00 | 本轮未刷新，仍停在 2026-04-08 02:16:43 +08:00 |
++| 数据库整体口径 | 只能拆开写 | 本轮仍需拆开写，rebuilt PASS，旧表 FAIL |
++
++3. 截图与替代说明
++
++(1) 本轮是主目录代码与脚本巡检，没有新增界面操作，不适合附截图。
++(2) 已用上面的验证结果表和前后对比表替代截图说明。
++
++八、风险与回退点
++
++1. 当前最大风险不是 WE1 主链，也不是甪直 pilot，而是有人把旧表 `junction_groups` 当成运行时真相继续使用。
++2. 第二个风险是 trace 文件长时间不更新时，容易误判“甪直 AI 还在正常跑”，所以后续巡检要继续把 trace 更新时间单列出来。
++3. 第三个风险是工作树很多，若有人从 detached worktree 读状态，容易把 `6410a10` 当当前版本。
++4. 本轮未改业务代码，没有业务回退动作；若后续要回退，只需回退本巡检文档和 automation memory。
++
++九、最终交付物
++
++1. 巡检文档：[`/F:/smartgas-grid/docs/automation/project-heartbeat-2026-04-08-111427.md`](/F:/smartgas-grid/docs/automation/project-heartbeat-2026-04-08-111427.md)。
++2. automation memory：`C:\Users\Administrator\.codex\automations\automation\memory.md` 追加本轮结论。
++3. 人话结论：甪直 AI 和 WE1 主仿真本轮都没被打穿，真正要继续盯的是旧表 `junction_groups` 这 15 个数据库口径问题，以及 trace 文件未继续刷新这件事。
+*** End Patch

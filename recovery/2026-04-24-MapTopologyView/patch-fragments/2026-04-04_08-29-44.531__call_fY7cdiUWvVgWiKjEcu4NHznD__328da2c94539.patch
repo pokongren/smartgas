@@ -1,0 +1,277 @@
+*** Begin Patch
+*** Delete File: C:\Users\Administrator\.codex\automations\automation\HEARTBEAT_LAST_RUN.md
+*** Add File: C:\Users\Administrator\.codex\automations\automation\HEARTBEAT_LAST_RUN.md
++# 项目心跳 - 2026-04-04 16:27 CST
++
++## 改动目标
++
++这轮不是改业务代码。
++目标就两件事：
++
++- 先确认巡检真的落在 `F:\smartgas-grid`
++- 再按主目录事实收口这轮到底是代码变化、数据库变化，还是路径阻塞
++
++## 当前结论
++
++这轮主要是代码变化 + 数据库内容变化 + 本地实验噪音，不是 `worktree/path sync blockage`。
++初始 `cwd` 是 `C:\Users\Administrator\.codex\worktrees\4c4a\smartgas-grid`，切换后 `cwd` 是 `F:\smartgas-grid`，`git rev-parse --show-toplevel` 是 `F:/smartgas-grid`。本轮判断只基于主目录，没有把 detached worktree 当事实来源。
++
++## 做了什么
++
++1. 主代理先做入口判断
++
++- 读取 automation memory，避免重复把同一种阻塞误判成新问题
++- 直接切到 `F:\smartgas-grid`
++- 校验当前目录、git 根目录、`.git` 形态、`git worktree list`
++
++2. 侦察代理 A 做环境与路径侦察
++
++- 看了 `git log -5`
++- 看了 `git status --short`
++- 看了 `git diff --stat`
++- 看了 `git diff --stat -- docs`
++- 确认 `F:\smartgas-grid\.git` 是真实目录，不是指针文件
++
++3. 侦察代理 B 做地图链路侦察
++
++- 看了 [`src/utils/hierarchyRenderer.ts`](F:\smartgas-grid\src\utils\hierarchyRenderer.ts)
++- 看了 [`src/utils/mapRenderer.ts`](F:\smartgas-grid\src\utils\mapRenderer.ts)
++- 看了 [`src/views/GlobalPipelineView.tsx`](F:\smartgas-grid\src\views\GlobalPipelineView.tsx)
++- 看了 [`src/views/MapTopologyView.tsx`](F:\smartgas-grid\src\views\MapTopologyView.tsx)
++
++4. 侦察代理 C 做枢纽 / DB / 脚本侦察
++
++- 看了 [`backend/app/models.py`](F:\smartgas-grid\backend\app\models.py)
++- 看了 [`backend/app/services/junction_groups.py`](F:\smartgas-grid\backend\app\services\junction_groups.py)
++- 看了 [`backend/app/routers/topology_editor.py`](F:\smartgas-grid\backend\app\routers\topology_editor.py)
++- 直接查了 [`backend/data/smartgas.db`](F:\smartgas-grid\backend\data\smartgas.db)
++- 看了 [`backend/check_db.py`](F:\smartgas-grid\backend\check_db.py)
++- 看了 [`backend/scripts/add_sj2.py`](F:\smartgas-grid\backend\scripts\add_sj2.py)
++- 看了 [`backend/scripts/add_we3.py`](F:\smartgas-grid\backend\scripts\add_we3.py)
++- 看了 [`backend/scripts/reimport_sj23.py`](F:\smartgas-grid\backend\scripts\reimport_sj23.py)
++- 看了 [`src/services/api.ts`](F:\smartgas-grid\src\services\api.ts)
++- 看了 [`src/hooks/useTopology.ts`](F:\smartgas-grid\src\hooks\useTopology.ts)
++
++5. 验证代理做独立复核
++
++- 专门防三种说过头
++- 不把 national-map 这条 inspected chain 说成全仓统一
++- 不把脚本变更说成已落库
++- 不把 runtime 归一化说成 DB 原始数据已经干净
++
++## 改动前的问题
++
++这轮最容易说错的，不是“有没有变化”，而是“变化到底落到哪一层了”。
++
++- 容易把 detached worktree 当事实来源
++- 容易看到 `add_we3.py` 在改，就顺手说成 `WE3` 已经进 live DB
++- 容易把全国地图这条链路的现状，说成整个仓库都统一了
++
++## 改动后的结果
++
++### 1. 环境与路径
++
++- 主目录落点正确：`cwd=F:\smartgas-grid`
++- git 根目录正确：`git_root=F:/smartgas-grid`
++- `.git` 是隐藏目录，不是 worktree 指针文件
++- `git worktree list --porcelain` 里，只有 `F:\smartgas-grid` 挂着 live branch `eaf6ac4`
++- 那批 Codex worktree 仍然都停在 detached `6410a10`
++
++### 2. 全国地图缩放与层级显示
++
++这条 inspected chain 现在是：
++
++`hierarchyRenderer.ts -> mapRenderer.ts -> GlobalPipelineView.tsx`
++
++这轮确认到的点：
++
++- `criticalZoom=6`
++- `highZoom=10`
++- `mediumZoom=14`
++- `valveMinZoom=11`
++- `expandClusterZoom=12`
++- `mapRenderer.ts` 已经接上 `hierarchyRenderer.ts`
++- `GlobalPipelineView.tsx` 会把 `pipelineData` 传给 `MapView`
++
++但阀室规则还没收平。
++`hierarchyRenderer.ts` 里虽然写了 `valveMinZoom=11`，但 `getNodeImportance()` 仍把 `valve` 归到 `LOW`，而 `shouldShowNodeAtZoom()` 先按重要性过滤，所以阀室实际更接近 `zoom >= 14` 才稳定出现。
++
++另一个没统一的点在编辑器链路：
++
++- [`src/views/MapTopologyView.tsx`](F:\smartgas-grid\src\views\MapTopologyView.tsx) 仍然是裸 `MapView`
++- 它没有传 `pipelineData`
++- 它还把 `junction` 映射回 `station`
++
++所以只能说“全国地图这条 inspected chain 已经接上”，不能说“地图和拓扑视图已经一套口径”。
++
++### 3. 起源点与枢纽规则
++
++后端 runtime 规则比库里原始行干净。
++
++- [`backend/app/services/junction_groups.py`](F:\smartgas-grid\backend\app\services\junction_groups.py) 会展开 `JUNCTION-x` / `junction-x`
++- 同一个服务还会把重叠枢纽做归并
++- [`backend/app/routers/topology_editor.py`](F:\smartgas-grid\backend\app\routers\topology_editor.py) 的 `create_junction_group` 要求展开后至少 2 个底层站点
++
++但写入口径没完全统一：
++
++- `merge_stations` 仍会写出单站 `junction_group`
++- `create_junction_group` 却拒绝少于 2 个底层站点
++
++也就是说，runtime 读口比写口更干净，规则还存在前后不一致。
++
++### 4. 数据库口径与导入脚本
++
++这轮 live DB 实数是：
++
++- `stations=1256`
++- `pipelines=1253`
++- `pipeline_systems=13`
++- `junction_groups=16`
++- `pipeline_system ids = cred,gn,gs,jxlz,ncsh,pt,sj2,sj3,sj4,we1,we2,zg,zm`
++- `positionMeta` 仍存在于 89 条 `stations.properties`
++
++库里还留着两类脏事实：
++
++- nested junction：`junction_groups.id=17 = ["JUNCTION-16","JXLZ-11"]`
++- single-station junction：当前仍有 7 条
++
++导入脚本这轮确实在动：
++
++- [`backend/scripts/add_sj2.py`](F:\smartgas-grid\backend\scripts\add_sj2.py) 仍是 SJ2 局部导入脚本，改的是 `西沙屯 -> 琉璃河 -> 永清` 这段
++- [`backend/scripts/add_we3.py`](F:\smartgas-grid\backend\scripts\add_we3.py) 仍是 WE3 局部脚本，里面已经用 `西沙屯分输站`，并明确去掉“长阳分输站”
++- [`backend/scripts/reimport_sj23.py`](F:\smartgas-grid\backend\scripts\reimport_sj23.py) 是新的 SJ2 / SJ3 全量重导脚本，会删旧 `sj2/sj3` 系统、清理相关 `junction_groups`，再重写 `pipeline_systems`
++
++但这轮不能把脚本变化直接说成 live DB 已落地。因为 DB 里现在还是：
++
++- `SJ2=70` 站 / `69` 段
++- `SJ3=71` 站 / `70` 段
++- `WE3=0` 站 / `0` 段
++- `pipeline_systems` 里没有 `we3`
++
++所以安全说法只有一个：SJ2 / SJ3 / WE3 这块现在有脚本 churn，其中 `WE3` 仍停留在脚本层，不是已落库事实。
++
++### 5. API 端口与前后端字段口径
++
++这里现在是混合态，不是单一前缀。
++
++- [`backend/run.py`](F:\smartgas-grid\backend\run.py) 跑 `8080`
++- [`vite.config.ts`](F:\smartgas-grid\vite.config.ts) 把 `/api`、`/topology`、`/docs`、`/openapi.json` 都代理到 `8080`
++- [`src/hooks/useTopology.ts`](F:\smartgas-grid\src\hooks\useTopology.ts) 现在直接走 `/topology/...`
++- [`src/services/api.ts`](F:\smartgas-grid\src\services\api.ts) 还是混着 `/api/topology/...` 和 `/topology/correct/...`
++- docs 变化主要集中在 [`docs/TOPOLOGY_SETUP_GUIDE.md`](F:\smartgas-grid\docs\TOPOLOGY_SETUP_GUIDE.md) 和 [`docs/TOPOLOGY_COMPUTATION_USAGE.md`](F:\smartgas-grid\docs\TOPOLOGY_COMPUTATION_USAGE.md)，是在把这个混合现实写清楚
++
++## 影响范围
++
++- [`backend/app/services/junction_groups.py`](F:\smartgas-grid\backend\app\services\junction_groups.py)
++- [`backend/app/routers/topology_editor.py`](F:\smartgas-grid\backend\app\routers\topology_editor.py)
++- [`backend/data/smartgas.db`](F:\smartgas-grid\backend\data\smartgas.db)
++- [`backend/check_db.py`](F:\smartgas-grid\backend\check_db.py)
++- [`backend/scripts/add_sj2.py`](F:\smartgas-grid\backend\scripts\add_sj2.py)
++- [`backend/scripts/add_we3.py`](F:\smartgas-grid\backend\scripts\add_we3.py)
++- [`backend/scripts/reimport_sj23.py`](F:\smartgas-grid\backend\scripts\reimport_sj23.py)
++- [`src/services/api.ts`](F:\smartgas-grid\src\services\api.ts)
++- [`src/hooks/useTopology.ts`](F:\smartgas-grid\src\hooks\useTopology.ts)
++- [`src/utils/hierarchyRenderer.ts`](F:\smartgas-grid\src\utils\hierarchyRenderer.ts)
++- [`src/utils/mapRenderer.ts`](F:\smartgas-grid\src\utils\mapRenderer.ts)
++- [`src/views/GlobalPipelineView.tsx`](F:\smartgas-grid\src\views\GlobalPipelineView.tsx)
++- [`src/views/MapTopologyView.tsx`](F:\smartgas-grid\src\views\MapTopologyView.tsx)
++- [`docs/TOPOLOGY_SETUP_GUIDE.md`](F:\smartgas-grid\docs\TOPOLOGY_SETUP_GUIDE.md)
++- [`docs/TOPOLOGY_COMPUTATION_USAGE.md`](F:\smartgas-grid\docs\TOPOLOGY_COMPUTATION_USAGE.md)
++
++## 验证方式
++
++- 校验 `cwd` 是否落在 `F:\smartgas-grid`
++- 校验 `git rev-parse --show-toplevel` 是否为 `F:/smartgas-grid`
++- 查看 `git worktree list --porcelain`
++- 查看 `git log --oneline -5`
++- 查看 `git status --short`
++- 查看 `git diff --stat`
++- 查看 `git diff --stat -- docs`
++- 直接读取关键源码文件
++- 直接查询 `backend/data/smartgas.db`
++- 做一轮独立复核，避免把局部现象说成全局事实
++
++## 验证结果
++
++- 主目录落点正确，不是环境错位
++- 当前是活仓，不是空壳 worktree
++- docs 变化集中在 topology 两份说明文档
++- national-map inspected chain 已接上，但 editor chain 仍是另一套口径
++- 阀室显示阈值仍存在“配置 11，实际更像 14”的错位
++- runtime 的 junction 归一化比 DB 原始存储更干净
++- `WE3` 仍停留在脚本变更层，live DB 没证据支持“已落库”
++
++## 风险点
++
++- 地图缩放口径还没统一，阀室显示容易误判
++- [`src/views/GlobalPipelineView.tsx`](F:\smartgas-grid\src\views\GlobalPipelineView.tsx) 和 [`src/views/MapTopologyView.tsx`](F:\smartgas-grid\src\views\MapTopologyView.tsx) 的节点类型语义仍在分叉
++- `merge_stations` 和 `create_junction_group` 写入口径不一致，后面还会继续制造 single-station junction
++- `.agent/`、`.npm-cache/`、AI assistant 相关改动还混在同一棵工作树里，容易污染业务判断
++
++## 前后对比图
++
++这轮不适合放界面截图。
++原因很简单：
++
++- 没改业务 UI
++- 这轮核心是路径落点、代码口径和 DB 快照核对
++- 用结构图更直观
++
++```mermaid
++flowchart LR
++    A["初始 cwd\nC:\\Users\\Administrator\\.codex\\worktrees\\4c4a\\smartgas-grid"] --> B["切到主目录\nF:\\smartgas-grid"]
++    B --> C["git 根目录\nF:/smartgas-grid"]
++    C --> D["全国地图链路\nhierarchyRenderer.ts -> mapRenderer.ts -> GlobalPipelineView.tsx"]
++    C --> E["编辑器链路\nMapTopologyView.tsx"]
++    C --> F["live DB\nbackend/data/smartgas.db"]
++    C --> G["导入脚本\nadd_sj2.py / add_we3.py / reimport_sj23.py"]
++    D --> H["阀室阈值仍打架\n配置 11，实际更接近 14"]
++    E --> I["junction 仍映射回 station\n且没有传 pipelineData"]
++    F --> J["库里仍有 nested + single-station junction"]
++    G --> K["WE3 仍是脚本变化\n不是已落库事实"]
++```
++
++## 前后对比表
++
++| 对比项 | 改动前容易说错的点 | 这轮确认后的说法 |
++| --- | --- | --- |
++| 事实来源 | 容易把 detached worktree 当事实源 | 只以 `F:\smartgas-grid` 为准 |
++| 仓库状态 | 容易先判成 blockage | 这轮是代码变化 + DB 变化 + 本地噪音混合 |
++| 全国地图链路 | 容易说“地图都统一了” | 只确认 national-map inspected chain 已接上 |
++| 阀室阈值 | 容易照着 `valveMinZoom=11` 直接下结论 | 实际显示仍受 `LOW` 分层影响，更接近 `zoom >= 14` |
++| WE3 状态 | 容易把脚本变更说成已进库 | 现在只能说脚本在改，live DB 仍是 `0/0` |
++| 枢纽状态 | 容易把 runtime 归一化说成库已清洗 | runtime 更干净，库里仍有 nested / single-station junction |
++
++## 测试结果
++
++这轮没跑业务测试。
++原因不是漏跑，而是这次没有改业务代码，做的是巡检型验证。
++
++## 回退方式
++
++这轮没有业务代码改动。
++如果要回退，只需要忽略这份 summary 和 memory 追加记录即可。
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ 2026-04-04 14:30 CST
+ 
+ - This run again passed the main-root landing rule: initial automation cwd was `C:\Users\Administrator\.codex\worktrees\7117\smartgas-grid`, then the inspection switched into `F:\smartgas-grid`, and both runtime cwd plus `git rev-parse --show-toplevel` resolved to `F:\smartgas-grid` / `F:/smartgas-grid`. All business conclusions stayed anchored to the live repo only.
+ - Current progress summary: this round is still real code change + database content change + local experiment/noise mixed together, not `automation env mismatch / worktree-path blockage`. `F:\smartgas-grid\.git` is a real directory; `git worktree list --porcelain` still shows `F:\smartgas-grid` as the only live branch worktree on `HEAD eaf6ac4...`, while Codex worktrees remain detached at `6410a10...`.
+ - Environment/diff line: `git log --oneline -5` still shows live commits (`eaf6ac4`, `b31a010`, `d3c9d08`, `c19937f`, `3e47946`). `git status --short` still spans `src/`, `backend/`, `docs/`, plus local residue in `.npm-cache/`, `.agent/workflows/start.md`, and AI-assistant related files. `git diff --stat -- docs` is still centered on `docs/TOPOLOGY_SETUP_GUIDE.md` plus `docs/TOPOLOGY_COMPUTATION_USAGE.md`.
+@@
+ - API/docs line: runtime and docs still describe a mixed `8080` contract. `backend/run.py` and `vite.config.ts` stay on `8080`; `src/hooks/useTopology.ts` goes straight to `/topology/...`; `src/services/api.ts` still mixes `/api/topology/...` graph/stats with direct `/topology/correct/...`; and both topology docs now explicitly document that mixed reality instead of the old `8000` story.
+ - Verifier reminder for future runs: do not call the repo "fully unified", do not treat `add_we3.py` or other import scripts as already reflected in live DB content unless counts or rows prove it, and keep map conclusions scoped to the inspected national-map chain plus editor chain.
+ - No business code was modified by this heartbeat run. Memory and automation summary updated only. Run completed at `2026-04-04T14:30:46+08:00`.
++
++2026-04-04 16:27 CST
++
++- Entry check passed again the right way: initial cwd was `C:\Users\Administrator\.codex\worktrees\4c4a\smartgas-grid`, then the run switched into `F:\smartgas-grid`, and both runtime cwd plus `git rev-parse --show-toplevel` resolved to `F:\smartgas-grid` / `F:/smartgas-grid`. `.git` under `F:\smartgas-grid` is a hidden directory, not a pointer file.
++- Current progress summary: this round is still real code change + database content change + local experiment/noise mixed together, not `automation env mismatch / worktree-path blockage`. `git worktree list --porcelain` still shows `F:\smartgas-grid` as the only live branch worktree on `HEAD eaf6ac4...`, while the Codex worktrees remain detached at `6410a10...`.
++- Environment/diff line: `git log --oneline -5` still shows live commits (`eaf6ac4`, `b31a010`, `d3c9d08`, `c19937f`, `3e47946`). `git status --short` still spans `src/`, `backend/`, `docs/`, plus local residue in `.agent/`, `.npm-cache/`, and AI-assistant files. `git diff --stat -- docs` is still concentrated in `docs/TOPOLOGY_SETUP_GUIDE.md` and `docs/TOPOLOGY_COMPUTATION_USAGE.md`.
++- National-map line: the inspected map chain remains `src/utils/hierarchyRenderer.ts` -> `src/utils/mapRenderer.ts` -> `src/views/GlobalPipelineView.tsx`. Thresholds still read `critical=6`, `high=10`, `medium=14`, `valveMinZoom=11`, `expandClusterZoom=12`, but `getNodeImportance()` still classifies `valve` as `LOW`, so `shouldShowNodeAtZoom()` still makes real valve visibility behave closer to `zoom >= 14`. Keep this scoped to the inspected national-map chain only.
++- National-map vs editor line: `src/views/GlobalPipelineView.tsx` still passes `pipelineData` into `MapView`, while `src/views/MapTopologyView.tsx` still mounts `MapView` without `pipelineData` and still maps `junction` back to `station`. Safe phrasing remains: the national-map chain and the editor chain still do not share one node-type / zoom vocabulary.
++- Junction/DB line: backend runtime normalization is still cleaner than stored rows. `backend/app/services/junction_groups.py` still expands `JUNCTION-x` refs and merges overlaps, while `backend/app/routers/topology_editor.py` still has split write rules where `merge_stations` writes `station_ids=[keep_station_id]` but `create_junction_group` rejects fewer than two normalized station ids. Live DB snapshot from this run remains `stations=1256`, `pipelines=1253`, `pipeline_systems=13`, `junction_groups=16`; system ids remain `cred,gn,gs,jxlz,ncsh,pt,sj2,sj3,sj4,we1,we2,zg,zm`; storage still contains nested row `junction_groups.id=17=["JUNCTION-16","JXLZ-11"]`, 7 single-station groups, and 89 rows carrying `positionMeta`.
++- Script-vs-live-data line: keep treating `backend/scripts/add_sj2.py`, `backend/scripts/add_we3.py`, and `backend/scripts/reimport_sj23.py` as script churn unless DB rows prove the result. This run still shows `SJ2=70/69`, `SJ3=71/70`, `WE3=0/0`, and `pipeline_systems` still have no `we3`, so `add_we3.py` must not be described as already landed in the live DB.
++- API/docs line: runtime and docs still describe a mixed `8080` contract. `backend/run.py` and `vite.config.ts` stay on `8080`; `src/hooks/useTopology.ts` goes straight to `/topology/...`; `src/services/api.ts` still mixes `/api/topology/...` with `/topology/correct/...`; and both topology docs now document that mixed reality instead of the old `8000` / single-prefix story.
++- Automation outputs only: rewrote `C:\Users\Administrator\.codex\automations\automation\HEARTBEAT_LAST_RUN.md` in plain-language UTF-8 markdown and appended this memory entry. No business code was modified. Run completed at `2026-04-04 16:27:25 +08:00`.
+*** End Patch

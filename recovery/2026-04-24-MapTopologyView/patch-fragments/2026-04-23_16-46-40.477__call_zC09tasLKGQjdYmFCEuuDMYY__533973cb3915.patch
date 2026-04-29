@@ -1,0 +1,107 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const sendSimulationToAiAnalysis = useCallback(() => {
+@@
+         setStatusMsg('宸插皢浠跨湡缁撴灉鍙戦€佺粰 AI锛屾鍦ㄧ敓鎴愬垎鏋愮粨璁?)
+     }, [simulationNarrativePlain, simulationStructuredBrief, steadyScenarioId, steadyScenarioOption?.label])
++    const cutoffAiAnalysis = useMemo(() => {
++        if (!cutoffResult) return null
++
++        const cutoffNodeName = topoNodes.find(n => n.id === cutoffResult.cutoffNodeId)?.name ?? cutoffResult.cutoffNodeName
++        const supplyLost = cutoffResult.summary.supplyLost
++        const rerouted = cutoffResult.summary.rerouted
++        const same = cutoffResult.summary.same
++        const analyzedTotal = cutoffResult.totalDistributionNodes
++        const affectedTotal = cutoffResult.affectedNodes.length
++        const supplyLostRatio = analyzedTotal > 0 ? supplyLost / analyzedTotal : 0
++
++        const riskLevel =
++            supplyLostRatio >= 0.3
++                ? '高风险'
++                : supplyLost > 0
++                    ? '中风险'
++                    : rerouted > 0
++                        ? '低中风险'
++                        : '低风险'
++
++        const conclusion =
++            supplyLost > 0
++                ? `截断点 ${cutoffNodeName} 对下游供气已形成实质影响，当前断供 ${supplyLost} 站，优先处置失供链路。`
++                : rerouted > 0
++                    ? `截断点 ${cutoffNodeName} 未出现断供，但有 ${rerouted} 站进入绕行状态，建议压降跟踪。`
++                    : `截断点 ${cutoffNodeName} 当前未发现断供和绕行，系统保持稳定。`
++
++        const lostStations = cutoffResult.affectedNodes
++            .filter(node => node.status === 'supply_lost')
++            .map(node => node.name || node.id)
++            .slice(0, 8)
++        const reroutedStations = cutoffResult.affectedNodes
++            .filter(node => node.status === 'rerouted')
++            .map(node => node.name || node.id)
++            .slice(0, 8)
++
++        const action =
++            supplyLost > 0
++                ? '先恢复主供气链路或切换替代供气点，再校核失供站入口压力与最小约束。'
++                : rerouted > 0
++                    ? '保留绕行方案并持续观察高负荷管段，必要时限流分配。'
++                    : '维持当前工况，建议留档为截断演练基线。'
++
++        return {
++            cutoffNodeName,
++            riskLevel,
++            conclusion,
++            action,
++            summaryLine: `分析站点 ${analyzedTotal}，断供 ${supplyLost}，绕行 ${rerouted}，正常 ${same}。`,
++            lostText: lostStations.length > 0 ? lostStations.join('、') : '无',
++            reroutedText: reroutedStations.length > 0 ? reroutedStations.join('、') : '无',
++            structured: {
++                cutoff_node_id: cutoffResult.cutoffNodeId,
++                cutoff_node_name: cutoffNodeName,
++                source_nodes: cutoffResult.sourceNodes.map(item => item.name),
++                analyzed_distribution_nodes: analyzedTotal,
++                affected_nodes: affectedTotal,
++                summary: cutoffResult.summary,
++                top_supply_lost_nodes: lostStations,
++                top_rerouted_nodes: reroutedStations,
++                risk_level: riskLevel,
++            },
++        }
++    }, [cutoffResult, topoNodes])
++    const sendCutoffToAiAnalysis = useCallback(() => {
++        if (!cutoffAiAnalysis || !cutoffResult) return
++        const prompt = [
++            '/数据分析',
++            '请基于以下截断仿真结果做专业分析，给出结论、风险、建议动作：',
++            `截断点：${cutoffAiAnalysis.cutoffNodeName}`,
++            `风险等级：${cutoffAiAnalysis.riskLevel}`,
++            `概览：${cutoffAiAnalysis.summaryLine}`,
++            `断供站点：${cutoffAiAnalysis.lostText}`,
++            `绕行站点：${cutoffAiAnalysis.reroutedText}`,
++            `建议动作：${cutoffAiAnalysis.action}`,
++            '',
++            '结构化结果(JSON)：',
++            JSON.stringify(cutoffAiAnalysis.structured, null, 2),
++        ].join('\n')
++
++        window.dispatchEvent(
++            new CustomEvent('assistant-send-message', {
++                detail: {
++                    message: prompt,
++                    autoOpen: true,
++                },
++            }),
++        )
++        setShowCutoffAiModal(false)
++        setStatusMsg('已发送截断仿真解读到 AI 助手')
++    }, [cutoffAiAnalysis, cutoffResult])
++    useEffect(() => {
++        if (!showCutoffAiModal) return
++        const handleEsc = (event: KeyboardEvent) => {
++            if (event.key === 'Escape') setShowCutoffAiModal(false)
++        }
++        window.addEventListener('keydown', handleEsc)
++        return () => window.removeEventListener('keydown', handleEsc)
++    }, [showCutoffAiModal])
+*** End Patch

@@ -1,0 +1,24 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-    const [junctionMode, setJunctionMode] = useState<string>('runtime_readonly')
+-    const [editMode, setEditMode] = useState<EditMode>('view')
+-    const [pointType, setPointType] = useState<PointType>('station')
+-    const [connectFrom, setConnectFrom] = useState<string | null>(null)
+-    const [statusMsg, setStatusMsg] = useState('闂傚倷鑳剁划顖炲礉濡ゅ懎绠犻柟鎹愵嚙閸氳銇勯弴妤€浜炬繝纰樷偓鎰佸殶濞寸媴濡囩划鐢碘偓锝庝簼椤旀捇姊绘担渚劸缂佽鐗撳畷鏇㈡嚑椤戣棄浜炬慨姗嗗墯閸犳ɑ顨ラ悙鑼ф鐐差儏閳诲海浠﹂幋鎺戭棜闁诲骸绠嶉崕閬嶅箠鎼搭煉缍栭柨婵嗩槸缁狙囨煟閹邦垰鐓愭い銉ヮ樀閺屾盯骞嬮婊呯槇閻庢鍠栭悘姘嚗閸曨偆鏆嗗┑鐘插€归崐搴ｇ磽?)
+-    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+-    const [mergeJunctionName, setMergeJunctionName] = useState('')
+-    const [mergeJunctionDescription, setMergeJunctionDescription] = useState('')
+-    const [isMerging, setIsMerging] = useState(false)
+-    const [deletingJunctionId, setDeletingJunctionId] = useState<number | null>(null)
++    const [junctionMode, setJunctionMode] = useState<string>('runtime_readonly')
++    const [editMode, setEditMode] = useState<EditMode>('view')
++    const [pointType, setPointType] = useState<PointType>('station')
++    const [connectFrom, setConnectFrom] = useState<string | null>(null)
++    const [statusMsg, setStatusMsg] = useState('点击“导入拓扑”加载数据，或在仿真页直接运行场景。')
++    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
++    const [mergeJunctionName, setMergeJunctionName] = useState('')
++    const [mergeJunctionDescription, setMergeJunctionDescription] = useState('')
++    const [isMerging, setIsMerging] = useState(false)
++    const [deletingJunctionId, setDeletingJunctionId] = useState<number | null>(null)
+*** End Patch

@@ -1,0 +1,135 @@
+*** Begin Patch
+*** Add File: C:\Users\Administrator\.codex\worktrees\5c28\smartgas-grid\HEARTBEAT_ISSUES.md
++# smartgas-grid 当前工作区巡检问题记录
++
++## 当前结论
++
++本轮巡检严格以当前 `cwd` / git 根目录 `C:\Users\Administrator\.codex\worktrees\5c28\smartgas-grid` 为准，没有沿用旧 memory 中提到的历史 worktree 路径作为事实来源。
++
++当前工作区不是一个包含完整项目代码的可巡检副本，而是一个几乎为空的 git worktree：
++
++- 根目录仅存在 `.git` 和 `README.md`
++- `git status` 干净，没有未提交改动
++- `git log` 仅看到 `6410a10 Initial commit`
++- 当前根目录下没有 `docs` 目录，也没有任何前端、后端、数据库或脚本文件
++
++因此，本轮不能把问题归类为“代码变化”“数据库变化”或“本地实验数据变化”，而应归类为：
++
++- 当前 worktree 内容缺失
++- 实际巡检对象与旧 memory 中记录的仓库内容不一致
++- 三条主线核查均被路径/同步问题阻断
++
++## 已确认的问题
++
++### 1. 当前工作区缺少目标代码文件
++
++以下本轮要求重点核查的文件，在当前 git 根目录下全部不存在：
++
++- `src/utils/mapRenderer.ts`
++- `src/utils/hierarchyRenderer.ts`
++- `src/views/MapTopologyView.tsx`
++- `src/views/GlobalPipelineView.tsx`
++- `backend/app/models.py`
++- `backend/app/services/junction_groups.py`
++- `backend/app/routers/topology_editor.py`
++- `backend/data/smartgas.db`
++- `backend/check_db.py`
++- `backend/scripts/add_sj2.py`
++- `backend/scripts/add_we3.py`
++- `backend/scripts/reimport_sj23.py`
++- `src/services/api.ts`
++- `src/hooks/useTopology.ts`
++
++影响：
++
++- 无法核查全国地图缩放与层级显示规则
++- 无法核查起源点、枢纽、`JUNCTION-x` 展开与命名口径
++- 无法核查数据库表数量、ID 前缀、system id、layers_config、API 端口与字段口径
++
++### 2. 当前 worktree 与历史 memory 指向的项目内容不一致
++
++当前 `.git` 文件指向：
++
++- `F:/smartgas-grid/.git/worktrees/smartgas-grid10`
++
++但当前 worktree 实际检出的内容只有一个极简 `README.md`，并没有上轮 memory 中提到的完整项目结构。这说明至少存在以下一种情况：
++
++- 当前 worktree 没有完成正确检出
++- 当前 worktree 指向了一个空壳状态
++- 旧 memory 对应的是另一个实际有代码的仓库副本
++
++影响：
++
++- 不能直接把旧 memory 中的业务结论视为当前仓库事实
++- 如果继续沿用旧路径，会把别处代码状态误报为当前工作区状态
++
++### 3. 三条主线的核查目前都处于阻塞状态
++
++#### 主线一：全国地图缩放与层级显示
++
++由于缺少 `src/utils/mapRenderer.ts`、`src/utils/hierarchyRenderer.ts`、`src/views/MapTopologyView.tsx`、`src/views/GlobalPipelineView.tsx`，当前无法确认：
++
++- 气源 / 压气站 / 分输站 / 阀室 / 枢纽在不同 zoom 下的显示阈值
++- 隐藏规则是否一致
++- 节点重要性分层是否已接入
++- 地图视图与拓扑视图的口径是否一致
++
++#### 主线二：起源点与枢纽规则
++
++由于缺少 `backend/app/models.py`、`backend/app/services/junction_groups.py`、`backend/app/routers/topology_editor.py`、`src/utils/mapRenderer.ts`，当前无法确认：
++
++- `source`、`junction` 命名是否一致
++- `JUNCTION-x` 引用是否展开
++- 重叠枢纽是否合并
++- 起终点 / 连接点渲染与命名是否一致
++
++#### 主线三：数据库口径与导入脚本
++
++由于缺少 `backend/data/smartgas.db`、`backend/check_db.py`、`backend/scripts/add_sj2.py`、`backend/scripts/add_we3.py`、`backend/scripts/reimport_sj23.py`、`src/services/api.ts`、`src/hooks/useTopology.ts`，当前无法确认：
++
++- `stations`、`pipelines`、`pipeline_systems`、`junction_groups` 数量
++- 各类站点与管线 ID 前缀是否一致
++- `system id`、`layers_config` 是否匹配
++- API 端口是否一致
++- 前后端字段口径是否一致
++- 这些变化到底属于结构变更、导入脚本变更、数据库内容变更，还是本地试验数据
++
++## 当前判断
++
++本轮最核心的问题不是发现了新的业务规则冲突，而是：
++
++1. 当前自动化要求检查的 worktree 不包含实际项目内容
++2. 因此无法对指定模块做有效巡检
++3. 旧 memory 中记录的是另一个有完整内容的仓库状态，不能直接当作本轮结论
++
++## 建议的下一步
++
++### 建议 1：先确认正确的巡检仓库副本
++
++优先确认当前自动化到底应该以哪个 git 根目录为准：
++
++- 如果必须以当前 `C:\Users\Administrator\.codex\worktrees\5c28\smartgas-grid` 为准，那么当前结论应保持为“仓库内容缺失，无法核查”
++- 如果实际要巡检的是包含完整代码与数据库的 live worktree，那么需要先切换到那个真实副本再执行三条主线核查
++
++### 建议 2：在确认仓库前，不要继续沿用旧 memory 的业务结论
++
++原因：
++
++- 旧 memory 中的结论可能对真实项目副本成立
++- 但对当前 worktree 不成立
++- 如果混用，会把路径问题误报成代码或数据库问题
++
++### 建议 3：等目标文件出现后，再恢复三条主线巡检
++
++至少需要当前工作区实际出现以下文件后，才能继续：
++
++- `src/utils/mapRenderer.ts`
++- `src/utils/hierarchyRenderer.ts`
++- `backend/app/services/junction_groups.py`
++- `backend/data/smartgas.db`
++- `src/services/api.ts`
++
++## 一句话摘要
++
++当前 `smartgas-grid` 工作区不是完整项目副本，三条主线核查均因目标文件和数据库缺失而阻塞；本轮应判定为路径/同步问题，而不是新的代码或数据库变化。
+*** End Patch

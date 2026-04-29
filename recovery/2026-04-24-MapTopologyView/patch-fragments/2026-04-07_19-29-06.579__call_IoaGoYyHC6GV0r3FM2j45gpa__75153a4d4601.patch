@@ -1,0 +1,32 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const doNodeClick = (nodeId: string) => {
+         if (modeRef.current === 'connect') {
+             const from = cfRef.current
+             if (!from) {
+                 setConnectFrom(nodeId)
+@@
+         }
+ 
+         setSelectedNode(clickedNode)
++        setSelectedEdgeId(null)
+ 
+         // 截断模式：点击节点设为截断点
+         if (modeRef.current === 'view' && activeTab === 'cutoff') {
+             const nd = clickedNode
+@@
+         }
+     }
++
++    const doEdgeClick = (edgeId: string) => {
++        const clickedEdge = edgesRef.current.find(edge => edge.id === edgeId) ?? null
++        setSelectedNode(null)
++        setSelectedEdgeId(edgeId)
++        if (clickedEdge) {
++            setStatusMsg(`已选中连线：${clickedEdge.name || edgeId}`)
++        }
++    }
+ 
+     const doAddEdge = (startId: string, endId: string) => {
+*** End Patch

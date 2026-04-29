@@ -1,0 +1,36 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                                    <SimParamEditor
+-                                        seedNodes={paramEditorSeedNodes}
+-                                        edges={paramEditorEdges}
+-                                        nodeOverrides={nodeParamOverrides}
+-                                        edgeLengthOverrides={edgeLengthOverrides}
+-                                        globalDefaults={globalParamDefaults}
+-                                        validationError={paramValidationError}
+-                                        onNodeOverridesChange={setNodeParamOverrides}
+-                                        onEdgeLengthOverridesChange={setEdgeLengthOverrides}
+-                                        onGlobalDefaultsChange={setGlobalParamDefaults}
+-                                    />
++                                    <div className="flex justify-end">
++                                        <button
++                                            onClick={() => setShowSimParamEditor(prev => !prev)}
++                                            className="rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-1.5 text-xs text-cyan-100 hover:bg-cyan-900/35"
++                                        >
++                                            {showSimParamEditor ? '收起站场参数与管段长度' : '展开站场参数与管段长度'}
++                                        </button>
++                                    </div>
++                                    {showSimParamEditor && (
++                                        <SimParamEditor
++                                            seedNodes={paramEditorSeedNodes}
++                                            edges={paramEditorEdges}
++                                            nodeOverrides={nodeParamOverrides}
++                                            edgeLengthOverrides={edgeLengthOverrides}
++                                            globalDefaults={globalParamDefaults}
++                                            validationError={paramValidationError}
++                                            onNodeOverridesChange={setNodeParamOverrides}
++                                            onEdgeLengthOverridesChange={setEdgeLengthOverrides}
++                                            onGlobalDefaultsChange={setGlobalParamDefaults}
++                                        />
++                                    )}
+*** End Patch

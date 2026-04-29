@@ -36,6 +36,7 @@ interface UseSimulationReturn {
   bulkTrialRunActive: boolean
   comparison: SimulationComparison | null
   trialRunItems: SimulationTrialRunItem[]
+  animatingState: { active: boolean; iteration: number; total: number; prevOverlay: SimulationOverlay | null } | null
   setScenario: (id: string) => void
   setSelectedSnapshotRunId: (id: string) => void
   setBaselineSnapshotRunId: (id: string) => void
@@ -184,6 +185,7 @@ export function useSimulation({
   const [trialRunScenarioId, setTrialRunScenarioId] = useState('')
   const [bulkTrialRunActive, setBulkTrialRunActive] = useState(false)
   const [baselineSnapshot, setBaselineSnapshot] = useState<SimulationSnapshotRecord | null>(null)
+  const [animatingState, setAnimatingState] = useState<{ active: boolean; iteration: number; total: number; prevOverlay: SimulationOverlay | null } | null>(null)
 
   const overlayCacheRef = useRef<Map<string, SimulationOverlay>>(new Map())
   const snapshotRecordCacheRef = useRef<Map<string, SimulationSnapshotRecord>>(new Map())
@@ -237,9 +239,24 @@ export function useSimulation({
             }),
           })
 
+      const prevOverlay = overlayCacheRef.current.get(cacheKey) ?? null
       overlayCacheRef.current.set(cacheKey, data)
       setOverlay(data)
       setSelectedSnapshotRunId('')
+
+      // Start animation loop
+      const totalIters = Math.max(5, data.iterations ?? 1)
+      setAnimatingState({ active: true, iteration: 1, total: totalIters, prevOverlay })
+      
+      const animateTicks = async () => {
+        for (let i = 1; i <= totalIters; i++) {
+          setAnimatingState({ active: true, iteration: i, total: totalIters, prevOverlay })
+          await new Promise(r => setTimeout(r, 200)) // 200ms per tick
+        }
+        setAnimatingState(null)
+      }
+      void animateTicks()
+
     } catch (requestError) {
       setError(getErrorMessage(requestError, '仿真运行失败，请稍后再试'))
     } finally {
@@ -606,6 +623,7 @@ export function useSimulation({
     bulkTrialRunActive,
     comparison,
     trialRunItems,
+    animatingState,
     setScenario,
     setSelectedSnapshotRunId,
     setBaselineSnapshotRunId,

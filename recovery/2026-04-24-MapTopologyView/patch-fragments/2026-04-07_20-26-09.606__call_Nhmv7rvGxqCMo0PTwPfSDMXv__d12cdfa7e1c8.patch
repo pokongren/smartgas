@@ -1,0 +1,23 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-import { SimPanel } from '@/components/topology/SimPanel'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
+ import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+ import type { PipelinePackage } from '@/data/pipelines/types'
+-import { useSimulation } from '@/hooks/useSimulation'
+-import { topologyAPI, type SimulationResult } from '@/services/api'
++import { useSimulation } from '@/hooks/useSimulation'
+ import {
+     topologyEditorApi,
+     type JunctionGroup,
+     type PositionPreviewResult,
+ } from '@/services/topologyEditorApi'
+@@
+ } from '@/utils/topology-validator'
+ import type { ValidationReport } from '@/utils/topology-validator'
++import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
+ import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+ import type { CutoffResult } from '@/utils/cutoff-simulator'
++import { MAINLINE_SCENARIOS } from '@/types/simulation'
+*** End Patch

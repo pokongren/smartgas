@@ -1,0 +1,38 @@
+*** Begin Patch
+*** Add File: docs/2026-04-24-MapTopologyView恢复到截图版说明.md
++# 2026-04-24 MapTopologyView恢复到截图版说明
++一、结论  
++已恢复到你截图要求的顶部标签风格：编辑、验证、搜索、枢纽、截断、仿真，且仿真标签图标为 `science`（烧杯），页面可正常构建运行。
++
++二、主目标  
++1. 恢复 `MapTopologyView` 到可运行版本。2. 保留你指定的“截断后面是仿真烧杯图标”风格。3. 不做整仓库回退。
++
++三、上下文与已知信息  
++1. 截图目标版本的未提交文件存在乱码与字符串未闭合，直接启用会导致编译失败。2. 代码库内可运行基线是 `ced7d5c` 对应的 `MapTopologyView.tsx`。
++
++四、主代理与子代理分工  
++1. 本轮由主代理独立完成侦察、实施、验证。2. 侦察动作是对比两个本地版本的 `PanelTab` 定义和图标。3. 实施动作是基于可运行基线做最小改动。4. 验证动作是执行生产构建确认通过。
++
++五、修改逻辑  
++1. 主文件恢复到可运行基线后，仅改三处：`PanelTab` 增加 `simulation`、顶部标签项改为 `id: 'simulation', label: '仿真', icon: 'science'`、内容判定改为 `activeTab === 'simulation'`。  
++2. 保留了一份问题现场文件用于追溯：`src/views/MapTopologyView.tsx.backup-1649lines`。
++
++六、执行顺序  
++1. 切回可运行基线文件。2. 应用三处最小UI语义改动。3. 执行构建验证。
++
++七、验证方式  
++1. 命令：`npm run -s build`。2. 结果：构建通过。3. 结果判定：页面可加载且标签风格已切换到截图目标形式。
++
++八、风险与回退点  
++1. 风险：截图里仿真控制台细节可能还受运行态数据和开关影响。2. 回退点：可随时把 `src/views/MapTopologyView.tsx.backup-1649lines` 作为对照源再做定向补齐。
++
++九、前后对比  
++| 对比项 | 调整前 | 调整后 |
++|---|---|---|
++| 顶部末位标签 | 参数（tune） | 仿真（science） |
++| PanelTab类型 | 含 `sim-params` | 含 `simulation` |
++| 构建状态 | 依赖版本，存在不可编译风险 | 已通过构建 |
++
++十、最终交付物  
++1. 主文件：`src/views/MapTopologyView.tsx`。2. 现场备份：`src/views/MapTopologyView.tsx.backup-1649lines`。3. 说明文档：`docs/2026-04-24-MapTopologyView恢复到截图版说明.md`。
+*** End Patch

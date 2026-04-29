@@ -1,0 +1,29 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     useEffect(() => {
+         if (editMode !== 'merge') {
+             if (selectedMergeNodeIds.length > 0) {
+                 setSelectedMergeNodeIds([])
+             }
++            if (mergeJunctionName) {
++                setMergeJunctionName('')
++            }
++            if (mergeJunctionDescription) {
++                setMergeJunctionDescription('')
++            }
+             paintMergeSelection(new Set())
+             return
+         }
+         paintMergeSelection(selectedMergeNodeSet)
+-    }, [editMode, paintMergeSelection, selectedMergeNodeIds.length, selectedMergeNodeSet, topoNodes])
++    }, [
++        editMode,
++        mergeJunctionDescription,
++        mergeJunctionName,
++        paintMergeSelection,
++        selectedMergeNodeIds.length,
++        selectedMergeNodeSet,
++        topoNodes,
++    ])
+*** End Patch

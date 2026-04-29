@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const selectedBaselineSnapshotSummary = useMemo(() => {
+         if (!steadyBaselineSnapshotRunId) return null
+         return steadySnapshots.find(item => item.run_id === steadyBaselineSnapshotRunId) ?? null
+     }, [steadyBaselineSnapshotRunId, steadySnapshots])
++    const trialCoverageSummary = useMemo(() => {
++        const coveredCount = steadyTrialRunItems.filter(item => item.covered).length
++        return {
++            coveredCount,
++            pendingCount: steadyTrialRunItems.length - coveredCount,
++        }
++    }, [steadyTrialRunItems])
+*** End Patch

@@ -1,0 +1,156 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const handleCreateJunction = useCallback(async () => {
+-        if (selectedMergeNodeIds.length < 2) {
+-            setStatusMsg('至少选择两个节点才能捏合')
++        const uniqueSelectedIds = [...new Set(selectedMergeNodeIds)]
++        const selectedNodes = baseTopoNodes.filter(node => uniqueSelectedIds.includes(node.id))
++
++        if (selectedNodes.length < 2) {
++            setStatusMsg('至少选择两个有效底层站点才能捏合')
+             return
+         }
+ 
+-        const selectedNodes = baseTopoNodes.filter(node => selectedMergeNodeIds.includes(node.id))
++        if (selectedNodes.length !== uniqueSelectedIds.length) {
++            setStatusMsg('当前选择中包含失效节点，请重新选择后再试')
++            return
++        }
++
++        const transientNodes = selectedNodes.filter(node => !persistedTopologyNodeIds.has(node.id))
++        if (transientNodes.length > 0) {
++            const transientNames = transientNodes.slice(0, 3).map(node => node.name).join('、')
++            const suffix = transientNodes.length > 3 ? ' 等节点' : ''
++            setStatusMsg(`当前选择包含临时节点：${transientNames}${suffix}，只能捏合已导入的真实站点`)
++            return
++        }
++
++        const occupiedNodeIds = new Set(junctionGroups.flatMap(group => group.station_ids))
++        const occupiedNodes = selectedNodes.filter(node => occupiedNodeIds.has(node.id))
++        if (occupiedNodes.length > 0) {
++            const occupiedNames = occupiedNodes.slice(0, 3).map(node => node.name).join('、')
++            const suffix = occupiedNodes.length > 3 ? ' 等站点' : ''
++            setStatusMsg(`所选站点中已有枢纽成员：${occupiedNames}${suffix}，请先拆分后再重组`)
++            return
++        }
++
++        const stationIds = selectedNodes.map(node => node.id)
+         const defaultName = selectedNodes.map(node => node.name).slice(0, 2).join('-') || `联合枢纽-${Date.now().toString().slice(-4)}`
+         const junctionName = window.prompt('请输入枢纽名称', `${defaultName}枢纽`)
+         if (!junctionName?.trim()) return
+ 
+         try {
+-            const res = await fetch(resolveApiPath('/api/topology/junctions'), {
+-                method: 'POST',
+-                headers: { 'Content-Type': 'application/json' },
+-                body: JSON.stringify({
+-                    name: junctionName.trim(),
+-                    station_ids: selectedMergeNodeIds,
+-                    description: 'MapTopologyView 创建',
+-                }),
++            const data = await topologyEditorApi.createJunctionGroup({
++                name: junctionName.trim(),
++                station_ids: stationIds,
++                description: 'MapTopologyView 创建',
+             })
+-            if (!res.ok) throw new Error(await res.text())
+-
+-            const data = await res.json()
+             invalidatePipelineCache()
+             await loadJunctionGroups()
+             setUndoStack(prev => [...prev, {
+                 type: 'create-junction',
+                 junctionId: data.id,
+                 name: junctionName.trim(),
+-                stationIds: [...selectedMergeNodeIds],
++                stationIds,
+             }])
+             setSelectedMergeNodeIds([])
+             setEditMode('view')
+-            setStatusMsg(`已捏合 ${selectedMergeNodeIds.length} 个节点为「${junctionName.trim()}」`)
++            setStatusMsg(`已捏合 ${stationIds.length} 个节点为「${junctionName.trim()}」`)
+         } catch (error) {
+             console.error(error)
+-            setStatusMsg('创建枢纽失败')
++            setStatusMsg(error instanceof Error ? `创建枢纽失败：${error.message}` : '创建枢纽失败')
+         }
+-    }, [baseTopoNodes, loadJunctionGroups, selectedMergeNodeIds])
++    }, [baseTopoNodes, junctionGroups, loadJunctionGroups, persistedTopologyNodeIds, selectedMergeNodeIds])
+ 
+-    const handleDeleteJunction = useCallback((group: JunctionGroup) => {
++    const handleDeleteJunction = useCallback(async (group: JunctionGroup) => {
+         if (!window.confirm(`确认拆分枢纽「${group.name}」，并恢复 ${group.station_ids.length} 个底层站点吗？`)) {
+             return
+         }
+-        ; (async () => {
+-            try {
+-                const res = await fetch(resolveApiPath(`/api/topology/junctions/${group.id}`), { method: 'DELETE' })
+-                if (!res.ok) throw new Error(await res.text())
+-                invalidatePipelineCache()
+-                await loadJunctionGroups()
+-                setUndoStack(prev => [...prev, { type: 'delete-junction', group }])
+-                setSelectedNode(null)
+-                setSelectedMergeNodeIds([])
+-                setStatusMsg(`枢纽「${group.name}」已拆分`)
+-            } catch (error) {
+-                console.error(error)
+-                setStatusMsg('拆分枢纽失败')
+-            }
+-        })()
++        try {
++            const result = await topologyEditorApi.deleteJunctionGroup(group.id)
++            invalidatePipelineCache()
++            await loadJunctionGroups()
++            setUndoStack(prev => [...prev, { type: 'delete-junction', group }])
++            setSelectedNode(null)
++            setSelectedMergeNodeIds([])
++            setStatusMsg(result.message || `枢纽「${group.name}」已拆分`)
++        } catch (error) {
++            console.error(error)
++            setStatusMsg(error instanceof Error ? `拆分枢纽失败：${error.message}` : '拆分枢纽失败')
++        }
+     }, [loadJunctionGroups])
+@@
+         } else if (action.type === 'create-junction') {
+             try {
+-                const res = await fetch(resolveApiPath(`/api/topology/junctions/${action.junctionId}`), { method: 'DELETE' })
+-                if (!res.ok) throw new Error(await res.text())
++                await topologyEditorApi.deleteJunctionGroup(action.junctionId)
+                 invalidatePipelineCache()
+                 await loadJunctionGroups()
+                 setSelectedNode(null)
+                 setStatusMsg(`已撤销: 拆分枢纽「${action.name}」`)
+             } catch (error) {
+                 console.error(error)
+-                setStatusMsg('撤销枢纽创建失败')
++                setStatusMsg(error instanceof Error ? `撤销枢纽创建失败：${error.message}` : '撤销枢纽创建失败')
+             }
+         } else if (action.type === 'delete-junction') {
+             try {
+-                const res = await fetch(resolveApiPath('/api/topology/junctions'), {
+-                    method: 'POST',
+-                    headers: { 'Content-Type': 'application/json' },
+-                    body: JSON.stringify({
+-                        name: action.group.name,
+-                        station_ids: action.group.station_ids,
+-                        description: action.group.description,
+-                    }),
++                await topologyEditorApi.createJunctionGroup({
++                    name: action.group.name,
++                    station_ids: action.group.station_ids,
++                    description: action.group.description ?? undefined,
+                 })
+-                if (!res.ok) throw new Error(await res.text())
+                 invalidatePipelineCache()
+                 await loadJunctionGroups()
+                 setStatusMsg(`已撤销: 恢复枢纽「${action.group.name}」`)
+             } catch (error) {
+                 console.error(error)
+-                setStatusMsg('撤销枢纽拆分失败')
++                setStatusMsg(error instanceof Error ? `撤销枢纽拆分失败：${error.message}` : '撤销枢纽拆分失败')
+             }
+         }
+-    }, [baseTopoNodes, loadJunctionGroups, undoStack])
++    }, [baseTopoNodes, loadJunctionGroups, undoStack])
+*** End Patch

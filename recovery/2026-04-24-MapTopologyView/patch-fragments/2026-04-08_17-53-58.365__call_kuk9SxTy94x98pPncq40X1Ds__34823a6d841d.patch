@@ -1,0 +1,34 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     function applyLatestCoveredSnapshotAsBaseline() {
+         if (!latestCoveredSnapshotSummary) {
+             setStatusMsg('褰撳墠杩樻病鏈夋渶杩戠暀妗ｅ揩鐓э紝鍏堣窇涓€鏉″満鏅啀璁惧熀绾?)
+             return
+         }
+         setSteadyBaselineSnapshotRunId(latestCoveredSnapshotSummary.run_id)
+         setStatusMsg(`宸叉妸鏈€杩戠暀妗ｅ揩鐓ц涓哄熀绾匡細${latestCoveredSnapshotSummary.scenario_id}`)
+     }
++
++    const openTopologyShowcase = useCallback(() => {
++        writeSimulationShowcaseSyncContext({
++            source: 'map-topology',
++            pilotId: WE1_PRIMARY_PILOT_ID,
++            scenarioId: steadyOverlay?.scenario_id ?? steadyScenarioId,
++            selectedSnapshotRunId: steadySelectedSnapshotRunId,
++            baselineSnapshotRunId: steadyBaselineSnapshotRunId,
++            overlay: steadyOverlay,
++            updatedAt: new Date().toISOString(),
++        })
++        setStatusMsg('已把当前主仿真上下文带到第三张图展示页')
++        navigate('/topology')
++    }, [
++        navigate,
++        steadyBaselineSnapshotRunId,
++        steadyOverlay,
++        steadyScenarioId,
++        steadySelectedSnapshotRunId,
++    ])
+ 
+     // ================== 娓叉煋 ==================
+*** End Patch

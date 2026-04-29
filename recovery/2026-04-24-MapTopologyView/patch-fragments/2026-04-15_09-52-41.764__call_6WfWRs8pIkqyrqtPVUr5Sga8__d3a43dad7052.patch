@@ -1,0 +1,42 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const copySimulationStructuredBrief = useCallback(async () => {
+         try {
+             await navigator.clipboard.writeText(JSON.stringify(simulationStructuredBrief, null, 2))
+             setStatusMsg('仿真结构化简报已复制，可直接贴给 AI 继续分析')
+         } catch (error) {
+             setStatusMsg(error instanceof Error ? error.message : '复制结构化简报失败')
+         }
+     }, [simulationStructuredBrief])
++    const sendSimulationToAiAnalysis = useCallback(() => {
++        const scenarioLabel = steadyScenarioOption?.label ?? steadyScenarioId
++        const structured = JSON.stringify(simulationStructuredBrief, null, 2)
++        const prompt = [
++            `请基于 WE1 主仿真结果做专业分析，场景：${scenarioLabel}。`,
++            '请按以下结构输出：',
++            '1. 运行结论（是否稳定、风险等级）',
++            '2. 关键异常（压力、流量、告警、映射命中）',
++            '3. 相对基线变化与解释',
++            '4. 建议动作（立即动作、短期动作）',
++            '',
++            '仿真人话简报：',
++            simulationNarrativePlain,
++            '',
++            '仿真结构化结果(JSON)：',
++            structured,
++        ].join('\n')
++
++        window.dispatchEvent(
++            new CustomEvent('assistant-send-message', {
++                detail: {
++                    message: prompt,
++                    autoOpen: true,
++                },
++            }),
++        )
++        setStatusMsg('已将仿真结果发送给 AI，正在生成分析结论')
++    }, [simulationNarrativePlain, simulationStructuredBrief, steadyScenarioId, steadyScenarioOption?.label])
+     useEffect(() => {
+         const cutoffContext: Record<string, any> = {}
+*** End Patch

@@ -1,0 +1,17 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+     const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
+     const [isPreviewing, setIsPreviewing] = useState(false)
+     const [lineFlowPhase, setLineFlowPhase] = useState(0)
++    const [animatedNodeOutPressure, setAnimatedNodeOutPressure] = useState<Map<string, number>>(new Map())
+     const [damageFlashVisible, setDamageFlashVisible] = useState(false)
+     const [isMapInteracting, setIsMapInteracting] = useState(false)
+     const [renderSafetyMode, setRenderSafetyMode] = useState<'full' | 'lite'>('full')
+@@
+     const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
+     const lastNodeContentRef = useRef<Map<string, string>>(new Map())
+     const lastEdgeOptionsRef = useRef<Map<string, string>>(new Map())
++    const pressureAnimationFrameRef = useRef<number | null>(null)
++    const pressureAnimationTargetRef = useRef<Map<string, number>>(new Map())
+*** End Patch

@@ -1,0 +1,106 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+                                 {editMode === 'draw-point' && (
+                                     <div>
+                                         <p className="text-[10px] text-gray-500 mb-1.5 uppercase tracking-wider">节点类型</p>
+                                         <div className="grid grid-cols-2 gap-1.5">
+                                             {(Object.keys(TOPO_LABELS) as PointType[]).map(key => (
+@@
+                                         </div>
+                                     </div>
+                                 )}
++
++                                {editMode === 'merge' && (
++                                    <div className="border border-purple-500/20 bg-purple-950/20 rounded-lg p-2.5 space-y-2">
++                                        <div className="flex items-center justify-between gap-3">
++                                            <p className="text-[10px] text-purple-300 uppercase tracking-wider">手工捏合</p>
++                                            <span className="text-[10px] text-purple-400">已选 {selectedMergeNodeIds.length} 站</span>
++                                        </div>
++                                        <p className="text-xs text-gray-300 leading-5">
++                                            这块是修正入口。点地图上的底层站点，把需要归成同一个枢纽的站选出来，再创建覆盖层。
++                                            运行时重编结果继续作为底座，手工捏合只覆盖你明确选中的站点。
++                                        </p>
++                                        <input
++                                            value={mergeJunctionName}
++                                            onChange={e => setMergeJunctionName(e.target.value)}
++                                            placeholder={selectedMergeAutoName || '给这次手工捏合起个名字'}
++                                            className="w-full rounded-lg border border-purple-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none focus:border-purple-400"
++                                        />
++                                        <textarea
++                                            value={mergeJunctionDescription}
++                                            onChange={e => setMergeJunctionDescription(e.target.value)}
++                                            placeholder="可选：写下修正原因，后面复盘更容易看懂"
++                                            rows={3}
++                                            className="w-full resize-none rounded-lg border border-purple-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none focus:border-purple-400"
++                                        />
++                                        <div className="rounded-lg bg-black/20 p-2">
++                                            <div className="flex items-center justify-between text-[10px] text-gray-400">
++                                                <span>本次选中的站点</span>
++                                                <button
++                                                    type="button"
++                                                    onClick={() => setSelectedMergeNodeIds([])}
++                                                    disabled={selectedMergeNodeIds.length === 0}
++                                                    className="text-gray-400 hover:text-white disabled:opacity-40"
++                                                >
++                                                    清空
++                                                </button>
++                                            </div>
++                                            <div className="mt-2 max-h-28 space-y-1 overflow-y-auto">
++                                                {selectedMergeNodes.length > 0 ? selectedMergeNodes.map(node => (
++                                                    <div key={node.id} className="flex items-center gap-2 rounded bg-white/5 px-2 py-1 text-xs text-gray-200">
++                                                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: TOPO_COLORS[node.type] }} />
++                                                        <span className="flex-1 truncate">{node.name}</span>
++                                                        <span className="text-[10px] text-gray-500">{node.id}</span>
++                                                    </div>
++                                                )) : (
++                                                    <div className="rounded bg-white/5 px-2 py-2 text-xs text-gray-500">
++                                                        还没选站点。先去地图上点两个及以上底层站点。
++                                                    </div>
++                                                )}
++                                            </div>
++                                        </div>
++                                        <button
++                                            onClick={() => void handleCreateManualJunction()}
++                                            disabled={selectedMergeNodeIds.length < 2 || isMerging}
++                                            className="w-full bg-purple-700/80 hover:bg-purple-600 text-white py-2 rounded-lg text-xs transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
++                                        >
++                                            <span className="material-symbols-outlined text-sm">hub</span>
++                                            {isMerging ? '创建中...' : '创建手工捏合枢纽'}
++                                        </button>
++                                        <div className="rounded-lg border border-white/10 bg-black/10 p-2">
++                                            <div className="flex items-center justify-between text-[10px] text-gray-400">
++                                                <span>当前可拆分的手工捏合</span>
++                                                <span>{manualEditableJunctionGroups.length} 个</span>
++                                            </div>
++                                            <div className="mt-2 max-h-32 space-y-1 overflow-y-auto">
++                                                {manualEditableJunctionGroups.length > 0 ? manualEditableJunctionGroups.map(group => (
++                                                    <div key={group.id} className="rounded bg-white/5 px-2 py-2">
++                                                        <div className="flex items-center gap-2">
++                                                            <span className="flex-1 truncate text-xs text-gray-200">{group.name}</span>
++                                                            <button
++                                                                type="button"
++                                                                onClick={() => void handleDeleteManualJunction(group)}
++                                                                disabled={deletingJunctionId === group.id}
++                                                                className="text-[10px] text-red-300 hover:text-red-200 disabled:opacity-40"
++                                                            >
++                                                                {deletingJunctionId === group.id ? '拆分中...' : '拆分'}
++                                                            </button>
++                                                        </div>
++                                                        <div className="mt-1 text-[10px] text-gray-500">
++                                                            覆盖 {group.member_count ?? group.station_ids.length} 个站点
++                                                        </div>
++                                                    </div>
++                                                )) : (
++                                                    <div className="rounded bg-white/5 px-2 py-2 text-xs text-gray-500">
++                                                        现在没有手工捏合覆盖层。
++                                                    </div>
++                                                )}
++                                            </div>
++                                        </div>
++                                    </div>
++                                )}
+ 
+ 
+                                 <div className="border border-cyan-500/20 bg-cyan-950/20 rounded-lg p-2.5 space-y-2">
+*** End Patch

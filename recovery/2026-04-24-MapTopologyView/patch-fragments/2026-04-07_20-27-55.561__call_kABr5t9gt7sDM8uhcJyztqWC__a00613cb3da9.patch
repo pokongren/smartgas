@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const [simDrawerVisible, setSimDrawerVisible] = useState(false)
+-    const [isSimulating, setIsSimulating] = useState(false)
+-    const [simResults, setSimResults] = useState<SimulationResult[]>([])
+-    const [currentSimStep, setCurrentSimStep] = useState(0)
+     const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
+*** End Patch

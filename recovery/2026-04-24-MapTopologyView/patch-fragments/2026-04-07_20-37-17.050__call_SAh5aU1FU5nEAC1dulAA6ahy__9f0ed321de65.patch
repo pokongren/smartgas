@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const steadyOverlayStatusText = steadyOverlay
+         ? `ä¸»ä»¿çœ?${steadyScenarioOption?.label ?? steadyOverlay.scenario_id} Â· ${SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}`
+         : 'ä¸»ä»¿çœŸè¿˜æ²¡è¿è¡?
++    const simulationRunStateText = steadySimLoading ? 'running' : steadyOverlay ? 'ready' : 'idle'
++    const simulationSnapshotCountText = `${steadySnapshots.length}`
++    const simulationHitFocusText = simulationHitFocus ? 'on' : 'off'
+     const simulationEntryHint = steadyOverlay
+         ? 'ç¬¬ä¸€å¼ å›¾å·²ç»æŽ¥ä¸Šå½“å‰ä¸»ä»¿çœŸç»“æžœï¼Œå…ˆçœ‹åœºæ™¯æ‘˜è¦ï¼Œå†çœ‹è¦†ç›–ç»“æžœæ¸…å•ã€?
+         : 'å…ˆåˆ‡åœºæ™¯å¹¶è¿è¡Œæ­£å¼ä»¿çœŸï¼Œç­‰ç»“æžœå‡ºæ¥åŽå†åšå¿«ç…§ã€å¯¹æ¯”å’Œè¦†ç›–è¡¥è·‘ã€?
+*** End Patch

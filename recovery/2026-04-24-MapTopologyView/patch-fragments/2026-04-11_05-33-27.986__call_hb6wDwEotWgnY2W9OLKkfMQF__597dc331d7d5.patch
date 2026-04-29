@@ -1,0 +1,20 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    // ================== 鏀堕泦鍏ㄩ儴绠＄嚎鍘熷鏁版嵁锛堜笉浼犵粰 MapView锛屼粎渚涘鍏ョ敤锛?==================
++    useEffect(() => {
++        if (!steadyOverlay?.run_id) return
++        setDamageFlashVisible(true)
++        const timer = window.setTimeout(() => setDamageFlashVisible(false), 4500)
++        return () => window.clearTimeout(timer)
++    }, [steadyOverlay?.run_id])
++    useEffect(() => {
++        if (!steadyOverlay) return
++        const timer = window.setInterval(() => {
++            setLineFlowPhase(prev => (prev + 2) % 1000)
++        }, 120)
++        return () => window.clearInterval(timer)
++    }, [steadyOverlay?.run_id])
++
++    // ================== 鏀堕泦鍏ㄩ儴绠＄嚎鍘熷鏁版嵁锛堜笉浼犵粰 MapView锛屼粎渚涘鍏ョ敤锛?==================
+*** End Patch

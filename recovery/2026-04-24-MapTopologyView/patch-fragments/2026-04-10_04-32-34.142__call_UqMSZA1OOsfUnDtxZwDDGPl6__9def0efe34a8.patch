@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ function formatDateTimeLabel(value?: string): string {
+     if (!value) return '-'
+     const date = new Date(value)
+     if (Number.isNaN(date.getTime())) return value
+     return date.toLocaleString('zh-CN', { hour12: false })
+ }
++
++function estimateTemperatureByPressure(pressureMpa: number): number {
++    return Number((13 + pressureMpa * 1.7).toFixed(1))
++}
+*** End Patch

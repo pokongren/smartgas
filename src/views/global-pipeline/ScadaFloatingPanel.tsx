@@ -35,18 +35,14 @@ export const ScadaFloatingPanel: React.FC<ScadaFloatingPanelProps> = ({
 
     return (
         <div
-            className={`absolute z-10 flex flex-col select-none overflow-hidden ${isDragging ? 'cursor-grabbing' : ''}`}
+            className={`absolute z-10 glass-panel neon-border rounded-xl flex flex-col select-none overflow-hidden transition-all duration-300 ${isDragging ? 'cursor-grabbing scale-[1.02] shadow-2xl' : ''}`}
             style={{
                 width: '480px',
                 height: '310px',
-                background,
-                backdropFilter: 'blur(12px)',
-                borderRadius: '10px',
-                border: `1px solid ${borderColor}`,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)',
                 ...style,
             }}
         >
+
             <div style={{ height: '3px', background: topBarGradient, borderRadius: '10px 10px 0 0', opacity: 0.9 }} />
             <div
                 className={`px-4 py-2.5 flex justify-between items-center shrink-0 ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}

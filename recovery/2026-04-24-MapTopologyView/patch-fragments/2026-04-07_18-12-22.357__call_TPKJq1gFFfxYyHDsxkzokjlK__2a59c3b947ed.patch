@@ -1,0 +1,42 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-        for (const [startId, endId] of edgePairs) {
+-            const sNode = importedMap.get(startId)
+-            const eNode = importedMap.get(endId)
++        for (const { startNodeId, endNodeId, sourceEdgeIds } of collapsedEdges.values()) {
++            const sNode = importedMap.get(startNodeId)
++            const eNode = importedMap.get(endNodeId)
+             if (!sNode || !eNode) continue
+-            const edgeId = `ce-${startId.slice(-4)}-${endId.slice(-4)}`
+-            importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} 鈫?${eNode.name}` })
++            const edgeId = `ce-${startNodeId.slice(-4)}-${endNodeId.slice(-4)}`
++            importedEdges.push({
++                id: edgeId,
++                startNodeId,
++                endNodeId,
++                name: `${sNode.name} 鈫?${eNode.name}`,
++                sourceEdgeIds,
++            })
+         }
+@@
+     const stats = useMemo(() => ({
+         nodes: topoNodes.length,
+         edges: topoEdges.length,
+         isolated: topoNodes.length > 0
+             ? findIsolatedNodes(
+@@
+             ).length
+             : 0,
+     }), [topoNodes, topoEdges])
++    const simulationMapping = useMemo(() => {
++        return buildSimulationOverlayMapping(topoNodes, topoEdges, steadyOverlay)
++    }, [steadyOverlay, topoEdges, topoNodes])
++    const selectedNodeSimulationMatch = useMemo(() => {
++        if (!selectedNode || !simulationMapping) return null
++        return simulationMapping.nodeMatchesByDisplayId.get(selectedNode.id) ?? null
++    }, [selectedNode, simulationMapping])
++    const mappingSummary = simulationMapping?.summary ?? null
++    const unmatchedNodePreview = mappingSummary?.unmatchedOverlayNodeIds.slice(0, 5) ?? []
++    const unmatchedEdgePreview = mappingSummary?.unmatchedOverlayEdgeIds.slice(0, 5) ?? []
+*** End Patch

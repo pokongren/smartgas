@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+     const [showSimParamEditor, setShowSimParamEditor] = useState(false)
++    const [showSnapshotPressureOverlay, setShowSnapshotPressureOverlay] = useState(false)
+*** End Patch

@@ -1,0 +1,40 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                     <div className="grid grid-cols-1 gap-2">
+@@
+                                         <div>
+                                             <div className="mb-1 text-[10px] text-gray-500">基线快照</div>
+                                             <select value={steadyBaselineSnapshotRunId} onChange={event => setSteadyBaselineSnapshotRunId(event.target.value)} className="w-full rounded-lg border border-violet-500/20 bg-black/20 px-3 py-2 text-xs text-white outline-none">
+                                                 <option value="">请选择基线快照</option>
+                                                 {steadySnapshots.map(item => <option key={`baseline-${item.run_id}`} value={item.run_id}>{item.scenario_id} | {item.run_id.slice(0, 12)} | {formatDateTimeLabel(item.saved_at)}</option>)}
+                                             </select>
+                                         </div>
+                                     </div>
++                                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-3 space-y-2">
++                                        <label className="flex items-center justify-between gap-3 text-xs text-emerald-100">
++                                            <span>仿真前写入压力/温度/流量</span>
++                                            <input type="checkbox" checked={preSimInputEnabled} onChange={event => setPreSimInputEnabled(event.target.checked)} className="h-4 w-4 accent-emerald-400" />
++                                        </label>
++                                        <div className="grid grid-cols-3 gap-2">
++                                            <label className="space-y-1 text-[10px] text-gray-400">
++                                                <span>默认压力(MPa)</span>
++                                                <input type="number" step="0.1" value={preSimDefaultPressureMpa} onChange={event => setPreSimDefaultPressureMpa(Number(event.target.value))} disabled={!preSimInputEnabled} className="w-full rounded border border-emerald-500/20 bg-black/20 px-2 py-1 text-xs text-white outline-none disabled:opacity-40" />
++                                            </label>
++                                            <label className="space-y-1 text-[10px] text-gray-400">
++                                                <span>默认温度(°C)</span>
++                                                <input type="number" step="0.1" value={preSimDefaultTemperatureC} onChange={event => setPreSimDefaultTemperatureC(Number(event.target.value))} disabled={!preSimInputEnabled} className="w-full rounded border border-emerald-500/20 bg-black/20 px-2 py-1 text-xs text-white outline-none disabled:opacity-40" />
++                                            </label>
++                                            <label className="space-y-1 text-[10px] text-gray-400">
++                                                <span>默认流量(万方/天)</span>
++                                                <input type="number" step="1" value={preSimDefaultFlowRate} onChange={event => setPreSimDefaultFlowRate(Number(event.target.value))} disabled={!preSimInputEnabled} className="w-full rounded border border-emerald-500/20 bg-black/20 px-2 py-1 text-xs text-white outline-none disabled:opacity-40" />
++                                            </label>
++                                        </div>
++                                        <label className="flex items-center gap-2 text-[11px] text-gray-300">
++                                            <input type="checkbox" checked={preSimApplyToSources} onChange={event => setPreSimApplyToSources(event.target.checked)} disabled={!preSimInputEnabled} className="h-3.5 w-3.5 accent-emerald-400 disabled:opacity-40" />
++                                            <span>同时覆盖源站压力</span>
++                                        </label>
++                                        <div className="text-[10px] text-gray-400">关闭开关时，系统自动使用后端默认压力与温度估算。</div>
++                                    </div>
+                                     {false && (<div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2 space-y-2">
+*** End Patch

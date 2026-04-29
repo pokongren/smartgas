@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-    }, [simulationMapping, baselineSimulationMapping, topoNodes, cutoffNodeId, selectedMergeNodeIds, activeTab, cutoffResult, isBreakScenarioActive, nodePressureDeltaMap, damageFlashVisible, isMapInteracting, renderSafetyMode, seedNodePressures, animatedNodeOutPressure])
++    }, [simulationMapping, baselineSimulationMapping, topoNodes, cutoffNodeId, selectedMergeNodeIds, activeTab, cutoffResult, isBreakScenarioActive, nodePressureDeltaMap, damageFlashVisible, isMapInteracting, renderSafetyMode, seedNodePressures, animatedNodeOutPressure, showSnapshotPressureOverlay])
+*** End Patch

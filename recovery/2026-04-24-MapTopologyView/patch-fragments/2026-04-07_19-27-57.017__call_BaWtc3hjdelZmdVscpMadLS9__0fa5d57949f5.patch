@@ -1,0 +1,127 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ interface TopoNode {
+     id: string
+     type: PointType
+     name: string
+     position: [number, number]
+     sourceNodeIds?: string[]
++    internalSourceEdgeIds?: string[]
+     junctionId?: number
+     isJunction?: boolean
+     junctionKind?: string
+     sourceTable?: string
+     marker?: any
+@@
+ function formatSnapshotOption(runId: string, scenarioId: string, savedAt: string): string {
+     return `${scenarioId} | ${runId.slice(0, 12)} | ${savedAt.slice(11, 19)}`
+ }
++
++function formatDateTimeLabel(value?: string): string {
++    if (!value) return '-'
++
++    const date = new Date(value)
++    if (Number.isNaN(date.getTime())) return value
++
++    return date.toLocaleString('zh-CN', {
++        hour12: false,
++    })
++}
++
++const ALERT_LEVEL_LABELS: Record<'normal' | 'warning' | 'critical', string> = {
++    normal: '正常',
++    warning: '预警',
++    critical: '严重',
++}
++
++const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
++    converged: '已收敛',
++    max_iter: '达到迭代上限',
++    error: '求解失败',
++}
+@@
+-    // 仿真状态 (Sim Status)
+-    const [simDrawerVisible, setSimDrawerVisible] = useState(false)
+-    const [isSimulating, setIsSimulating] = useState(false)
+-    const [simResults, setSimResults] = useState<SimulationResult[]>([])
+-    const [currentSimStep, setCurrentSimStep] = useState(0)
+     const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
+@@
+     ) => {
+         const stationToDisplayId = new Map<string, string>()
+         const displayNodes: TopoNode[] = []
++        const displayNodeMap = new Map<string, TopoNode>()
+ 
+         groups.forEach(group => {
+             const memberNodes = nodes.filter(node => group.station_ids.includes(node.id))
+             if (memberNodes.length === 0) return
+@@
+-            displayNodes.push({
++            const junctionNode: TopoNode = {
+                 id: junctionNodeId,
+                 name: group.name,
+                 type: 'junction',
+                 position: [centerLng, centerLat],
+                 sourceNodeIds: [...group.station_ids],
++                internalSourceEdgeIds: [],
+                 junctionId: group.id,
+                 isJunction: true,
+                 junctionKind: group.junction_kind,
+                 sourceTable: group.source_table,
+-            })
++            }
++            displayNodes.push(junctionNode)
++            displayNodeMap.set(junctionNodeId, junctionNode)
+         })
+ 
+         nodes.forEach(node => {
+             if (stationToDisplayId.has(node.id)) return
+-            displayNodes.push({
++            const displayNode: TopoNode = {
+                 ...node,
+                 sourceNodeIds: [node.id],
++                internalSourceEdgeIds: [],
+                 isJunction: false,
+-            })
++            }
++            displayNodes.push(displayNode)
++            displayNodeMap.set(node.id, displayNode)
+         })
+ 
+         const collapsedEdgeMap = new Map<string, TopoEdge>()
+         edges.forEach(edge => {
+             const startNodeId = stationToDisplayId.get(edge.startNodeId) ?? edge.startNodeId
+             const endNodeId = stationToDisplayId.get(edge.endNodeId) ?? edge.endNodeId
+-            if (startNodeId === endNodeId) return
++            const nextSourceEdgeIds = edge.sourceEdgeIds?.length ? edge.sourceEdgeIds : [edge.id]
++            if (startNodeId === endNodeId) {
++                const ownerNode = displayNodeMap.get(startNodeId)
++                if (ownerNode) {
++                    ownerNode.internalSourceEdgeIds = [
++                        ...new Set([...(ownerNode.internalSourceEdgeIds ?? []), ...nextSourceEdgeIds]),
++                    ]
++                }
++                return
++            }
+ 
+             const sorted = [startNodeId, endNodeId].sort()
+             const key = `${sorted[0]}__${sorted[1]}`
+             const existing = collapsedEdgeMap.get(key)
+-            const nextSourceEdgeIds = edge.sourceEdgeIds?.length ? edge.sourceEdgeIds : [edge.id]
+             if (existing) {
+                 existing.sourceEdgeIds = [...new Set([...(existing.sourceEdgeIds ?? []), ...nextSourceEdgeIds])]
+                 return
+             }
+@@
+     const mappingSummary = simulationMapping?.summary ?? null
+     const unmatchedNodePreview = mappingSummary?.unmatchedOverlayNodeIds.slice(0, 5) ?? []
+     const unmatchedEdgePreview = mappingSummary?.unmatchedOverlayEdgeIds.slice(0, 5) ?? []
++    const steadyScenarioOption = useMemo(() => {
++        return MAINLINE_SCENARIOS.find(item => item.id === steadyScenarioId) ?? null
++    }, [steadyScenarioId])
++    const selectedSnapshotSummary = useMemo(() => {
++        if (!steadySelectedSnapshotRunId) return null
++        return steadySnapshots.find(item => item.run_id === steadySelectedSnapshotRunId) ?? null
++    }, [steadySelectedSnapshotRunId, steadySnapshots])
+*** End Patch

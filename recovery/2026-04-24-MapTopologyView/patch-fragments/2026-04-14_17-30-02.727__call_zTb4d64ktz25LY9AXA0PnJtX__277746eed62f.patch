@@ -1,0 +1,33 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+         topoNodes.forEach(node => {
+             if (!node.marker) return
++            const allowFancyNodeEffect = renderSafetyMode === 'full' && !isMapInteracting
+@@
+-            const shouldPulseCore = isCriticalAlert || (isBreakScenarioActive && node.id === 'WE1-76')
++            const shouldPulseCore = allowFancyNodeEffect && (isCriticalAlert || (isBreakScenarioActive && node.id === 'WE1-76'))
+             const pressureDelta = nodePressureDeltaMap.get(node.id)
+-            const showDamage = !isMapInteracting && damageFlashVisible && typeof pressureDelta === 'number' && pressureDelta < -0.01
++            const showDamage = allowFancyNodeEffect && damageFlashVisible && typeof pressureDelta === 'number' && pressureDelta < -0.01
+@@
+         topoEdges.forEach(edge => {
+             if (!edge.poly) return
++            const allowFancyEdgeEffect = renderSafetyMode === 'full' && !isMapInteracting
+             const match = simulationMapping.edgeMatchesByDisplayId.get(edge.id)
+@@
+-            if (hasFlow || isDashed) {
++            if (allowFancyEdgeEffect && (hasFlow || isDashed)) {
+                 edgeOptions.strokeDasharray = [10, 12]
+-                edgeOptions.strokeDashoffset = isMapInteracting ? 0 : -Math.round(lineFlowPhase * flowSpeed)
++                edgeOptions.strokeDashoffset = -Math.round(lineFlowPhase * flowSpeed)
++            } else if (hasFlow || isDashed) {
++                edgeOptions.strokeDasharray = [10, 12]
++                edgeOptions.strokeDashoffset = 0
+             }
+             safeSetPolylineOptions(edge.poly, edgeOptions)
+         })
+ 
+-    }, [simulationMapping, topoNodes, topoEdges, cutoffNodeId, selectedMergeNodeIds, activeTab, cutoffResult, lineFlowPhase, isBreakScenarioActive, nodePressureDeltaMap, damageFlashVisible, isMapInteracting])
++    }, [simulationMapping, topoNodes, topoEdges, cutoffNodeId, selectedMergeNodeIds, activeTab, cutoffResult, lineFlowPhase, isBreakScenarioActive, nodePressureDeltaMap, damageFlashVisible, isMapInteracting, renderSafetyMode])
+*** End Patch

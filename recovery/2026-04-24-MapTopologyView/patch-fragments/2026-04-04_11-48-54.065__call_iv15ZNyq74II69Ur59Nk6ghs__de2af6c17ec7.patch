@@ -1,0 +1,334 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\docs\2026-04-04-阶段3-编辑器只读化总结_人话版.md
++# 阶段 3 干了什么：把编辑器里的手工枢纽入口正式降级成只读
++
++## 改动目标
++
++把“运行时枢纽已经接管事实来源，但前端编辑器还在暴露手工捏合入口”这件事收口。
++
++这一步的目标很明确：
++
++- 枢纽继续参与拓扑展示和计算
++- 但编辑器默认不再把“手工创建 / 手工拆分 / 手工合并枢纽”当主流程
++- 真要临时放开，仍然可以靠后端开关回退
++
++## 改动前的问题
++
++前面阶段已经把后端主链路切到 `junction_groups_rebuilt` 了，但编辑器侧还有两类旧入口没收干净：
++
++1. `MapTopologyView.tsx`
++   - 还显示“捏合”“创建枢纽”“解除捏合”“加入待捏合列表”
++   - 用户会误以为枢纽还是靠手工维护
++
++2. `TopologyView.tsx`
++   - 右键多选节点后，仍然能看到“合并为大枢纽”
++   - 这和新的运行时规则直接冲突
++
++## 这次具体做了什么
++
++### 1) 编辑器接口改成“读运行时结果 + 写接口默认 409”
++
++文件：
++
++- `F:\smartgas-grid\backend\app\routers\topology_editor.py`
++
++处理方式：
++
++- `GET /api/topology/junctions` 现在直接返回运行时枢纽结果
++- 同时返回：
++  - `manual_editing_enabled`
++  - `mode`
++- `POST /junctions`
++- `DELETE /junctions/{id}`
++- `POST /merge-stations`
++
++这些写操作在默认配置下会直接返回 `409`，并给出只读提示。
++
++### 2) 地图拓扑编辑器改成“运行时枢纽只读查看”
++
++文件：
++
++- `F:\smartgas-grid\src\views\MapTopologyView.tsx`
++
++主要改动：
++
++- 默认隐藏“捏合”模式入口
++- 默认不再允许 `Shift` 多选去拼枢纽
++- 新增“运行时枢纽”信息卡，直接展示：
++  - 当前模式
++  - 枢纽数量
++  - 大枢纽数量
++  - 覆盖站点数
++- 选中枢纽时：
++  - 仍可看底层成员
++  - 仍可看枢纽历史
++  - 但默认不再显示“解除捏合”按钮
++- 选中普通站点时：
++  - 默认不再显示“加入待捏合列表”
++  - 改成只读说明
++
++### 3) 老 Canvas 拓扑页去掉“手工合并”侧门
++
++文件：
++
++- `F:\smartgas-grid\src\views\TopologyView.tsx`
++
++处理方式：
++
++- 右键菜单不再执行“合并为大枢纽”
++- 改成只读提示：
++  - 当前选中了多少个节点
++  - 枢纽关系由后台按交汇规则运行时重编
++  - 这个页面不再支持手工合并
++
++## 改动后的结果
++
++现在编辑器的语义终于对齐了：
++
++- 枢纽仍然存在，而且继续用于拓扑结构
++- 但枢纽事实来源已经明确是运行时重编结果
++- 前端不再默认鼓励用户用手工捏合去改主事实
++
++这就满足了“要用枢纽完成拓扑结构”，同时又把旧的人肉维护路径降成例外能力。
++
++## 为什么这么做
++
++原因很简单。
++
++如果后端说“枢纽是运行时重编的”，前端却还把“创建枢纽 / 解除捏合”摆在主按钮上，团队后面一定会反复混淆：
++
++- 到底谁才是主事实
++- 出问题该看影子表还是看手工编辑结果
++
++这一步就是把这个口径彻底统一。
++
++## 影响范围
++
++改动文件：
++
++- `F:\smartgas-grid\backend\app\routers\topology_editor.py`
++- `F:\smartgas-grid\src\views\MapTopologyView.tsx`
++- `F:\smartgas-grid\src\views\TopologyView.tsx`
++
++## 验证方式
++
++1. 前端 `vite build`
++2. 后端 `py_compile`
++3. 实际检查编辑器接口返回结构
++4. 人工复核关键交互是否还暴露手工枢纽入口
++
++## 验证结果
++
++已验证通过：
++
++- `npm --prefix F:\smartgas-grid run build` 通过
++- `python -m py_compile` 覆盖相关后端文件通过
++- `GET /api/topology/junctions` 已能返回：
++  - `junctions`
++  - `manual_editing_enabled`
++  - `mode`
++- 编辑器默认只读模式下：
++  - 不再显示“创建枢纽”主入口
++  - 不再显示“解除捏合”主入口
++  - 不再保留“合并为大枢纽”右键动作
++
++## 前后对比
++
++这一步没有放截图。
++
++原因：
++
++- 本次改动的重点不是一个固定界面长相
++- 而是“是否还允许手工改枢纽事实”的交互语义
++
++所以这里用表格替代：
++
++| 对比项 | 改前 | 改后 |
++| --- | --- | --- |
++| 地图拓扑编辑器 | 还暴露捏合/创建/拆分枢纽 | 默认只读查看运行时枢纽 |
++| 站点详情侧栏 | 可加入待捏合列表 | 默认改成只读说明 |
++| 枢纽详情侧栏 | 可直接解除捏合 | 默认仅保留成员查看和历史查看 |
++| Canvas 拓扑页右键 | 可“合并为大枢纽” | 改成只读提示 |
++| 编辑器后端接口 | 看起来还能直接写 | 默认写接口 409，读接口返回运行时模式信息 |
++
++## 风险点
++
++- 目前是“默认只读 + 保留开关回退”，不是物理删除旧代码
++- 如果后面临时打开 `TOPOLOGY_MANUAL_JUNCTION_EDIT=1`，旧编辑路径仍会恢复
++- 团队后续如果想彻底去掉手工枢纽逻辑，还需要单独做一次代码清理
++
++## 回退方式
++
++- 如果确实需要临时恢复手工枢纽编辑：
++  - 设置 `TOPOLOGY_MANUAL_JUNCTION_EDIT=1`
++  - 重启后端
++- 前端会跟随后端返回的 `manual_editing_enabled` 自动恢复旧入口
++
++## 一句话总结
++
++现在“枢纽用于拓扑”和“枢纽由运行时结果维护”这两件事已经不再打架了，编辑器默认语义也终于统一到了新规则上。
+*** Add File: F:\smartgas-grid\docs\2026-04-04-统一整改落实总结_人话版.md
++# 2026-04-04 统一整改落实总结
++
++## 这次最终落地了什么
++
++这次不是只改一个点，而是把“枢纽重编版”从规则、数据、后端、前端、验收整条链都落完了。
++
++最终状态可以直接概括成一句话：
++
++**现在拓扑结构继续用枢纽来表达交汇，但枢纽主事实已经切到运行时重编结果，前端也默认不再把手工捏合作为主流程。**
++
++## 四个实施阶段
++
++### 阶段 1：重编影子枢纽
++
++交付物：
++
++- `F:\smartgas-grid\docs\2026-04-04-阶段1-枢纽重编总结_人话版.md`
++
++结果：
++
++- 旧 `junction_groups` 先做了备份
++- live DB 新写入 `junction_groups_rebuilt`
++- 重编后共 12 个运行时枢纽
++  - `10` 个 `junction`
++  - `2` 个 `major_junction`
++- 严格校验 `0` 个结构性问题
++
++### 阶段 2：后端主链路收口
++
++交付物：
++
++- `F:\smartgas-grid\docs\2026-04-04-阶段2-后端收口总结_人话版.md`
++
++结果：
++
++- `topology`
++- `pipeline-packages`
++- `scada`
++
++都已经优先消费 `junction_groups_rebuilt`
++
++同时修掉了部分脚本导入管段被误判为 `interconnect` 的问题。
++
++### 阶段 3：编辑器默认只读化
++
++交付物：
++
++- `F:\smartgas-grid\docs\2026-04-04-阶段3-编辑器只读化总结_人话版.md`
++
++结果：
++
++- 编辑器继续能看运行时枢纽
++- 但默认不再暴露“创建枢纽 / 解除捏合 / 合并为大枢纽”主入口
++- 写接口默认走 `409` 只读提示
++
++### 阶段 4：导入与验收闭环
++
++交付物：
++
++- `F:\smartgas-grid\docs\2026-04-04-阶段4-导入闭环总结_人话版.md`
++
++结果：
++
++- `WE3` 已实际落库
++- `SJ2` / `SJ3` 保持在库
++- `check_db.py` 能做硬验收
++- `verify_junctions.py` 能输出 JSON 归档
++
++## 最终验收结果
++
++### 数据侧
++
++- `junction_groups.count = 16`
++- `junction_groups_backup_20260404.count = 16`
++- `junction_groups_rebuilt.count = 12`
++- shadow 枢纽 `issue_count = 0`
++
++### 管线系统侧
++
++- `we3` 存在
++- `sj2` 存在
++- `sj3` 存在
++
++### 前缀快照
++
++- `WE3`: `stations=16`, `pipelines=15`
++- `SJ2`: `stations=70`, `pipelines=69`
++- `SJ3`: `stations=71`, `pipelines=70`
++
++### 构建与脚本
++
++- `npm --prefix F:\smartgas-grid run build` 通过
++- 相关 Python 文件 `py_compile` 通过
++- `verify_junctions.py --table junction_groups_rebuilt --strict` 通过
++
++## 最终交付物
++
++核心代码与脚本：
++
++- `F:\smartgas-grid\backend\app\services\junction_groups.py`
++- `F:\smartgas-grid\backend\app\services\topology.py`
++- `F:\smartgas-grid\backend\app\routers\pipeline_packages.py`
++- `F:\smartgas-grid\backend\app\routers\scada.py`
++- `F:\smartgas-grid\backend\app\routers\topology_editor.py`
++- `F:\smartgas-grid\src\views\MapTopologyView.tsx`
++- `F:\smartgas-grid\src\views\TopologyView.tsx`
++- `F:\smartgas-grid\backend\check_db.py`
++- `F:\smartgas-grid\backend\scripts\rebuild_junctions.py`
++- `F:\smartgas-grid\backend\scripts\verify_junctions.py`
++- `F:\smartgas-grid\backend\scripts\add_sj2.py`
++- `F:\smartgas-grid\backend\scripts\add_we3.py`
++- `F:\smartgas-grid\backend\scripts\reimport_sj23.py`
++
++验收产物：
++
++- `F:\smartgas-grid\backend\data\junction_groups_backup_20260404.json`
++- `F:\smartgas-grid\backend\data\junction-rebuild-live-shadow.json`
++- `F:\smartgas-grid\backend\data\verify-junctions-rebuilt-summary.json`
++
++总结文档：
++
++- `F:\smartgas-grid\docs\2026-04-04-阶段1-枢纽重编总结_人话版.md`
++- `F:\smartgas-grid\docs\2026-04-04-阶段2-后端收口总结_人话版.md`
++- `F:\smartgas-grid\docs\2026-04-04-阶段3-编辑器只读化总结_人话版.md`
++- `F:\smartgas-grid\docs\2026-04-04-阶段4-导入闭环总结_人话版.md`
++- `F:\smartgas-grid\docs\2026-04-04-统一整改落实总结_人话版.md`
++
++## 前后对比
++
++这次没有放统一截图。
++
++原因：
++
++- 这轮整改跨了 DB、后端、前端编辑器、验收脚本四层
++- 单张截图说明不了“主事实切换”和“验收闭环”
++
++所以这里直接给结论表：
++
++| 对比项 | 整改前 | 整改后 |
++| --- | --- | --- |
++| 枢纽主事实 | 旧 `junction_groups` + 手工维护混用 | `junction_groups_rebuilt` 为运行时主事实 |
++| 拓扑结构中的枢纽 | 有，但口径不稳 | 继续保留，而且规则统一 |
++| 编辑器语义 | 还鼓励手工捏合 | 默认只读查看运行时枢纽 |
++| WE3 落库状态 | 不可直接证明 | 已能从 DB 输出直接证明 |
++| 验收方式 | 依赖人工口头确认 | 有 `check_db.py` + `verify_junctions.py` 硬证据 |
++
++## 风险点和回退点
++
++### 风险点
++
++- 旧 `junction_groups` 还保留着，没有立即覆盖
++- 手工枢纽逻辑是“默认关闭”，不是彻底删除
++- 后面如果继续扩支线导入，需要在脚本里明确写 `branch`
++
++### 回退点
++
++- 运行时枢纽读取链有回退能力
++- `junction_groups_backup_20260404` 还在
++- 若需临时恢复手工编辑，可打开 `TOPOLOGY_MANUAL_JUNCTION_EDIT=1`
++
++## 一句话总结
++
++这次“统一整改方案”已经不是纸面方案了，规则、数据、接口、页面、验收都已经落地，而且现在能拿 DB 和构建结果直接证明。
+*** End Patch

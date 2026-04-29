@@ -1,0 +1,79 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const handleSavePositions = useCallback(async () => {
+         if (dirtyPositions.size === 0 || isSaving) return
+         setIsSaving(true)
+         try {
+             const updates = [...dirtyPositions.entries()].map(([id, position]) => ({
+                 id,
+                 longitude: position[0],
+                 latitude: position[1],
+             }))
+-            const res = await fetch(resolveApiPath('/api/topology/positions/commit'), {
+-                method: 'PUT',
+-                headers: { 'Content-Type': 'application/json' },
+-                body: JSON.stringify({
+-                    updates,
+-                    cascade_valves: cascadeValves,
+-                    cascade_scope: 'segment',
+-                }),
++            const data = await topologyEditorApi.commitPositions({
++                updates,
++                cascade_valves: cascadeValves,
++                cascade_scope: 'segment',
+             })
+-            if (!res.ok) throw new Error(await res.text())
+-
+-            const data = await res.json()
+             invalidatePipelineCache()
+             const packages = await loadAllPipelines()
+             setPipelines(packages)
+             setDirtyPositions(new Map())
+             setPositionPreview(null)
+@@
+                 `已保存 ${data.updated_station_ids?.length ?? 0} 个主点，联动 ${data.updated_valve_ids?.length ?? 0} 个阀室`
+             )
+         } catch (error) {
+             console.error(error)
+-            setStatusMsg('保存点位失败')
++            setStatusMsg(error instanceof Error ? `保存点位失败：${error.message}` : '保存点位失败')
+         } finally {
+             setIsSaving(false)
+         }
+     }, [cascadeValves, dirtyPositions, isSaving])
+@@
+         try {
+             const updates = [...dirtyPositions.entries()].map(([id, position]) => ({
+                 id,
+                 longitude: position[0],
+                 latitude: position[1],
+             }))
+-            const res = await fetch(resolveApiPath('/api/topology/positions/preview'), {
+-                method: 'POST',
+-                headers: { 'Content-Type': 'application/json' },
+-                body: JSON.stringify({
+-                    updates,
+-                    cascade_valves: cascadeValves,
+-                    cascade_scope: 'segment',
+-                }),
++            const data = await topologyEditorApi.previewPositions({
++                updates,
++                cascade_valves: cascadeValves,
++                cascade_scope: 'segment',
+             })
+-            if (!res.ok) throw new Error(await res.text())
+-            const data = await res.json()
+             setPositionPreview(data)
+             setStatusMsg(
+                 `预览完成：将影响 ${data.updated_station_ids?.length ?? 0} 个主点、${data.updated_valve_ids?.length ?? 0} 个阀室`
+             )
+         } catch (error) {
+             console.error(error)
+-            setStatusMsg('预览影响失败')
++            setStatusMsg(error instanceof Error ? `预览影响失败：${error.message}` : '预览影响失败')
+         } finally {
+             setIsPreviewing(false)
+         }
+     }, [cascadeValves, dirtyPositions, isPreviewing, isSaving])
+*** End Patch

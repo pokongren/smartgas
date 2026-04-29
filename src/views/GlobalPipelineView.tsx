@@ -49,6 +49,45 @@ type TrendChartConfig = {
     mileageMode: 'estimated' | 'sequence'
 }
 
+type DirectoryLayoutState = {
+    position?: { x: number; y: number }
+    size?: { width: number; height: number }
+    orderIds?: string[]
+    visibleLayers?: Record<string, boolean>
+    expandedGroups?: Record<string, boolean>
+    scadaPanels?: {
+        we1?: boolean
+        we1West?: boolean
+        we2?: boolean
+        cred?: boolean
+        pt?: boolean
+        extra?: Record<string, boolean>
+    }
+    activeTrendPipelineId?: string | null
+    activePressureOverlayIds?: Record<string, boolean>
+    trendWidth?: number
+}
+
+const DIRECTORY_LAYOUT_STORAGE_KEY = 'smartgas.globalPipeline.directoryLayout.v1'
+
+function readDirectoryLayoutState(): DirectoryLayoutState {
+    if (typeof window === 'undefined') return {}
+
+    try {
+        const raw = window.localStorage.getItem(DIRECTORY_LAYOUT_STORAGE_KEY)
+        if (!raw) return {}
+        const parsed = JSON.parse(raw) as DirectoryLayoutState
+        return parsed && typeof parsed === 'object' ? parsed : {}
+    } catch (error) {
+        console.warn('[GlobalPipelineView] 读取管线目录布局失败:', error)
+        return {}
+    }
+}
+
+function clampNumber(value: number, min: number, max: number) {
+    return Math.min(max, Math.max(min, value))
+}
+
 function normalizeStationMatchKey(name: string): string {
     return name
         .replace(/[（(][^()（）]*[)）]/g, '')
@@ -537,7 +576,9 @@ const PressureTrendChart: React.FC<{
     onMouseDown?: (e: React.MouseEvent) => void
     isDragging?: boolean
     standalone?: boolean
-}> = ({ config, onClose, onMouseDown, isDragging, standalone = false }) => {
+    width?: number
+    onResizeMouseDown?: (e: React.MouseEvent) => void
+}> = ({ config, onClose, onMouseDown, isDragging, standalone = false, width = 920, onResizeMouseDown }) => {
     const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
 
     const stations = config.stations
@@ -601,7 +642,7 @@ const PressureTrendChart: React.FC<{
         <div
             className={`${standalone ? 'h-full w-full' : `absolute z-20 ${isDragging ? 'cursor-grabbing' : ''}`} flex flex-col select-none overflow-hidden`}
             style={{
-                width: standalone ? '100%' : '920px',
+                width: standalone ? '100%' : `${width}px`,
                 height: standalone ? '100%' : '420px',
                 background: 'linear-gradient(180deg, rgba(5,10,18,0.97) 0%, rgba(8,15,12,0.97) 100%)',
                 backdropFilter: 'blur(16px)',
@@ -752,6 +793,13 @@ const PressureTrendChart: React.FC<{
                     </svg>
                 </div>
             )}
+            {!standalone && (
+                <div
+                    className="absolute right-0 top-0 h-full w-3 cursor-ew-resize bg-white/[0.02] hover:bg-cyan-400/10"
+                    onMouseDown={onResizeMouseDown}
+                    title="拖动调整压力图宽度"
+                />
+            )}
         </div>
     )
 }
@@ -790,6 +838,7 @@ const GlobalPipelineView: React.FC = () => {
     const toggleExtraScada = (id: string) => setExtraScadaVisible(prev => ({ ...prev, [id]: !prev[id] }))
     // 通用压力趋势图面板
     const [activeTrendPipelineId, setActiveTrendPipelineId] = useState<string | null>(null)
+    const [activePressureOverlayIds, setActivePressureOverlayIds] = useState<Record<string, boolean>>({})
     // SCADA 历史曲线面板状态，支持指定指标类型和基准值
     const [historyTarget, setHistoryTarget] = useState<{
         stationName: string
@@ -916,6 +965,29 @@ const GlobalPipelineView: React.FC = () => {
     // 获取屏幕尺寸计算安全位置
     const W = typeof window !== 'undefined' ? window.innerWidth : 1280
     const H = typeof window !== 'undefined' ? window.innerHeight : 800
+    const initialDirectoryLayoutRef = React.useRef<DirectoryLayoutState>(readDirectoryLayoutState())
+    const [directoryPos, setDirectoryPos] = useState(() => {
+        const saved = initialDirectoryLayoutRef.current.position
+        return saved
+            ? { x: clampNumber(saved.x, 0, Math.max(0, W - 260)), y: clampNumber(saved.y, 60, Math.max(60, H - 180)) }
+            : { x: 24, y: 96 }
+    })
+    const [directorySize, setDirectorySize] = useState(() => {
+        const saved = initialDirectoryLayoutRef.current.size
+        return saved
+            ? { width: clampNumber(saved.width, 260, Math.min(560, W - 20)), height: clampNumber(saved.height, 320, Math.max(320, H - 110)) }
+            : { width: 288, height: Math.min(620, Math.max(420, H - 140)) }
+    })
+    const [isDraggingDirectory, setIsDraggingDirectory] = useState(false)
+    const [isResizingDirectory, setIsResizingDirectory] = useState(false)
+    const directoryDragOffsetRef = React.useRef({ x: 0, y: 0 })
+    const directoryResizeStartRef = React.useRef({ x: 0, y: 0, width: 288, height: 520 })
+    const [pipelineOrderIds, setPipelineOrderIds] = useState<string[]>(() => initialDirectoryLayoutRef.current.orderIds || [])
+    const [pipelineDragId, setPipelineDragId] = useState<string | null>(null)
+    const [pipelineDropIndex, setPipelineDropIndex] = useState<number | null>(null)
+    const [trendWidth, setTrendWidth] = useState(() => clampNumber(initialDirectoryLayoutRef.current.trendWidth || 920, 720, 1280))
+    const [isResizingTrend, setIsResizingTrend] = useState(false)
+    const trendResizeStartRef = React.useRef({ x: 0, width: 920 })
 
     // 西一线西段 SCADA 面板（放在西一线东段面板右侧）
     const [we1WestPos, setWe1WestPos] = useState({ x: 330, y: H - 340 })
@@ -951,6 +1023,11 @@ const GlobalPipelineView: React.FC = () => {
     const handleTrendMouseDown = (e: React.MouseEvent) => {
         setIsDraggingTrend(true)
         trendOffsetRef.current = { x: e.clientX - trendPos.x, y: e.clientY - trendPos.y }
+    }
+    const handleTrendResizeMouseDown = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        setIsResizingTrend(true)
+        trendResizeStartRef.current = { x: e.clientX, width: trendWidth }
     }
 
     // 使用 useCallback 稳定回调引用，避免触发 MapView 无限循环
@@ -1001,6 +1078,23 @@ const GlobalPipelineView: React.FC = () => {
         if (isDraggingTrend)   setTrendPos({   x: e.clientX - trendOffsetRef.current.x,   y: e.clientY - trendOffsetRef.current.y   })
         if (isDraggingHistory) setHistoryChartPos({ x: e.clientX - historyOffsetRef.current.x, y: e.clientY - historyOffsetRef.current.y })
         if (isDraggingStationHistory) setStationHistoryPos({ x: e.clientX - stationHistoryOffsetRef.current.x, y: e.clientY - stationHistoryOffsetRef.current.y })
+        if (isDraggingDirectory) {
+            setDirectoryPos({
+                x: clampNumber(e.clientX - directoryDragOffsetRef.current.x, 0, Math.max(0, W - directorySize.width)),
+                y: clampNumber(e.clientY - directoryDragOffsetRef.current.y, 60, Math.max(60, H - 120)),
+            })
+        }
+        if (isResizingDirectory) {
+            const nextWidth = directoryResizeStartRef.current.width + e.clientX - directoryResizeStartRef.current.x
+            const nextHeight = directoryResizeStartRef.current.height + e.clientY - directoryResizeStartRef.current.y
+            setDirectorySize({
+                width: clampNumber(nextWidth, 260, Math.min(560, W - directoryPos.x - 10)),
+                height: clampNumber(nextHeight, 320, Math.max(320, H - directoryPos.y - 10)),
+            })
+        }
+        if (isResizingTrend) {
+            setTrendWidth(clampNumber(trendResizeStartRef.current.width + e.clientX - trendResizeStartRef.current.x, 720, 1280))
+        }
     }
 
     const handleGlobalMouseUp = () => {
@@ -1012,6 +1106,13 @@ const GlobalPipelineView: React.FC = () => {
         if (isDraggingTrend)    setIsDraggingTrend(false)
         if (isDraggingHistory)  setIsDraggingHistory(false)
         if (isDraggingStationHistory) setIsDraggingStationHistory(false)
+        if (isDraggingDirectory) setIsDraggingDirectory(false)
+        if (isResizingDirectory) setIsResizingDirectory(false)
+        if (isResizingTrend) setIsResizingTrend(false)
+        if (pipelineDragId) {
+            setPipelineDragId(null)
+            setPipelineDropIndex(null)
+        }
     }
 
     const hasScadaStandalone = useCallback((pipelineId: string) => {
@@ -1066,8 +1167,10 @@ const GlobalPipelineView: React.FC = () => {
         let visibilityButton: React.ReactNode = <span className={directoryActionPlaceholderClass} aria-hidden="true" />
         let popoutButton: React.ReactNode = <span className={directoryActionPlaceholderClass} aria-hidden="true" />
         let trendButton: React.ReactNode = <span className={directoryActionPlaceholderClass} aria-hidden="true" />
+        let pressureButton: React.ReactNode = <span className={directoryActionPlaceholderClass} aria-hidden="true" />
         const trendSource = getTrendSource(pkg.id)
         const isTrendActive = activeTrendPipelineId === pkg.id
+        const isPressureActive = Boolean(activePressureOverlayIds[pkg.id])
 
         if (pkg.name === '西气东输一线' && !isScadaPoppedOut) {
             visibilityButton = (
@@ -1156,13 +1259,24 @@ const GlobalPipelineView: React.FC = () => {
                     <span className="material-symbols-outlined text-sm">show_chart</span>
                 </button>
             )
+            pressureButton = (
+                <button
+                    onClick={(e) => { e.stopPropagation(); togglePressureOverlay(pkg.id) }}
+                    className={`${directoryActionButtonClass} ${isPressureActive ? 'bg-white/10 border-white/10 hover:opacity-90' : 'text-gray-500 hover:text-gray-300'}`}
+                    style={isPressureActive ? { color: trendSource.color } : undefined}
+                    title={`${isPressureActive ? '隐藏' : '显示'}${trendSource.title}管道压力标签`}
+                >
+                    <span className="material-symbols-outlined text-sm">speed</span>
+                </button>
+            )
         }
 
         return (
-            <div className="ml-3 shrink-0 grid w-[106px] grid-cols-3 justify-items-center gap-1 rounded-lg border border-white/5 bg-black/20 px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <div className="ml-3 shrink-0 grid w-[140px] grid-cols-4 justify-items-center gap-1 rounded-lg border border-white/5 bg-black/20 px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                 {visibilityButton}
                 {popoutButton}
                 {trendButton}
+                {pressureButton}
             </div>
         )
     }
@@ -1181,10 +1295,146 @@ const GlobalPipelineView: React.FC = () => {
 
     // 可见性状态 - 当管线数据加载完成后初始化
     const [visibleLayers, setVisibleLayers] = useState<Record<string, boolean>>({})
+    const hasHydratedDirectoryRef = React.useRef(false)
     useEffect(() => {
         if (!pipelinesLoaded || pipelines.length === 0) return
-        setVisibleLayers(buildInitialLayerVisibility(pipelines))
+        const saved = initialDirectoryLayoutRef.current
+        const defaults = buildInitialLayerVisibility(pipelines)
+        setVisibleLayers({ ...defaults, ...(saved.visibleLayers || {}) })
+        setExpandedGroups({ we1: true, ...(saved.expandedGroups || {}) })
+        setPipelineOrderIds((saved.orderIds || []).filter(id => pipelines.some(pkg => pkg.id === id)))
+        setShowScada(Boolean(saved.scadaPanels?.we1))
+        setShowWe1WestScada(Boolean(saved.scadaPanels?.we1West))
+        setShowWe2Scada(Boolean(saved.scadaPanels?.we2))
+        setShowCredScada(Boolean(saved.scadaPanels?.cred))
+        setShowPtScada(Boolean(saved.scadaPanels?.pt))
+        setExtraScadaVisible(saved.scadaPanels?.extra || {})
+        setActiveTrendPipelineId(saved.activeTrendPipelineId || null)
+        setActivePressureOverlayIds(saved.activePressureOverlayIds || {})
+        hasHydratedDirectoryRef.current = true
     }, [pipelinesLoaded, pipelines])
+
+    const orderedPipelines = useMemo(() => {
+        if (pipelineOrderIds.length === 0) return pipelines
+        const packageMap = new Map(pipelines.map(pkg => [pkg.id, pkg]))
+        const ordered = pipelineOrderIds
+            .map(id => packageMap.get(id))
+            .filter((pkg): pkg is PipelinePackage => Boolean(pkg))
+        const missing = pipelines.filter(pkg => !pipelineOrderIds.includes(pkg.id))
+        return [...ordered, ...missing]
+    }, [pipelineOrderIds, pipelines])
+
+    useEffect(() => {
+        if (!pipelinesLoaded || !hasHydratedDirectoryRef.current) return
+
+        const state: DirectoryLayoutState = {
+            position: directoryPos,
+            size: directorySize,
+            orderIds: orderedPipelines.map(pkg => pkg.id),
+            visibleLayers,
+            expandedGroups,
+            scadaPanels: {
+                we1: showScada,
+                we1West: showWe1WestScada,
+                we2: showWe2Scada,
+                cred: showCredScada,
+                pt: showPtScada,
+                extra: extraScadaVisible,
+            },
+            activeTrendPipelineId,
+            activePressureOverlayIds,
+            trendWidth,
+        }
+
+        try {
+            window.localStorage.setItem(DIRECTORY_LAYOUT_STORAGE_KEY, JSON.stringify(state))
+        } catch (error) {
+            console.warn('[GlobalPipelineView] 保存管线目录布局失败:', error)
+        }
+    }, [
+        activePressureOverlayIds,
+        activeTrendPipelineId,
+        directoryPos,
+        directorySize,
+        expandedGroups,
+        extraScadaVisible,
+        orderedPipelines,
+        pipelinesLoaded,
+        showCredScada,
+        showPtScada,
+        showScada,
+        showWe1WestScada,
+        showWe2Scada,
+        trendWidth,
+        visibleLayers,
+    ])
+
+    const resetDirectoryLayout = useCallback(() => {
+        if (typeof window !== 'undefined') {
+            window.localStorage.removeItem(DIRECTORY_LAYOUT_STORAGE_KEY)
+        }
+        setDirectoryPos({ x: 24, y: 96 })
+        setDirectorySize({ width: 288, height: Math.min(620, Math.max(420, H - 140)) })
+        setPipelineOrderIds(pipelines.map(pkg => pkg.id))
+        setExpandedGroups({ we1: true })
+        setVisibleLayers(buildInitialLayerVisibility(pipelines))
+        setShowScada(false)
+        setShowWe1WestScada(false)
+        setShowWe2Scada(false)
+        setShowCredScada(false)
+        setShowPtScada(false)
+        setExtraScadaVisible({})
+        setActiveTrendPipelineId(null)
+        setActivePressureOverlayIds({})
+        setTrendWidth(920)
+    }, [H, pipelines])
+
+    const handleDirectoryMouseDown = (e: React.MouseEvent) => {
+        const target = e.target as HTMLElement
+        if (target.closest('button') || target.closest('[data-pipeline-row]') || target.closest('[data-directory-resize]')) return
+        setIsDraggingDirectory(true)
+        directoryDragOffsetRef.current = { x: e.clientX - directoryPos.x, y: e.clientY - directoryPos.y }
+    }
+
+    const handleDirectoryResizeMouseDown = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        setIsResizingDirectory(true)
+        directoryResizeStartRef.current = { x: e.clientX, y: e.clientY, width: directorySize.width, height: directorySize.height }
+    }
+
+    const handlePipelineDragStart = (e: React.DragEvent, pipelineId: string) => {
+        setPipelineDragId(pipelineId)
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', pipelineId)
+    }
+
+    const handlePipelineDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault()
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+        const nextIndex = e.clientY > rect.top + rect.height / 2 ? index + 1 : index
+        setPipelineDropIndex(nextIndex)
+    }
+
+    const handlePipelineDrop = (e: React.DragEvent) => {
+        e.preventDefault()
+        const dragId = pipelineDragId || e.dataTransfer.getData('text/plain')
+        if (!dragId || pipelineDropIndex == null) return
+
+        const currentIds = orderedPipelines.map(pkg => pkg.id)
+        const fromIndex = currentIds.indexOf(dragId)
+        if (fromIndex < 0) return
+
+        const nextIds = currentIds.filter(id => id !== dragId)
+        const adjustedIndex = fromIndex < pipelineDropIndex ? pipelineDropIndex - 1 : pipelineDropIndex
+        nextIds.splice(clampNumber(adjustedIndex, 0, nextIds.length), 0, dragId)
+        setPipelineOrderIds(nextIds)
+        setPipelineDragId(null)
+        setPipelineDropIndex(null)
+    }
+
+    const togglePressureOverlay = useCallback((pipelineId: string) => {
+        setActivePressureOverlayIds(prev => ({ ...prev, [pipelineId]: !prev[pipelineId] }))
+    }, [])
 
     // 切换分组展开
     const toggleGroupExpand = (pipelineId: string) => {
@@ -1286,6 +1536,25 @@ const GlobalPipelineView: React.FC = () => {
         if (!mapInstance) return
 
         let timer: any
+        const activeEntries = Object.entries(activePressureOverlayIds).filter(([, active]) => active)
+        const activeStationData = new Map<string, { inP: number; outP: number; inT?: number; outT?: number; color: string }>()
+        activeEntries.forEach(([pipelineId]) => {
+            const source = getTrendSource(pipelineId)
+            if (!source) return
+
+            source.entries.forEach(([name, record]) => {
+                if (!Number.isFinite(record.inP) || !Number.isFinite(record.outP)) return
+                const value = {
+                    inP: record.inP,
+                    outP: record.outP,
+                    inT: record.inT,
+                    outT: record.outT,
+                    color: source.color,
+                }
+                activeStationData.set(name, value)
+                activeStationData.set(normalizeStationMatchKey(name), value)
+            })
+        })
 
         // 使用 timer 定期重新挂载属性（考虑用户缩放或平移时地图重新生成 marker）
         timer = setInterval(() => {
@@ -1306,7 +1575,7 @@ const GlobalPipelineView: React.FC = () => {
                     originalContent = originalContent.split('<!--scada-label-->')[0]
                 }
 
-                const scadaData = REAL_SCADA_DATA[node.name]
+                const scadaData = activeStationData.get(node.name) || activeStationData.get(normalizeStationMatchKey(node.name))
                 if (!scadaData) {
                     if (hasRealtime) marker.setContent(originalContent)
                     return
@@ -1314,15 +1583,16 @@ const GlobalPipelineView: React.FC = () => {
 
                 const inTLabel = scadaData.inT ? ` T: ${scadaData.inT}` : ''
                 const outTLabel = scadaData.outT ? ` T: ${scadaData.outT}` : ''
+                const shadow = '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000'
 
                 const scadaHTML = `
                     <!--scada-label-->
                     <div class="absolute left-1/2 -top-1 -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none whitespace-nowrap z-50 overflow-visible" 
                          style="line-height: 1.1; display:flex;">
-                        <span style="font-size:10px; font-weight:bold; color:#10b981; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;">
+                        <span style="font-size:10px; font-weight:bold; color:#f59e0b; text-shadow: ${shadow};">
                             入 P: ${scadaData.inP.toFixed(2)}${inTLabel}
                         </span>
-                        <span style="font-size:10px; font-weight:bold; color:#3b82f6; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;">
+                        <span style="font-size:10px; font-weight:bold; color:${scadaData.color}; text-shadow: ${shadow};">
                             出 P: ${scadaData.outP.toFixed(2)}${outTLabel}
                         </span>
                     </div>
@@ -1339,7 +1609,7 @@ const GlobalPipelineView: React.FC = () => {
         }, 800)
 
         return () => clearInterval(timer)
-    }, [mapInstance])
+    }, [activePressureOverlayIds, mapInstance])
 
     const fixedScadaPanels = [
         {
@@ -1508,9 +1778,21 @@ const GlobalPipelineView: React.FC = () => {
             />
 
             {/* 图层控制面板 - 树形结构 */}
-            <div className="absolute top-24 left-6 z-10 bg-[#0c1218]/90 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.6)] rounded-lg border border-[rgba(45,59,78,0.7)] w-72 max-h-[75vh] flex flex-col overflow-hidden">
+            <div
+                className={`absolute z-10 bg-[#0c1218]/90 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.6)] rounded-lg border border-[rgba(45,59,78,0.7)] flex flex-col overflow-hidden ${isDraggingDirectory ? 'cursor-grabbing' : ''}`}
+                style={{
+                    left: `${directoryPos.x}px`,
+                    top: `${directoryPos.y}px`,
+                    width: `${directorySize.width}px`,
+                    height: `${directorySize.height}px`,
+                }}
+            >
                 {/* 粘性表头 */}
-                <div className="flex justify-between items-center px-4 py-3 bg-[#0c1218]/95 border-b border-gray-700/60 sticky top-0 z-20 shrink-0">
+                <div
+                    className={`flex justify-between items-center px-4 py-3 bg-[#0c1218]/95 border-b border-gray-700/60 sticky top-0 z-20 shrink-0 ${isDraggingDirectory ? 'cursor-grabbing' : 'cursor-grab'}`}
+                    onMouseDown={handleDirectoryMouseDown}
+                    title="按住标题栏可拖动管线目录"
+                >
                     <h3 className="text-white text-base font-bold flex items-center gap-2">
                         <span className="material-symbols-outlined text-xl">toc</span>
                         管线目录
@@ -1530,22 +1812,45 @@ const GlobalPipelineView: React.FC = () => {
                         >
                             全部取消
                         </button>
+                        <button
+                            onClick={resetDirectoryLayout}
+                            className="text-xs px-2 py-1 bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-200 rounded border border-cyan-500/30 hover:text-white transition-colors"
+                            title="复原目录位置、大小、排序和按钮状态"
+                        >
+                            复原
+                        </button>
 
                     </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
-                    {pipelines.map(pkg => {
+                    {orderedPipelines.map((pkg, pipelineIndex) => {
                         const layerIds = pkg.layers.map((layer, index) => getPipelineLayerId(pkg, layer, index))
                         const isAllVisible = layerIds.every(id => visibleLayers[id])
                         const isPartialVisible = !isAllVisible && layerIds.some(id => visibleLayers[id])
                         const hasBranches = pkg.layers.length > 1
 
                         return (
-                            <div key={pkg.id} className="px-1">
+                            <React.Fragment key={pkg.id}>
+                            {pipelineDropIndex === pipelineIndex && pipelineDragId !== pkg.id && (
+                                <div className="relative mx-1 my-1 h-3">
+                                    <div className="absolute left-1 right-1 top-1/2 h-px -translate-y-1/2 bg-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.9)]" />
+                                    <div className="absolute left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rotate-45 border-b border-l border-cyan-300 bg-[#0c1218]" />
+                                </div>
+                            )}
+                            <div
+                                className={`px-1 rounded-md ${pipelineDragId === pkg.id ? 'opacity-45' : ''}`}
+                                data-pipeline-row
+                                draggable
+                                onDragStart={(e) => handlePipelineDragStart(e, pkg.id)}
+                                onDragOver={(e) => handlePipelineDragOver(e, pipelineIndex)}
+                                onDrop={handlePipelineDrop}
+                                onDragEnd={() => { setPipelineDragId(null); setPipelineDropIndex(null) }}
+                                title="按住管线行可上下拖动排序"
+                            >
                                 {/* 组头部 (管线名) */}
                                 <div
-                                    className="flex items-center gap-2 hover:bg-white/5 p-1.5 rounded transition-colors select-none cursor-pointer group"
+                                    className="flex items-center gap-2 hover:bg-white/5 p-1.5 rounded transition-colors select-none cursor-grab active:cursor-grabbing group"
                                     onClick={() => hasBranches && toggleGroupExpand(pkg.id)}
                                 >
                                     {/* 展开/收起箭头 */}
@@ -1623,9 +1928,22 @@ const GlobalPipelineView: React.FC = () => {
                                     </div>
                                 )}
                             </div>
+                            </React.Fragment>
                         )
                     })}
+                    {pipelineDropIndex === orderedPipelines.length && (
+                        <div className="relative mx-1 my-1 h-3">
+                            <div className="absolute left-1 right-1 top-1/2 h-px -translate-y-1/2 bg-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.9)]" />
+                            <div className="absolute left-1 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rotate-45 border-b border-l border-cyan-300 bg-[#0c1218]" />
+                        </div>
+                    )}
                 </div>
+                <div
+                    data-directory-resize
+                    className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize rounded-tl-md border-l border-t border-cyan-400/30 bg-cyan-400/10"
+                    onMouseDown={handleDirectoryResizeMouseDown}
+                    title="拖动调整管线目录宽高"
+                />
             </div>
 
             {/* ====== 甪直分输站 · 历史回溯面板（试点） ====== */}
@@ -1738,6 +2056,8 @@ const GlobalPipelineView: React.FC = () => {
                         onClose={() => setActiveTrendPipelineId(null)}
                         onMouseDown={handleTrendMouseDown}
                         isDragging={isDraggingTrend}
+                        width={trendWidth}
+                        onResizeMouseDown={handleTrendResizeMouseDown}
                     />
                 </div>
             )}

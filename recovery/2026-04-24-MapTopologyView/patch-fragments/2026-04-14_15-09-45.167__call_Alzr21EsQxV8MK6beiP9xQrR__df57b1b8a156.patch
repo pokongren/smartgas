@@ -1,0 +1,23 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-14-WE1放大移动白屏_二轮修复验证_人话版.md
++一、主目标
++1. 解决“地图放大或移动时白屏”问题，并连续做2轮修复+验证。
++
++二、第1轮修复（防崩）
++1. 在 `src/views/MapTopologyView.tsx` 新增安全封装：`safeSetMarkerContent`、`safeSetPolylineOptions`。  
++2. 将高频渲染处的 `marker.setContent`、`polyline.setOptions` 改为安全调用，任何单点异常只记日志，不再把整页打崩。  
++3. 把覆盖物 `zooms` 统一成 `[2,20]`，和地图上限一致。
++
++三、第2轮修复（降载）
++1. 新增 `isMapInteracting`，监听 `zoomstart/movestart/dragstart` 与 `zoomend/moveend/dragend`。  
++2. 地图交互中暂停高频流动动画推进，降低 `lineFlowPhase` 刷新压力。  
++3. 交互中关闭掉血浮字、冻结虚线位移，避免缩放移动时渲染抖动和异常链路触发。
++
++四、验证结果
++1. 已执行 `npm run build`，构建通过。  
++2. 预期结果：放大/移动不再白屏；交互结束后动画恢复。
++
++五、交付物
++1. 代码：`src/views/MapTopologyView.tsx`。  
++2. 文档：`docs/2026-04-14-WE1放大移动白屏_二轮修复验证_人话版.md`。
+*** End Patch

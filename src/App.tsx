@@ -38,19 +38,11 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, AppError
   }
 
   private handleUnhandledRejection = (event: PromiseRejectionEvent): void => {
-    const message =
-      event?.reason instanceof Error
-        ? event.reason.message
-        : typeof event?.reason === 'string'
-          ? event.reason
-          : 'Unhandled promise rejection';
-    this.setState({ hasError: true, message });
+    event.preventDefault();
     console.error('[AppErrorBoundary] unhandled rejection', event?.reason);
   };
 
   private handleWindowError = (event: ErrorEvent): void => {
-    const message = event?.error?.message || event?.message || 'Window runtime error';
-    this.setState({ hasError: true, message });
     console.error('[AppErrorBoundary] window error', event?.error || event);
   };
 

@@ -1,0 +1,137 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const [preSimInputEnabled, setPreSimInputEnabled] = useState(true)
+     const [preSimDefaultPressureMpa, setPreSimDefaultPressureMpa] = useState(8.8)
+     const [preSimDefaultTemperatureC, setPreSimDefaultTemperatureC] = useState(28)
+     const [preSimDefaultFlowRate, setPreSimDefaultFlowRate] = useState(120)
+     const [preSimApplyToSources, setPreSimApplyToSources] = useState(false)
++    const [preSimNodePressureOverrides, setPreSimNodePressureOverrides] = useState<Record<string, number>>({})
++    const [preSimNodeTemperatureOverrides, setPreSimNodeTemperatureOverrides] = useState<Record<string, number>>({})
++    const [preSimEdgeFlowOverrides, setPreSimEdgeFlowOverrides] = useState<Record<string, number>>({})
+     const isLargeGraphMode = renderSafetyMode === 'lite' || topoNodes.length > 320 || topoEdges.length > 480
+ 
++    const upsertOverrideNumber = useCallback(
++        (
++            setter: React.Dispatch<React.SetStateAction<Record<string, number>>>,
++            id: string,
++            rawValue: string,
++        ) => {
++            const next = rawValue.trim()
++            setter(prev => {
++                const draft = { ...prev }
++                if (!next) {
++                    delete draft[id]
++                    return draft
++                }
++                const parsed = Number(next)
++                if (!Number.isFinite(parsed)) {
++                    return draft
++                }
++                draft[id] = parsed
++                return draft
++            })
++        },
++        [],
++    )
++
++    const clearPreSimulationCustomOverrides = useCallback(() => {
++        setPreSimNodePressureOverrides({})
++        setPreSimNodeTemperatureOverrides({})
++        setPreSimEdgeFlowOverrides({})
++    }, [])
++
+     const buildPreSimulationInput = useCallback((): SimulationInitialInput | undefined => {
+         if (!preSimInputEnabled) return undefined
+ 
+         const pressure = Number.isFinite(preSimDefaultPressureMpa) ? preSimDefaultPressureMpa : 8.8
+         const temperature = Number.isFinite(preSimDefaultTemperatureC) ? preSimDefaultTemperatureC : estimateTemperatureByPressure(pressure)
+         const flowRate = Number.isFinite(preSimDefaultFlowRate) ? preSimDefaultFlowRate : 120
++        const nodeIds = new Set([
++            ...Object.keys(preSimNodePressureOverrides),
++            ...Object.keys(preSimNodeTemperatureOverrides),
++        ])
++        const nodeOverrides = [...nodeIds]
++            .map(nodeId => {
++                const override: {
++                    node_id: string
++                    target_pressure_mpa?: number
++                    temperature_c?: number
++                } = { node_id: nodeId }
++                if (Number.isFinite(preSimNodePressureOverrides[nodeId])) {
++                    override.target_pressure_mpa = preSimNodePressureOverrides[nodeId]
++                }
++                if (Number.isFinite(preSimNodeTemperatureOverrides[nodeId])) {
++                    override.temperature_c = preSimNodeTemperatureOverrides[nodeId]
++                }
++                return override
++            })
++            .filter(item => item.target_pressure_mpa != null || item.temperature_c != null)
++        const edgeOverrides = Object.entries(preSimEdgeFlowOverrides)
++            .filter(([, value]) => Number.isFinite(value))
++            .map(([edgeId, value]) => ({
++                edge_id: edgeId,
++                flow_rate: value,
++            }))
+ 
+         return {
++            node_overrides: nodeOverrides,
++            edge_overrides: edgeOverrides,
+             default_pressure_mpa: pressure,
+             default_temperature_c: temperature,
+             default_flow_rate: flowRate,
+             apply_to_sources: preSimApplyToSources,
+         }
+@@
+         preSimDefaultFlowRate,
+         preSimDefaultPressureMpa,
+         preSimDefaultTemperatureC,
+         preSimInputEnabled,
++        preSimEdgeFlowOverrides,
++        preSimNodePressureOverrides,
++        preSimNodeTemperatureOverrides,
+     ])
+@@
+     const selectedNodeSimulationMetrics = useMemo(() => {
+         if (!selectedNode) return null
+         if (simulationMapping) {
+@@
+         }
+ 
+-        const fallbackPressure = Number.isFinite(preSimDefaultPressureMpa) ? preSimDefaultPressureMpa : 8.8
+-        const fallbackTemperature = Number.isFinite(preSimDefaultTemperatureC)
+-            ? preSimDefaultTemperatureC
+-            : estimateTemperatureByPressure(fallbackPressure)
++        const nodePressure = preSimNodePressureOverrides[selectedNode.id]
++        const fallbackPressure = Number.isFinite(nodePressure)
++            ? nodePressure
++            : Number.isFinite(preSimDefaultPressureMpa)
++                ? preSimDefaultPressureMpa
++                : 8.8
++        const nodeTemperature = preSimNodeTemperatureOverrides[selectedNode.id]
++        const fallbackTemperature = Number.isFinite(nodeTemperature)
++            ? nodeTemperature
++            : Number.isFinite(preSimDefaultTemperatureC)
++                ? preSimDefaultTemperatureC
++                : estimateTemperatureByPressure(fallbackPressure)
+ 
+         return {
+             pressure: fallbackPressure,
+@@
+             estimated: true,
+             preSimulation: true,
+         }
+-    }, [preSimDefaultPressureMpa, preSimDefaultTemperatureC, selectedNode, simulationMapping])
++    }, [
++        preSimDefaultPressureMpa,
++        preSimDefaultTemperatureC,
++        preSimNodePressureOverrides,
++        preSimNodeTemperatureOverrides,
++        selectedNode,
++        simulationMapping,
++    ])
++    const selectedNodeConnectedEdges = useMemo(() => {
++        if (!selectedNode) return []
++        return topoEdges.filter(edge => edge.startNodeId === selectedNode.id || edge.endNodeId === selectedNode.id)
++    }, [selectedNode, topoEdges])
+*** End Patch

@@ -1,0 +1,675 @@
+﻿Exit code: 0
+Wall time: 0.2 seconds
+Total output lines: 3784
+Output:
+/**
+ * 閸︽澘娴橀幏鎾村ⅳ缁狅紕鎮婄憴鍡楁禈閿涘牏瀚粩瀣€夐棃顫礆
+ *
+ * 閸欘亝妯夌粈铏瑰嚱閹锋挻澧ょ仦鍌︾礄缁犫偓濞蹭礁娓鹃悙?+ 閻╁鍤庨敍澶涚礉闂呮劘妫岄幍鈧張澶岀彲閸?闂冣偓鐎广倗娈戞径宥嗘絽閸ユ儳鑸伴妴?
+ * 閻欘剛鐝涙禍搴″弿閸ョ晫顓哥純鎴犵埠娑撯偓鐟欏棗娴橀崪?Canvas 閹锋挻澧ょ憴鍡楁禈閵?
+ */
+
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import MapView from '@/components/map-view/MapView'
+import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
+import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+import type { PipelinePackage } from '@/data/pipelines/types'
+import { useSimulation } from '@/hooks/useSimulation'
+import {
+    topologyEditorApi,
+    type JunctionGroup,
+    type PositionPreviewResult,
+} from '@/services/topologyEditorApi'
+import type { PipelineNode, PipelineLine } from '@/types'
+import {
+    validateTopology,
+    computeBetweennessCentrality,
+    findIsolatedNodes,
+} from '@/utils/topology-validator'
+import type { ValidationReport } from '@/utils/topology-validator'
+import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
+import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+import type { CutoffResult } from '@/utils/cutoff-simulator'
+import { clearSimulationShowcaseSyncContext, writeSimulationShowcaseSyncContext } from '@/utils/simulationShowcaseSync'
+import { setAssistantRuntimeContext } from '@/components/ai-assistant/runtimeAssistantContext'
+import { MAINLINE_SCENARIOS, type SimulationInitialInput } from '@/types/simulation'
+import { seedNodeAPI } from '@/services/api'
+import type { SeedNodePressure } from '@/services/api'
+import SimParamEditor from '@/components/topology/SimParamEditor'
+
+// ================== 缁鐎?==================
+type PointType = 'station' | 'valve' | 'distribution' | 'compressor' | 'junction'
+type EditMode = 'view' | 'draw-point' | 'connect' | 'merge'
+type PanelTab = 'edit' | 'validate' | 'search' | 'centrality' | 'cutoff' | 'simulation'
+
+interface TopoNode {
+    id: string
+    type: PointType
+    name: string
+    position: [number, number]
+    sourceNodeIds?: string[]
+    internalSourceEdgeIds?: string[]
+    junctionId?: number
+    isJunction?: boolean
+    junctionKind?: string
+    sourceTable?: string
+    marker?: any
+}
+
+interface TopoEdge {
+    id: string
+    startNodeId: string
+    endNodeId: string
+    name?: string
+    sourceEdgeIds?: string[]
+    /** 娴犲骸甯慨瀣吀缁炬寧鏆熼幑顔界湽閹崵娈戞妯款吇闂€鍨閿涘潣m閿涘绱濋張顏囶潶閻劍鍩涚憰鍡欐磰閺冩湹缍旀稉杞拌雹閻喎鍙嗛崣?*/
+    defaultLengthKm?: number
+    poly?: any
+}
+
+interface BaseTopoNode {
+    id: string
+    type: PointType
+    name: string
+    position: [number, number]
+}
+
+interface BaseTopoEdge {
+    id: string
+    startNodeId: string
+    endNodeId: string
+    name?: string
+    sourceEdgeIds?: string[]
+    /** 娴犲骸甯慨瀣吀缁炬寧鏆熼幑顔界湽閹崵娈戞妯款吇闂€鍨閿涘潣m閿?*/
+    defaultLengthKm?: number
+}
+
+const WE1_PRIMARY_PILOT_ID = 'mainline_zhongwei_jingbian'
+const TOPOLOGY_DRAFT_STORAGE_KEY = 'smartgas-map-topology-draft-v1'
+
+function formatDateTimeLabel(value?: string): string {
+    if (!value) return '-'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function estimateTemperatureByPressure(pressureMpa: number): number {
+    return Number((13 + pressureMpa * 1.7).toFixed(1))
+}
+
+function clamp01(value: number): number {
+    if (!Number.isFinite(value)) return 0
+    if (value <= 0) return 0
+    if (value >= 1) return 1
+    return value
+}
+
+/** Haversine 閸忣剙绱＄拋锛勭暬娑撱倕婀撮悶鍡楁綏閺嶅洭妫块悶鍐桨鐠烘繄顬囬敍鍧榤閿?*/
+function haversineKm(lng1: number, lat1: number, lng2: number, lat2: number): number {
+    const R = 6371
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+function formatSignedNumber(value: number, digits = 2): string {
+    const sign = value > 0 ? '+' : ''
+    return `${sign}${value.toFixed(digits)}`
+}
+
+function buildOpsSuggestion(alertCount: number, avgUtilization: number, solverStatus: 'converged' | 'max_iter' | 'error'): string {
+    if (solverStatus === 'error') return '閺堫剚顐煎Ч鍌澬掓径杈Е閿涘苯鍘涘Λ鈧弻銉ユ簚閺咁垰寮弫鏉挎嫲鏉堝湱鏅弶鈥叉閿涘苯鍟€闁插秷绐囨稉璁宠雹閻喆鈧?
+    if (solverStatus === 'max_iter') return '閺堫剚顐兼潏鎯у煂鏉╊厺鍞稉濠囨閿涘苯缂撶拋顔煎帥缂傗晛鐨幍鏉垮З楠炲懎瀹抽獮鑸电壋鐎电懓鐔€缁惧灝鎻╅悡褋鈧?
+    if (alertCount >= 5) return '閸涘﹨顒熼崑蹇擃樋閿涘奔绱崗鍫熷笓閺屻儰瀵岄獮鏌ョ彯鐠愮喕宓庡▓闈涙嫲閸樺鐨电粩娆庣瑐娑撳鐖堕崢瀣▕閵?
+    if (avgUtilization >= 0.82) return '閸掆晝鏁ら悳鍥т焊妤傛﹫绱濆楦款唴閸忓牆浠涢梽鎰ウ閸︾儤娅欑€佃鐦獮璺哄櫙婢跺洩鐨熷畡鎵摜閻ｃ儯鈧?
+    return '鏉╂劘顢戦悩鑸碘偓浣搁挬缁嬬绱濋崣顖氱殺瑜版挸澧犵紒鎾寸亯娴ｆ粈璐熸稉瀣╃鏉烆喖绱撶敮绋挎簚閺咁垰顕В鏂跨唨缁捐￥鈧?
+}
+
+function safeSetMarkerContent(marker: any, content: string): void {
+    try {
+        marker?.setContent?.(content)
+    } catch (error) {
+        console.warn('[MapTopologyView] marker.setContent failed', error)
+    }
+}
+
+function safeSetPolylineOptions(polyline: any, options: Record<string, unknown>): void {
+    try {
+        polyline?.setOptions?.(options)
+    } catch (error) {
+        console.warn('[MapTopologyView] polyline.setOptions failed', error)
+    }
+}
+
+const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
+    converged: '瀹稿弶鏁归弫?,
+    max_iter: '鏉堟儳鍩屾潻顓濆敩娑撳﹪妾?,
+    error: '濮瑰倽袙婢惰精瑙?,
+}
+
+const FAILURE_LAYER_LABELS: Record<'frontend-consumption' | 'mapping-source-ids' | 'overlay-contract' | 'rendering-style', string> = {
+    'frontend-consumption': '閸忓牊鐓￠崜宥囶伂濞戝牐鍨傜仦鍌︾礄MapTopologyView / 闂堛垺婢橀敍?,
+    'mapping-source-ids': '閸愬秵鐓?source IDs 閸?overlay IDs 閻ㄥ嫭妲х亸?,
+    'overlay-contract': '閸愬秵鐓?simulation-overlay 婵傛垹瀹?,
+    'rendering-style': '閺堚偓閸氬骸鍟€閺屻儱婀撮崶鐐壉瀵繐鎷板〒鍙夌厠鐎电钖?,
+}
+
+const MAINLINE_SCENARIO_PLAYBOOK: Record<string, {
+    focus: string
+    success: string
+    risk: string
+    talk: string
+}> = {
+    steady_base: {
+        focus: '閸忓牏婀呮稉璇插叡閸樺濮忛崪灞剧ウ闁插繑妲告稉宥嗘Ц楠炴娊銆庨敍宀€鈥樼拋銈囶儑娑撯偓瀵姴娴橀懗鐣屒旂€规俺绐囬柅姘モ偓?,
+        success: '閹绶电紒娆嶁偓浣光偓濠氭付濮瑰倶鈧礁閽╅崸鍥у焺閻劎宸奸柈鍊熷厴濮濓絽鐖堕拃钘夊毉閺夈儻绱濋崨濠咁劅閺侀绗夌憰浣虹崐閻掕泛宕屾妯糕偓?,
+        risk: '婵″倹鐏夌敮姝岊潐缁嬭櫕鈧線鍏樺▽鈩冩箒缂佹挻鐏夐敍灞芥倵闂堛垻娈戝鍌氱埗閸︾儤娅欓崗鍫濆焼鐠佽绱濋崗鍫熷Ω濮濓絽绱℃禒璺ㄦ埂鐠烘垿鈧哎鈧?,
+        talk: '閸忓牏鏁ょ敮姝岊潐缁嬭櫕鈧焦濡告稉濠氭懠閹垫捇鈧熬绱濈拠浣规閹锋挻澧ら妴浣呵旈幀浣圭湴鐟欙絽鎷版い鐢告桨闁棄鍑＄紒蹇氱箾娑撳鈧?,
+    },
+    zhongwei_compressor_offline: {
+        focus: '闁插秶鍋ｉ惇瀣╄厬閸楊偄甯囧鏃傜彲閸嬫粏绻嶉崥搴礉娑撳﹣绗呭〒绋垮竾閸旀稒婀佸▽鈩冩箒閺勫孩妯夐幒澶庢儰閵?,
+        success: '閸╄櫣鍤庣€佃鐦柌宀冨厴閻鍤懞鍌滃仯閸樺妯婇敍灞芥嚒娑擃叀濡悙鐟版嫲閸涘﹨顒熼弫棰佺窗濮ｆ柨鐖剁憴鍕旈幀浣规纯閺勫孩妯夐妴?,
+        risk: '婵″倹鐏夊▽锟犫偓澶婄唨缁惧灝鎻╅悡褝绱濇潻娆庨嚋閸︾儤娅欓崣顏囧厴閻鍩岃ぐ鎾冲閸婄》绱濋惇瀣╃瑝閸戝搫浠犳潻鎰閸氬骸妯婂鍌樷偓?,
+        talk: '鏉╂瑤绔撮獮鏇氬瘜鐟曚浇顔夐崢瀣毜缁旀瑥绱撶敮绋挎倵閿涘奔瀵岄獮鎻掑竾閸旀稒妲搁幀搴濈疄瀵扳偓娑撳﹣绗呭〒闀愮炊闁帞娈戦妴?,
+    },
+    zhongwei_trunk_break: {
+        focus: '闁插秶鍋ｉ惇瀣╄厬閸楊偊妾潻鎴滃瘜楠炶弓鑵戦弬顓炴倵閿涘矁绻涚痪鎸庣ウ闁插繐鎷版稉瀣埗娓氭稓绮伴幀搴濈疄閸欐ê瀵查妴?,
+        success: '閸╄櫣鍤庣€佃鐦柌宀€娈戞潻鐐靛殠濞翠線鍣洪崣妯哄娴兼艾绶㈢粣浣稿毉閿涘奔绗呭〒绋挎嚒娑擃厾鍋ｇ痪鍨嫲閸涘﹨顒熸导姘鐠ч攱濮径娣偓?,
+        risk: '婵″倹鐏夐弰鐘茬殸鐟曞棛娲婇幗妯款洣闁插苯鎳℃稉顓濈瑝鐡掔绱濇潻娆庨嚋閸︾儤娅欐导姘辨箙娑撳秵绔诲Δ姘焽閻愮懓濂栭崫宥呭帥娴肩姴鍩岄崫顏傗偓?,
+        talk: '鏉╂瑤绔撮獮鏇☆唹娑撹鍏遍弫鍛存娴肩姵鎸遍敍灞炬付闁倸鎮庨幏鎸庢降濠曟梻銇氱粭顑跨瀵姴娴橀惃鍕壋韫囧啩鐜崐绗衡偓?,
+    },
+    yanchi_jingbian_limited: {
+        focus: '闁插秶鍋ｉ惇瀣磦濮圭姴鍩岄棃鏍珶闂勬劖绁﹂崥搴礉閸掆晝鏁ら悳鍥ф嫲閸忔娊鏁▓浣冪鏉炶姤婀佸▽鈩冩箒閹额剙宕岄妴?,
+        success: '鏉╂劘顢戠紒鎾寸亯閹芥顩﹂柌灞介挬閸у洤鍩勯悽銊у芳娴兼艾褰夐崠鏍电礉鏉╃偟鍤庣拠锔藉剰闁插瞼娈戦崚鈺冩暏閻滃洤妯婇崐鑹板厴閻鍤弶銉ｂ偓?,
+        risk: '婵″倹鐏夎ぐ鎾冲閸︾儤娅欏▽锛勬殌韫囶偆鍙庨敍灞藉涧闂堢姳绔村▎陇绻嶇悰宀€绮ㄩ弸婊愮礉娑撳秹鈧倸鎮庨幏鎸庢降閸嬫氨菙鐎规岸鐛欓弨韬测偓?,
+        talk: '鏉╂瑤绔撮獮鏇☆唹闂勬劖绁﹂敍灞肩瑝閺勵垱鏌囨潏鎿勭礉閼板本妲告稉璇插叡鏉╂鍏樼捄鎴滅稻鏉╂劘顢戞潏鍦櫕瀵偓婵褰夌槐褋鈧?,
+    },
+}
+
+const COVERAGE_RECOMMENDATION_ORDER = [
+    'zhongwei_trunk_break',
+    'zhongwei_compressor_offline',
+    'yanchi_jingbian_limited',
+    'steady_base',
+]
+
+function resolveFocusTarget(nodes: TopoNode[], focusNodeId: string): TopoNode | null {
+    const directNode = nodes.find(node => node.id === focusNodeId)
+    if (directNode) return directNode
+
+    const sourceNode = nodes.find(node => node.sourceNodeIds?.includes(focusNodeId))
+    if (sourceNode) return sourceNode
+
+    if (focusNodeId.startsWith('JUNCTION-')) {
+        const junctionId = Number.parseInt(focusNodeId.slice('JUNCTION-'.length), 10)
+        if (Number.isFinite(junctionId)) {
+            return nodes.find(node => node.junctionId === junctionId) || null
+        }
+    }
+
+    return null
+}
+
+// ================== 閹锋挻澧ら弽宄扮础閿涘牊鐎粻鈧崷鍡欏仯 + 妫版粏澹婇崠鍝勫瀻閿?==================
+const TOPO_COLORS: Record<PointType, string> = {
+    compressor: '#fb923c',
+    distribution: '#60a5fa',
+    junction: '#22d3ee',
+    station: '#f87171',
+    valve: '#94a3b8',
+}
+
+const TOPO_LABELS: Record<PointType, string> = {
+    compressor: '閸樺鐨电粩?,
+    distribution: '閸掑棜绶粩?,
+    junction: '娴溿倖鐪归弸銏㈣埅',
+    station: '缁旀瑥婧€',
+    valve: '闂冣偓鐎?,
+}
+
+const TOPO_SIZES: Record<PointType, number> = {
+    compressor: 10,
+    distribution: 8,
+    junction: 9,
+    station: 8,
+    valve: 5,
+}
+
+const MANUAL_JUNCTION_EDIT_ENABLED_BY_DEFAULT =
+    String(import.meta.env.VITE_TOPOLOGY_MANUAL_JUNCTION_EDIT ?? '1').trim() !== '0'
+const JUNCTION_READONLY_HINT = '瑜版挸澧犻弸銏㈣埅閻㈣精绻嶇悰灞炬闁插秶绱紒鎾寸亯缂佸瓨濮㈤敍宀€绱潏鎴濇珤娴犲懏鏁幐浣稿涧鐠囩粯鐓￠惇瀣剁礉娑撳秴鍟€娴犮儲澧滃銉﹀礂閸氬牅缍旀稉杞板瘜濞翠胶鈻奸妴?
+const JUNCTION_MODE_LABELS: Record<string, string> = {
+    runtime_readonly: '閸欘亣顕板Ο鈥崇础',
+    legacy_editable: '閺冄勭ウ缁嬪鍚嬬€?,
+}
+
+const LINE_COLOR = '#2dd4bf'
+const LINE_WEIGHT = 2
+const TOPO_RENDER_BUDGET = {
+    full: { maxNodes: 520, maxEdges: 760 },
+    lite: { maxNodes: 260, maxEdges: 360 },
+}
+
+/** 娴?PipelineNode.type (NodeType 閺嬫矮濡囬崐纭风礉閸у洣璐熺亸蹇撳晸) 閺勭姴鐨犻崚鎵椽鏉堟垵娅?PointType */
+const TYPE_MAP: Record<string, PointType> = {
+    regulator: 'compressor',
+    metering: 'distribution',
+    valve: 'valve',
+    junction: 'junction',
+    // NOTE: sj4 缁涘鏌婇弫鐗堝祦閺傚洣娆㈤惄瀛樺复娴ｈ法鏁?compressor/distribution 缁涘鈧?
+    compressor: 'compressor',
+    distribution: 'distribution',
+}
+
+// ================== 閸掓稑缂撶痪顖涘珖閹垫垵娓鹃悙瑙勭垼鐠?==================
+function createTopoMarkerContent(type: PointType, name: string = '', isHighlight = false, isJunction = false): string {
+    const color = TOPO_COLORS[type]
+    const size = isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[type]
+    const border = isHighlight ? '2px solid rgba(255,255,255,0.9)' : '1px solid rgba(255,255,255,0.35)'
+    const shadow = isHighlight ? '0 0 10px rgba(255,255,255,0.45)' : '0 1px 6px rgba(0,0,0,0.35)'
+    const shapeStyle = isJunction
+        ? `width:${size}px;height:${size}px;border-radius: 4px;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
+        : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
+    
+    return `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+            <div style="${shapeStyle}"></div>
+            ${name ? `<div style="position: absolute; top: ${size + 7}px; white-space: nowrap; font-size: 11px; line-height: 1.2; color: #e2e8f0; background: rgba(10,18,28,0.75); border: 1px solid rgba(148,163,184,0.35); border-radius: 6px; padding: 1px 6px; z-index: 10;">${name}</div>` : ''}
+        </div>
+    `
+}
+
+// ================== 娑撹崵绮嶆禒?==================
+const MapTopologyView: React.FC = () => {
+    const location = useLocation()
+    const navigate = useNavigate()
+    const [mapInstance, setMapInstance] = useState<any>(null)
+    const handleMapLoad = useCallback((map: any) => setMapInstance(map), [])
+    const importedOnceRef = useRef(false)
+    const appliedFocusNodeRef = useRef<string | null>(null)
+
+    // 缁狅紕鍤庨弫鐗堝祦瀵倹顒為崝鐘烘祰
+    const [pipelines, setPipelines] = useState<PipelinePackage[]>([])
+    useEffect(() => {
+        loadAllPipelines()
+            .then(data => setPipelines(data))
+            .catch(err => console.error('[MapTopologyView] 缁狅紕鍤庨弫鐗堝祦閸旂姾娴囨径杈Е:', err))
+    }, [])
+
+    // 缂傛牞绶崳銊уЦ閹?
+    const [baseTopoNodes, setBaseTopoNodes] = useState<BaseTopoNode[]>([])
+    const [baseTopoEdges, setBaseTopoEdges] = useState<BaseTopoEdge[]>([])
+    const [topoNodes, setTopoNodes] = useState<TopoNode[]>([])
+    const [topoEdges, setTopoEdges] = useState<TopoEdge[]>([])
+    const [junctionGroups, setJunctionGroups] = useState<JunctionGroup[]>([])
+    const [manualJunctionEditingEnabled, setManualJunctionEditingEnabled] = useState(
+        MANUAL_JUNCTION_EDIT_ENABLED_BY_DEFAULT
+    )
+    const [junctionMode, setJunctionMode] = useState<string>('runtime_readonly')
+    const [editMode, setEditMode] = useState<EditMode>('view')
+    const [pointType, setPointType] = useState<PointType>('station')
+    const [connectFrom, setConnectFrom] = useState<string | null>(null)
+    const [statusMsg, setStatusMsg] = useState('閻愮懓鍤妴灞筋嚤閸忋儲瀚囬幍鎴欌偓宥呭鏉炶棄鍑￠張澶岊吀缁?)
+    const [selectedMergeNodeIds, setSelectedMergeNodeIds] = useState<string[]>([])
+    const [mergeJunctionName, setMergeJunctionName] = useState('')
+    const [mergeJunctionDescription, setMergeJunctionDescription] = useState('')
+    const [isMerging, setIsMerging] = useState(false)
+    const [deletingJunctionId, setDeletingJunctionId] = useState<number | null>(null)
+    const [activeTab, setActiveTab] = useState<PanelTab>('simulation')
+    const activeTabRef = useRef<PanelTab>(activeTab)
+
+    // Tooltip 閹剚璇炲鍡欏Ц閹?
+    const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
+    const [tooltipPos, setTooltipPos] = useState<{ x: number, y: number } | null>(null)
+    const hoveredRawEdge = useMemo(() => {
+        if (!hoveredEdgeId) return null;
+        const e = topoEdges.find(edge => edge.id === hoveredEdgeId);
+        if (!e) return null;
+        for (const p of pipelines) {
+            const lines = Array.isArray(p?.lines) ? p.lines : [];
+            const l = lines.find(x => x.startNodeId === e.startNodeId || e.sourceEdgeIds?.includes(x.id));
+            if (l) {
+                return {
+                    name: e.name || l.name,
+                    flowRate: l.flowRate,
+                    currentPressure: l.currentPressure,
+                    pressureLevel: l.pressureLevel,
+                    startNodeId: e.startNodeId
+                }
+            }
+        }
+        return e;
+    }, [hoveredEdgeId, topoEdges, pipelines])
+
+    useEffect(() => {
+        activeTabRef.current = activeTab
+        if (activeTab !== 'edit') {
+            setEditMode('view')
+            setConnectFrom(null)
+        }
+    }, [activeTab])
+    const [searchText, setSearchText] = useState('')
+    const [report, setReport] = useState<ValidationReport | null>(null)
+    const [centralityData, setCentralityData] = useState<Array<{ id: string; name: string; value: number }>>([])
+
+    const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
+    const [seedNodePressures, setSeedNodePressures] = useState<Map<string, SeedNodePressure>>(new Map())
+    const [nodeParamOverrides, setNodeParamOverrides] = useState<Record<string, { target_pressure_mpa?: number; min_pressure_mpa?: number; temperature_c?: number }>>({})
+    const [edgeLengthOverrides, setEdgeLengthOverrides] = useState<Record<string, number>>({})
+    const [showSimParamEditor, setShowSimParamEditor] = useState(false)
+    const [showSnapshotPressureOverlay, setShowSnapshotPressureOverlay] = useState(false)
+    const [globalParamDefaults, setGlobalParamDefaults] = useState<{
+        default_pressure_mpa?: number
+        default_temperature_c?: number
+        default_flow_rate?: number
+        apply_to_sources?: boolean
+    }>({})
+    const [paramValidationError, setParamValidationError] = useState<string | null>(null)
+    const [historyChartTarget, setHistoryChartTarget] = useState<null | {
+        stationName?: string
+        junctionId?: string
+        displayName?: string
+    }>(null)
+
+    // 閹俱倝鏀㈤弽?
+    type UndoAction =
+        | { type: 'add-node'; nodeId: string }
+        | { type: 'add-edge'; edgeId: string }
+        | { type: 'create-junction'; junctionId: number; name: string }
+        | { type: 'delete-junction'; group: JunctionGroup }
+    const [undoStack, setUndoStack] = useState<UndoAction[]>([])
+
+    // 閹搭亝鏌囨禒璺ㄦ埂閻樿埖鈧?
+    const [cutoffNodeId, setCutoffNodeId] = useState<string | null>(null)
+    const [cutoffResult, setCutoffResult] = useState<CutoffResult | null>(null)
+    const [cutoffSearch, setCutoffSearch] = useState('')
+
+    // 娣囨繂鐡ㄩ張鍝勫煑閿涙俺绐￠煪顏呭珛閹锋垝鎱ㄩ弨鍦畱閸ф劖鐖r
+    const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
+    const [unsavedEdgeIds, setUnsavedEdgeIds] = useState<Set<string>>(new Set())
+    const [hasSavedDraft, setHasSavedDraft] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const {
+        overlay: steadyOverlay,
+        baselineOverlay: steadyBaselineOverlay,
+        isLoading: steadySimLoading,
+        error: steadySimError,
+        currentScenario: steadyScenarioId,
+        snapshots: steadySnapshots,
+        snapshotLoading: steadySnapshotLoading,
+        baselineSnapshotLoading: steadyBaselineSnapshotLoading,
+        snapshotError: steadySnapshotError,
+        selectedSnapshotRunId: steadySelectedSnapshotRunId,
+        baselineSnapshotRunId: steadyBaselineSnapshotRunId,
+        trialRunScenarioId: steadyTrialRunScenarioId,
+        bulkTrialRunActive: steadyBulkTrialRunActive,
+        comparison: steadyComparison,
+        trialRunItems: steadyTrialRunItems,
+        setScenario: setSteadyScenario,
+        setSelectedSnapshotRunId: setSteadySelectedSnapshotRunId,
+        setBaselineSnapshotRunId: setSteadyBaselineSnapshotRunId,
+        runSimulation: runSteadySimulation,
+        saveSnapshot: saveSteadySnapshot,
+        refreshSnapshots: refreshSteadySnapshots,
+        loadS鈥?0244 tokens truncated鈥?/div>
+                                        <div className="mt-1 text-[11px] text-slate-300 whitespace-pre-line leading-5">{simulationNarrative}</div>
+                                    </div>
+                                    <div className="hidden rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-3 py-2">
+                                        <div className="text-[10px] uppercase tracking-wider text-emerald-200">娴滈缚鐦界憴锝夊櫞閿涘牆鈧偐褰崣顖濐嚢閿?/div>
+                                        <div className="mt-1 text-[11px] text-slate-300 whitespace-pre-line leading-5">{simulationNarrativePlain}</div>
+                                    </div>
+                                </div>
+                                {(steadySimError || steadySnapshotError) && <div className="rounded-lg border border-red-900/40 bg-red-950/20 p-3 text-[11px] text-red-200">{steadySimError || steadySnapshotError}</div>}
+                            </div>
+                        )}
+                        {activeTab === 'centrality' && (
+                            <div className="space-y-2">
+                                {centralityData.length === 0 ? (
+                                    <div className="text-center py-6">
+                                        <span className="material-symbols-outlined text-4xl text-gray-600">stars</span>
+                                        <p className="text-gray-500 text-xs mt-2">閻愮懓鍤い鑸电埉閵嗗苯鍙ч柨顔垮Ν閻愬箍鈧秷顓哥粻?/p>
+                                        <p className="text-gray-600 text-[10px] mt-1">閸╄桨绨禒瀣殶娑擃厼绺鹃幀褏鐣诲▔?/p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p className="text-[10px] text-gray-500">娴犲鏆熸稉顓炵妇閹?Top {centralityData.length}</p>
+                                        {centralityData.map((node, i) => (
+                                            <button key={node.id} onClick={() => { const n = topoNodes.find(x => x.id === node.id); if (n) flyTo(n) }}
+                                                className="w-full flex items-center gap-2 p-2 rounded-lg text-xs hover:bg-white/5 transition-colors text-left">
+                                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${i < 3 ? 'bg-amber-500 text-black' : 'bg-gray-700 text-gray-300'}`}>{i + 1}</span>
+                                                <span className="text-gray-200 flex-1 truncate">{node.name}</span>
+                                                <div className="w-16 h-1.5 bg-gray-800 rounded overflow-hidden shrink-0">
+                                                    <div className="h-full bg-gradient-to-r from-amber-500 to-cyan-400 rounded" style={{ width: `${node.value}%` }} />
+                                                </div>
+                                                <span className="text-gray-500 w-8 text-right shrink-0">{node.value}%</span>
+                                            </button>
+                                        ))}
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 閻樿埖鈧焦鐖?*/}
+                    <div className="px-3 py-2 bg-[#080d12] border-t border-gray-800/60 text-[10px] text-gray-500 truncate shrink-0 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[10px]">info</span>{statusMsg}
+                    </div>
+                </div>
+            </div>
+
+            {selectedNode && (
+                <div className="absolute top-[84px] right-4 bottom-4 z-20 w-[360px]">
+                    <div className="h-full bg-[#0c1218]/95 backdrop-blur-md rounded-xl border border-cyan-500/20 shadow-2xl overflow-hidden flex flex-col">
+                        <div className="px-4 py-3 border-b border-cyan-500/20 flex items-center justify-between bg-[#0f1722]">
+                            <div>
+                                <h3 className="text-sm font-semibold text-white">{selectedNode.name}</h3>
+                                <p className="text-[11px] text-gray-400 mt-0.5">閼哄倻鍋ｇ拠锔藉剰</p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedNode(null)}
+                                className="text-gray-400 hover:text-white transition-colors"
+                            >
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
+                            <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: TOPO_COLORS[selectedNode.type] }} />
+                                    <span className="text-white font-medium">{selectedNode.name}</span>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-2">缁鐎烽敍姝縮electedNode.isJunction ? '閺嬨垻鑸? : TOPO_LABELS[selectedNode.type]}</p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    閸ф劖鐖ｉ敍姝縮electedNode.position[0].toFixed(4)}, {selectedNode.position[1].toFixed(4)}
+                                </p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    閸忓疇浠堟潻鐐靛殠閿涙topoEdges.filter(edge => edge.startNodeId === selectedNode.id || edge.endNodeId === selectedNode.id).length}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/20 p-3 space-y-2">
+                                <p className="text-xs text-emerald-300 uppercase tracking-wider">鏉╂劘顢戦悩鑸碘偓?/p>
+
+                                {/* 鏉╂稓鐝崢瀣 */}
+                                <div className="flex items-center justify-between gap-3 text-xs">
+                                    <span className="text-gray-400">鏉╂稓鐝崢瀣</span>
+                                    <span className="text-emerald-100 font-medium">
+                                        {selectedNodeSimulationMetrics?.pressure != null
+                                            ? `鏉╂稓鐝?${(selectedNodeAnimatedInPressure ?? (selectedNodeSimulationMetrics.pressure * 0.95)).toFixed(2)} MPa`
+                                            : selectedNodeAnimatedInPressure != null
+                                                ? `${selectedNodeAnimatedInPressure.toFixed(2)} MPa`
+                                                : selectedNodeSeedData?.operating_pressure_in != null
+                                                    ? `${selectedNodeSeedData.operating_pressure_in.toFixed(2)} MPa`
+                                                    : '閺嗗倹妫ら弫鐗堝祦'}
+                                    </span>
+                                </div>
+
+                                {/* 閸戣櫣鐝崢瀣 */}
+                                <div className="flex items-center justify-between gap-3 text-xs">
+                                    <span className="text-gray-400">閸戣櫣鐝崢瀣</span>
+                                    <span className="text-cyan-200 font-medium">
+                                        {selectedNodeSimulationMetrics?.pressure != null
+                                            ? `${(selectedNodeAnimatedOutPressure ?? selectedNodeSimulationMetrics.pressure).toFixed(2)} MPa`
+                                            : selectedNodeAnimatedOutPressure != null
+                                                ? `${selectedNodeAnimatedOutPressure.toFixed(2)} MPa`
+                                                : selectedNodeSeedData?.operating_pressure_out != null
+                                                    ? `${selectedNodeSeedData.operating_pressure_out.toFixed(2)} MPa`
+                                                    : '閺嗗倹妫ら弫鐗堝祦'}
+                                    </span>
+                                </div>
+
+                                {/* 濞撯晛瀹?*/}
+                                <div className="flex items-center justify-between gap-3 text-xs">
+                                    <span className="text-gray-400">閸戣櫣鐝〒鈺佸</span>
+                                    <span className="text-emerald-100 font-medium">
+                                        {selectedNodeSimulationMetrics?.temperatureC != null
+                                            ? `${selectedNodeSimulationMetrics.temperatureC.toFixed(1)}鎺矯${selectedNodeSimulationMetrics.estimated ? '閿涘牅鍙婄粻妤嬬礆' : ''}`
+                                            : selectedNodeSeedData?.operating_temp_out != null
+                                                ? `${selectedNodeSeedData.operating_temp_out.toFixed(1)}鎺矯`
+                                                : '閺嗗倹妫ら弫鐗堝祦'}
+                                    </span>
+                                </div>
+                                <div className="my-1 h-px bg-emerald-400/20" />
+                                <div className="text-[10px] uppercase tracking-wider text-violet-200">閸╄櫣鍤庤箛顐ゅ弾</div>
+                                <div className="flex items-center justify-between gap-3 text-xs">
+                                    <span className="text-gray-400">閸╄櫣鍤庢潻娑氱彲閸樺濮?/span>
+                                    <span className="text-violet-200 font-medium">
+                                        {selectedNodeBaselineMetrics?.pressure != null
+                                            ? `${(selectedNodeBaselineMetrics.pressure * 0.95).toFixed(2)} MPa`
+                                            : '閺嗗倹妫ら弫鐗堝祦'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 text-xs">
+                                    <span className="text-gray-400">閸╄櫣鍤庨崙铏圭彲閸樺濮?/span>
+                                    <span className="text-violet-200 font-medium">
+                                        {selectedNodeBaselineMetrics?.pressure != null
+                                            ? `${selectedNodeBaselineMetrics.pressure.toFixed(2)} MPa`
+                                            : '閺嗗倹妫ら弫鐗堝祦'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 text-xs">
+                                    <span className="text-gray-400">閸╄櫣鍤庨崙铏圭彲濞撯晛瀹?/span>
+                                    <span className="text-violet-200 font-medium">
+                                        {selectedNodeBaselineMetrics?.temperatureC != null
+                                            ? `${selectedNodeBaselineMetrics.temperatureC.toFixed(1)}鎺矯${selectedNodeBaselineMetrics.estimated ? '閿涘牅鍙婄粻妤嬬礆' : ''}`
+                                            : '閺嗗倹妫ら弫鐗堝祦'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {selectedNode.isJunction ? (
+                                <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 space-y-3">
+                                    <div>
+                                        <p className="text-xs text-purple-300 uppercase tracking-wider">鎼存洖鐪扮粩娆戝仯</p>
+                                        <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                                            {selectedNode.sourceNodeIds?.map(stationId => {
+                                                const rawNode = baseTopoNodes.find(node => node.id === stationId)
+                                                return (
+                                                    <div key={stationId} className="text-xs text-gray-300 bg-white/5 rounded px-2 py-1">
+                                                        {rawNode?.name || stationId}
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                    <div className="rounded-lg bg-black/15 px-3 py-2 text-xs text-gray-300 space-y-1">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span>閺夈儲绨?/span>
+                                            <span className="text-[10px] text-gray-400">
+                                                {selectedJunctionGroup && isRuntimeReadonlyGroup(selectedJunctionGroup)
+                                                    ? '鏉╂劘顢戦弮鍫曞櫢缂?
+                                                    : '閹靛浼愰幑蹇撴値鐟曞棛娲?}
+                                            </span>
+                                        </div>
+                                        {selectedNode.junctionKind && (
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span>閺嬨垻鑸猾璇茬€?/span>
+                                                <span className="text-[10px] text-gray-400">{selectedNode.junctionKind}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {!manualJunctionEditingEnabled && (
+                                        <div className="rounded-lg border border-sky-500/20 bg-sky-950/20 px-3 py-2.5 text-xs text-gray-300 leading-5">
+                                            瑜版挸澧犻弸銏㈣埅閺夈儴鍤滄潻鎰攽閺冨爼鍣哥紓鏍у鐎涙劘銆冮敍宀€鎴风紒顓濈稊娑撶儤瀚囬幍鎴炵亼缁捐棄寮稉搴＄潔缁€鍝勬嫲鐠侊紕鐣婚敍灞肩稻鏉╂瑩鍣锋稉宥呭晙閹跺﹥澧滃銉﹀閸掑棗缍嬫稉缁樼ウ缁嬪鈧?
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={() => setHistoryChartTarget({
+                                            junctionId: selectedNode.junctionId ? `JUNCTION-${selectedNode.junctionId}` : selectedNode.id,
+                                            displayName: selectedNode.name,
+                                        })}
+                                        className="w-full bg-blue-700/80 hover:bg-blue-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                                    >
+                                        <span className="material-symbols-outlined text-sm">show_chart</span>閺屻儳婀呴弸銏㈣埅閸樺棗褰禱r
+                                    </button>
+                                    {canDeleteSelectedJunction && selectedJunctionGroup && (
+                                        <button
+                                            onClick={() => void handleDeleteManualJunction(selectedJunctionGroup)}
+                                            disabled={deletingJunctionId === selectedJunctionGroup.id}
+                                            className="w-full bg-red-900/60 hover:bg-red-800 text-red-200 py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1 disabled:opacity-40"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">account_tree_off</span>
+                                            {deletingJunctionId === selectedJunctionGroup.id ? '閹峰棗鍨庢稉?..' : '閹峰棗鍨庢潻娆庨嚋閹靛浼愰幑蹇撴値'}
+                                        </button>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="rounded-lg border border-gray-700/40 bg-white/5 p-3">
+                                    <p className="text-xs text-gray-300 leading-5">
+                                        鏉╂瑩鍣锋穱婵堟殌缁旀瑧鍋ｉ弻銉ф箙閸滃瞼鍋ｆ担宥囩椽鏉堟垯鈧倹鐏戠痪钘夊彠缁崵鏁遍崥搴″酱閹稿姘﹀Ч鍥潐閸掓瑨绻嶇悰灞炬閻㈢喐鍨氶敍灞肩瑝閸愬秴婀潻娆庨嚋闂堛垺婢橀柌灞惧瀹搞儲宕楅崥鍫涒偓?
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {historyChartTarget && (
+                <div className="absolute inset-0 z-30 bg-black/30 backdrop-blur-[1px] flex items-center justify-center">
+                    <ScadaHistoryChart
+                        stationName={historyChartTarget.stationName}
+                        junctionId={historyChartTarget.junctionId}
+                        displayName={historyChartTarget.displayName}
+                        onClose={() => setHistoryChartTarget(null)}
+                    />
+                </div>
+            )}
+
+            {/* 缁狅紕鍤?Hover Tooltip */}
+            {hoveredEdgeId && tooltipPos && hoveredRawEdge && (
+                <div
+                    className="fixed z-50 pointer-events-none bg-[#0f1722]/95 border border-cyan-500/30 rounded-lg p-3 shadow-2xl backdrop-blur-md min-w-[200px]"
+                    style={{ left: tooltipPos.x + 15, top: tooltipPos.y + 15 }}
+                >
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                        <span className="text-white font-medium text-sm">{hoveredRawEdge.name}</span>
+                    </div>
+                    {hoveredRawEdge.flowRate !== undefined && (
+                        <div className="flex items-center justify-between gap-4 mt-2">
+                            <span className="text-gray-400 text-xs">鏉╂劘顢戝ù渚€鍣烘导鎷岊吀</span>
+                            <span className="text-cyan-300 font-mono text-sm">{hoveredRawEdge.flowRate} <span className="text-[10px] text-gray-500">娑撳洦鏌?婢?/span></span>
+                        </div>
+                    )}
+                    {hoveredRawEdge.currentPressure !== undefined && (
+                        <div className="flex items-center justify-between gap-4 mt-1">
+                            <span className="text-gray-400 text-xs">閸у洤甯囬幒銊︾川</span>
+                            <span className="text-emerald-300 font-mono text-sm">{hoveredRawEdge.currentPressure} <span className="text-[10px] text-gray-500">MPa</span></span>
+                        </div>
+                    )}
+                    {hoveredRawEdge.flowRate === undefined && (
+                        <p className="text-[10px] text-gray-500 mt-2 italic">閺嗗倹妫ゅù浣风秼閸斻劌濮忕€涳箒顔曠€?/p>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
+export default MapTopologyView
+
+

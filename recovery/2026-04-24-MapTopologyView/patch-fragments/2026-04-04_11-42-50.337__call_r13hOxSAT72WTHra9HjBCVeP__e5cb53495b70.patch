@@ -1,0 +1,25 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-type EditMode = 'view' | 'draw-point' | 'connect' | 'merge'
++type EditMode = 'view' | 'draw-point' | 'connect'
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    type UndoAction = 
+-        | { type: 'add-node'; nodeId: string }
+-        | { type: 'add-edge'; edgeId: string }
+-        | { type: 'create-junction'; junctionId: number; name: string; stationIds: string[] }
+-        | { type: 'delete-junction'; group: JunctionGroup }
++    type UndoAction =
++        | { type: 'add-node'; nodeId: string }
++        | { type: 'add-edge'; edgeId: string }
+     const [undoStack, setUndoStack] = useState<UndoAction[]>([])
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-    const persistedTopologyNodeIds = useMemo(
+-        () => new Set(rawPipelineData.nodes.map(node => node.id)),
+-        [rawPipelineData.nodes]
+-    )
+-
+     const clearRenderedTopology = useCallback(() => {
+*** End Patch

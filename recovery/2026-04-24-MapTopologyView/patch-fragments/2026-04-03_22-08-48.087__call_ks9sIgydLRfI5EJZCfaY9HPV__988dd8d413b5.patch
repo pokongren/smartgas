@@ -1,0 +1,87 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\docs\2026-04-04-topology-rule-fix-summary.md
++# 拓扑规则收口修复总结
++
++## 改动目标
++
++这次主要修三件事：
++
++1. 让 `hierarchyRenderer.ts` 真正接进全国地图视图链路。
++2. 清掉 `pipelineDomain.ts` 和 `hierarchyRenderer.ts` 里会影响判断逻辑的乱码风险。
++3. 把拓扑文档收口到当前真实运行口径：`8080`、`/api/topology/...` 和 `/topology/...` 并存但职责不同。
++
++## 改动前的问题
++
++- `src/utils/hierarchyRenderer.ts` 虽然存在，但没有任何视图真的在用。
++- `src/utils/pipelineDomain.ts` 的中文回退判断有乱码风险，节点和管线类型可能被兜底成默认值。
++- `docs/TOPOLOGY_SETUP_GUIDE.md`、`docs/TOPOLOGY_COMPUTATION_USAGE.md` 还停在 `8000` 和旧的 `/api/topology/...` 叙述上，和代码现状不一致。
++
++## 改动后的结果
++
++- `src/utils/mapRenderer.ts` 已经接入 `getNodeImportance()` 和 `getMaxVisibleImportanceForZoom()`。
++- 全国地图视图现在会按缩放级别做节点重要性过滤，不再只有“阀室低缩放隐藏”这一条旧规则。
++- `src/utils/pipelineDomain.ts` 的关键词判断改成稳定的 Unicode 转义写法，避免编码把业务判断打坏。
++- 两份拓扑文档已经改成当前真实口径，明确区分：
++  - 拓扑编辑器链路更多走 `/api/topology/...`
++  - `useTopology` 这类计算链路更多走 `/topology/...`
++
++## 前后对比
++
++这次没有放前后截图。
++
++原因：这轮改动主要是规则接线、类型判断和文档口径，不是一个靠单张界面图就能说清的问题。这里用前后对比表更直观。
++
++| 项目 | 改动前 | 改动后 |
++| --- | --- | --- |
++| `hierarchyRenderer.ts` 是否被使用 | 没有真实消费方 | 已接入 `src/utils/mapRenderer.ts` |
++| 地图缩放规则 | 主要只看阀室阈值 | 增加按节点重要性分层显示 |
++| 节点/管线中文回退判断 | 有乱码风险 | 改成稳定关键词，编码不再影响判断 |
++| 拓扑接入文档端口 | 还写 `8000` | 改成 `8080` |
++| 拓扑路径说明 | 倾向旧的 `/api/topology/...` | 明确 `/api/topology/...` 与 `/topology/...` 当前分工 |
++
++## 关键文件
++
++- `src/utils/hierarchyRenderer.ts`
++- `src/utils/pipelineDomain.ts`
++- `src/utils/mapRenderer.ts`
++- `docs/TOPOLOGY_SETUP_GUIDE.md`
++- `docs/TOPOLOGY_COMPUTATION_USAGE.md`
++
++## 验证结果
++
++- 代码链路检查通过：
++  - `src/utils/mapRenderer.ts` 已引用 `getNodeImportance`、`getMaxVisibleImportanceForZoom`
++  - 过滤逻辑已进入 `renderPipelineNodesWithClustering()`
++- 构建验证通过：
++
++```bash
++npm run build
++```
++
++结果：构建成功，`vite build` 完成，没有因为这次改动引入新的构建阻断。
++
++## 影响范围
++
++- 会影响走 `MapView -> mapRenderer` 这条链路的全国地图类页面。
++- 不会自动影响 `MapTopologyView.tsx`，因为它现在还是独立渲染体系，不走 `MapView` 的节点渲染链。
++- 会影响依赖 `pipelineDomain.ts` 做类型判断的地图、拓扑和类型转换逻辑。
++
++## 风险点
++
++- 这次修的是“全国地图规则接线”，不等于“拓扑编辑页也完全统一”。
++- `/api/topology/...` 和 `/topology/...` 目前还是并存状态，文档已经如实写清，但代码层面的彻底统一还没做完。
++- 仓库里别的页面仍有历史乱码痕迹，这次只处理了会影响这条判断链的核心文件。
++
++## 回退方式
++
++如果这次规则接线导致地图缩放显示不符合预期，可以优先回退这三个文件：
++
++1. `src/utils/mapRenderer.ts`
++2. `src/utils/hierarchyRenderer.ts`
++3. `src/utils/pipelineDomain.ts`
++
++文档回退则看：
++
++1. `docs/TOPOLOGY_SETUP_GUIDE.md`
++2. `docs/TOPOLOGY_COMPUTATION_USAGE.md`
+*** End Patch

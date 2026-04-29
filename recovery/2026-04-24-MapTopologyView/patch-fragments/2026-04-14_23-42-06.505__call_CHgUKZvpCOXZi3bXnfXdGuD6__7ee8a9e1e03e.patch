@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-        const tooManyOverlays = topoNodes.length > 140 || topoEdges.length > 180
++        const tooManyOverlays = topoNodes.length > TOPO_RENDER_BUDGET.full.maxNodes || topoEdges.length > TOPO_RENDER_BUDGET.full.maxEdges
+*** End Patch

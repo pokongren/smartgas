@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                    <div className="flex items-center gap-2">
++                    <div className="flex items-center gap-2">
++                        <button
++                            onClick={openTopologyShowcase}
++                            className="px-3 py-1.5 border border-cyan-500/30 bg-cyan-950/30 hover:bg-cyan-900/40 text-cyan-100 text-xs rounded-lg transition-colors flex items-center gap-1"
++                        >
++                            <span className="material-symbols-outlined text-sm">monitoring</span>第三张图展示
++                        </button>
+                         <button
+                             onClick={() => setActiveTab('simulation')}
+                             className="px-3 py-1.5 border border-cyan-500/30 bg-cyan-900/30 hover:bg-cyan-800/40 text-cyan-100 text-xs rounded-lg transition-colors flex items-center gap-1"
+*** End Patch

@@ -1,0 +1,29 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const [baseTopoEdges, setBaseTopoEdges] = useState<BaseTopoEdge[]>([])
+     const [topoNodes, setTopoNodes] = useState<TopoNode[]>([])
+     const [topoEdges, setTopoEdges] = useState<TopoEdge[]>([])
+     const [junctionGroups, setJunctionGroups] = useState<JunctionGroup[]>([])
++    const [manualJunctionEditingEnabled, setManualJunctionEditingEnabled] = useState(
++        MANUAL_JUNCTION_EDIT_ENABLED_BY_DEFAULT
++    )
++    const [junctionMode, setJunctionMode] = useState<string>('runtime_readonly')
+     const [editMode, setEditMode] = useState<EditMode>('view')
+@@
+     const loadJunctionGroups = useCallback(async () => {
+         try {
+-            const groups = await topologyEditorApi.getJunctionGroups()
+-            setJunctionGroups(groups)
+-            return groups
++            const result = await topologyEditorApi.getJunctionGroups()
++            setJunctionGroups(result.junctions)
++            setManualJunctionEditingEnabled(result.manual_editing_enabled)
++            setJunctionMode(result.mode)
++            return result.junctions
+         } catch (error) {
+             console.error('[MapTopologyView] 枢纽组加载失败:', error)
+             setStatusMsg(error instanceof Error ? `加载枢纽组失败：${error.message}` : '加载枢纽组失败')
+             return []
+         }
+*** End Patch

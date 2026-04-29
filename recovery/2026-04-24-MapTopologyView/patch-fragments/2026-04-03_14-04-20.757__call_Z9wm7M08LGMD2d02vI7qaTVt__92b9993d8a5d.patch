@@ -1,0 +1,21 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-import { invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
++import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+@@
+     // ================== 收集全部管线原始数据（不传给 MapView，仅供导入用） ==================
+     const rawPipelineData = useMemo(() => {
+-        const nodes: PipelineNode[] = []
+-        const lines: PipelineLine[] = []
+-        for (const pkg of pipelines) {
+-            for (const layer of pkg.layers) {
+-                for (const n of layer.nodes) nodes.push(n)
+-                for (const l of layer.lines) lines.push(l)
+-            }
+-        }
+-        return { nodes, lines }
++        const { nodes, lines } = buildPipelineDataFromPackages(pipelines)
++        return { nodes, lines }
+     }, [pipelines])
+*** End Patch

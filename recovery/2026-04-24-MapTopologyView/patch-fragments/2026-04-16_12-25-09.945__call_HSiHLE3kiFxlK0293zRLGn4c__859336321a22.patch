@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-function buildOpsSuggestion(alertCount: number, avgUtilization: number, solverStatus: 'converged' | 'max_iter' | 'error'): string {`r`n    if (solverStatus === 'error') return '本次求解失败，建议先检查输入参数后重试。'`r`n    if (solverStatus === 'max_iter') return '本次达到迭代上限，建议减小扰动后重试。'`r`n    if (alertCount >= 5) return '告警较多，优先检查主干高负荷段与上下游压差。'`r`n    if (avgUtilization >= 0.82) return '利用率偏高，建议对比限流场景并提前调峰。'`r`n    return '运行状态平稳，可作为下一轮场景对比基线。'`r`n}`r`n`r`nfunction safeSetMarkerContent(marker: any, content: string): void {
++function buildOpsSuggestion(alertCount: number, avgUtilization: number, solverStatus: 'converged' | 'max_iter' | 'error'): string {
++    if (solverStatus === 'error') return '本次求解失败，建议先检查输入参数后重试。'
++    if (solverStatus === 'max_iter') return '本次达到迭代上限，建议减小扰动后重试。'
++    if (alertCount >= 5) return '告警较多，优先检查主干高负荷段与上下游压差。'
++    if (avgUtilization >= 0.82) return '利用率偏高，建议对比限流场景并提前调峰。'
++    return '运行状态平稳，可作为下一轮场景对比基线。'
++}
++
++function safeSetMarkerContent(marker: any, content: string): void {
+*** End Patch

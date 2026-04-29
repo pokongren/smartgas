@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-            safeSetMarkerContent(node.marker, createTopoMarkerContent(node.type, node.name, isSelected, !!node.isJunction))
++            safeSetMarkerContent(node.marker, createTopoMarkerContent(node.type, isLargeGraphMode ? '' : node.name, isSelected, !!node.isJunction))
+*** End Patch

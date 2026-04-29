@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                     <div className="rounded-lg border border-cyan-500/20 bg-black/10 px-3 py-2">
+                                         <div className="text-[10px] uppercase tracking-wider text-cyan-200">仿真自动解读（可给AI）</div>
+                                         <div className="mt-1 text-[11px] text-slate-300 whitespace-pre-line leading-5">{simulationNarrative}</div>
+                                     </div>
++                                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-3 py-2">
++                                        <div className="text-[10px] uppercase tracking-wider text-emerald-200">人话解释（值班可读）</div>
++                                        <div className="mt-1 text-[11px] text-slate-300 whitespace-pre-line leading-5">{simulationNarrativePlain}</div>
++                                    </div>
+                                 </div>
+*** End Patch

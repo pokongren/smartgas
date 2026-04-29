@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                zIndex: node.isJunction ? 260 : 200,
+-                zooms: [2, 30],
++                zIndex: node.isJunction ? 260 : 200,
++                zooms: [2, 20],
+@@
+-                zIndex: 100,
+-                zooms: [2, 30],
++                zIndex: 100,
++                zooms: [2, 20],
+*** End Patch

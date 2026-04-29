@@ -1,0 +1,33 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/backend/scripts/verify_we1_maintenance.py
+@@
+ def _verify_entry_semantics() -> Dict[str, Any]:
+     app_path = REPO_ROOT / "src" / "App.tsx"
+     map_path = REPO_ROOT / "src" / "views" / "MapTopologyView.tsx"
++    ai_context_path = REPO_ROOT / "src" / "components" / "ai-assistant" / "useAiAssistantPageContext.ts"
+     app_text = _read_text(app_path)
+     map_text = _read_text(map_path)
++    ai_context_text = _read_text(ai_context_path)
+@@
+         {
+             "id": "map_view_exposes_primary_entry_hint",
+             "passed": "simulationEntryHint" in map_text,
+             "file": str(map_path),
+         },
++        {
++            "id": "ai_context_map_vs_topology_distinct",
++            "passed": all(
++                token in ai_context_text
++                for token in [
++                    "'/topology':",
++                    "page: 'topology-canvas'",
++                    "Debug-only topology canvas",
++                    "'/map-topology':",
++                    "page: 'map-topology'",
++                    "Primary WE1 simulation entry on the first map",
++                ]
++            ),
++            "file": str(ai_context_path),
++        },
+     ]
+*** End Patch

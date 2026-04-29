@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    }, [simulatedNodeOutPressureMap, steadyOverlay?.run_id])
++    }, [seedNodePressures, simulatedNodeOutPressureMap, steadyOverlay?.run_id])
+*** End Patch

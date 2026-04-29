@@ -1,0 +1,22 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                    const ids = [sn.id, curr].sort()
++                    const ids = [sn.id, curr.nodeId].sort()
+                     const key = `${ids[0]}_${ids[1]}`
+-                    if (!collapsedEdges.has(key)) {
+-                        collapsedEdges.add(key)
+-                        edgePairs.push([sn.id, curr])
++                    const sourceEdgeIds = [...new Set(curr.sourceEdgeIds)]
++                    const existing = collapsedEdges.get(key)
++                    if (existing) {
++                        existing.sourceEdgeIds = [...new Set([...existing.sourceEdgeIds, ...sourceEdgeIds])]
++                    } else {
++                        collapsedEdges.set(key, {
++                            startNodeId: sn.id,
++                            endNodeId: curr.nodeId,
++                            sourceEdgeIds,
++                        })
+                     }
+                 }
+*** End Patch

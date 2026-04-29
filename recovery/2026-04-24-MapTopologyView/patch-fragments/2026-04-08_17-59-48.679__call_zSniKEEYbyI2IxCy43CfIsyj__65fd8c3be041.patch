@@ -1,0 +1,79 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-09-WE1第三张图仿真展示专页第3阶段第1轮总结_人话版.md
++一、主目标
++
++1. 这一轮要打通第一张图和第三张图的联动，让第一张图刚刚跑出来的正式仿真上下文，能直接带到第三张图展示页，不再要求用户到第三张图重新选一遍场景和快照。
++
++二、上下文与已知信息
++
++1. 第一张图是 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)，它负责正式仿真操作。第三张图是 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)，它负责仿真展示。两边之前都在用 [useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)，但是各跑各的，没有共享状态。
++
++2. 这轮不做后端改造，不上全局 store，只做轻量单向同步。原因很简单，这一轮的目标是先把展示链打通，不是重做整个状态架构。
++
++三、主代理与子代理分工
++
++1. 主代理负责收敛方案、落代码、跑构建、写总结。
++
++2. 侦察子代理负责只读检查联动边界，确认应该同步哪些字段、放在哪一层最稳、有什么回归风险。它给出的结论是优先同步 `scenarioId`、`selectedSnapshotRunId`、`baselineSnapshotRunId`、`overlay`，并提醒要覆盖“清空主仿真后不要残留旧结果”这个风险。
++
++3. 验证子代理负责独立复核当前改动链，确认第一张图到第三张图的单向同步是否闭合。当前已发起验证任务，主代理先完成本地构建验证。
++
++四、修改逻辑
++
++1. 新增了 [simulationShowcaseSync.ts](/F:/smartgas-grid/src/utils/simulationShowcaseSync.ts)。这一层只干一件事，就是把“展示上下文”写进 `sessionStorage`，再从 `sessionStorage` 读出来。这里同步的字段包括 `pilotId`、`scenarioId`、`selectedSnapshotRunId`、`baselineSnapshotRunId`、`overlay`、`updatedAt`。
++
++2. 调整了 [useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)。这次不是重构 hook，只补了两个小口子。第一个口子是 `loadSnapshotByRunId`，让第三张图能按 run_id 主动加载快照，不用依赖先点选再加载。第二个口子是 `hydrateFromContext`，让第三张图可以先吃到第一张图透传过来的上下文，再决定要不要补一次快照加载。
++
++3. 修改了 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)。这里做了两件事。第一件事是在正式仿真相关状态变化时，自动把最新展示上下文写进 `sessionStorage`。第二件事是在页头增加“第三张图展示”按钮，点过去前会先把当前上下文写好，再跳到第三张图。
++
++4. 修改了 [TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)。第三张图启动后会先读第一张图留下来的上下文，先恢复场景、选中快照、基线快照和 overlay。只要拿到了 `selectedSnapshotRunId`，就再补一次按 run_id 的正式加载，保证画布和展示卡能尽量吃到标准数据。如果快照加载失败，也至少保留第一张图透传过来的 overlay，不至于展示全空。
++
++5. 第三张图还补了一条人话提示，告诉用户“这份展示已经同步了第一张图主仿真上下文”，这样用户一眼就知道现在看的不是孤立演示页，而是带联动来源的展示页。
++
++五、执行顺序
++
++1. 先做联动数据载体，也就是 `sessionStorage` 工具文件。
++
++2. 再补 hook 的两个小口子，让页面能恢复上下文和按 run_id 补加载。
++
++3. 然后改第一张图，让它负责持续写入上下文，并给出跳转入口。
++
++4. 最后改第三张图，让它在启动时恢复上下文，并把同步状态显示出来。
++
++六、验证方式
++
++1. 本地已执行 `npm run build`，结果通过，没有出现 TypeScript 或 Vite 构建错误。
++
++2. 这轮重点验证的是三件事。第一件事是第一张图改场景、跑主仿真、换快照、换基线后，`sessionStorage` 里的展示上下文会跟着更新。第二件事是从第一张图进入第三张图后，第三张图能直接带出当前场景、当前 run、当前快照/基线状态。第三件事是即使快照补加载失败，第三张图也不会完全丢掉展示结果。
++
++3. 独立验证子代理已发起，只读复核这4个文件的联动链和回归点。
++
++七、风险与回退点
++
++1. 当前方案是轻量同步，不是最终架构。好处是这一轮落地快、影响面小。代价是状态共享仍然是页面级单向同步，不是全局统一状态。
++
++2. 现在同步了完整 `overlay`。对 WE1 试点来说这样最直观，因为第三张图画布和展示卡都能直接用。后面如果网络规模再放大，`sessionStorage` 体积可能会变大，到时候再退成“只存 run_id + 摘要，再懒加载完整结果”也来得及。
++
++3. 这轮没有做第三张图反向改第一张图，目的是防止两个页面互相覆盖状态，先把主链路控制在“第一张图驱动第三张图”。
++
++八、前后对比
++
++1. 修改前后对比如下。
++
++| 项目 | 修改前 | 修改后 |
++| --- | --- | --- |
++| 第一张图和第三张图关系 | 两边各自跑，各自存状态 | 第一张图把正式仿真上下文单向带给第三张图 |
++| 第三张图打开后的表现 | 只能看自己页面当前状态，常常需要重新选 | 启动时先恢复第一张图的场景、快照、基线和 overlay |
++| 用户入口 | 从第一张图切到第三张图没有专门入口 | 第一张图页头新增“第三张图展示”按钮 |
++| 画布展示 | 只能靠第三张图自己已有 overlay | 可以先吃第一张图同步来的 overlay，再按 run_id 补标准加载 |
++
++2. 这轮没有补截图。原因是当前环境里更关键的是把联动链和代码落地，前后差异用上面的对比表已经能准确说明。
++
++九、最终交付物
++
++1. 新增文件：[simulationShowcaseSync.ts](/F:/smartgas-grid/src/utils/simulationShowcaseSync.ts)。
++
++2. 修改文件：[useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)、[MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)、[TopologyView.tsx](/F:/smartgas-grid/src/views/TopologyView.tsx)。
++
++3. 本轮总结文件就是当前这份：[2026-04-09-WE1第三张图仿真展示专页第3阶段第1轮总结_人话版.md](/F:/smartgas-grid/docs/2026-04-09-WE1第三张图仿真展示专页第3阶段第1轮总结_人话版.md)。
+*** End Patch

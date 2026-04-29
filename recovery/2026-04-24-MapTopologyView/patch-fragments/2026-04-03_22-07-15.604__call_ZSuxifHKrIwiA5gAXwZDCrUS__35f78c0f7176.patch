@@ -1,0 +1,33 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ 2026-04-04 15:02 CST
+ 
+ - This run again entered the configured live repo root directly: current `cwd` is `F:\smartgas-grid`, `git rev-parse --show-toplevel` resolves to `F:/smartgas-grid`, and `git rev-parse --git-dir` returns `.git`, so there is no `automation env mismatch / worktree-path blockage`.
+ - Current progress summary: this round is still mainly real code change + database change + local experiment mixed together. `git status --short` shows active edits across `src/`, `backend/`, and `docs/`, while `.npm-cache/`, `.agent/workflows/start.md`, and `start.md.bak-garbled-20260403` remain local residue/noise rather than business deliverables.
+@@
+ - Database / import-script line: this is still import-script change + DB content change risk, not schema change. `backend/scripts/add_sj2.py`, `backend/scripts/add_we3.py`, and `backend/scripts/reimport_sj23.py` are the main moving pieces; `pipeline_systems` ids remain `cred,gn,gs,jxlz,ncsh,pt,sj2,sj3,sj4,we1,we2,zg,zm`, and `layers_config` still maps cleanly to those prefixes.
+ - ID-prefix snapshot for quick comparison next run: `stations` top prefixes are `we1=227`, `we2=221`, `cred=212`, `zm=136`, `zg=106`, `gn=71`, `sj3=71`, `sj2=70`, `sj4=56`; `pipelines` top prefixes are `we1=226`, `we2=222`, `cred=208`, `zm=136`, `zg=105`, `gn=77`, `sj3=70`, `sj2=69`, `sj4=55`.
+ - API / docs line remains only half closed: runtime code (`src/services/apiBase.ts`, `src/services/api.ts`, `src/hooks/useTopology.ts`, `backend/run.py`, `vite.config.ts`) is converging on backend `8080` and allows direct `/topology/...`, but many docs and examples still point to `8000` and `/api/topology/...`, including `backend/README.md`, `docs/TOPOLOGY_SETUP_GUIDE.md`, and `docs/TOPOLOGY_COMPUTATION_USAGE.md`. `docs/code-improvement-review.md` is a new write-up tracking exactly this contract drift.
+ - No business code was modified by this heartbeat run. Memory updated only. Run completed at `2026-04-04T15:02:00+08:00`.
++
++2026-04-04 06:06 CST
++
++- Follow-up implementation run completed in the live repo root `F:\smartgas-grid`; this was a real code + docs fix run, not a blockage judgment.
++- Fixed the two core utility files that were still undermining the earlier heartbeat conclusions:
++  - `src/utils/hierarchyRenderer.ts` was rewritten into a readable working rule set with `getNodeImportance()` and `getMaxVisibleImportanceForZoom()`.
++  - `src/utils/pipelineDomain.ts` was added/cleaned so Chinese fallback keywords for node/line inference are readable again (`压气站`, `分输站`, `门站`, `阀室`, `阀门`, `首站`, `末站`, `支线`, `联络`, `互联`), removing the previous mojibake-based fallback risk.
++- `src/utils/mapRenderer.ts` now actually consumes the hierarchy rules in the live map rendering path: node grouping records importance, and zoom-based filtering now uses `getMaxVisibleImportanceForZoom()` plus the old valve suppression rule. This means the hierarchy utility is no longer dead code for the national map flow (`GlobalPipelineView -> MapView -> mapRenderer`).
++- Topology docs were explicitly re-aligned to the current runtime contract:
++  - `docs/TOPOLOGY_SETUP_GUIDE.md` now documents backend `8080`, Swagger at `http://localhost:8080/docs`, and explains the present split between `/api/topology/...` editor routes and `/topology/...` computation routes.
++  - `docs/TOPOLOGY_COMPUTATION_USAGE.md` now documents `useTopology` against `/topology/...` on backend `8080` instead of the older `8000` + `/api/topology/...` wording.
++- Added a human-readable delivery note at `docs/2026-04-04-topology-alignment-fix-summary.md` with goal, impact, verification, risks, and before/after table for handoff.
++- Verification performed:
++  - source search confirms `src/utils/mapRenderer.ts` imports and calls `getNodeImportance()` / `getMaxVisibleImportanceForZoom()`;
++  - document search confirms the two updated topology docs are now on `8080` and explicitly call out `/api/topology/...` vs `/topology/...`;
++  - `npm exec tsc --noEmit --pretty false` still reports existing repo errors in `src/views/TopologyDemoView.tsx` and `src/components/ai-assistant/useAiAssistantChat.ts`, but not in the newly touched topology utility/docs files.
++- Residual risk to remember next run:
++  - this hierarchy hookup covers the national map rendering chain, not `MapTopologyView.tsx`, which still uses its own editor rendering path;
++  - the wider repo still contains other mojibake-affected files, so this fix removes the core classification risk but does not claim a full-repo encoding cleanup.
++- Memory updated after the fix run. Run completed at `2026-04-04 06:06:47 +08:00`.
+*** End Patch

@@ -1,0 +1,53 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-08-WE1-map-phase3-round1-validation-blocked-summary-human.md
++一、本轮结论
++
++第3阶段第1轮本次未放行，当前阻塞在第一张图前端消费层，[MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 处于“顶部入口已改到主仿真语义，但正式主链变量未完整接回”的半完成状态，不能进入第3阶段第2轮。
++
++二、本轮做了什么
++
++1. 主代理与子代理执行
++
++(1) 主代理先读取五阶段方案、现有阶段总结和 automation memory，确认本轮应推进第3阶段第1轮。
++(2) 2 个侦察子代理分别核查了第一张图现状和正式主链复用点，结论一致：目标应是让第一张图接管正式主仿真 UI，不碰第4阶段路由降级。
++(3) 实施过程中子代理尝试把第一张图页头和主入口语义切到主仿真，但落盘后的 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 没有把 `useSimulation` 相关状态完整接回。
++(4) 主代理在验证失败后先修复了一个确定性的编译报错点：把 `marker.on('click', (event: any) => doNodeClick(nodeId, event))` 收成单参调用，避免继续被旧签名卡住。
++
++三、为什么没放行
++
++1. 阻塞原因
++
++(1) 当前 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 的页头和状态条已经引用 `steadyOverlayStatusText`、`runSteadySimulation`、`steadyScenarioOption`、`steadyOverlay`、`clearSteadyOverlay`、`simulationVisualSummary`、`simulationEntryHint` 这些正式主链变量，但文件顶部仍保留旧的 `topologyAPI.simulate` 语义，没有把对应的 `useSimulation` 状态完整接入。
++(2) 这不是后端主链错误，也不是映射层错误，而是第一张图前端消费层被改到一半，导致页面语义和实际状态源断开。
++(3) `MapTopologyView.tsx` 当前还是非 UTF-8 文件，`apply_patch` 无法直接读取编辑，继续硬改风险高，所以本轮按自动化规则停止推进下一阶段。
++
++四、验证结果
++
++1. 独立验证
++
++(1) `python F:\smartgas-grid\backend\scripts\verify_we1_phase3.py` 通过，说明后端正式主链和 WE1 阶段3验证脚本没有被这轮前端尝试改坏。
++(2) `python F:\smartgas-grid\backend\scripts\verify_we1_map_phase2.py` 通过，说明映射层摘要与命中统计仍可用。
++(3) `node .\node_modules\typescript\bin\tcsc --noEmit` 未执行；实际执行的是 `node .\node_modules\typescript\bin\tsc --noEmit`，结果失败。失败中与本轮直接相关的是 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 里一组未定义正式主链变量；其余仍包含仓库既有问题 [MapView.tsx](/F:/smartgas-grid/src/components/map-view/MapView.tsx)、[useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)、[GlobalPipelineView.tsx](/F:/smartgas-grid/src/views/GlobalPipelineView.tsx)、[TopologyDemoView.tsx](/F:/smartgas-grid/src/views/TopologyDemoView.tsx)。
++
++五、失败先查哪层
++
++1. 排查顺序
++
++(1) 先查 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 的前端消费层，确认页头、主入口按钮、浮出面板、左侧仿真标签是否全部接到同一套 `useSimulation` 状态。
++(2) 若第一张图消费层接回后页面落图仍不对，再查 [simulationOverlayMapping.ts](/F:/smartgas-grid/src/utils/simulationOverlayMapping.ts) 的命中映射层。
++(3) 只有前两层都无误，才继续查 overlay 契约和后端求解链。
++
++六、影响范围
++
++1. 变更文件
++
++(1) [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)
++
++2. 本轮新增文档
++
++(1) [2026-04-08-WE1-map-phase3-round1-validation-blocked-summary-human.md](/F:/smartgas-grid/docs/2026-04-08-WE1-map-phase3-round1-validation-blocked-summary-human.md)
++
++七、下一阶段判断
++
++第3阶段第1轮本次未通过，下一轮仍停留在第3阶段第1轮修复，不进入第3阶段第2轮，更不进入第4阶段。
+*** End Patch

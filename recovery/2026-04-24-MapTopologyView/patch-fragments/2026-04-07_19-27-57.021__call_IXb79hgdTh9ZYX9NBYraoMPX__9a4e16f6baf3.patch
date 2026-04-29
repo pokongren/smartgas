@@ -1,0 +1,70 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ const TOPO_SIZES: Record<PointType, number> = {
+     compressor: 10,
+     distribution: 8,
+     junction: 9,
+     station: 8,
+     valve: 5,
+ }
++
++interface MarkerRenderOptions {
++    fillColor?: string
++    borderColor?: string
++    glowColor?: string
++    labelColor?: string
++    sizeOverride?: number
++}
+ 
+ const MANUAL_JUNCTION_EDIT_ENABLED_BY_DEFAULT =
+     String(import.meta.env.VITE_TOPOLOGY_MANUAL_JUNCTION_EDIT ?? '1').trim() !== '0'
+@@
+ const LINE_COLOR = '#34d399'
+ const LINE_WEIGHT = 2
++const SIMULATION_ALERT_COLORS: Record<'normal' | 'warning' | 'critical', string> = {
++    normal: '#22c55e',
++    warning: '#f59e0b',
++    critical: '#ef4444',
++}
++const SIMULATION_NEUTRAL_COLOR = '#38bdf8'
+ 
+ /** 从 PipelineNode.type (NodeType 枚举值，均为小写) 映射到编辑器 PointType */
+ const TYPE_MAP: Record<string, PointType> = {
+@@
+-function createTopoMarkerContent(type: PointType, name: string = '', isHighlight = false, isJunction = false): string {
+-    const color = TOPO_COLORS[type]
+-    const size = isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[type]
+-    const border = isHighlight ? '2px solid #fff' : '1px solid rgba(255,255,255,0.5)'
+-    const shadow = isHighlight ? '0 0 8px rgba(255,255,255,0.5)' : 'none'
++function createTopoMarkerContent(
++    type: PointType,
++    name: string = '',
++    isHighlight = false,
++    isJunction = false,
++    options?: MarkerRenderOptions,
++): string {
++    const color = options?.fillColor ?? TOPO_COLORS[type]
++    const size = options?.sizeOverride ?? (isJunction ? TOPO_SIZES.station + 4 : TOPO_SIZES[type])
++    const borderColor = options?.borderColor ?? (isHighlight ? '#ffffff' : 'rgba(255,255,255,0.5)')
++    const glowColor = options?.glowColor
++    const border = `2px solid ${borderColor}`
++    const shadow = glowColor
++        ? `0 0 10px ${glowColor}`
++        : isHighlight
++            ? '0 0 8px rgba(255,255,255,0.5)'
++            : 'none'
++    const labelColor = options?.labelColor ?? '#ffffff'
+     const shapeStyle = isJunction
+         ? `width:${size}px;height:${size}px;transform: rotate(45deg);border-radius: 3px;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
+         : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
+     
+     return `
+         <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+             <div style="${shapeStyle}"></div>
+-            ${name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10;">${name}</div>` : ''}
++            ${name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: ${labelColor}; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10;">${name}</div>` : ''}
+         </div>
+     `
+ }
+*** End Patch

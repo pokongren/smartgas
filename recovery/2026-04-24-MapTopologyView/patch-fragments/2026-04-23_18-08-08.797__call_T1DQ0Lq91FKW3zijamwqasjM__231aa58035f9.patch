@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ const SOLVER_STATUS_LABELS: Record<'converged' | 'max_iter' | 'error', string> = {
+-    converged: '闂佽楠稿﹢閬嶁€﹂崼婵愬殨闁割偅娲栭弸浣烘喐閻楀牆绗掗柡?,
+-    max_iter: '闂備礁鎼ˇ顖炴偋婵犲洤纾块柟鎯版閺勩儵鎮橀悙闈涗壕濞存嚎鍊栭妵鍕箻鐎靛摜鐣甸梺杞拌閺呮盯鍩ユ径鎰缂佹稓顢婇崥顐⑩攽?,
+-    error: '濠电姵顔栭崰姘跺箠閹捐纾归柛濠勫櫏閺嗘澘鈹戦悩顔肩仾闁稿氦鍋愰崚鎺楀礈瑜庨崰?,
++    converged: '收敛完成',
++    max_iter: '达到迭代上限',
++    error: '求解失败',
+ }
+*** End Patch

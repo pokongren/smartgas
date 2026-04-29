@@ -1,0 +1,87 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-        const adj = new Map<string, Array<{ nodeId: string; edgeId: string }>>()
++        const adj = new Map<string, Array<{ nodeId: string; edgeId: string }>>()
+         for (const sn of srcN) {
+             adj.set(sn.id, [])
+         }
+         for (const sl of srcL) {
+             if (adj.has(sl.startNodeId) && adj.has(sl.endNodeId)) {
+@@
+-        const collapsedEdges = new Map<string, { startNodeId: string; endNodeId: string; sourceEdgeIds: string[] }>()
++        const collapsedEdges = new Map<string, { startNodeId: string; endNodeId: string; sourceEdgeIds: string[] }>()
+ 
+         for (const sn of srcN) {
+             if (valveIds.has(sn.id)) continue  // 璧风偣蹇呴』鏄潪闃€瀹?
+ 
+-            const queue = [...(adj.get(sn.id) || [])]
++            const queue = (adj.get(sn.id) || []).map(item => ({
++                nodeId: item.nodeId,
++                sourceEdgeIds: [item.edgeId],
++            }))
+             const visited = new Set<string>([sn.id])
+ 
+             while (queue.length > 0) {
+-                const curr = queue.shift()!
+-                if (visited.has(curr)) continue
+-                visited.add(curr)
++                const current = queue.shift()!
++                const curr = current.nodeId
++                if (visited.has(curr)) continue
++                visited.add(curr)
+ 
+                 if (valveIds.has(curr)) {
+                     // 褰撳墠鏄榾瀹?鈫?缁х画绌胯秺
+                     for (const next of adj.get(curr) || []) {
+-                        if (!visited.has(next)) queue.push(next)
++                        if (!visited.has(next.nodeId)) {
++                            queue.push({
++                                nodeId: next.nodeId,
++                                sourceEdgeIds: [...current.sourceEdgeIds, next.edgeId],
++                            })
++                        }
+                     }
+                 } else {
+                     // 鎵惧埌浜嗗彟涓€涓潪闃€瀹よ妭鐐?鈫?鐢熸垚鍚堝苟杈?
+                     const ids = [sn.id, curr].sort()
+                     const key = `${ids[0]}_${ids[1]}`
+-                    if (!collapsedEdges.has(key)) {
+-                        collapsedEdges.add(key)
+-                        edgePairs.push([sn.id, curr])
++                    const sourceEdgeIds = [...new Set(current.sourceEdgeIds)]
++                    if (!collapsedEdges.has(key)) {
++                        collapsedEdges.set(key, {
++                            startNodeId: sn.id,
++                            endNodeId: curr,
++                            sourceEdgeIds,
++                        })
++                    } else {
++                        const existing = collapsedEdges.get(key)
++                        if (existing) {
++                            existing.sourceEdgeIds = [...new Set([...existing.sourceEdgeIds, ...sourceEdgeIds])]
++                        }
+                     }
+                 }
+             }
+         }
+@@
+-        for (const [startId, endId] of edgePairs) {
+-            const sNode = importedMap.get(startId)
+-            const eNode = importedMap.get(endId)
++        for (const { startNodeId, endNodeId, sourceEdgeIds } of collapsedEdges.values()) {
++            const sNode = importedMap.get(startNodeId)
++            const eNode = importedMap.get(endNodeId)
+             if (!sNode || !eNode) continue
+-            const edgeId = `ce-${startId.slice(-4)}-${endId.slice(-4)}`
+-            importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} 鈫?${eNode.name}` })
++            const edgeId = `ce-${startNodeId.slice(-4)}-${endNodeId.slice(-4)}`
++            importedEdges.push({
++                id: edgeId,
++                startNodeId,
++                endNodeId,
++                name: `${sNode.name} 鈫?${eNode.name}`,
++                sourceEdgeIds,
++            })
+         }
+*** End Patch

@@ -1,0 +1,58 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    function exportSimulationReport() {
+-        const lines = [
+-            '# WE1 缁楊兛绔村鐘叉禈娑撹璞㈤惇鐔奉嚤閸戠儤绔婚崡?,
+-            '',
+-            `鐎电厧鍤弮鍫曟？閿?{formatDateTimeLabel(new Date().toISOString())}`,
+-            `瑜版挸澧犻崷鐑樻珯閿?{steadyScenarioOption?.label ?? steadyScenarioId}`,
+-            `瑜版挸澧犵紒鎾寸亯閿?{steadyOverlay ? `${steadyOverlay.run_id} | ${SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}` : '鏉╂ɑ鐥呮潻鎰攽濮濓絽绱℃禒璺ㄦ埂'}`,
+-            `閸樺棗褰惰箛顐ゅ弾閺佸府绱?{steadySnapshots.length}`,
+-            `閸╄櫣鍤庤箛顐ゅ弾閿?{selectedBaselineSnapshotSummary ? `${selectedBaselineSnapshotSummary.scenario_id} | ${formatDateTimeLabel(selectedBaselineSnapshotSummary.saved_at)}` : '閺堫亪鈧瀚?}`,
+-            '',
+-            '## 鏉╂劘顢戠紒鎾寸亯閹芥顩?,
+-            `閹绶电紒娆欑窗${steadyOverlay?.summary.total_supply?.toFixed(2) ?? '-'}`,
+-            `閹娓跺Ч鍌︾窗${steadyOverlay?.summary.total_demand?.toFixed(2) ?? '-'}`,
+-            `楠炲啿娼庨崚鈺冩暏閻滃浄绱?{steadyOverlay?.summary.avg_utilization?.toFixed(3) ?? '-'}`,
+-            `閸涘﹨顒熼弫甯窗${steadyOverlay?.summary.alert_count ?? '-'}`,
+-            `閸涙垝鑵戦懞鍌滃仯閿?{simulationVisualSummary?.highlightedNodeCount ?? 0}`,
+-            `閸涙垝鑵戞潻鐐靛殠閿?{simulationVisualSummary?.highlightedEdgeCount ?? 0}`,
+-            '',
+-            '## 閸╄櫣鍤庣€佃鐦?,
+-            `娓氭稓绮板顔尖偓纭风窗${steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.total_supply.delta, 2) : '-'}`,
+-            `闂団偓濮瑰倸妯婇崐纭风窗${steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.total_demand.delta, 2) : '-'}`,
+-            `閸掆晝鏁ら悳鍥ф▕閸婄》绱?{steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.avg_utilization.delta, 3) : '-'}`,
+-            `閸涘﹨顒熷顔尖偓纭风窗${steadyComparison ? formatSignedNumber(steadyComparison.summary_delta.alert_count.delta, 0) : '-'}`,
+-            '',
+-            '## 鐟曞棛娲婄紒鎾寸亯濞撳懎宕?,
+-            `瑜版挸澧犻悾娆愩€傞敍?{coverageResultSummary.currentScenarioCovered ? `瀹歌尙鏆€濡?${coverageResultSummary.currentScenarioSnapshotCount} 閺夘摝 : '鏉╂ɑ鐥呴悾娆愩€?}`,
+-            `閺堚偓鏉╂垼顩惄鏍ㄦ闂傝揪绱?{coverageResultSummary.latestCoverageTime ? formatDateTimeLabel(coverageResultSummary.latestCoverageTime) : '閺嗗倹妫?}`,
+-            `瑜版挸澧犻崨鎴掕厬閼哄倻鍋ｉ敍?{coverageResultSummary.matchedNodeText}`,
+-            `瑜版挸澧犻崨鎴掕厬鏉╃偟鍤庨敍?{coverageResultSummary.matchedEdgeText}`,
+-            `瀵ら缚顔呭鏃傘仛閿?{recommendedCoverageScenario?.label ?? '閺嗗倹妫?}`,
+-            `瑜版挸澧犻崚銈嗘焽閿?{coverageResultSummary.riskSummary}`,
+-            '',
+-            '## 閸︾儤娅欏〒鍛礋',
+-            ...coverageChecklistItems.flatMap(item => [
+-                `- ${item.label} | ${item.covered ? '瀹歌尙鏆€濡? : '瀵板懓藟鐠?}`,
+-                `  閸忚櫕鏁為悙鐧哥窗${item.focus}`,
+-                `  闁俺绻冮幀搴濈疄閻绱?{item.success}`,
+-                `  閻滄澘婧€妞嬪酣娅撻敍?{item.risk}`,
+-            ]),
+-            '',
+-            '## 閸ュ搫鐣惧鏃傘仛閸欙絽绶?,
+-            ...demoGuideSteps,
+-            `婢惰精瑙﹂崗鍫熺叀閸濐亜鐪伴敍?{failureInvestigationLayerLabel}`,
+-        ]
+-        const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+-        const url = URL.createObjectURL(blob)
+-        const a = document.createElement('a')
+-        a.href = url
+-        a.download = `we1_main_sim_report_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.md`
+-        a.click()
+-        URL.revokeObjectURL(url)
+-        setStatusMsg('娑撹璞㈤惇鐔奉嚤閸戠儤绔婚崡鏇炲嚒閻㈢喐鍨?)
+-    }
+-
+*** End Patch

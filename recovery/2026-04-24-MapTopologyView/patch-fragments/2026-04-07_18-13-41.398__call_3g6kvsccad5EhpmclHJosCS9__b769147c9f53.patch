@@ -1,0 +1,34 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-        const importedEdges: BaseTopoEdge[] = []
+-        const importedMap = new Map(imported.map(node => [node.id, node]))
+-
+-        for (const edge of collapsedEdges.values()) {
+-            const sNode = importedMap.get(edge.startNodeId)
+-            const eNode = importedMap.get(edge.endNodeId)
+-            if (!sNode || !eNode) continue
+-            const edgeId = `ce-${edge.startNodeId.slice(-4)}-${edge.endNodeId.slice(-4)}`
+-            importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} 鈫?${eNode.name}` })
+-        }
+-
+-        setBaseTopoNodes(imported)
++        const importedEdges: BaseTopoEdge[] = []
++        const importedMap = new Map(imported.map(node => [node.id, node]))
++
++        for (const edge of collapsedEdges.values()) {
++            const sNode = importedMap.get(edge.startNodeId)
++            const eNode = importedMap.get(edge.endNodeId)
++            if (!sNode || !eNode) continue
++            const edgeId = `ce-${edge.startNodeId.slice(-4)}-${edge.endNodeId.slice(-4)}`
++            importedEdges.push({
++                id: edgeId,
++                startNodeId: edge.startNodeId,
++                endNodeId: edge.endNodeId,
++                name: `${sNode.name} -> ${eNode.name}`,
++                sourceEdgeIds: edge.sourceEdgeIds,
++            })
++        }
++
++        setBaseTopoNodes(imported)
+*** End Patch

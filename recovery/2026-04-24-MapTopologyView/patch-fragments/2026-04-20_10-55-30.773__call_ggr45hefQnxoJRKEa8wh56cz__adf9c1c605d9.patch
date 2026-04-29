@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                                        <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('已清空当前主仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空主仿真</button>
++                                        <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('已清空当前主仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空主仿真</button>
++                                        <button
++                                            onClick={() => {
++                                                if (!steadyOverlay) {
++                                                    setStatusMsg('请先加载或运行一条快照结果，再上图显示压力')
++                                                    return
++                                                }
++                                                setShowSnapshotPressureOverlay(prev => !prev)
++                                            }}
++                                            className="col-span-2 rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs font-medium text-cyan-100"
++                                        >
++                                            {showSnapshotPressureOverlay ? '隐藏快照压力上图' : '快照压力上图'}
++                                        </button>
+*** End Patch

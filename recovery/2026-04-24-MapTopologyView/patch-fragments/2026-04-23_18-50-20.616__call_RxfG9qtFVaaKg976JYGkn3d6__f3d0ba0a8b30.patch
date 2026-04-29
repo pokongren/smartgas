@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                        {activeTab === 'simulation' && (
++                        {false && activeTab === 'simulation' && (
+*** End Patch

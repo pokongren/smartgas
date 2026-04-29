@@ -1,0 +1,221 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ const FAILURE_LAYER_LABELS: Record<'frontend-consumption' | 'mapping-source-ids' | 'overlay-contract' | 'rendering-style', string> = {
+     'frontend-consumption': '先查前端消费层（MapTopologyView / 面板）',
+     'mapping-source-ids': '再查 source IDs 到 overlay IDs 的映射',
+     'overlay-contract': '最后查 simulation-overlay 契约',
+     'rendering-style': '最后再查样式渲染和地图对象',
+ }
++
++const MAINLINE_SCENARIO_PLAYBOOK: Record<string, {
++    focus: string
++    success: string
++    risk: string
++    talk: string
++}> = {
++    steady_base: {
++        focus: '先看主干压力和流量是不是平顺，确认第一张图能稳定跑通。',
++        success: '总供给、总需求、平均利用率都能正常落出来，告警数不要突然升高。',
++        risk: '如果常规稳态都没有结果，后面的异常场景先别讲，先把正式仿真跑通。',
++        talk: '先用常规稳态把主链打通，证明这套拓扑和稳态求解已经接上了。',
++    },
++    zhongwei_compressor_offline: {
++        focus: '重点看中卫压气站停运后，上下游压力有没有明显掉落。',
++        success: '基线对比里能看出节点压差，命中节点和告警数会比常规稳态更明显。',
++        risk: '如果没选基线快照，这个场景就只会看到当前值，看不出停运前后差异。',
++        talk: '这一幕主要讲压气站异常后，主干压力是怎么往上下游传递的。',
++    },
++    zhongwei_trunk_break: {
++        focus: '重点看中卫附近主干中断后，连线流量和下游供给怎么变化。',
++        success: '基线对比里的连线流量变化会很突出，下游命中点线和告警会一起抬头。',
++        risk: '如果映射覆盖摘要里命中不足，这个场景会看不清楚断点影响先传到哪。',
++        talk: '这一幕讲主干故障传播，最适合拿来演示第一张图的核心价值。',
++    },
++    yanchi_jingbian_limited: {
++        focus: '重点看盐池到靖边限流后，利用率和关键段负载有没有抬升。',
++        success: '运行结果摘要里平均利用率会变化，连线详情里的利用率差值能看出来。',
++        risk: '如果当前场景没留快照，只靠一次运行结果，不适合拿来做稳定验收。',
++        talk: '这一幕讲限流，不是断输，而是主干还能跑但运行边界开始变紧。',
++    },
++}
++
++const COVERAGE_RECOMMENDATION_ORDER = [
++    'zhongwei_trunk_break',
++    'zhongwei_compressor_offline',
++    'yanchi_jingbian_limited',
++    'steady_base',
++]
+@@
+     const trialCoverageSummary = useMemo(() => {
+         const coveredCount = steadyTrialRunItems.filter(item => item.covered).length
+         return {
+             coveredCount,
+             pendingCount: steadyTrialRunItems.length - coveredCount,
+         }
+     }, [steadyTrialRunItems])
++    const latestCoveredTrialItem = useMemo(() => {
++        return [...steadyTrialRunItems]
++            .filter(item => item.covered && item.last_saved_at)
++            .sort((left, right) => (right.last_saved_at ?? '').localeCompare(left.last_saved_at ?? ''))[0] ?? null
++    }, [steadyTrialRunItems])
++    const recommendedCoverageScenario = useMemo(() => {
++        const itemMap = new Map(steadyTrialRunItems.map(item => [item.scenario_id, item]))
++        for (const scenarioId of [steadyScenarioId, ...COVERAGE_RECOMMENDATION_ORDER]) {
++            const matched = itemMap.get(scenarioId)
++            if (matched?.covered) {
++                return matched
++            }
++        }
++        return steadyTrialRunItems.find(item => item.covered) ?? steadyTrialRunItems[0] ?? null
++    }, [steadyScenarioId, steadyTrialRunItems])
++    const coverageResultSummary = useMemo(() => {
++        const currentScenarioItem = steadyTrialRunItems.find(item => item.scenario_id === steadyScenarioId) ?? null
++        const matchedNodeText = simulationMapping
++            ? `${mappingSummary?.displayNodesWithMatchedOverlay ?? 0} / ${mappingSummary?.displayNodeCount ?? 0}`
++            : '-'
++        const matchedEdgeText = simulationMapping
++            ? `${mappingSummary?.matchedOverlayEdgeCount ?? 0} / ${steadyOverlay?.edges.length ?? 0}`
++            : '-'
++        const readinessLabel = trialCoverageSummary.pendingCount === 0
++            ? '可完整演示'
++            : trialCoverageSummary.coveredCount > 0
++                ? '可局部演示'
++                : '还不能演示'
++        const riskSummary = trialCoverageSummary.pendingCount > 0
++            ? `还有 ${trialCoverageSummary.pendingCount} 个典型场景没留快照，验收前先补齐。`
++            : (mappingSummary && (mappingSummary.unmatchedOverlayNodeIds.length > 0 || mappingSummary.unmatchedOverlayEdgeIds.length > 0))
++                ? '场景覆盖已经补齐，但当前结果还有点线没命中显示层，讲解时要同步看映射覆盖摘要。'
++                : '场景覆盖和当前命中都够用，可以直接进入固定演示口径。'
++
++        return {
++            readinessLabel,
++            currentScenarioCovered: Boolean(currentScenarioItem?.covered),
++            latestCoverageTime: latestCoveredTrialItem?.last_saved_at ?? '',
++            currentScenarioSnapshotCount: currentScenarioItem?.snapshot_count ?? 0,
++            matchedNodeText,
++            matchedEdgeText,
++            riskSummary,
++        }
++    }, [
++        latestCoveredTrialItem?.last_saved_at,
++        mappingSummary,
++        simulationMapping,
++        steadyOverlay?.edges.length,
++        steadyScenarioId,
++        steadyTrialRunItems,
++        trialCoverageSummary.coveredCount,
++        trialCoverageSummary.pendingCount,
++    ])
++    const coverageChecklistItems = useMemo(() => {
++        return steadyTrialRunItems.map(item => {
++            const playbook = MAINLINE_SCENARIO_PLAYBOOK[item.scenario_id] ?? {
++                focus: '先看当前场景对应的压力、流量和告警有没有合理变化。',
++                success: '至少要能跑出正式结果，并能留下一条可回看的快照。',
++                risk: '如果当前场景没有历史快照，验收时只能看即时结果。',
++                talk: '按当前场景解释主干状态变化。',
++            }
++            return {
++                ...item,
++                focus: playbook.focus,
++                success: playbook.success,
++                risk: playbook.risk,
++                talk: playbook.talk,
++                isCurrent: item.scenario_id === steadyScenarioId,
++                isRecommended: item.scenario_id === recommendedCoverageScenario?.scenario_id,
++                isSelectedSnapshot: Boolean(item.last_run_id && item.last_run_id === steadySelectedSnapshotRunId),
++            }
++        })
++    }, [recommendedCoverageScenario?.scenario_id, steadyScenarioId, steadySelectedSnapshotRunId, steadyTrialRunItems])
+     const selectedNodeComparisonDelta = useMemo(() => {
+         if (!selectedNodeSimulationMatch && !selectedNodeBaselineMatch) return null
+@@
+                                     <div className="rounded-lg border border-amber-500/20 bg-amber-950/10 p-3 space-y-3 text-[11px] text-gray-300">
+                                         <div className="flex items-center justify-between gap-3">
+                                             <div>
+                                                 <div className="text-[10px] uppercase tracking-wider text-amber-200">试运行覆盖</div>
+                                                 <div className="mt-1 text-gray-400">把第一张图主链的几个典型场景都跑一遍，确认能运行、能留快照、能回看。</div>
+@@
+                                             })}
+                                         </div>
+                                     </div>
++                                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 p-3 space-y-3 text-[11px] text-gray-300">
++                                        <div className="flex items-center justify-between gap-3">
++                                            <div>
++                                                <div className="text-[10px] uppercase tracking-wider text-emerald-200">覆盖结果清单</div>
++                                                <div className="mt-1 text-gray-400">把场景留档、当前命中和推荐演示口径收成一张清单，方便验收和复盘。</div>
++                                            </div>
++                                            <div className={`rounded-full px-3 py-1 text-[10px] font-semibold ${
++                                                coverageResultSummary.readinessLabel === '可完整演示'
++                                                    ? 'border border-emerald-400/30 bg-emerald-500/15 text-emerald-100'
++                                                    : coverageResultSummary.readinessLabel === '可局部演示'
++                                                        ? 'border border-amber-400/30 bg-amber-500/15 text-amber-100'
++                                                        : 'border border-red-400/30 bg-red-500/15 text-red-100'
++                                            }`}>
++                                                {coverageResultSummary.readinessLabel}
++                                            </div>
++                                        </div>
++                                        <div className="grid grid-cols-2 gap-2 text-xs">
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">当前场景留档</div>
++                                                <div className={`mt-1 font-semibold ${coverageResultSummary.currentScenarioCovered ? 'text-emerald-300' : 'text-amber-300'}`}>
++                                                    {coverageResultSummary.currentScenarioCovered ? `已留档 ${coverageResultSummary.currentScenarioSnapshotCount} 条` : '还没留档'}
++                                                </div>
++                                            </div>
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">最近覆盖时间</div>
++                                                <div className="mt-1 font-semibold text-white">
++                                                    {coverageResultSummary.latestCoverageTime ? formatDateTimeLabel(coverageResultSummary.latestCoverageTime) : '暂无'}
++                                                </div>
++                                            </div>
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">当前命中节点</div>
++                                                <div className="mt-1 font-semibold text-white">{coverageResultSummary.matchedNodeText}</div>
++                                            </div>
++                                            <div className="rounded-lg bg-black/15 px-3 py-2">
++                                                <div className="text-[10px] text-gray-500">当前命中连线</div>
++                                                <div className="mt-1 font-semibold text-white">{coverageResultSummary.matchedEdgeText}</div>
++                                            </div>
++                                        </div>
++                                        <div className="rounded-lg bg-black/15 px-3 py-2 leading-5 text-gray-300">
++                                            <div>建议演示：{recommendedCoverageScenario?.label ?? '暂无'}</div>
++                                            <div>当前判断：{coverageResultSummary.riskSummary}</div>
++                                        </div>
++                                        <div className="space-y-2">
++                                            {coverageChecklistItems.map(item => (
++                                                <div key={`coverage-check-${item.scenario_id}`} className="rounded-lg bg-black/15 px-3 py-2">
++                                                    <div className="flex items-start justify-between gap-3">
++                                                        <div className="min-w-0">
++                                                            <div className="flex flex-wrap items-center gap-2">
++                                                                <span className="truncate text-gray-100">{item.label}</span>
++                                                                {item.isCurrent && (
++                                                                    <span className="rounded-full border border-sky-400/20 bg-sky-500/10 px-2 py-0.5 text-[10px] text-sky-100">当前场景</span>
++                                                                )}
++                                                                {item.isRecommended && (
++                                                                    <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-100">建议演示</span>
++                                                                )}
++                                                                {item.isSelectedSnapshot && (
++                                                                    <span className="rounded-full border border-violet-400/20 bg-violet-500/10 px-2 py-0.5 text-[10px] text-violet-100">当前已选快照</span>
++                                                                )}
++                                                            </div>
++                                                            <div className="mt-1 text-[10px] leading-5 text-gray-400">关注点：{item.focus}</div>
++                                                            <div className="text-[10px] leading-5 text-gray-500">通过怎么看：{item.success}</div>
++                                                            <div className="text-[10px] leading-5 text-gray-500">现场风险：{item.risk}</div>
++                                                        </div>
++                                                        <div className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
++                                                            item.covered
++                                                                ? 'border border-emerald-400/20 bg-emerald-500/10 text-emerald-100'
++                                                                : 'border border-amber-400/20 bg-amber-500/10 text-amber-100'
++                                                        }`}>
++                                                            {item.covered ? '已留档' : '待补跑'}
++                                                        </div>
++                                                    </div>
++                                                    <div className="mt-2 text-[10px] leading-5 text-gray-500">
++                                                        快照 {item.snapshot_count} 条，最近一次：{item.last_saved_at ? formatDateTimeLabel(item.last_saved_at) : '无'}{item.last_run_id ? `，run ${item.last_run_id.slice(0, 12)}` : ''}
++                                                    </div>
++                                                </div>
++                                            ))}
++                                        </div>
++                                    </div>
+                                 </div>
+*** End Patch

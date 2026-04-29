@@ -174,11 +174,116 @@ export const zhongweiHubNodeSimple: HubNode = {
 }
 
 /**
+ * 西一线古浪站
+ */
+export const we1GulangHubNode: HubNode = {
+  id: 'S-we1-gulang',
+  name: '西一线古浪压气站',
+  type: 'compressor',
+  coordinate: {
+    longitude: 103.52,
+    latitude: 37.48
+  },
+  designPressure: 10.0,
+  operatingPressure: 9.0,
+  capacity: 1800,
+  extension: {
+    isHub: true,
+    hubLevel: 2,
+    distributionStrategy: DistributionStrategy.PROPORTIONAL,
+    ports: [
+      {
+        portId: 'gulang-we1-in',
+        pipelineId: 'P-we1',
+        pipelineName: '西气东输一线',
+        direction: PortDirection.IN,
+        pressureRange: [5.0, 9.0],
+        flowCapacity: 1800,
+        displayAngle: 180, // 左侧
+        status: 'active'
+      },
+      {
+        portId: 'gulang-we1-out',
+        pipelineId: 'P-we1',
+        pipelineName: '西气东输一线',
+        direction: PortDirection.OUT,
+        pressureRange: [7.0, 11.0],
+        flowCapacity: 1800,
+        displayAngle: 0, // 右侧
+        status: 'active'
+      }
+    ],
+    internalConnections: [
+      {
+        fromPort: 'gulang-we1-in',
+        toPort: 'gulang-we1-out',
+        flowRatio: 1.0,
+        isActive: true,
+        remark: '干线直通'
+      }
+    ]
+  }
+}
+
+/**
+ * 西二线古浪站
+ */
+export const we2GulangHubNode: HubNode = {
+  id: 'S-we2-gulang',
+  name: '西二线古浪压气站',
+  type: 'compressor',
+  coordinate: {
+    longitude: 103.00,
+    latitude: 37.60
+  },
+  designPressure: 12.0,
+  operatingPressure: 10.5,
+  capacity: 2500,
+  extension: {
+    isHub: true,
+    hubLevel: 2,
+    distributionStrategy: DistributionStrategy.PROPORTIONAL,
+    ports: [
+      {
+        portId: 'gulang-we2-in',
+        pipelineId: 'P-we2',
+        pipelineName: '西气东输二线',
+        direction: PortDirection.IN,
+        pressureRange: [7.0, 11.0],
+        flowCapacity: 2500,
+        displayAngle: 180,
+        status: 'active'
+      },
+      {
+        portId: 'gulang-we2-out',
+        pipelineId: 'P-we2',
+        pipelineName: '西气东输二线',
+        direction: PortDirection.OUT,
+        pressureRange: [9.0, 12.0],
+        flowCapacity: 2500,
+        displayAngle: 0,
+        status: 'active'
+      }
+    ],
+    internalConnections: [
+      {
+        fromPort: 'gulang-we2-in',
+        toPort: 'gulang-we2-out',
+        flowRatio: 1.0,
+        isActive: true,
+        remark: '干线直通'
+      }
+    ]
+  }
+}
+
+/**
  * 多个枢纽节点示例
  */
 export const hubNodesSample: HubNode[] = [
   zhongweiHubNodeSimple,
-  // 可以添加更多枢纽节点...
+  we1GulangHubNode,
+  we2GulangHubNode
 ]
 
 /**

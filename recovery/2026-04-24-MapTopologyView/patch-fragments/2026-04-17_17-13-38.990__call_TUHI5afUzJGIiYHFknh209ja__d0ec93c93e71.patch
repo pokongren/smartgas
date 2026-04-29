@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+     const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null)
+     const [seedNodePressures, setSeedNodePressures] = useState<Map<string, SeedNodePressure>>(new Map())
++    const [nodeParamOverrides, setNodeParamOverrides] = useState<Record<string, { target_pressure_mpa?: number; temperature_c?: number }>>({})
++    const [edgeLengthOverrides, setEdgeLengthOverrides] = useState<Record<string, number>>({})
+     const [historyChartTarget, setHistoryChartTarget] = useState<null | {
+         stationName?: string
+         junctionId?: string
+         displayName?: string
+     }>(null)
+*** End Patch

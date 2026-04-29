@@ -1,0 +1,14 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                         {/* 关键枢纽 */}
+                         {activeTab === 'simulation' && (
+                             <div className="space-y-3">
++                                <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 p-3 text-[11px] leading-5 text-gray-300">
++                                    <div className="text-[10px] uppercase tracking-wider text-cyan-200">入口说明</div>
++                                    <div className="mt-1">
++                                        第一张图正式主仿真入口已经同步挂到地图左侧浮出面板；这里继续保留摘要、映射诊断和细节对照，避免把调试信息混进主操作区。
++                                    </div>
++                                </div>
+                                 <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 p-3 space-y-3">
+*** End Patch

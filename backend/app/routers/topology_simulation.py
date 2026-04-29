@@ -43,12 +43,14 @@ router = APIRouter(tags=["steady-simulation"])
 class NodeInitialOverrideInput(BaseModel):
     node_id: str
     target_pressure_mpa: Optional[float] = None
+    min_pressure_mpa: Optional[float] = None
     temperature_c: Optional[float] = None
 
 
 class EdgeInitialOverrideInput(BaseModel):
     edge_id: str
     flow_rate: Optional[float] = None
+    length_km: Optional[float] = None
 
 
 class InitialConditionsInput(BaseModel):
@@ -143,6 +145,8 @@ def _apply_initial_conditions(
         override: Dict[str, Any] = {"node_id": node_id}
         if item.target_pressure_mpa is not None:
             override["target_pressure_mpa"] = float(item.target_pressure_mpa)
+        if item.min_pressure_mpa is not None:
+            override["min_pressure_mpa"] = float(item.min_pressure_mpa)
         if item.temperature_c is not None:
             override["temperature_c"] = float(item.temperature_c)
         if len(override) > 1:
@@ -156,6 +160,8 @@ def _apply_initial_conditions(
         override: Dict[str, Any] = {"edge_id": edge_id}
         if item.flow_rate is not None:
             override["flow_rate"] = float(item.flow_rate)
+        if item.length_km is not None:
+            override["length_km"] = float(item.length_km)
         if len(override) > 1:
             edge_overrides.append(override)
             explicit_edge_ids.add(edge_id)

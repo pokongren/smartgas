@@ -1,0 +1,34 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                 <div className="border border-cyan-500/20 bg-cyan-950/20 rounded-lg p-2.5 space-y-2">
+                                     <div className="flex items-center justify-between">
+                                         <p className="text-[10px] text-cyan-300 uppercase tracking-wider">点位保存</p>
+                                         <span className="text-[10px] text-cyan-400">{dirtyPositions.size} 个待保存</span>
+                                     </div>
++                                    <div className="flex items-center justify-between text-[10px] text-cyan-400">
++                                        <span>新增连线待保存</span>
++                                        <span>{unsavedEdgeIds.size} 条</span>
++                                    </div>
+@@
+                                     <div className="flex gap-1.5">
+@@
+                                         <button
+                                             onClick={() => void handleSavePositions()}
+                                             disabled={dirtyPositions.size === 0 || isSaving}
+                                             className="flex-1 bg-cyan-700/80 hover:bg-cyan-600 text-white py-2 rounded-lg text-xs transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
+                                         >
+                                             <span className="material-symbols-outlined text-sm">save</span>
+                                             {isSaving ? '保存中...' : '保存坐标'}
+                                         </button>
+                                     </div>
++                                    <button
++                                        onClick={saveConnectedEdges}
++                                        disabled={unsavedEdgeIds.size === 0 || isSaving}
++                                        className="w-full bg-emerald-700/80 hover:bg-emerald-600 text-white py-2 rounded-lg text-xs transition-colors disabled:opacity-40 flex items-center justify-center gap-1"
++                                    >
++                                        <span className="material-symbols-outlined text-sm">timeline</span>
++                                        保存连线（JSON）
++                                    </button>
+                                 </div>
+*** End Patch

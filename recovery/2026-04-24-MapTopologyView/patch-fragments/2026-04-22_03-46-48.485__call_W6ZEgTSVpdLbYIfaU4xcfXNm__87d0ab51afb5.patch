@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                            if (!steadyOverlay && seedNodePressures.size === 0) {
+-                                                setStatusMsg('璇峰厛鍔犺浇鎴栬繍琛屼竴鏉″揩鐓х粨鏋滐紝鍐嶄笂鍥炬樉绀哄帇鍔?)
+-                                                setStatusMsg('璇峰厛璇诲彇璧峰鍘嬪姏鎴栧厛杩愯涓€娆′富浠跨湡')
+-                                                return
+-                                            }
++                                            if (!steadyOverlay && seedNodePressures.size === 0) {
++                                                setStatusMsg('请先读取起始压力或先运行一次主仿真')
++                                                return
++                                            }
+*** End Patch

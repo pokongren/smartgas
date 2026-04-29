@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-        if (error) {
+-            setStatusMsg(`鍙傛暟鏍￠獙澶辫触锛?{error}`)
+-            throw new Error(error)
+-        }
++        if (error) {
++            setStatusMsg(`参数校验失败：${error}`)
++            throw new Error(error)
++        }
+*** End Patch

@@ -1,0 +1,53 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-            const queue = [...(adj.get(sn.id) || [])]
++            const queue = (adj.get(sn.id) || []).map(item => ({
++                nodeId: item.nodeId,
++                sourceEdgeIds: [item.edgeId],
++            }))
+             const visited = new Set<string>([sn.id])
+ 
+             while (queue.length > 0) {
+                 const curr = queue.shift()!
+-                if (visited.has(curr)) continue
+-                visited.add(curr)
++                if (visited.has(curr.nodeId)) continue
++                visited.add(curr.nodeId)
+ 
+-                if (valveIds.has(curr)) {
++                if (valveIds.has(curr.nodeId)) {
+                     // 褰撳墠鏄榾瀹?鈫?缁х画绌胯秺
+-                    for (const next of adj.get(curr) || []) {
+-                        if (!visited.has(next)) queue.push(next)
++                    for (const next of adj.get(curr.nodeId) || []) {
++                        if (!visited.has(next.nodeId)) {
++                            queue.push({
++                                nodeId: next.nodeId,
++                                sourceEdgeIds: [...curr.sourceEdgeIds, next.edgeId],
++                            })
++                        }
+                     }
+                 } else {
+                     // 鎵惧埌浜嗗彟涓€涓潪闃€瀹よ妭鐐?鈫?鐢熸垚鍚堝苟杈?
+-                    const ids = [sn.id, curr].sort()
++                    const ids = [sn.id, curr.nodeId].sort()
+                     const key = `${ids[0]}_${ids[1]}`
+-                    if (!collapsedEdges.has(key)) {
+-                        collapsedEdges.add(key)
+-                        edgePairs.push([sn.id, curr])
++                    const sourceEdgeIds = [...new Set(curr.sourceEdgeIds)]
++                    const existing = collapsedEdges.get(key)
++                    if (existing) {
++                        existing.sourceEdgeIds = [...new Set([...existing.sourceEdgeIds, ...sourceEdgeIds])]
++                    } else {
++                        collapsedEdges.set(key, {
++                            startNodeId: sn.id,
++                            endNodeId: curr.nodeId,
++                            sourceEdgeIds,
++                        })
+                     }
+                 }
+             }
+         }
+*** End Patch

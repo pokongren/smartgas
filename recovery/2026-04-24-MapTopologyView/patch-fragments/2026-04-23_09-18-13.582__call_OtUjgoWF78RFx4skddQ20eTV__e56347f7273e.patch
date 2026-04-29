@@ -1,0 +1,11 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                    const _baselineTempItems = (_baselineMatch?.matchedNodes ?? [])
+-                        .map((item: any) => item.temperature_c)
+-                        .filter((value: unknown): value is number => typeof value === 'number' && Number.isFinite(value))
+-                    const _baselineTemp = _baselineTempItems.length > 0
+-                        ? _baselineTempItems.reduce((sum: number, value: number) => sum + value, 0) / _baselineTempItems.length
+-                        : (_baselineOutPressure != null ? estimateTemperatureByPressure(_baselineOutPressure) : null)
+                     const snapshotPressureLabel = showSnapshotPressureOverlay
+*** End Patch

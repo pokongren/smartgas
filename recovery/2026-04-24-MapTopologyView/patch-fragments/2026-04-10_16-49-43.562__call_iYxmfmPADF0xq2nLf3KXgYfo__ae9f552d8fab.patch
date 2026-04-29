@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                         <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('已清空当前主仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空主仿真</button>
+                                         <button onClick={copySimulationNarrative} className="col-span-2 rounded-lg border border-cyan-400/30 bg-cyan-950/30 px-3 py-2 text-xs font-medium text-cyan-100">复制仿真文字简报（第2次迭代）</button>
++                                        <button onClick={copySimulationStructuredBrief} className="col-span-2 rounded-lg border border-violet-400/30 bg-violet-950/30 px-3 py-2 text-xs font-medium text-violet-100">复制结构化简报（给AI）</button>
+                                         <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">导出演示清单</button>
+                                     </div>
+                                     <div className="rounded-lg border border-cyan-500/20 bg-black/10 px-3 py-2">
+                                         <div className="text-[10px] uppercase tracking-wider text-cyan-200">仿真自动解读（可给AI）</div>
+                                         <div className="mt-1 text-[11px] text-slate-300 whitespace-pre-line leading-5">{simulationNarrative}</div>
+                                     </div>
++                                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-3 py-2">
++                                        <div className="text-[10px] uppercase tracking-wider text-emerald-200">人话解释（值班可读）</div>
++                                        <div className="mt-1 text-[11px] text-slate-300 whitespace-pre-line leading-5">{simulationNarrativePlain}</div>
++                                    </div>
+                                 </div>
+*** End Patch

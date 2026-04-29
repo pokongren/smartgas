@@ -1,0 +1,60 @@
+*** Begin Patch
+*** Add File: C:\Users\Administrator\.codex\automations\automation\2026-04-05-heartbeat-main-directory-summary.md
++# 项目心跳巡检总结（2026-04-05 12:25 +08:00）
++
++## 做了什么
++
++这轮先按入口规则把巡检落到 `F:\smartgas-grid` 主目录，再看 `git log`、`git status`、未提交 diff、`git worktree list`、`.git`、docs 变化和四条主线里的关键文件。
++
++主代理负责收口，侦察按环境路径、地图层级、枢纽/数据库、AI 链路四条线分开看，最后再按“别把 detached worktree 当事实、别把局部说成全局、别沿用旧数字、别把未跟踪文件说成正式基线”这四条边界复核。
++
++## 为什么这么做
++
++之前的 heartbeat memory 里已经混进了几轮旧数字和过期判断。尤其是：
++
++- 把 `WE3` 还在主库里当成既成事实。
++- 把 `junction_groups.manual_overlay` 当成当前表结构里的现成字段。
++- 把地图统一口径说得太满，像是 `MapTopologyView.tsx` 也已经并到统一 LOD。
++
++这轮先把入口和事实源钉死，再把这些容易误导后续巡检的点改正。
++
++## 影响范围
++
++- 自动化后续巡检会以 `F:\smartgas-grid` 为唯一事实源，不再借 detached worktree 补业务结论。
++- 数据库基线更新为当前主库实测：`stations=1256`、`pipelines=1251`、`pipeline_systems=13`、`junction_groups=25`、`junction_groups_rebuilt=7`，`WE3` 当前缺失。
++- 枢纽口径修正为“runtime 优先 rebuilt，但旧 `junction_groups` 表还在，而且当前表结构没有 `manual_overlay` 列”。
++- AI 口径继续保守，只认“主目录里的本地未提交半接线链路”，不抬成正式基线。
++
++## 验证结果
++
++验证动作：
++
++- 切到 `F:\smartgas-grid` 后确认 `cwd` 和 `git rev-parse --show-toplevel` 都回到主目录。
++- 查 `git worktree list --porcelain`，确认主目录是 `eaf6ac4`，大量 `.codex/worktrees/*` 仍在 `6410a10` detached。
++- 查 `git diff --stat`、`git status --short`、`git diff --stat -- docs`，确认这轮不是纯 docs 变动。
++- 直接读 `backend/data/smartgas.db`，重新查表数量、`pipeline_systems.id`、`junction_groups` / `junction_groups_rebuilt` schema。
++- 用 `rg` 钉 `hierarchyRenderer.ts`、`mapRenderer.ts`、`MapTopologyView.tsx`、`GlobalPipelineView.tsx`、`ai_assistant.py`、`ai_client.py`、`useAiAssistantChat.ts`、`useAiAssistantPageContext.ts`、docs 两份说明。
++
++结果怎么看：
++
++- 入口通过，当前不是 `automation env mismatch / worktree-path blockage`。
++- 主目录里确实存在大量未提交代码、数据库和本地实验混合变化。
++- 旧 memory 里的一部分数字已经过期，这轮已按主目录实测覆盖。
++
++## 前后对比
++
++| 项目 | 旧口径 / 容易误判 | 这轮修正后 |
++| --- | --- | --- |
++| 事实源 | 容易拿 detached worktree 或旧 memory 补判断 | 只认 `F:\smartgas-grid` 主目录 |
++| 地图统一口径 | 容易说成地图和拓扑视图都统一了 | 只有 `GlobalPipelineView -> mapRenderer` 明确吃到统一 LOD，`MapTopologyView.tsx` 还保留自己口径 |
++| 主库数量 | 曾沿用 `1272 / 1268 / 14` | 当前实测是 `1256 / 1251 / 13` |
++| WE3 | 曾按“主库已在”处理 | 当前主库里 `WE3` 前缀站/段都是 `0` |
++| junction_groups 结构 | 曾按“有 manual_overlay 字段”处理 | 当前只有 `id,name,description,station_ids` 四列 |
++| AI 口径 | 容易顺手说成新链路已正式接入 | 现在只能算主目录里的本地未提交半接线能力 |
++
++## 截图 / 补充
++
++这轮没补截图。
++
++原因：这次结论主要靠 git、schema、文件跟踪状态和源码命中，不是 UI 行为回归；文字和对比表已经能把阻塞点和变化点说清。
+*** End Patch

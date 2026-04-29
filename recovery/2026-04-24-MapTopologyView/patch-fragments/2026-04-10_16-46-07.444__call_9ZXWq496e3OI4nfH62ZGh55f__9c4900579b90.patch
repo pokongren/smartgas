@@ -1,0 +1,44 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                     </div>
++                                    <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
++                                        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">运行轨迹</div>
++                                        <div className="mt-2 grid grid-cols-4 gap-2">
++                                            {simulationRunTimeline.map(item => (
++                                                <div key={item.key} className={`rounded-md border px-2 py-1.5 text-center text-[10px] transition-all duration-300 ${item.active ? 'border-cyan-300/30 bg-cyan-500/10 text-cyan-100' : 'border-white/10 bg-white/5 text-slate-500'} ${item.pulse ? 'animate-pulse' : ''}`}>
++                                                    {item.label}
++                                                </div>
++                                            ))}
++                                        </div>
++                                    </div>
+                                     <div className="mt-3 grid grid-cols-2 gap-2">
+                                         {steadyMetricCards.map((item, index) => (
+                                             <div key={`steady-metric-${item.label}`} className={`rounded-xl border border-white/10 bg-black/15 px-3 py-2 transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-300/30 ${steadyOverlay ? 'animate-[pulse_2.8s_ease-in-out_infinite]' : ''}`} style={steadyOverlay ? { animationDelay: `${index * 180}ms` } : undefined}>
+@@
+                                                 <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+-                                                    <div className={`h-full bg-gradient-to-r ${item.tone} transition-all duration-700`} style={{ width: `${item.percent}%` }} />
++                                                    <div className={`relative h-full bg-gradient-to-r ${item.tone} transition-all duration-700`} style={{ width: `${item.percent}%` }}>
++                                                        {item.percent > 0 && <div className="absolute inset-y-0 right-0 w-5 bg-white/30 blur-sm animate-pulse" />}
++                                                    </div>
+                                                 </div>
+                                                 <div className="text-[10px] text-slate-400">{item.text}</div>
+                                             </div>
+                                         ))}
+                                     </div>
+@@
+                                         <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('宸叉竻绌哄綋鍓嶄富浠跨湡缁撴灉') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">娓呯┖涓讳豢鐪?/button>
+                                         <button onClick={copySimulationNarrative} className="col-span-2 rounded-lg border border-cyan-400/30 bg-cyan-950/30 px-3 py-2 text-xs font-medium text-cyan-100">澶嶅埗浠跨湡鏂囧瓧绠€鎶ワ紙绗?娆¤凯浠ｏ級</button>
++                                        <button onClick={copySimulationStructuredBrief} className="col-span-2 rounded-lg border border-violet-400/30 bg-violet-950/30 px-3 py-2 text-xs font-medium text-violet-100">复制结构化简报（给AI）</button>
+                                         <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">瀵煎嚭婕旂ず娓呭崟</button>
+                                     </div>
+                                     <div className="rounded-lg border border-cyan-500/20 bg-black/10 px-3 py-2">
+                                         <div className="text-[10px] uppercase tracking-wider text-cyan-200">浠跨湡鑷姩瑙ｈ锛堝彲缁?AI锛?/div>
+                                         <div className="mt-1 text-[11px] text-slate-300 whitespace-pre-line leading-5">{simulationNarrative}</div>
+                                     </div>
++                                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-3 py-2">
++                                        <div className="text-[10px] uppercase tracking-wider text-emerald-200">人话解释（值班可读）</div>
++                                        <div className="mt-1 text-[11px] text-slate-300 whitespace-pre-line leading-5">{simulationNarrativePlain}</div>
++                                    </div>
+                                 </div>
+*** End Patch

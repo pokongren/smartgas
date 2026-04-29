@@ -1,0 +1,16 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                    <div className="mt-3 grid grid-cols-2 gap-2">
++                                    <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2">
++                                        <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">运行轨迹</div>
++                                        <div className="mt-2 grid grid-cols-4 gap-2">
++                                            {simulationRunTimeline.map(item => (
++                                                <div key={item.key} className={`rounded-md border px-2 py-1.5 text-center text-[10px] transition-all duration-300 ${item.active ? 'border-cyan-300/30 bg-cyan-500/10 text-cyan-100' : 'border-white/10 bg-white/5 text-slate-500'} ${item.pulse ? 'animate-pulse' : ''}`}>
++                                                    {item.label}
++                                                </div>
++                                            ))}
++                                        </div>
++                                    </div>
++                                    <div className="mt-3 grid grid-cols-2 gap-2">
+*** End Patch

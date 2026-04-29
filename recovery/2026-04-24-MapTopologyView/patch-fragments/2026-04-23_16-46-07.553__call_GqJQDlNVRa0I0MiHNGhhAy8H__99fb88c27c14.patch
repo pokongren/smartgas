@@ -1,0 +1,8 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const [cutoffNodeId, setCutoffNodeId] = useState<string | null>(null)
+     const [cutoffResult, setCutoffResult] = useState<CutoffResult | null>(null)
+     const [cutoffSearch, setCutoffSearch] = useState('')
++    const [showCutoffAiModal, setShowCutoffAiModal] = useState(false)
+*** End Patch

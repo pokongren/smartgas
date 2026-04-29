@@ -1,0 +1,8 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-        const prompt = [
++        const prompt = [
++            '/数据分析',
+             `璇峰熀浜?WE1 涓讳豢鐪熺粨鏋滃仛涓撲笟鍒嗘瀽锛屽満鏅細${scenarioLabel}銆俙,
+*** End Patch

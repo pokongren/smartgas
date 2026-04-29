@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                                            兼容手工捏合（非主流）
++                                            兼容手工捏合（旧流程）
+@@
+-                                            {junctionMode === 'runtime_readonly' ? '只读模式' : junctionMode}
++                                            {JUNCTION_MODE_LABELS[junctionMode] || junctionMode}
+*** End Patch

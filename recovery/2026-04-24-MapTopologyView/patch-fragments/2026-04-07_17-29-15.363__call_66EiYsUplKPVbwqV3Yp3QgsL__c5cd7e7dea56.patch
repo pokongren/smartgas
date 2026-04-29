@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-                                                setStatusMsg(`浠跨湡瀹屾垚锛屽叡 ${result.data.length} 姝)
++                                                setStatusMsg(`WE1 姝ｅ紡浠跨湡宸插畬鎴愶細${currentScenario}`)
+*** End Patch

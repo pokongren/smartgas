@@ -1,0 +1,67 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                                <p className="text-xs text-gray-400 mt-2">绫诲瀷锛歿selectedNode.isJunction ? '鏋㈢航' : TOPO_LABELS[selectedNode.type]}</p>
++                                <p className="text-xs text-gray-400 mt-2">类型：{selectedNode.isJunction ? '枢纽' : TOPO_LABELS[selectedNode.type]}</p>
+                                 <p className="text-xs text-gray-400 mt-1">
+-                                    鍧愭爣锛歿selectedNode.position[0].toFixed(4)}, {selectedNode.position[1].toFixed(4)}
++                                    坐标：{selectedNode.position[0].toFixed(4)}, {selectedNode.position[1].toFixed(4)}
+                                 </p>
+                                 <p className="text-xs text-gray-400 mt-1">
+-                                    鍏宠仈杩炵嚎锛歿topoEdges.filter(edge => edge.startNodeId === selectedNode.id || edge.endNodeId === selectedNode.id).length}
++                                    关联连线：{topoEdges.filter(edge => edge.startNodeId === selectedNode.id || edge.endNodeId === selectedNode.id).length}
+                                 </p>
+                             </div>
+                             <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/20 p-3 space-y-2">
+-                                <p className="text-xs text-emerald-300 uppercase tracking-wider">杩愯鐘舵€?/p>
++                                <p className="text-xs text-emerald-300 uppercase tracking-wider">运行状态</p>
+@@
+-                                    <span className="text-gray-400">杩涚珯鍘嬪姏</span>
++                                    <span className="text-gray-400">进站压力</span>
+@@
+-                                            ? `杩涚珯 ${(selectedNodeAnimatedInPressure ?? (selectedNodeSimulationMetrics.pressure * 0.95)).toFixed(2)} MPa`
++                                            ? `进站 ${(selectedNodeAnimatedInPressure ?? (selectedNodeSimulationMetrics.pressure * 0.95)).toFixed(2)} MPa`
+@@
+-                                                    : '鏆傛棤鏁版嵁'}
++                                                    : '暂无数据'}
+@@
+-                                    <span className="text-gray-400">鍑虹珯鍘嬪姏</span>
++                                    <span className="text-gray-400">出站压力</span>
+@@
+-                                                    : '鏆傛棤鏁版嵁'}
++                                                    : '暂无数据'}
+@@
+-                                    <span className="text-gray-400">鍑虹珯娓╁害</span>
++                                    <span className="text-gray-400">出站温度</span>
+@@
+-                                            ? `${selectedNodeSimulationMetrics.temperatureC.toFixed(1)}掳C${selectedNodeSimulationMetrics.estimated ? '锛堜及绠楋級' : ''}`
++                                            ? `${selectedNodeSimulationMetrics.temperatureC.toFixed(1)}°C${selectedNodeSimulationMetrics.estimated ? '（估算）' : ''}`
+                                             : selectedNodeSeedData?.operating_temp_out != null
+-                                                ? `${selectedNodeSeedData.operating_temp_out.toFixed(1)}掳C`
+-                                                : '鏆傛棤鏁版嵁'}
++                                                ? `${selectedNodeSeedData.operating_temp_out.toFixed(1)}°C`
++                                                : '暂无数据'}
+@@
+-                                <div className="text-[10px] uppercase tracking-wider text-violet-200">鍩虹嚎蹇収</div>
++                                <div className="text-[10px] uppercase tracking-wider text-violet-200">基线快照</div>
+@@
+-                                    <span className="text-gray-400">鍩虹嚎杩涚珯鍘嬪姏</span>
++                                    <span className="text-gray-400">基线进站压力</span>
+@@
+-                                            : '鏆傛棤鏁版嵁'}
++                                            : '暂无数据'}
+@@
+-                                    <span className="text-gray-400">鍩虹嚎鍑虹珯鍘嬪姏</span>
++                                    <span className="text-gray-400">基线出站压力</span>
+@@
+-                                            : '鏆傛棤鏁版嵁'}
++                                            : '暂无数据'}
+@@
+-                                    <span className="text-gray-400">鍩虹嚎鍑虹珯娓╁害</span>
++                                    <span className="text-gray-400">基线出站温度</span>
+@@
+-                                            ? `${selectedNodeBaselineMetrics.temperatureC.toFixed(1)}掳C${selectedNodeBaselineMetrics.estimated ? '锛堜及绠楋級' : ''}`
+-                                            : '鏆傛棤鏁版嵁'}
++                                            ? `${selectedNodeBaselineMetrics.temperatureC.toFixed(1)}°C${selectedNodeBaselineMetrics.estimated ? '（估算）' : ''}`
++                                            : '暂无数据'}
+*** End Patch

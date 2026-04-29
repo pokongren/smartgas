@@ -1,0 +1,24 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ 2026-04-04 15:02 CST
+ 
+ - This run again entered the configured live repo root directly: current `cwd` is `F:\smartgas-grid`, `git rev-parse --show-toplevel` resolves to `F:/smartgas-grid`, and `git rev-parse --git-dir` returns `.git`, so there is no `automation env mismatch / worktree-path blockage`.
+ - Current progress summary: this round is still mainly real code change + database change + local experiment mixed together. `git status --short` shows active edits across `src/`, `backend/`, and `docs/`, while `.npm-cache/`, `.agent/workflows/start.md`, and `start.md.bak-garbled-20260403` remain local residue/noise rather than business deliverables.
+@@
+ - ID-prefix snapshot for quick comparison next run: `stations` top prefixes are `we1=227`, `we2=221`, `cred=212`, `zm=136`, `zg=106`, `gn=71`, `sj3=71`, `sj2=70`, `sj4=56`; `pipelines` top prefixes are `we1=226`, `we2=222`, `cred=208`, `zm=136`, `zg=105`, `gn=77`, `sj3=70`, `sj2=69`, `sj4=55`.
+ - API / docs line remains only half closed: runtime code (`src/services/apiBase.ts`, `src/services/api.ts`, `src/hooks/useTopology.ts`, `backend/run.py`, `vite.config.ts`) is converging on backend `8080` and allows direct `/topology/...`, but many docs and examples still point to `8000` and `/api/topology/...`, including `backend/README.md`, `docs/TOPOLOGY_SETUP_GUIDE.md`, and `docs/TOPOLOGY_COMPUTATION_USAGE.md`. `docs/code-improvement-review.md` is a new write-up tracking exactly this contract drift.
+ - No business code was modified by this heartbeat run. Memory updated only. Run completed at `2026-04-04T15:02:00+08:00`.
++
++2026-04-04 06:09 CST
++
++- Follow-up implementation run completed in the live repo root `F:\smartgas-grid`; this was no longer just inspection. The main outcome is that the previously flagged topology-alignment work is now partially fixed in code + docs, not just recorded as risk.
++- `src/utils/hierarchyRenderer.ts` and `src/utils/pipelineDomain.ts` were rewritten so the rule keywords no longer depend on broken file encoding; keyword matching now uses stable Unicode escapes for station/line labels such as compressor, distribution, valve, source, branch, and interconnect.
++- `src/utils/mapRenderer.ts` now really consumes the hierarchy helper: `getNodeImportance()` and `getMaxVisibleImportanceForZoom()` are used inside `renderPipelineNodesWithClustering()`, and grouped nodes now mark `hasImportantStation` from importance instead of the older compressor/distribution-only heuristic.
++- This means the national-map render chain `GlobalPipelineView -> MapView -> mapRenderer` now has a live zoom/importance rule. `src/views/MapTopologyView.tsx` was intentionally left alone because it still uses its own editor-side rendering path and does not consume `MapView` pipeline-node rendering.
++- `docs/TOPOLOGY_SETUP_GUIDE.md` and `docs/TOPOLOGY_COMPUTATION_USAGE.md` were rewritten to match current runtime reality: backend `8080`, direct `/topology/...` for the `useTopology` computation path, and `/api/topology/...` still present for editor-style topology APIs.
++- Human-readable delivery note added at `docs/2026-04-04-topology-rule-fix-summary.md`, using a before/after comparison table instead of images because this round was mainly about rules, path contracts, and render behavior rather than a clean visual screenshot delta.
++- Local verification: `npm run build` succeeded in `F:\smartgas-grid`. A broader `tsc` check still exposes pre-existing repo errors around `src/views/TopologyDemoView.tsx` and `src/components/ai-assistant/useAiAssistantChat.ts`; these were not introduced by this fix.
++- Remaining boundary to remember next run: we can now say the national-map side has moved closer to one rule set, but we still cannot honestly claim that the map, topology editor, and database layer are fully unified. The editor view remains a separate render system and the `/api/topology/...` vs `/topology/...` contract is still only documented, not fully consolidated in code.
++- Memory updated after implementation. Run completed at `2026-04-04 06:09:11 +08:00`.
+*** End Patch

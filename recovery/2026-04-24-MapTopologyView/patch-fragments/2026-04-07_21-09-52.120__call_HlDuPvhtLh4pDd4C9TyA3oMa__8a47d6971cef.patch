@@ -1,0 +1,121 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/docs/2026-04-08-WE1第一张图联调验收脚本第5阶段第3轮总结_人话版.md
++# WE1第一张图联调验收脚本第5阶段第3轮总结
++
++一、主目标
++1. 这一轮只收一件事：给 WE1 第一张图主仿真补一条独立验收脚本，把第5阶段已经落下来的主链、快照、基线对比、覆盖清单、演示口径和路由语义一起验掉，避免后面封板还只能靠人工记忆。
++
++二、上下文与已知信息
++1. automation memory 还停在第3阶段第1轮阻塞，但 `docs` 里已经连续落下第3阶段第2轮、第4阶段第2轮、第5阶段第2轮总结，所以这轮按真实落盘状态续做第5阶段第3轮，不倒回去重做旧阶段。
++2. 第5阶段前两轮已经把“覆盖结果清单”和“固定演示口径”收到了 [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)，但还缺一条独立验收入口把这些口径和主链放到同一个脚本里验证。
++3. 现有脚本 [verify_we1_phase34_final.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase34_final.py) 更偏第3到4阶段联合回归，[verify_we1_snapshot_archive.py](/F:/smartgas-grid/backend/scripts/verify_we1_snapshot_archive.py) 只验快照归档，二者都不直接覆盖第5阶段 UI 收口语义。
++
++三、主代理与子代理分工
++1. 主代理先核对 memory、阶段总结和现有验证脚本，确认当前实际位置是第5阶段第3轮，再只选“补独立验收脚本”这一个方向推进。
++2. 侦察子代理 A 负责判断当前阶段位置和第5阶段剩余缺口，侦察子代理 B 负责核对现有验证链覆盖范围和最值得补的验证入口。
++3. 实施子代理只在 `backend/scripts` 范围内新增一个脚本，不碰求解公式、不扩场景、不新造第三套页面。
++4. 验证由主代理独立回归，按“新脚本 -> 阶段3到4联合回归 -> 快照归档”三条链复核；失败时先查入口消费层，再查映射消费层，再查快照层，最后查后端主链。
++
++四、修改逻辑
++1. 新增 [verify_we1_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase5.py)，把第5阶段真正关心的四类事实收进一个脚本。
++2. 第一类事实是 `steady_base` overlay 合同是否完整，至少要确认顶层字段、`summary`、`meta`、`nodes`、`edges` 都齐。
++3. 第二类事实是快照保存、回读、列表三条链是否可用，避免第5阶段页面上能点“保存快照”，但封板时没有稳定归档依据。
++4. 第三类事实是第5阶段页面消费点是否还在，包括 coverage checklist、scenario playbook、failure triage、baseline compare 四组关键标识，避免页面收口被后续改动悄悄打散。
++5. 第四类事实是 `/map-topology` 和 `/topology` 的路由以及 AI page context 是否仍然能区分正式页和调试页，防止第4阶段降级语义被回归打穿。
++
++五、执行顺序
++1. 先读 memory 和阶段总结，判定当前处于第5阶段第3轮。
++2. 再并行侦察当前缺口和验证链覆盖面。
++3. 只让实施子代理新增 [verify_we1_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase5.py)。
++4. 修改完成后，独立运行 `python backend/scripts/verify_we1_phase5.py`。
++5. 再运行 `python backend/scripts/verify_we1_phase34_final.py` 和 `python backend/scripts/verify_we1_snapshot_archive.py` 做回归复核。
++
++六、验证方式
++1. 运行 `python backend/scripts/verify_we1_phase5.py`，结果通过；脚本输出 `status: passed`，并且 14 条检查全部通过，覆盖 overlay 合同、快照 create/get/list、MapTopologyView 第5阶段消费点、App 路由、AI page context。
++2. 运行 `python backend/scripts/verify_we1_phase34_final.py`，结果通过；主辅样板 overlay 契约统一、主样板稳态与故障收敛、辅样板场景列表完整。
++3. 运行 `python backend/scripts/verify_we1_snapshot_archive.py`，结果通过；快照创建、回读、列表都正常，最新 `run_id` 成功出现在列表里。
++4. 失败时先查哪层：先查第一张图入口和前端消费层，再查 source IDs 到 overlay IDs 的映射消费层，再查快照 create/get/list 归档层，最后再查 solver input 和稳态求解后端主链。
++
++七、风险与回退点
++1. 这一轮脚本里有一部分第5阶段 UI 验证依赖源码关键标识字符串，后面如果只是变量名重构，没有同步更新脚本，可能出现“能力还在但脚本误报失败”。
++2. 脚本依赖本地 WE1 pilot、seed 和 DB 数据可用；如果环境数据异常，失败点会落在数据或接口层，不代表这轮脚本逻辑本身有问题。
++3. 这一轮只补独立验收脚本，不替代最终的人眼演示验收，所以第5阶段还不能直接切到维护模式，下一轮还要做封板说明和巡检口径落盘。
++
++八、最终交付物
++1. 代码交付：新增 [verify_we1_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase5.py)。
++2. 文档交付：本总结 [2026-04-08-WE1第一张图联调验收脚本第5阶段第3轮总结_人话版.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图联调验收脚本第5阶段第3轮总结_人话版.md)。
++3. automation memory 已更新到“第5阶段第3轮完成，第5阶段第4轮待执行”。
++
++九、前后对比
++| 项目 | 这一轮之前 | 这一轮之后 |
++| --- | --- | --- |
++| 第5阶段验收入口 | 分散在第3到4阶段联合回归脚本和快照脚本里 | 新增单独的第5阶段验收脚本统一收口 |
++| UI 收口验证 | 主要靠人工看页面和读代码 | 脚本能直接检查 coverage checklist、playbook、failure triage、baseline compare |
++| 封板前判断 | 还缺一条“能不能放行”的统一口径 | 现在能先跑 phase5 脚本，再跑旧回归脚本做双保险 |
++| 下一轮目标 | 还不够清楚 | 只剩第5阶段第4轮封板说明与维护模式切换 |
++
++十、当前结论
++1. 第5阶段第3轮已完成，并且独立回归通过。
++2. 当前不进入下一阶段，因为方案里没有第6阶段；下一轮继续留在第5阶段，执行第4轮“联调收口与封板”。
+*** Update File: C:\Users\Administrator\.codex\automations\we1\memory.md
+@@
+-????
+-1. 2026-04-08 04:28:05 +08:00?
+-
+-????
+-1. ??????3???1??????????
+-2. ?3?????????????????? UI???????????????????????
+-3. ????????3???2??????????????????????????????? simulate-failure ?????????4???????
+-
+-????
+-1. ???????????? 2 ???????1 ????????????????????????? [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)?
+-2. ???????????????????????????????????????????????
+-3. ????????????????????`marker.on('click', (event: any) => doNodeClick(nodeId, event))` ????????
+-4. ???????????????`MapTopologyView.tsx` ????????????????????????????????????/??????tsc ????????????? JSX ??????
+-5. ?? docs ????? [2026-04-08-WE1-map-phase3-round1-validation-blocked-summary-human.md](/F:/smartgas-grid/docs/2026-04-08-WE1-map-phase3-round1-validation-blocked-summary-human.md)?
+-
+-????
+-1. `python backend/scripts/verify_we1_phase3.py` ????
+-2. `python backend/scripts/verify_we1_map_phase2.py` ????
+-3. `node .\node_modules\typescript\bin\tsc --noEmit` ??????????????? `src/views/MapTopologyView.tsx`?????????????????? JSX ?????`src/components/map-view/MapView.tsx`?`src/hooks/useSimulation.ts`?`src/views/GlobalPipelineView.tsx`?`src/views/TopologyDemoView.tsx` ?????????
+-
+-??????
+-1. ???? [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) ????????????????????? UTF-8 + ???????
+-2. ????????????????????? [simulationOverlayMapping.ts](/F:/smartgas-grid/src/utils/simulationOverlayMapping.ts)?
+-3. ?????????? overlay ?????????
+-
+-????
+-1. [MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)
+-2. [2026-04-08-WE1-map-phase3-round1-validation-blocked-summary-human.md](/F:/smartgas-grid/docs/2026-04-08-WE1-map-phase3-round1-validation-blocked-summary-human.md)
+-
+-????
+-1. ?3???1??????????????
+-2. ??????3???1???????? `MapTopologyView.tsx` ?????????????????????
++一、运行时间
++1. 2026-04-08 05:05:05 +08:00。
++
++二、当前阶段
++1. automation memory 原先停在第3阶段第1轮阻塞，但本轮已按 `docs` 真实落盘状态纠偏。
++2. 当前已完成到第5阶段第3轮，主题是“联调验收脚本收口”。
++3. 下一轮继续第5阶段第4轮，只做联调收口与封板；5 个阶段全部完成后转入巡检、回归和修复，不再扩阶段。
++
++三、本轮完成内容
++1. 新增独立验收脚本 [verify_we1_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase5.py)，统一验证 steady_base overlay 合同、快照 create/get/list、MapTopologyView 第5阶段消费点、App 路由、AI page context。
++2. 新增本轮总结 [2026-04-08-WE1第一张图联调验收脚本第5阶段第3轮总结_人话版.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图联调验收脚本第5阶段第3轮总结_人话版.md)。
++3. 本轮没有改 solver 公式，没有扩新试点，没有新造第三套仿真页面。
++
++四、验证结果
++1. `python backend/scripts/verify_we1_phase5.py` 通过。
++2. `python backend/scripts/verify_we1_phase34_final.py` 通过。
++3. `python backend/scripts/verify_we1_snapshot_archive.py` 通过。
++4. 失败时先查哪层：第一张图入口与前端消费层 -> source IDs 到 overlay IDs 映射消费层 -> 快照归档层 -> 后端 solver input 与稳态求解主链。
++
++五、改动文件
++1. [verify_we1_phase5.py](/F:/smartgas-grid/backend/scripts/verify_we1_phase5.py)
++2. [2026-04-08-WE1第一张图联调验收脚本第5阶段第3轮总结_人话版.md](/F:/smartgas-grid/docs/2026-04-08-WE1第一张图联调验收脚本第5阶段第3轮总结_人话版.md)
++3. [memory.md](C:/Users/Administrator/.codex/automations/we1/memory.md)
++
++六、下一轮优先项
++1. 第5阶段第4轮只做封板说明、回退点确认、维护模式切换口径落盘。
++2. 不往第6阶段扩，不回头大改前面已通过验证的主链。
+*** End Patch

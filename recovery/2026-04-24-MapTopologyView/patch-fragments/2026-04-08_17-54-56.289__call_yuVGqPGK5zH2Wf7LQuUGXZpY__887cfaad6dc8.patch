@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                    <div className="grid grid-cols-2 gap-2">
+-                                        <button onClick={async () => { try { await runSteadySimulation(); setStatusMsg(`WE1 涓讳豢鐪熷凡杩愯锛?{steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 涓讳豢鐪熻繍琛屽け璐?) } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '杩愯涓?..' : '杩愯涓讳豢鐪?}</button>
++                                    <div className="grid grid-cols-2 gap-2">
++                                        <button onClick={openTopologyShowcase} className="col-span-2 rounded-lg border border-cyan-500/30 bg-cyan-950/20 px-3 py-2 text-xs font-medium text-cyan-100">前往第三张图展示</button>
++                                        <button onClick={async () => { try { await runSteadySimulation(); setStatusMsg(`WE1 涓讳豢鐪熷凡杩愯锛?{steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 涓讳豢鐪熻繍琛屽け璐?) } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '杩愯涓?..' : '杩愯涓讳豢鐪?}</button>
+*** End Patch

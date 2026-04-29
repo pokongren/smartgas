@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx.tmp-switch-20260424
+*** Move to: src/views/MapTopologyView.tsx.backup-1649lines
+@@
+-/**
++/**
+*** End Patch

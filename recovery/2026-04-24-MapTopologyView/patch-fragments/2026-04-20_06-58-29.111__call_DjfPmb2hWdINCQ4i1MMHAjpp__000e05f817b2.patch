@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-950/10 px-3 py-2">
+-                                        <div className="text-[10px] uppercase tracking-wider text-emerald-200">AI分析摘要</div>
+-                                        <div className="mt-1 text-[11px] text-emerald-100">风险等级：{simulationAiSummary.riskLevel}</div>
+-                                        <div className="mt-2 space-y-1">
+-                                            {simulationAiSummary.lines.map((line, index) => (
+-                                                <div key={`ai-summary-${index}`} className="text-[11px] text-slate-300 leading-5">
+-                                                    {index + 1}. {line}
+-                                                </div>
+-                                            ))}
+-                                        </div>
+-                                    </div>
+*** End Patch

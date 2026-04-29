@@ -1,0 +1,11 @@
+*** Begin Patch
+*** Update File: backend/scripts/verify_we1_maintenance.py
+@@
+ def _verify_entry_semantics() -> Dict[str, Any]:
+     app_path = REPO_ROOT / "src" / "App.tsx"
+     map_path = REPO_ROOT / "src" / "views" / "MapTopologyView.tsx"
++    ai_context_path = REPO_ROOT / "src" / "components" / "ai-assistant" / "useAiAssistantPageContext.ts"
+     app_text = _read_text(app_path)
+     map_text = _read_text(map_path)
++    ai_context_text = _read_text(ai_context_path)
+*** End Patch

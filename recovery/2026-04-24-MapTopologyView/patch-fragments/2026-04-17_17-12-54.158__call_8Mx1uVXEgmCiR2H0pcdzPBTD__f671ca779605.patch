@@ -1,0 +1,11 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+ import { clearSimulationShowcaseSyncContext, writeSimulationShowcaseSyncContext } from '@/utils/simulationShowcaseSync'
+ import { setAssistantRuntimeContext } from '@/components/ai-assistant/runtimeAssistantContext'
+-import { MAINLINE_SCENARIOS } from '@/types/simulation'
++import { MAINLINE_SCENARIOS, type SimulationInitialInput } from '@/types/simulation'
+ import { seedNodeAPI } from '@/services/api'
+ import type { SeedNodePressure } from '@/services/api'
++import SimParamEditor from '@/components/topology/SimParamEditor'
+*** End Patch

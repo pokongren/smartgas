@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-type PanelTab = 'edit' | 'validate' | 'search' | 'centrality' | 'cutoff' | 'sim-params'
++type PanelTab = 'edit' | 'validate' | 'search' | 'centrality' | 'cutoff' | 'simulation'
+@@
+-                            { id: 'sim-params' as PanelTab, label: '参数', icon: 'tune' },
++                            { id: 'simulation' as PanelTab, label: '仿真', icon: 'science' },
+@@
+-                        {activeTab === 'sim-params' && (
++                        {activeTab === 'simulation' && (
+*** End Patch

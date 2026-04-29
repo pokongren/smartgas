@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-        const adj = new Map<string, Set<string>>()
++        const adj = new Map<string, Array<{ nodeId: string; edgeId: string }>>()
+         for (const sn of srcN) {
+-            adj.set(sn.id, new Set())
++            adj.set(sn.id, [])
+         }
+         for (const sl of srcL) {
+             if (adj.has(sl.startNodeId) && adj.has(sl.endNodeId)) {
+-                adj.get(sl.startNodeId)!.add(sl.endNodeId)
+-                adj.get(sl.endNodeId)!.add(sl.startNodeId)
++                adj.get(sl.startNodeId)!.push({ nodeId: sl.endNodeId, edgeId: sl.id })
++                adj.get(sl.endNodeId)!.push({ nodeId: sl.startNodeId, edgeId: sl.id })
+             }
+         }
+*** End Patch

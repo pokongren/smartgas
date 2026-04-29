@@ -1,0 +1,22 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                    const _dbPressure = _seedEntry?.operating_pressure_out ?? null
+-                    const extraLabel = match && match.averagePressureMpa != null
+-                        ? `<div style="font-size: 9px; color: #67e8f9; background: rgba(0,20,30,0.8); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px solid rgba(103,232,249,0.3);">${match.averagePressureMpa.toFixed(2)} MPa</div>`
+-                        : _dbPressure != null
+-                            ? `<div style="font-size: 9px; color: #86efac; background: rgba(0,15,0,0.75); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px dashed rgba(134,239,172,0.4);">${_dbPressure.toFixed(2)} MPa</div>`
+-                            : ''
++                    const _dbOutPressure = _seedEntry?.operating_pressure_out ?? null
++                    const _dbInPressure = _seedEntry?.operating_pressure_in ?? null
++                    const _simOutPressure = animatedNodeOutPressure.get(node.id) ?? (match?.averagePressureMpa ?? null)
++                    const _simInPressure = _simOutPressure != null ? _simOutPressure * 0.95 : null
++                    const extraLabel = _simOutPressure != null
++                        ? `<div style="font-size: 9px; color: #67e8f9; background: rgba(0,20,30,0.82); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px solid rgba(103,232,249,0.3);">进 ${_simInPressure!.toFixed(2)} | 出 ${_simOutPressure.toFixed(2)} MPa</div>`
++                        : _dbOutPressure != null || _dbInPressure != null
++                            ? `<div style="font-size: 9px; color: #86efac; background: rgba(0,15,0,0.75); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px dashed rgba(134,239,172,0.4);">进 ${(_dbInPressure ?? (_dbOutPressure != null ? _dbOutPressure * 0.95 : 0)).toFixed(2)} | 出 ${(_dbOutPressure ?? 0).toFixed(2)} MPa</div>`
++                            : ''
+@@
+-    }, [simulationMapping, topoNodes, cutoffNodeId, selectedMergeNodeIds, activeTab, cutoffResult, isBreakScenarioActive, nodePressureDeltaMap, damageFlashVisible, isMapInteracting, renderSafetyMode, seedNodePressures])
++    }, [simulationMapping, topoNodes, cutoffNodeId, selectedMergeNodeIds, activeTab, cutoffResult, isBreakScenarioActive, nodePressureDeltaMap, damageFlashVisible, isMapInteracting, renderSafetyMode, seedNodePressures, animatedNodeOutPressure])
+*** End Patch

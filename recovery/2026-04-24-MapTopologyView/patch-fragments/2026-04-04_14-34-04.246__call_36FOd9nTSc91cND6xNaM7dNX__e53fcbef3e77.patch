@@ -1,0 +1,21 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ # 2026-04-04 20:39:48 +08:00
+ 
+ - 已按用户要求把“项目心跳”自动化加入 AI 模块链路查询，并顺手把 `C:\Users\Administrator\.codex\automations\automation\automation.toml` 里的乱码 prompt 重写成可读中文。
+ - 新增了“侦察代理 D：AI 模块链路”，默认检查 `backend/app/routers/ai_assistant.py`、`backend/app/services/ai_client.py`、`backend/app/services/ai_analysis_orchestrator.py`、`backend/app/services/analysis_validator.py`、`backend/app/services/fix_task_router.py`、`src/components/ai-assistant/AiAssistant.tsx`、`src/components/ai-assistant/useAiAssistantChat.ts`、`src/components/ai-assistant/useAiAssistantPageContext.ts`、`src/services/api.ts`。
+ - AI 模块巡检口径已经写进主线要求：后续自动化要确认前端入口、请求路径、后端路由、编排服务、校验层、修复任务分发、页面上下文注入、模型/网关配置、异常兜底是不是一条链，并区分正式能力、半接线状态、本地试验。
+ - 本次只改自动化配置和 memory，没有改 `F:\smartgas-grid` 里的业务代码。
++
++# 2026-04-04 22:33:28 +08:00
++
++- 本轮先按入口要求落点到 `F:\smartgas-grid`。初始 cwd 是 `C:\Users\Administrator\.codex\worktrees\01d3\smartgas-grid`，切换后 `cwd` 和 `git rev-parse --show-toplevel` 都是 `F:\smartgas-grid`；主目录入口通过，不是 `automation env mismatch / worktree-path blockage`，也不是空壳 worktree。
++- 这轮主判断要收口成“代码变化 + 数据库变化 + AI 模块链路变化 + 少量本地实验残留”。`git status --short` 里四条主线相关文件都在动，同时还有 `.npm-cache/`、`backend/data/junction-rebuild-*.json`、`backend/data/smartgas.rebuild-preview.db`、`backend/scripts/rebuild_junctions.py`、`backend/scripts/verify_junctions.py`、`tmp_debug.txt` 这类本地实验/辅助验证痕迹，别把它们都算正式交付。
++- 地图层级这轮可以确认全国地图链路确实统一到了 `src/utils/hierarchyRenderer.ts` 的 LOD 阈值：`critical/high/medium = 6/10/14`、`valveMinZoom = 11`、`expandClusterZoom = 12`，`src/utils/mapRenderer.ts` 已接 `getNodeLODStrategy()` 和 `shouldShowNodeAtZoom()`。`src/views/GlobalPipelineView.tsx` 补了 junction kind 展示和跳转 `focusNode`，`src/views/MapTopologyView.tsx` 会按 `focusNode` 定位，但不要写成“地图页和拓扑页已经完全共用同一套渲染逻辑”。
++- 枢纽规则这轮要纠正旧 memory 的说法：`backend/app/services/junction_groups.py` 运行时入口确实优先读 `junction_groups_rebuilt`，`backend/app/routers/topology_editor.py` 也返回 `manual_editing_enabled` 和 `mode`，但代码默认 `TOPOLOGY_MANUAL_JUNCTION_EDIT=1`，也就是默认仍允许手工编辑；只有显式设成 `0` 才会退到 `runtime_readonly`。前端 `src/views/MapTopologyView.tsx` 和 `src/services/topologyEditorApi.ts` 也按这个开关接了展示，所以以后不要再默认写成“手工 merge 已默认下线”。
++- 数据库现状继续以主目录实测为准：`stations=1272`、`pipelines=1268`、`pipeline_systems=14`、`junction_groups=16`、`junction_groups_rebuilt=12`；`we3/sj2/sj3` 都已落库，`WE3=16/15`、`SJ2=70/69`、`SJ3=71/70`。`backend/check_db.py --require-system we3 --require-system sj2 --require-system sj3 --require-prefix WE3 --require-prefix SJ2 --require-prefix SJ3` 本轮再次通过，`junction_shadow_stats` 为 `junction=10`、`major_junction=2`、`issue_count=0`，`generated_at=2026-04-04T11:09:08.312826+00:00`。`pipeline_systems` 结构仍只有 `id/name/color/sort_order/layers_config`，不要写成已经有 `system_id` 落库；同时全库还有 `229` 条 `pipelines.category` 不在 `trunk/branch`，所以这是导入口径收紧中，不是历史数据已清洗完。
++- AI 模块链路这轮可以定性为“本地工作树里已接成一条链，但还没提交干净”。前端 `src/components/ai-assistant/useAiAssistantChat.ts` 通过 `resolveApiPath('/api/ai-assistant/chat')` 发请求，并带 `useAiAssistantPageContext()` 和 `analysis_mode=subagents`；后端 `backend/app/routers/ai_assistant.py` 已接 `AiAnalysisOrchestrator -> AnalysisValidator -> FixTaskRouter`，不是纯调试残留。模型/网关配置来自 `backend/.env` 的 `AI_BASE_URL` 和 `AI_DEFAULT_MODEL`，不是代码里的默认 OpenAI 值；但 `backend/app/services/ai_client.py` 和 `src/components/ai-assistant/useAiAssistantChat.ts` 里都有明显乱码 fallback/error 文案，后续巡检要把它当成链路风险，不要说成已经完全收口。
++- docs 变化本轮仍只认 `docs/TOPOLOGY_COMPUTATION_USAGE.md` 和 `docs/TOPOLOGY_SETUP_GUIDE.md` 这两份，内容是在补 `8080`、`/api/topology/...` 与 `/topology/...` 双轨现状；别把 docs 文案当成接口口径已经彻底统一的证明。
++- 当前运行时间：`2026-04-04 22:33:28 +08:00`。
+*** End Patch

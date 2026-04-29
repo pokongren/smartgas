@@ -1,0 +1,21 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-        const fromMap = pressureAnimationTargetRef.current
++        const fromMap = pressureAnimationTargetRef.current.size > 0
++            ? pressureAnimationTargetRef.current
++            : (() => {
++                const fallbackMap = new Map<string, number>()
++                toMap.forEach((_, nodeId) => {
++                    const seedItem = seedNodePressures.get(nodeId)
++                    const seedPressure = seedItem?.operating_pressure_out
++                        ?? seedItem?.target_pressure_mpa
++                        ?? null
++                    if (typeof seedPressure === 'number' && Number.isFinite(seedPressure)) {
++                        fallbackMap.set(nodeId, seedPressure)
++                    }
++                })
++                return fallbackMap
++            })()
+         const toMap = simulatedNodeOutPressureMap
+*** End Patch

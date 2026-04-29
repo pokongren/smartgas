@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                         <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('已清空当前主仿真结果') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">清空主仿真</button>
+                                         <button onClick={copySimulationNarrative} className="col-span-2 rounded-lg border border-cyan-400/30 bg-cyan-950/30 px-3 py-2 text-xs font-medium text-cyan-100">复制仿真文字简报（第2次迭代）</button>
+                                         <button onClick={copySimulationStructuredBrief} className="col-span-2 rounded-lg border border-violet-400/30 bg-violet-950/30 px-3 py-2 text-xs font-medium text-violet-100">复制结构化简报（给AI）</button>
++                                        <button onClick={sendSimulationToAiAnalysis} disabled={!steadyOverlay} className="col-span-2 rounded-lg border border-emerald-400/30 bg-emerald-950/30 px-3 py-2 text-xs font-medium text-emerald-100 disabled:opacity-40">发送仿真结果到AI分析</button>
+                                         <button onClick={exportSimulationReport} className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-3 py-2 text-xs font-medium text-emerald-100">导出演示清单</button>
+*** End Patch

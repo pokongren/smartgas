@@ -1,0 +1,53 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const simulationStructuredBrief = useMemo(() => {
+@@
+     }, [
+         coverageResultSummary.matchedEdgeText,
+         coverageResultSummary.matchedNodeText,
+         coverageResultSummary.readinessLabel,
+         steadyComparison,
+         steadyOverlay,
+         steadyScenarioId,
+     ])
++    const simulationAiSummary = useMemo(() => {
++        if (!steadyOverlay) {
++            return {
++                riskLevel: '待运行',
++                lines: ['先运行主仿真，再生成AI分析结论。'],
++            }
++        }
++
++        const summary = steadyOverlay.summary
++        const gap = summary.total_supply - summary.total_demand
++        const riskLevel =
++            steadyOverlay.solver_status === 'error'
++                ? '高风险'
++                : steadyOverlay.solver_status === 'max_iter' || summary.alert_count >= 5
++                    ? '中高风险'
++                    : summary.alert_count >= 1 || summary.avg_utilization >= 0.82
++                        ? '中风险'
++                        : '低风险'
++
++        const baselineDelta = steadyComparison
++            ? `基线对比：供给${formatSignedNumber(steadyComparison.summary_delta.total_supply.delta, 2)}，需求${formatSignedNumber(steadyComparison.summary_delta.total_demand.delta, 2)}，利用率${formatSignedNumber(steadyComparison.summary_delta.avg_utilization.delta, 3)}`
++            : '基线对比：未选择基线快照'
++
++        return {
++            riskLevel,
++            lines: [
++                `运行状态：${SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}，告警${summary.alert_count}个，供需差${formatSignedNumber(gap, 2)}`,
++                `覆盖命中：节点${coverageResultSummary.matchedNodeText}，连线${coverageResultSummary.matchedEdgeText}`,
++                baselineDelta,
++                `建议动作：${buildOpsSuggestion(summary.alert_count, summary.avg_utilization, steadyOverlay.solver_status)}`,
++            ],
++        }
++    }, [
++        coverageResultSummary.matchedEdgeText,
++        coverageResultSummary.matchedNodeText,
++        steadyComparison,
++        steadyOverlay,
++    ])
+     const simulationRunTimeline = useMemo(() => {
+*** End Patch

@@ -7,7 +7,7 @@ import { getNodeImportance, getNodeLODStrategy, NODE_LOD_THRESHOLDS, NodeImporta
 /**
  * 地图渲染工具函数 - 性能优化版
  * 用于在高德地图上渲染管网数据
- * 
+ *
  * 优化点：
  * 1. 分批渲染，避免阻塞主线程
  * 2. 缓存聚合计算结果
@@ -79,7 +79,7 @@ function injectMarkerStyles() {
     const style = document.createElement('style')
     style.id = styleId
     style.textContent = `
-        /* 压气站标记容器 - 无动画 */
+        /* 压气站标记容器 - 带呼吸灯动效 */
         .compressor-marker-container {
             position: relative;
             width: ${COMPRESSOR_ICON_CONFIG.WIDTH}px;
@@ -88,23 +88,50 @@ function injectMarkerStyles() {
             justify-content: center;
             align-items: center;
             cursor: pointer;
+            filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.6));
+            transition: all 0.3s ease;
         }
-        
+        .compressor-marker-container:hover {
+            transform: scale(1.2) !important;
+            filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.9));
+        }
+
+        /* 呼吸灯发光层 */
+        .compressor-marker-glow {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(0, 229, 255, 0.4) 0%, rgba(0, 229, 255, 0) 70%);
+            border-radius: 50%;
+            animation: marker-pulse 2s ease-in-out infinite;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        @keyframes marker-pulse {
+            0%, 100% { transform: scale(0.8); opacity: 0.3; }
+            50% { transform: scale(1.5); opacity: 0.7; }
+        }
+
         /* 压气站图标 */
         .compressor-marker-icon {
             width: ${COMPRESSOR_ICON_CONFIG.WIDTH}px;
             height: ${COMPRESSOR_ICON_CONFIG.HEIGHT}px;
             object-fit: contain;
             pointer-events: none;
+            filter: brightness(1.1);
         }
 
-        /* 聚合标记样式 */
+        /* 聚合标记样式 - 玻璃拟态版 */
         .pipeline-cluster-marker {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.1);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            background-image: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.1), transparent);
         }
         .pipeline-cluster-marker:hover {
-            transform: scale(1.1);
+            transform: scale(1.15);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.3);
             z-index: 200;
         }
         .cluster-indicator {
@@ -118,26 +145,27 @@ function injectMarkerStyles() {
             color: white;
             font-weight: bold;
             border: 1px solid rgba(255,255,255,0.8);
+            box-shadow: 0 0 4px rgba(0,0,0,0.5);
         }
-        .cluster-indicator.compressor { background: #06b6d4; }
-        .cluster-indicator.distribution { background: #eab308; }
-        .cluster-indicator.valve { background: #6b7280; }
+        .cluster-indicator.compressor { background: #0ea5e9; }
+        .cluster-indicator.distribution { background: #f59e0b; }
+        .cluster-indicator.valve { background: #64748b; }
 
-        /* 枢纽节点样式 */
+        /* 枢纽节点样式 - 强化霓虹感 */
         .hub-marker {
             position: relative;
             cursor: pointer;
         }
         .hub-marker-diamond {
             transform: rotate(45deg);
-            border: 2px solid #fff;
+            border: 1px solid rgba(255,255,255,0.8);
         }
         .hub-marker-junction .hub-marker-diamond {
             animation: hub-pulse 2s ease-in-out infinite;
         }
         @keyframes hub-pulse {
-            0%, 100% { box-shadow: 0 0 4px rgba(0,229,255,0.6); }
-            50% { box-shadow: 0 0 12px rgba(0,229,255,1), 0 0 24px rgba(0,229,255,0.4); }
+            0%, 100% { box-shadow: 0 0 4px rgba(0,229,255,0.6); transform: rotate(45deg) scale(0.9); }
+            50% { box-shadow: 0 0 15px rgba(0,229,255,0.9), 0 0 30px rgba(0,229,255,0.3); transform: rotate(45deg) scale(1.1); }
         }
     `
     document.head.appendChild(style)
@@ -154,30 +182,30 @@ export const STATUS_COLORS = {
     [PipelineStatus.DISABLED]: '#6b7280',      // 灰色 - 已停用
 } as const
 
-// 管线类别颜色映射(深色主题优化)
+// 管线类别颜色映射(数字孪生色系)
 export const PIPELINE_CATEGORY_COLORS: Record<string, string> = {
-    '西一线': '#FF5722',
-    '中缅线': '#4caf50',
-    '中缅支线': '#8bc34a',
-    '中贵线': '#00d4ff',
-    '西二线': '#ff9800',
-    '西三线': '#9c27b0',
-    '西四线': '#e040fb',
-    '西气东输四线': '#e040fb',
-    '陕二线': '#4caf50',
-    '阿拉支干线': '#00bcd4',
-    '闽粤支干线': '#e91e63',
-    '广南/广西': '#ff00ff',
-    '广南支干线': '#ff5722',
-    '广深支干线': '#9c27b0',
-    '广西管道': '#00bcd4',
-    '海南': '#00ff00',
-    'LNG外输': '#ffff00',
-    '中俄东线': '#e91e63',
-    '平泰支干线': '#E91E63',
-    '陕京四线': '#00d4ff',
-    '陕京四线支线': '#8bc34a',
-    '其他': '#999999',
+    '西一线': '#f97316',       // 温暖橙
+    '中缅线': '#10b981',       // 翡翠绿
+    '中缅支线': '#34d399',     // 薄荷绿
+    '中贵线': '#0ea5e9',       // 天空蓝
+    '西二线': '#fbbf24',       // 琥珀黄
+    '西三线': '#a855f7',       // 罗兰紫
+    '西四线': '#d946ef',       // 霓虹粉
+    '西气东输四线': '#d946ef',
+    '陕二线': '#059669',       // 深绿
+    '阿拉支干线': '#06b6d4',   // 青色
+    '闽粤支干线': '#f43f5e',   // 珊瑚红
+    '广南/广西': '#ec4899',    // 粉红
+    '广南支干线': '#f97316',
+    '广深支干线': '#8b5cf6',   // 紫罗兰
+    '广西管道': '#0891b2',
+    '海南': '#22c55e',
+    'LNG外输': '#fb923c',
+    '中俄东线': '#ef4444',     // 正红
+    '平泰支干线': '#f43f5e',
+    '陕京四线': '#3b82f6',     // 宝蓝
+    '陕京四线支线': '#60a5fa',
+    '其他': '#94a3b8',         // 板岩灰
 }
 
 /**
@@ -376,7 +404,7 @@ export function clearClusterCache(): void {
 /** nodeId → AMap.Marker 实例 */
 const nodeMarkerMap = new Map<string, any>()
 
-/** 
+/**
  * 获取所有节点的 Marker 实例映射表
  * 暴露给外部用于基于操作 DOM 的实时状态更新（绕过 React 渲染周期避免卡顿）
  */
@@ -522,9 +550,9 @@ export function createCompressorIconSVG(): string {
                 <stop offset="100%" style="stop-color:#0099cc;stop-opacity:1" />
             </linearGradient>
         </defs>
-        <polygon points="0,0 0,${HEIGHT} ${WIDTH},${rightBottom} ${WIDTH},${rightTop}" 
-                 fill="url(#trapezoidGrad)" 
-                 stroke="rgba(255,255,255,0.5)" 
+        <polygon points="0,0 0,${HEIGHT} ${WIDTH},${rightBottom} ${WIDTH},${rightTop}"
+                 fill="url(#trapezoidGrad)"
+                 stroke="rgba(255,255,255,0.5)"
                  stroke-width="1"/>
     </svg>`
 
@@ -593,6 +621,27 @@ function pixelOffsetToLngLat(
 function createClusterMarkerContent(group: ClusterGroup): string {
     const count = group.nodes.length
     const { typeStats } = group
+    const hasJunctionNode = typeStats.majorJunction > 0 || typeStats.junction > 0
+
+    if (hasJunctionNode) {
+        return `
+            <div class="hub-marker" title="普通枢纽" style="
+                width: 28px;
+                height: 28px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+            ">
+                <div class="hub-marker-diamond" style="
+                    width: 18px;
+                    height: 18px;
+                    background: #00e5ff;
+                    box-shadow: 0 0 8px rgba(0,229,255,0.65);
+                "></div>
+            </div>
+        `
+    }
 
     let color: string = CLUSTER_CONFIG.CLUSTER_COLORS.FEW
     if (count > 15) {
@@ -657,7 +706,9 @@ function createClusterMarker(
     const marker = new AMap.Marker({
         position: [group.coordinate.longitude, group.coordinate.latitude],
         content: createClusterMarkerContent(group),
-        offset: new AMap.Pixel(-20, -20),
+        offset: group.typeStats.majorJunction > 0 || group.typeStats.junction > 0
+            ? new AMap.Pixel(-14, -14)
+            : new AMap.Pixel(-20, -20),
         zIndex: 150,
         extData: { type: 'cluster', group },
         zooms: [2, 30]
@@ -747,7 +798,12 @@ function createCompressorMarkerContent(rotation: number = 0): HTMLElement {
     container.className = 'compressor-marker-container'
     container.style.transform = `rotate(${rotation}deg)`
 
-    // 图标（无动画、无发光层、无阴影）
+    // 呼吸灯发光层
+    const glow = document.createElement('div')
+    glow.className = 'compressor-marker-glow'
+    container.appendChild(glow)
+
+    // 图标
     const icon = document.createElement('img')
     icon.className = 'compressor-marker-icon'
     icon.src = getCompressorIcon()
@@ -769,8 +825,10 @@ function createCircleNodeContent(color: string, size: number, strokeColor: strin
         background: ${color};
         border: ${strokeWidth}px solid ${strokeColor};
         cursor: move;
-        box-shadow: 0 0 6px rgba(0,0,0,0.4);
-    "></div>`
+        box-shadow: 0 0 12px ${color}, 0 0 2px rgba(255,255,255,0.8);
+        transition: all 0.2s ease;
+        filter: brightness(1.1);
+    " onmouseover="this.style.transform='scale(1.3)'; this.style.boxShadow='0 0 20px ${color}'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 0 12px ${color}'"></div>`
 }
 
 /**
@@ -800,7 +858,7 @@ function createOffsetNodeMarker(
 
     if (isCompressor) {
         let rotation = 0;
-        
+
         // 自动根据相连的管线计算朝向角度，修正固定90度导致的重叠和错误横置问题
         const connections = nodePolylinesMap.get(node.id);
         if (connections && connections.length > 0) {
@@ -850,10 +908,10 @@ function createOffsetNodeMarker(
         zooms: [2, 30]
     })
     } else if (isDistribution) {
-        markerSize = 16
+        markerSize = 12
         marker = new AMap.Marker({
             position: [position.longitude, position.latitude],
-            content: createCircleNodeContent('#ffd700', 8, '#ffffff', 2),
+            content: createCircleNodeContent('#ffd700', 6, '#ffffff', 2),
             offset: new AMap.Pixel(-markerSize / 2, -markerSize / 2),
             draggable: true,
             cursor: 'move',
@@ -944,6 +1002,7 @@ function createOffsetNodeMarker(
 export function renderPipelineLines(
     map: any,
     lines: PipelineLine[],
+    nodes: PipelineNode[] = [],
     onLineClick?: (event: { line: PipelineLine; position: { longitude: number; latitude: number } }) => void,
     signal?: AbortSignal
 ): Promise<any[]> {
@@ -973,20 +1032,36 @@ export function renderPipelineLines(
                     const color = line.properties?.color || getPipelineCategoryColor(category)
                     const strokeStyle = line.status === PipelineStatus.MAINTENANCE ? 'dashed' : 'solid'
                     const isBranch = getLinePipelineKind(line) === 'branch'
-                    const baseWidth = isBranch ? 2 : (line.pressureLevel === PressureLevel.HIGH ? 6 : 4)
+                    const baseWidth = isBranch ? 3 : (line.pressureLevel === PressureLevel.HIGH ? 7 : 5)
                     const path = line.path.map(p => [p.longitude, p.latitude])
 
+                    const haloPolyline = new AMap.Polyline({
+                        path,
+                        strokeColor: 'rgba(8, 15, 23, 0.95)',
+                        strokeWeight: baseWidth + 4,
+                        strokeOpacity: 0.75,
+                        zIndex: 46,
+                        lineJoin: 'round',
+                        lineCap: 'round',
+                        zooms: [2, 30],
+                        extData: { line, isHalo: true },
+                    })
+
                     const polyline = new AMap.Polyline({
-                        path: path,
+                        path,
                         strokeColor: color,
                         strokeWeight: baseWidth,
                         strokeStyle: strokeStyle,
-                        strokeOpacity: 1.0,
-                        zIndex: 50,
+                        strokeOpacity: 0.98,
+                        zIndex: 52,
                         lineJoin: 'round',
                         lineCap: 'round',
-                        zooms: [2, 30]
+                        zooms: [2, 30],
+                        extData: { line, isHalo: false },
                     })
+
+                    map.add(haloPolyline)
+                    polylines.push(haloPolyline)
 
                     if (onLineClick) {
                         polyline.on('click', (e: any) => {
@@ -1000,13 +1075,7 @@ export function renderPipelineLines(
                     map.add(polyline)
                     polylines.push(polyline)
 
-                    // 仅为主要管段创建流动动画
-                    if (line.length > 30000) {
-                        const flowMarker = createFlowAnimation(map, line, color)
-                        if (flowMarker) {
-                            polylines.push(flowMarker)
-                        }
-                    }
+                    // 不再在这里为单根极短管段创建光效，改在全部渲染完后基于合并长路径创建
                 } catch (error) {
                     // 渲染失败，继续下一条
                 }
@@ -1018,7 +1087,19 @@ export function renderPipelineLines(
                 // 还有未渲染的，下一帧继续
                 requestAnimationFrame(renderBatch)
             } else {
-                // 全部渲染完成
+                // 1. 基础管线全部渲染完成，现在执行路径缝合算法，提取出贯穿全国的超长干线！
+                const mergedPaths = mergeLinesIntoContinuousPaths(lines, nodes)
+
+                // 2. 在这些超长干线上施加流动光效
+                mergedPaths.forEach(({ path, color, totalLength }) => {
+                    if (totalLength > 20000) { // 只在大于20km的连续干线上运行动画
+                        const flowMarkers = createLongFlowAnimation(map, path, color, totalLength)
+                        if (flowMarkers && flowMarkers.length > 0) {
+                            polylines.push(...flowMarkers)
+                        }
+                    }
+                })
+
                 resolve(polylines)
             }
         }
@@ -1028,57 +1109,277 @@ export function renderPipelineLines(
     })
 }
 
-function createFlowAnimation(map: any, line: PipelineLine, color: string): any {
-    const AMap = (window as any).AMap
-    if (!AMap || line.path.length < 2) return null
+// ==========================================
+// 连续长路径光流动画系统
+// ==========================================
 
-    const flowMarker = new AMap.Marker({
-        position: [line.path[0].longitude, line.path[0].latitude],
-        icon: new AMap.Icon({
-            size: new AMap.Size(8, 8),
-            image: createFlowDot(color),
-            imageSize: new AMap.Size(8, 8),
-        }),
-        offset: new AMap.Pixel(-4, -4),
-        zIndex: 100,
-    })
+/**
+ * 核心算法：将原本被阀室/站点打断的零散管段，根据连通性（拓扑）无缝缝合成一条条完整的干线路径
+ */
+function mergeLinesIntoContinuousPaths(lines: PipelineLine[], nodes: PipelineNode[]): { path: number[][], color: string, totalLength: number }[] {
+    const paths: { path: number[][], color: string, totalLength: number }[] = []
 
-    map.add(flowMarker)
-
-    const path = line.path.map(p => [p.longitude, p.latitude])
-    const speed = Math.max(50, line.length * 0.5)
-
-    const startAnimation = () => {
-        flowMarker.moveAlong(path, {
-            duration: (line.length / speed) * 1000,
-            autoRotation: false,
+    // 找出所有具备“打断/发射”资格的重点站点
+    const hubNodeIds = new Set<string>()
+    if (nodes && nodes.length > 0) {
+        nodes.forEach(node => {
+            const rawType = getNodeRawType(node)
+            // 压气站、分输站、首末站、明确标注为枢纽的点，强制作为打断和发射的起点
+            if (rawType === 'compressor' || rawType === 'distribution' || rawType === 'source' || rawType === 'junction' || isMajorJunctionNode(node)) {
+                hubNodeIds.add(node.id)
+            }
         })
     }
 
-    flowMarker.on('movealong', startAnimation)
-    startAnimation()
+    // 1. 统计每个节点的连接数，识别自然拓扑上的分支点 (度数 >= 3)
+    const nodeDegree = new Map<string, number>()
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        if (line.startNodeId) nodeDegree.set(line.startNodeId, (nodeDegree.get(line.startNodeId) || 0) + 1)
+        if (line.endNodeId) nodeDegree.set(line.endNodeId, (nodeDegree.get(line.endNodeId) || 0) + 1)
+    }
 
-    return flowMarker
+    // 按颜色/类别分组，确保我们只连接属于同一系统的管线
+    const linesByColor = new Map<string, PipelineLine[]>()
+    for (const line of lines) {
+        if (!line.path || line.path.length < 2) continue
+        const color = line.properties?.color || '#00e5ff' // default fallback
+
+        if (!linesByColor.has(color)) linesByColor.set(color, [])
+        linesByColor.get(color)!.push(line)
+    }
+
+    // 贪心拼接连续路径
+    for (const [color, groupLines] of linesByColor.entries()) {
+        const remaining = [...groupLines]
+        while (remaining.length > 0) {
+            const currentChain = [remaining.pop()!]
+            let changed = true
+
+            while (changed) {
+                changed = false
+                const headNode = currentChain[0].startNodeId
+                const tailNode = currentChain[currentChain.length - 1].endNodeId
+
+                // 枢纽点打断逻辑：如果头部或尾部节点连接数大于2（分支），
+                // 或者它是明确的重要站点（压气站等），停止在该方向缝合。
+                // 这保证了激光动画会在这些站点截止，并从这里重新向外发射。
+                const headDegree = headNode ? (nodeDegree.get(headNode) || 0) : 0;
+                const tailDegree = tailNode ? (nodeDegree.get(tailNode) || 0) : 0;
+
+                const headIsHub = headDegree > 2 || (headNode && hubNodeIds.has(headNode));
+                const tailIsHub = tailDegree > 2 || (tailNode && hubNodeIds.has(tailNode));
+
+                const canExtendHead = headNode && !headIsHub;
+                const canExtendTail = tailNode && !tailIsHub;
+
+                if (!canExtendHead && !canExtendTail) {
+                    break;
+                }
+
+                for (let i = 0; i < remaining.length; i++) {
+                    const candidate = remaining[i]
+
+                    if (canExtendHead && candidate.endNodeId === headNode) {
+                        currentChain.unshift(candidate)
+                        remaining.splice(i, 1)
+                        changed = true
+                        break
+                    } else if (canExtendTail && candidate.startNodeId === tailNode) {
+                        currentChain.push(candidate)
+                        remaining.splice(i, 1)
+                        changed = true
+                        break
+                    } else if (canExtendHead && candidate.startNodeId === headNode) {
+                        // 倒排加入头部
+                        const revPath = [...candidate.path].reverse()
+                        currentChain.unshift({ ...candidate, path: revPath, startNodeId: candidate.endNodeId, endNodeId: candidate.startNodeId } as PipelineLine)
+                        remaining.splice(i, 1)
+                        changed = true
+                        break
+                    } else if (canExtendTail && candidate.endNodeId === tailNode) {
+                        // 倒排加入尾部
+                        const revPath = [...candidate.path].reverse()
+                        currentChain.push({ ...candidate, path: revPath, startNodeId: candidate.endNodeId, endNodeId: candidate.startNodeId } as PipelineLine)
+                        remaining.splice(i, 1)
+                        changed = true
+                        break
+                    }
+                }
+            }
+
+            // 将链条转换为连续点阵
+            const mergedPath: number[][] = []
+            let length = 0
+            for (let i = 0; i < currentChain.length; i++) {
+                const line = currentChain[i]
+                length += line.length || 10000
+                const pts = line.path.map(p => [p.longitude, p.latitude])
+                if (i > 0 && pts.length > 0) {
+                    pts.shift() // 去除连接点重复坐标
+                }
+                mergedPath.push(...pts)
+            }
+
+            paths.push({ path: mergedPath, color, totalLength: length })
+        }
+    }
+
+    return paths
 }
 
-function createFlowDot(color: string): string {
-    const canvas = document.createElement('canvas')
-    canvas.width = 8
-    canvas.height = 8
-    const ctx = canvas.getContext('2d')
+function createLongFlowAnimation(map: any, points: number[][], color: string, fallbackLength: number): any[] {
+    const AMap = (window as any).AMap
+    if (!AMap || points.length < 2) return []
 
-    if (!ctx) return ''
+    // 1. 计算长距离
+    const distances = [0]
+    let totalLength = 0
 
-    const gradient = ctx.createRadialGradient(4, 4, 0, 4, 4, 4)
-    gradient.addColorStop(0, color)
-    gradient.addColorStop(0.5, color + 'cc')
-    gradient.addColorStop(1, color + '00')
+    for (let i = 1; i < points.length; i++) {
+        let d = 0
+        try {
+            d = AMap.GeometryUtil.distance(points[i - 1], points[i])
+        } catch (e) {
+            const dx = points[i][0] - points[i - 1][0]
+            const dy = points[i][1] - points[i - 1][1]
+            d = Math.sqrt(dx * dx + dy * dy) * 111000
+        }
+        totalLength += d
+        distances.push(totalLength)
+    }
 
-    ctx.fillStyle = gradient
-    ctx.fillRect(0, 0, 8, 8)
+    if (totalLength <= 0) totalLength = fallbackLength
+    if (totalLength <= 0) return []
 
-    return canvas.toDataURL()
+    // 3. 恢复之前的样式尺寸（更大气）
+    const flowLength = Math.max(5000, Math.min(50000, totalLength * 0.10))
+
+    // 全局统一速度：例如 100 km/s (100,000 m/s -> 100 m/ms)
+    // 保证长短管线上的光束跑得一样快
+    const SPEED_M_PER_MS = 100;
+
+    // 跑完这根管线需要的时间
+    const durationMs = totalLength / SPEED_M_PER_MS;
+
+    // 全局统一发射周期（按您的要求，2秒一发）
+    // 这保证了只要是从同一个枢纽出发的管线，必定在同一绝对时间点同时发射光束
+    const GLOBAL_CYCLE_MS = 2000;
+
+    // 只要起点坐标相同，globalOffset 就完全一致！
+    const startX = Math.round(points[0][0] * 1000)
+    const startY = Math.round(points[0][1] * 1000)
+    const globalOffset = Math.floor((startX * 12345 + startY * 67890) % GLOBAL_CYCLE_MS)
+
+    // 根据管线总耗时和发射周期，计算这根管线上同时会存在几条光束
+    const numBeams = Math.max(1, Math.ceil(durationMs / GLOBAL_CYCLE_MS))
+    const localCycleMs = numBeams * GLOBAL_CYCLE_MS;
+
+    const polylines: any[] = []
+
+    for (let i = 0; i < numBeams; i++) {
+        // 2. 创建叠加折线
+        const flowPolyline = new AMap.Polyline({
+            path: [],
+            strokeColor: '#ffffff', // 核心高亮白
+            strokeWeight: 2,
+            isOutline: true,
+            outlineColor: color,
+            borderWeight: 3,
+            strokeOpacity: 1.0,
+            zIndex: 100,
+            lineJoin: 'round',
+            lineCap: 'round',
+        })
+
+        map.add(flowPolyline)
+        polylines.push(flowPolyline)
+
+        // 错开多条光束。这里保证第一条光束（i=0）必然在 time=0 发射
+        const startTime = Date.now() - globalOffset - (i * GLOBAL_CYCLE_MS)
+
+        // 4. 动画循环
+        const animate = () => {
+            if (!flowPolyline.getMap()) return
+
+            try {
+                const now = Date.now()
+                const delta = now - startTime
+                // 计算当前光束在自身的大周期中的时间
+                const timeInCycle = ((delta % localCycleMs) + localCycleMs) % localCycleMs
+
+                // 如果当前时间已经超过了跑完管线所需的时间，就隐藏（直到下一个周期再出现）
+                if (timeInCycle > durationMs) {
+                    flowPolyline.hide()
+                } else {
+                    const progress = timeInCycle / durationMs
+
+                    const headDist = progress * (totalLength + flowLength)
+                    const tailDist = headDist - flowLength
+
+                    const subPath = getSubPath(points, distances, tailDist, headDist)
+
+                    if (subPath.length < 2) {
+                        flowPolyline.hide()
+                    } else {
+                        flowPolyline.show()
+                        flowPolyline.setPath(subPath)
+                    }
+                }
+            } catch (err) {
+                // 静默失败
+            }
+
+            requestAnimationFrame(animate)
+        }
+
+        requestAnimationFrame(animate)
+    }
+
+    return polylines
 }
+
+
+function getSubPath(points: number[][], distances: number[], startDist: number, endDist: number) {
+    if (endDist <= 0 || startDist >= distances[distances.length - 1]) return []
+
+    const subPoints = []
+
+    for (let i = 0; i < points.length - 1; i++) {
+        const d1 = distances[i]
+        const d2 = distances[i+1]
+
+        if (d2 <= startDist) continue
+        if (d1 >= endDist) break
+
+        const p1 = points[i]
+        const p2 = points[i+1]
+        const segLen = d2 - d1
+
+        if (startDist > d1 && startDist < d2) {
+            const ratio = (startDist - d1) / segLen
+            const lng = p1[0] + (p2[0] - p1[0]) * ratio
+            const lat = p1[1] + (p2[1] - p1[1]) * ratio
+            subPoints.push([lng, lat])
+        } else if (d1 >= startDist && subPoints.length === 0) {
+            subPoints.push(p1)
+        }
+
+        if (endDist > d1 && endDist < d2) {
+            const ratio = (endDist - d1) / segLen
+            const lng = p1[0] + (p2[0] - p1[0]) * ratio
+            const lat = p1[1] + (p2[1] - p1[1]) * ratio
+            subPoints.push([lng, lat])
+            break
+        } else if (d2 <= endDist) {
+            subPoints.push(p2)
+        }
+    }
+
+    return subPoints
+}
+
+
 
 function isValveRoom(node: PipelineNode): boolean {
     if (node.type === NodeType.VALVE || isValveNode(node)) return true

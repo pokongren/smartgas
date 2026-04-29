@@ -1,0 +1,148 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\docs\2026-04-04-统一整改方案_枢纽重编版.md
+@@
+ 一句话总结：
+ 
+ 先改“定义和事实层”，再改“服务和前端消费”，最后补“脚本和验收闭环”。
+-
+-## 8. 主代理职责与编排方式
+-
+-这部分单独写出来，是为了避免“大家都在干活，但没人真正收口”。
+-
+-主代理的编排顺序建议固定成下面 6 步：
+-
+-1. 先扫上下文，冻结本轮口径和边界
+-2. 并行派出 3 个侦察代理，分别查 DB、编辑器链路、全国地图与脚本
+-3. 汇总证据，只保留 1 个最可信实施方向
+-4. 给实施代理下明确任务书，只允许一个实施代理主写
+-5. 实施完成后，交给独立验证代理做回归和风险复核
+-6. 主代理根据验证结果决定放行、灰度还是回退
+-
+-主代理在编排时必须盯住 4 个控制点：
+-
+-- 口径有没有冻结
+-- 实施边界有没有跑偏
+-- 验证结论是不是独立得出
+-- 对外结论有没有超出证据
+-
+-## 9. 子代理输入输出契约
+-
+-这一节是给真正开工时用的，避免子代理各自理解。
+-
+-### 9.1 侦察代理契约
+-
+-输入：
+-
+-- 主代理给定的文件范围
+-- 当前已知问题清单
+-- 需要验证的假设
+-
+-禁止事项：
+-
+-- 不直接改代码
+-- 不跳出指定边界扩散到整仓库
+-- 不在证据不足时直接下最终结论
+-
+-必交付：
+-
+-- 发现了什么
+-- 证据是什么
+-- 建议怎么处理
+-- 涉及哪些文件或模块
+-- 风险点和未确认项
+-
+-通过判定：
+-
+-- 证据能支撑建议
+-- 能明确指出“已确认”和“未确认”的边界
+-
+-### 9.2 实施代理契约
+-
+-输入：
+-
+-- 主代理冻结后的实施方向
+-- 明确的写入边界
+-- 必须满足的验证清单
+-
+-禁止事项：
+-
+-- 不顺手扩 scope
+-- 不同时改两套互相竞争的口径
+-- 不自己给自己判定“已修复”
+-
+-必交付：
+-
+-- 代码和脚本改动
+-- 改动说明
+-- 影响范围
+-- 自测结果
+-- 回退方式
+-
+-通过判定：
+-
+-- 改动边界清楚
+-- 能被验证代理独立复核
+-
+-### 9.3 验证代理契约
+-
+-输入：
+-
+-- 实施结果
+-- 主代理给定的验收标准
+-- 必要的脚本、接口、页面检查路径
+-
+-禁止事项：
+-
+-- 不替实施代理补逻辑
+-- 不把“理论上没问题”当成“已经验证通过”
+-
+-必交付：
+-
+-- 验证方式
+-- 验证结果
+-- 回归风险
+-- 未通过项
+-- 是否建议放行
+-
+-通过判定：
+-
+-- 结论和证据一一对应
+-- 能明确区分“通过”“不通过”“还没证实”
+-
+-## 10. 完成标准
+-
+-这轮整改只有同时满足下面这些条件，才算真的收口。
+-
+-1. 枢纽定义已经冻结，并且 DB、后端、前端都按同一口径执行
+-2. live DB 里已经清理掉 `nested junction` / `single-station junction` 旧残留，或至少完成可追溯迁移
+-3. `junction` / `major_junction` 能通过脚本和 DB 查询被直接证明
+-4. 编辑器链路不再把 `junction` 降格成 `station`
+-5. 全国地图里的显示层级、阈值、聚合规则已经与新口径一致
+-6. `WE3`、`SJ2`、`SJ3` 等导入脚本改动都能闭环到 DB 验收
+-7. 独立验证代理已经给出明确验证结论
+-8. 每个实施阶段都已经产出一份“人话版总结” Markdown
+-
+-如果上面任意一条还没满足，这轮只能算“推进中”，不能算“已完成”。
+*** Update File: F:\smartgas-grid\docs\2026-04-04-统一整改方案_枢纽重编版-编制总结_人话版.md
+@@
+ 文档中明确纳入关注的关键模块包括：
+ 
+ - `backend/app/services/junction_groups.py`
+ - `backend/app/services/topology.py`
+ - `backend/app/services/topology_computation.py`
+-- `backend/app/services/topology_correction.py`
++- `backend/app/services/position_commit.py`
+ - `backend/app/routers/topology_editor.py`
+-- `backend/app/routers/pipeline_packages.py`
++- `backend/app/models.py`
+ - `src/views/MapTopologyView.tsx`
+ - `src/views/GlobalPipelineView.tsx`
+ - `src/utils/hierarchyRenderer.ts`
+ - `src/utils/mapRenderer.ts`
++- `src/data/pipelines/index.ts`
++- `src/data/pipelines/transform.ts`
+ - `backend/scripts/add_sj2.py`
+ - `backend/scripts/add_we3.py`
+ - `backend/scripts/reimport_sj23.py`
+ - `backend/check_db.py`
+*** End Patch

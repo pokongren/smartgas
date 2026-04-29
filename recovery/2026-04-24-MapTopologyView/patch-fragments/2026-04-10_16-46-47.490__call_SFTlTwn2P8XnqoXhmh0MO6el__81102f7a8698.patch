@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-                                                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+-                                                    <div className={`h-full bg-gradient-to-r ${item.tone} transition-all duration-700`} style={{ width: `${item.percent}%` }} />
+-                                                </div>
++                                                <div className="h-2 rounded-full bg-white/10 overflow-hidden">
++                                                    <div className={`relative h-full bg-gradient-to-r ${item.tone} transition-all duration-700`} style={{ width: `${item.percent}%` }}>
++                                                        {item.percent > 0 && <div className="absolute inset-y-0 right-0 w-5 bg-white/30 blur-sm animate-pulse" />}
++                                                    </div>
++                                                </div>
+*** End Patch

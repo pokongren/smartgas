@@ -1,0 +1,78 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-            {historyChartTarget && (
++            {showCutoffAiModal && cutoffAiAnalysis && (
++                <div
++                    className="absolute inset-0 z-30 bg-black/45 backdrop-blur-[2px] flex items-center justify-center p-4"
++                    onClick={() => setShowCutoffAiModal(false)}
++                >
++                    <div
++                        className="w-full max-w-[760px] max-h-[82vh] overflow-y-auto rounded-xl border border-cyan-500/30 bg-[#0a1118]/95 shadow-2xl"
++                        onClick={event => event.stopPropagation()}
++                    >
++                        <div className="px-4 py-3 border-b border-cyan-500/20 flex items-center justify-between">
++                            <div>
++                                <div className="text-sm font-semibold text-cyan-100">截断仿真AI解读</div>
++                                <div className="text-[11px] text-slate-400 mt-1">截断点：{cutoffAiAnalysis.cutoffNodeName}</div>
++                            </div>
++                            <div className="flex items-center gap-2">
++                                <span className={`text-[11px] px-2 py-0.5 rounded border ${
++                                    cutoffAiAnalysis.riskLevel === 'high'
++                                        ? 'border-red-500/50 text-red-300 bg-red-900/20'
++                                        : cutoffAiAnalysis.riskLevel === 'medium'
++                                            ? 'border-orange-500/50 text-orange-300 bg-orange-900/20'
++                                            : 'border-emerald-500/50 text-emerald-300 bg-emerald-900/20'
++                                }`}>
++                                    {cutoffAiAnalysis.riskLevel}
++                                </span>
++                                <button
++                                    onClick={() => setShowCutoffAiModal(false)}
++                                    className="text-slate-400 hover:text-white transition-colors"
++                                >
++                                    <span className="material-symbols-outlined">close</span>
++                                </button>
++                            </div>
++                        </div>
++                        <div className="p-4 space-y-3 text-[12px]">
++                            <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/15 p-3">
++                                <div className="text-cyan-200 font-medium mb-1">运行结论</div>
++                                <div className="text-slate-200 leading-6">{cutoffAiAnalysis.conclusion}</div>
++                            </div>
++                            <div className="rounded-lg border border-slate-700/60 bg-black/20 p-3">
++                                <div className="text-slate-200 font-medium mb-1">关键指标</div>
++                                <div className="text-slate-300 leading-6">{cutoffAiAnalysis.summaryLine}</div>
++                            </div>
++                            <div className="rounded-lg border border-slate-700/60 bg-black/20 p-3">
++                                <div className="text-slate-200 font-medium mb-1">受影响站点</div>
++                                <div className="text-slate-300 leading-6">失供站点：{cutoffAiAnalysis.lostText}</div>
++                                <div className="text-slate-300 leading-6 mt-1">绕行站点：{cutoffAiAnalysis.reroutedText}</div>
++                            </div>
++                            <div className="rounded-lg border border-emerald-600/30 bg-emerald-950/15 p-3">
++                                <div className="text-emerald-200 font-medium mb-1">建议动作</div>
++                                <div className="text-slate-200 leading-6">{cutoffAiAnalysis.action}</div>
++                            </div>
++                        </div>
++                        <div className="px-4 py-3 border-t border-cyan-500/20 flex items-center justify-end gap-2">
++                            <button
++                                onClick={() => setShowCutoffAiModal(false)}
++                                className="px-3 py-1.5 rounded border border-slate-600/60 text-slate-300 hover:text-white hover:border-slate-400/70 transition-colors text-xs"
++                            >
++                                关闭
++                            </button>
++                            <button
++                                onClick={sendCutoffToAiAnalysis}
++                                className="px-3 py-1.5 rounded border border-cyan-500/60 bg-cyan-900/30 text-cyan-200 hover:bg-cyan-800/40 transition-colors text-xs flex items-center gap-1"
++                            >
++                                <span className="material-symbols-outlined text-[14px]">smart_toy</span>
++                                发送到AI助手
++                            </button>
++                        </div>
++                    </div>
++                </div>
++            )}
++            {historyChartTarget && (
+                 <div className="absolute inset-0 z-30 bg-black/30 backdrop-blur-[1px] flex items-center justify-center">
+                     <ScadaHistoryChart
+                         stationName={historyChartTarget.stationName}
+*** End Patch

@@ -1,0 +1,17 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const doAddEdge = (startId: string, endId: string) => {
+         const s = baseTopoNodes.find(n => n.id === startId)
+         const e = baseTopoNodes.find(n => n.id === endId)
+         if (!s || !e) return
+         const id = `te-${Date.now()}`
+         setBaseTopoEdges(prev => [...prev, { id, startNodeId: startId, endNodeId: endId, name: '新建管线' }])
++        setUnsavedEdgeIds(prev => {
++            const next = new Set(prev)
++            next.add(id)
++            return next
++        })
+         setUndoStack(prev => [...prev, { type: 'add-edge', edgeId: id }])
+     }
+*** End Patch

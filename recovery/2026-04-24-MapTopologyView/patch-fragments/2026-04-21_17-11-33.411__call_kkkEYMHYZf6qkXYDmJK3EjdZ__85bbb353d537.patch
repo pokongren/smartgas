@@ -1,0 +1,17 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-        const fromMap = pressureAnimationTargetRef.current.size > 0
++        const toMap = simulatedNodeOutPressureMap
++        const fromMap = pressureAnimationTargetRef.current.size > 0
+             ? pressureAnimationTargetRef.current
+             : (() => {
+                 const fallbackMap = new Map<string, number>()
+                 toMap.forEach((_, nodeId) => {
+@@
+                 })
+                 return fallbackMap
+             })()
+-        const toMap = simulatedNodeOutPressureMap
+         const startTime = performance.now()
+*** End Patch

@@ -1,0 +1,46 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    // ================== 导出 ==================
+-    const exportJSON = () => {
+-        const obj = {
+-            nodes: topoNodes.map(n => ({ id: n.id, name: n.name, type: n.type, lng: n.position[0], lat: n.position[1] })),
+-            edges: topoEdges.map(e => ({ id: e.id, from: e.startNodeId, to: e.endNodeId, name: e.name })),
+-        }
++    // ================== 导出 ==================
++    const buildTopologyPayload = useCallback(() => {
++        return {
++            nodes: topoNodes.map(n => ({ id: n.id, name: n.name, type: n.type, lng: n.position[0], lat: n.position[1] })),
++            edges: topoEdges.map(e => ({ id: e.id, from: e.startNodeId, to: e.endNodeId, name: e.name })),
++        }
++    }, [topoEdges, topoNodes])
++
++    const exportJSON = () => {
++        const obj = buildTopologyPayload()
+         const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' })
+         const url = URL.createObjectURL(blob)
+         const a = document.createElement('a')
+         a.href = url
+         a.download = `topology_${new Date().toISOString().slice(0, 10)}.json`
+         a.click()
+         URL.revokeObjectURL(url)
+         setStatusMsg(`已导出 ${topoNodes.length} 节点`)
+     }
++
++    const saveConnectedEdges = useCallback(() => {
++        if (unsavedEdgeIds.size === 0) return
++        const payload = buildTopologyPayload()
++        const savedAt = new Date().toISOString()
++        const draft = { ...payload, savedAt }
++        localStorage.setItem('smartgas-map-topology-draft-v1', JSON.stringify(draft))
++        const blob = new Blob([JSON.stringify(draft, null, 2)], { type: 'application/json' })
++        const url = URL.createObjectURL(blob)
++        const a = document.createElement('a')
++        a.href = url
++        a.download = `topology_saved_${savedAt.slice(0, 19).replace(/[:T]/g, '-')}.json`
++        a.click()
++        URL.revokeObjectURL(url)
++        setUnsavedEdgeIds(new Set())
++        setStatusMsg(`已保存连线，新增 ${unsavedEdgeIds.size} 条连线已落盘`)
++    }, [buildTopologyPayload, unsavedEdgeIds])
+*** End Patch

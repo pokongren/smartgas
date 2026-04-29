@@ -1,0 +1,22 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                    const displayExtraLabel = _simOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #67e8f9; background: rgba(0,20,30,0.82); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px solid rgba(103,232,249,0.3);">杩?{_simInPressure!.toFixed(2)} | 鍑?{_simOutPressure.toFixed(2)} MPa</div>`
+-                        : _dbOutPressure != null || _dbInPressure != null
+-                            ? `<div style="font-size: 9px; color: #86efac; background: rgba(0,15,0,0.75); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px dashed rgba(134,239,172,0.4);">杩?{(_dbInPressure ?? (_dbOutPressure != null ? _dbOutPressure * 0.95 : 0)).toFixed(2)} | 鍑?{(_dbOutPressure ?? 0).toFixed(2)} MPa</div>`
+-                            : ''
+-                    const displayBaselineExtraLabel = _baselineOutPressure != null
+-                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">鍩鸿繘${_baselineInPressure!.toFixed(2)} | 鍩哄嚭${_baselineOutPressure.toFixed(2)} MPa | 鍩烘俯${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}掳C</div>`
+-                        : ''
++                    const displayExtraLabel = showSnapshotPressureOverlay
++                        ? (_simOutPressure != null
++                            ? `<div style="font-size: 9px; color: #67e8f9; background: rgba(0,20,30,0.82); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px solid rgba(103,232,249,0.3);">进${_simInPressure!.toFixed(2)} | 出${_simOutPressure.toFixed(2)} MPa</div>`
++                            : _dbOutPressure != null || _dbInPressure != null
++                                ? `<div style="font-size: 9px; color: #86efac; background: rgba(0,15,0,0.75); padding: 2px 4px; border-radius: 3px; margin-top: 3px; border: 1px dashed rgba(134,239,172,0.4);">进${(_dbInPressure ?? (_dbOutPressure != null ? _dbOutPressure * 0.95 : 0)).toFixed(2)} | 出${(_dbOutPressure ?? 0).toFixed(2)} MPa</div>`
++                                : '')
++                        : ''
++                    const displayBaselineExtraLabel = showSnapshotPressureOverlay && _baselineOutPressure != null
++                        ? `<div style="font-size: 9px; color: #c4b5fd; background: rgba(40,18,66,0.78); padding: 2px 4px; border-radius: 3px; margin-top: 2px; border: 1px solid rgba(196,181,253,0.35);">基进${_baselineInPressure!.toFixed(2)} | 基出${_baselineOutPressure.toFixed(2)} MPa | 基温${(_baselineTemp ?? estimateTemperatureByPressure(_baselineOutPressure)).toFixed(1)}°C</div>`
++                        : ''
+*** End Patch

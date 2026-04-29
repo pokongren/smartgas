@@ -22,12 +22,14 @@ from app.models import Pipeline, PipelineSystem, Station
 from app.scada_models import ScadaHistory
 from app.services.ai_analysis_orchestrator import AiAnalysisOrchestrator, AssistantContext
 from app.services.ai_client import AiServiceError, ai_client
+from app.services.ai_sim_evaluator import evaluate_simulation_result
 from app.services.assistant_tools import build_tools_description, execute_tool
 from app.services.raw_excel_ai_direct import (
     try_direct_count_reply as try_raw_excel_direct_count_reply,
     try_direct_entity_lookup as try_raw_excel_direct_entity_lookup,
     try_direct_list_reply as try_raw_excel_direct_list_reply,
 )
+from app.services.we1_result_snapshot_service import get_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +125,14 @@ class ChatResponse(BaseModel):
     reply: str
     tool_calls: list[ToolCallInfo] = Field(default_factory=list)
     retrieval_log: list[str] = Field(default_factory=list)
+
+
+class SimulationEvaluationRequest(BaseModel):
+    overlay: dict[str, Any] | None = None
+    baseline_overlay: dict[str, Any] | None = None
+    run_id: str | None = None
+    pilot_id: str | None = None
+    baseline_run_id: str | None = None
 
 
 SYSTEM_PROMPT = """你是 SmartGas Grid 的智能调度助手，既懂天然气管网业务，也会像一个靠谱同事那样和用户交流。
@@ -3495,3 +3505,29 @@ def _format_optional_number(value: float | None, unit: str) -> str:
     if value is None:
         return f"未知{unit}"
     return f"{value:.2f} {unit}"
+
+
+@router.post("/simulation/evaluate")
+def evaluate_simulation_api(req: SimulationEvaluationRequest) -> dict[str, Any]:
+    result_data: dict[str, Any] | None = req.overlay
+    baseline_data: dict[str, Any] | None = req.baseline_overlay
+
+    if result_data is None and req.run_id:
+        snapshot = get_snapshot(req.run_id, pilot_id=req.pilot_id)
+        result_data = snapshot.get("result") or snapshot
+
+    if baseline_data is None and req.baseline_run_id:
+        try:
+            baseline_snapshot = get_snapshot(req.baseline_run_id, pilot_id=req.pilot_id)
+            baseline_data = baseline_snapshot.get("result") or baseline_snapshot
+        except Exception:
+            baseline_data = None
+
+    if result_data is None:
+        raise HTTPException(status_code=400, detail="overlay 或 run_id 至少提供一个")
+
+    evaluation = evaluate_simulation_result(result_data, baseline_data)
+    return {
+        "evaluation": evaluation,
+        "text": evaluation.get("text", ""),
+    }

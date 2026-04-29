@@ -1,0 +1,15 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
+ ### 这次补记的目的
+ - 下次再跑时，不要重复把“是不是主目录”“是不是空壳仓库”当成主要阻塞项；这轮已经确认不是。
+ - 真正要盯的是主目录里几条并行变化线：地图层级、枢纽运行时规则、数据库导入/验收、AI 助手链路，以及这些变化之间有没有口径打架。
++
++## 2026-04-05 00:24:33 +08:00 verifier
++
++### 独立复核边界
++- 安全结论：主目录落点正确、不是空壳、主目录 `HEAD=eaf6ac4` 在分支上、`.codex/worktrees/*` 多份 detached 停在 `6410a10` 这些都能直接被命令结果支撑。
++- 需要弱化 1：`WE3 仍偏局部补数脚本，SJ2/SJ3 更像正式重导链路` 这句带解释色彩，证据主要来自脚本形态和库内结果，不是直接跑通链路后的结论。更稳妥的说法是：`WE3` 现有脚本明显是局部补数；`SJ2/SJ3` 同时存在重导脚本和已落库结果，但是否已成为唯一正式链路，这轮不单独下结论。
++- 需要弱化 2：`MapTopologyView ... 所以两视图仍可能有显示差异` 这句后半段是推断。更稳妥的说法是：从 `MapTopologyView.tsx` 当前文件没看到显式消费 `zoom/LDO` 规则的代码，而地图显示规则主要落在 `MapView.tsx` / `mapRenderer.ts`，因此两视图是否完全同口径仍待继续核实。
++- 需要收紧 3：`旧 junction_groups 只作兼容` 可以改成 `运行时入口优先 rebuilt，旧 junction_groups 承担回退和 manual overlay 承载`，这样更贴近 `load_runtime_junction_groups()` 的实际行为。
+*** End Patch

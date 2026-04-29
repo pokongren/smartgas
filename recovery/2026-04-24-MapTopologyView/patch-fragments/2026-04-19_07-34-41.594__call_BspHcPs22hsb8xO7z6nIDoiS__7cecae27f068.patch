@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                                     <div className="grid grid-cols-2 gap-2">
+                                         <button onClick={async () => { try { await runMainSteadySimulation(); setStatusMsg(`WE1 涓讳豢鐪熷凡杩愯锛?{steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : 'WE1 涓讳豢鐪熻繍琛屽け璐?) } }} disabled={steadySimLoading} className="rounded-lg bg-cyan-700/80 px-3 py-2 text-xs font-medium text-white disabled:opacity-40">{steadySimLoading ? '杩愯涓?..' : '杩愯涓讳豢鐪?}</button>
+                                         <button onClick={async () => { try { await saveSteadySnapshot(); setStatusMsg(`宸蹭繚瀛樺揩鐓э細${steadyScenarioOption?.label ?? steadyScenarioId}`) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '淇濆瓨蹇収澶辫触') } }} disabled={!steadyOverlay || steadySnapshotLoading} className="rounded-lg border border-sky-500/30 bg-sky-900/20 px-3 py-2 text-xs font-medium text-sky-100 disabled:opacity-40">{steadySnapshotLoading ? '淇濆瓨涓?..' : '淇濆瓨蹇収'}</button>
+                                         <button onClick={async () => { try { await refreshSteadySnapshots(); setStatusMsg('蹇収鍒楄〃宸插埛鏂?) } catch (error) { setStatusMsg(error instanceof Error ? error.message : '鍒锋柊蹇収澶辫触') } }} disabled={steadySnapshotLoading || steadyBaselineSnapshotLoading} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200 disabled:opacity-40">鍒锋柊蹇収</button>
+                                         <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('宸叉竻绌哄綋鍓嶄富浠跨湡缁撴灉') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">娓呯┖涓讳豢鐪?/button>
++                                        <button onClick={sendSimulationToAiAnalysis} disabled={!steadyOverlay} className="col-span-2 rounded-lg border border-emerald-400/30 bg-emerald-950/30 px-3 py-2 text-xs font-medium text-emerald-100 disabled:opacity-40">发送仿真结果到AI分析</button>
++                                        <button onClick={copySimulationStructuredBrief} disabled={!steadyOverlay} className="col-span-2 rounded-lg border border-violet-400/30 bg-violet-950/30 px-3 py-2 text-xs font-medium text-violet-100 disabled:opacity-40">复制结构化简报（给AI）</button>
+                                     </div>
+                                     <div className="rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-[11px] text-slate-300">
+*** End Patch

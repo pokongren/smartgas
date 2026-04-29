@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: C:\Users\Administrator\.codex\automations\automation\memory.md
+@@
++# 2026-04-04 22:32:21 +08:00
++
++- 本轮先按要求落点到 `F:\smartgas-grid`；初始 cwd 是 `C:\Users\Administrator\.codex\worktrees\01d3\smartgas-grid`，切换后 `Get-Location` 与 `git rev-parse --show-toplevel` 都落在 `F:\smartgas-grid`，所以这轮不是 `automation env mismatch / worktree-path blockage`，也不是空壳 worktree。
++- 这轮主判断是“代码变化 + 数据库变化 + AI 模块链路变化 + 少量本地实验/脏工作区噪音”，不是纯 docs，也不是纯本地实验。主工作树是 `F:\smartgas-grid`，`git worktree list` 里其余 `.codex/worktrees/*` 仍然都是 detached 背景，不可拿来替代主目录事实。
++- git 侧证据要继续按主目录口径收口：主分支 HEAD 现在是 `eaf6ac4`，工作区同时有地图层级、枢纽规则、导入脚本、AI assistant、SCADA、`.npm-cache/`、preview DB/json 等并行改动。涉及 docs 的变更仍集中在 `docs/TOPOLOGY_COMPUTATION_USAGE.md` 和 `docs/TOPOLOGY_SETUP_GUIDE.md`，两份文档主要是在补 `8080` 端口和 `/api/...` + `/topology/...` 双轨现状。
++- 地图层级这轮没有推翻旧判断：`src/utils/hierarchyRenderer.ts` 仍然把 LOD 阈值统一在 `6/10/14`，阀室 `11` 才显示、聚合 `12` 才展开；`src/utils/mapRenderer.ts` 通过 `getNodeLODStrategy()` / `shouldShowNodeAtZoom()` 吃这套规则。`src/views/GlobalPipelineView.tsx` 增强的是 junction kind 标签和跳转 `focusNode`，`src/views/MapTopologyView.tsx` 仍保留自己一套拓扑点型/尺寸与面板状态，所以不要把它说成“地图页和拓扑页完全共用一套显示逻辑”。
++- 枢纽与数据库口径继续按“运行时影子表优先”收口：`backend/app/services/junction_groups.py` 的 `load_runtime_junction_groups()` 仍优先读 `junction_groups_rebuilt`，没有影子表才回退 `junction_groups`；当前主库实测仍是 `stations=1272`、`pipelines=1268`、`pipeline_systems=14`、`junction_groups=16`、`junction_groups_rebuilt=12`，且 `we3/sj2/sj3` 都已落库，前缀计数分别是 `WE3=16/15`、`SJ2=70/69`、`SJ3=71/70`。`pipeline_systems` 表字段依旧只有 `id/name/color/sort_order/layers_config`，不要写成已有 `system_id` 落库；全库仍有 `229` 条 `pipelines.category` 不在 `trunk/branch`。
++- `backend/app/routers/topology_editor.py` 当前代码口径要谨慎写：它把 `/api/topology/junctions` 的返回值改成运行时枢纽 + `manual_editing_enabled` + `mode`，但环境变量默认仍写的是 `TOPOLOGY_MANUAL_JUNCTION_EDIT=1`，也就是“兼容旧手工编辑开关还在”，不能直接写成“默认已全站只读”；更稳的说法是“代码已经提供 runtime_readonly 口径和开关，但默认值仍待运行环境确认”。
++- AI 模块链路这轮可以明确归到“正式链路已接上，但还夹着半接线/本地实验痕迹”。前端 `src/components/ai-assistant/AiAssistant.tsx` 挂了浮窗/弹窗入口，`useAiAssistantChat.ts` 把请求打到 `/api/ai-assistant/chat`，有页面上下文时会带 `context` 并把 `analysis_mode` 设成 `subagents`；`useAiAssistantPageContext.ts` 目前只按 route/title 注入通用页面上下文，没有更细的选中对象或筛选状态。后端 `backend/app/routers/ai_assistant.py` 已接 `AiAnalysisOrchestrator -> AnalysisValidator -> FixTaskRouter -> ai_client` 这条链，`backend/app/services/ai_client.py` 通过 `AI_BASE_URL` / `AI_API_KEY` / `AI_DEFAULT_MODEL` 走 OpenAI-compatible 网关，并对缺 key、429、401/403、5xx、超时做了明确兜底。需要继续注意：这次并未核实 `app.main` 的路由注册和线上环境变量，所以不要把它写成“线上已完全可用”。
++- 当前运行时间：`2026-04-04 22:32:21 +08:00`。
++
+ # 2026-04-04 20:27:00 +08:00
+ 
+ - 本轮先按要求落点到 `F:\smartgas-grid`；初始 cwd 是 `C:\Users\Administrator\.codex\worktrees\868b\smartgas-grid`，切换后 cwd 和 `git rev-parse --show-toplevel` 都是 `F:\smartgas-grid`，入口通过，不是 `automation env mismatch / worktree-path blockage`。
+*** End Patch

@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    const [cascadeValves, setCascadeValves] = useState(true)
+-    const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
+-    const [isPreviewing, setIsPreviewing] = useState(false)
++    const [cascadeValves, setCascadeValves] = useState(true)
++    const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
++    const [isPreviewing, setIsPreviewing] = useState(false)
++    const [lineFlowPhase, setLineFlowPhase] = useState(0)
++    const [damageFlashVisible, setDamageFlashVisible] = useState(false)
+*** End Patch

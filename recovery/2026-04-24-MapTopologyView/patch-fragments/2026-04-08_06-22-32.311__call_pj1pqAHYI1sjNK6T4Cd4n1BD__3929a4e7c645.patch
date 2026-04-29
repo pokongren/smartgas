@@ -1,0 +1,42 @@
+*** Begin Patch
+*** Add File: F:/smartgas-grid/2026-04-08-项目心跳第1阶段第3轮总结_人话版.md
++一、主目标
++
++1. 固定在 `F:\smartgas-grid` 主目录做项目心跳巡检，只认主目录事实，不拿 detached worktree 顶结论；完成入口校验后，按固定必查项检查地图缩放与层级显示、甪直 AI 分析、拓扑仿真、枢纽规则与数据库口径、导入脚本、AI 模块链路；本轮只更新巡检文档和 automation memory，不改业务代码。
++
++二、上下文与已知信息
++
++1. 主目录落点已通过。`Get-Location` 返回 `F:\smartgas-grid`，`git rev-parse --show-toplevel` 返回 `F:/smartgas-grid`，说明当前巡检基准目录就是主仓主目录。
++
++2. `.git` 为主目录下真实目录而不是 worktree 跳转文件。目录清单里 `.git` 的 `Mode` 为 `d--h--`，不是文本指针型 `.git` 文件，所以这轮判断以主仓事实为准。
++
++3. 仓库内已存在 `docs` 目录，主目录下还有 [`F:/smartgas-grid/2026-04-08-WE1第一张图主仿真入口第2阶段第1轮总结_人话版.md`](/F:/smartgas-grid/2026-04-08-WE1第一张图主仿真入口第2阶段第1轮总结_人话版.md) 这类当日巡检文档，说明 WE1 主链近期仍在持续收口。
++
++4. git `status`、`log`、`worktree list`、未提交 `diff` 这一组命令在本轮中途被本地 shell 沙箱凭据错误阻断，报错是 `CreateProcessWithLogonW failed: 1326`。这属于工具层阻断，不是仓库自身报错；因此这几项本轮只能记录为“入口已校验、git 深取证未完成”，下轮优先补齐。
++
++三、巡检结果
++
++1. 地图缩放与层级显示：通过静态巡检。[`F:/smartgas-grid/src/components/map-view/MapView.tsx`](/F:/smartgas-grid/src/components/map-view/MapView.tsx) 中默认地图配置写死了 `zoom: 4`、`minZoom: 3`、`maxZoom: 20`，并在 `loadControls` 中挂载比例尺、工具栏、罗盘，在 `loadDistrictLayer`、`loadProvinceLabels` 中加载区划层与省级标注；通过标准是缩放结束后能触发重绘且图层按配置挂载；失败先查 `MapView.tsx`，再查 `mapRenderer` / `hubRenderer`。
++
++2. 甪直 AI 分析：半通过。[`F:/smartgas-grid/src/components/ai-assistant/useAiAssistantChat.ts`](/F:/smartgas-grid/src/components/ai-assistant/useAiAssistantChat.ts) 已把请求发到 `/api/ai-assistant/chat`，存在页面上下文时会带上 `analysis_mode: subagents`；[`F:/smartgas-grid/src/components/ai-assistant/useAiAssistantPageContext.ts`](/F:/smartgas-grid/src/components/ai-assistant/useAiAssistantPageContext.ts) 已把 `/global`、`/topology`、`/map-topology` 等页面注入 `page/module/summary`；[`F:/smartgas-grid/src/components/ai-assistant/runtimeAssistantContext.ts`](/F:/smartgas-grid/src/components/ai-assistant/runtimeAssistantContext.ts) 已把运行时 `selection/filters` 注入上下文。当前还没补到后端 `luzhi-pilot trace/summary/report`、trace 文件更新时间来源、`direct/orchestrated/legacy` 命中判定；通过标准是这四项都能落到明确后端实现；失败先查 [`F:/smartgas-grid/backend/app/routers/ai_assistant.py`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py)，再查 [`F:/smartgas-grid/backend/app/services/ai_analysis_orchestrator.py`](/F:/smartgas-grid/backend/app/services/ai_analysis_orchestrator.py)。
++
++3. 拓扑仿真功能：通过静态巡检。[`F:/smartgas-grid/src/App.tsx`](/F:/smartgas-grid/src/App.tsx) 把 `/map-topology` 作为第一张图主仿真入口，把 `/topology` 保留成调试页；[`F:/smartgas-grid/src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 顶部直接引入 `buildSimulationOverlayMapping`、`useSimulation`、`MAINLINE_SCENARIOS`，并把 `pilotId` 固定为 `mainline_zhongwei_jingbian`；同文件里的 `FAILURE_LAYER_LABELS` 已把排查顺序明确拆成前端消费、映射、overlay 契约、渲染样式；[`F:/smartgas-grid/src/views/TopologyView.tsx`](/F:/smartgas-grid/src/views/TopologyView.tsx) 仍保留独立 canvas 仿真调试入口。通过标准是主入口、pilot、scenario、overlay 四者在同一主链上；失败时页面打不开先查前端入口，切错页先查 router，有结果但图不对先查 [`F:/smartgas-grid/backend/app/services/we1_solver_input_service.py`](/F:/smartgas-grid/backend/app/services/we1_solver_input_service.py)，基础稳态都不出结果再查 [`F:/smartgas-grid/backend/app/services/we1_steady_validation_service.py`](/F:/smartgas-grid/backend/app/services/we1_steady_validation_service.py) 和 [`F:/smartgas-grid/backend/app/services/we1_pilot_service.py`](/F:/smartgas-grid/backend/app/services/we1_pilot_service.py)。
++
++4. 枢纽规则与数据库口径：通过静态巡检。[`F:/smartgas-grid/src/views/MapTopologyView.tsx`](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 中 `JUNCTION_READONLY_HINT` 明确把运行时重编组作为主口径，`JUNCTION_MODE_LABELS` 把 `runtime_readonly` 与 `legacy_editable` 分开；后端存在 [`F:/smartgas-grid/backend/app/services/junction_groups.py`](/F:/smartgas-grid/backend/app/services/junction_groups.py)、[`F:/smartgas-grid/backend/app/routers/topology_editor.py`](/F:/smartgas-grid/backend/app/routers/topology_editor.py)、[`F:/smartgas-grid/backend/database_knowledge.md`](/F:/smartgas-grid/backend/database_knowledge.md) 等独立落点。通过标准是前端展示、后端规则、数据库文档三处口径一致；失败先查数据库和服务层，再查编辑器 UI。
++
++5. 导入脚本：通过静态巡检。仓库中存在 [`F:/smartgas-grid/backend/import_luzhi_scada.py`](/F:/smartgas-grid/backend/import_luzhi_scada.py)、[`F:/smartgas-grid/backend/数据库导入指南.md`](/F:/smartgas-grid/backend/数据库导入指南.md)、[`F:/smartgas-grid/backend/数据导入分步指南.md`](/F:/smartgas-grid/backend/数据导入分步指南.md)、[`F:/smartgas-grid/backend/批量CSV导入指南.md`](/F:/smartgas-grid/backend/批量CSV导入指南.md) 等脚本与说明。通过标准是脚本、模板、文档三件套齐全；失败先查脚本入口，再查模板，再查落库模型。
++
++6. AI 模块链路：通过静态巡检。前端入口在 [`F:/smartgas-grid/src/components/ai-assistant/AiAssistant.tsx`](/F:/smartgas-grid/src/components/ai-assistant/AiAssistant.tsx) 与 [`F:/smartgas-grid/src/components/ai-assistant/useAiAssistantChat.ts`](/F:/smartgas-grid/src/components/ai-assistant/useAiAssistantChat.ts)，后端路由在 [`F:/smartgas-grid/backend/app/routers/ai_assistant.py`](/F:/smartgas-grid/backend/app/routers/ai_assistant.py)，编排与工具层在 [`F:/smartgas-grid/backend/app/services/ai_analysis_orchestrator.py`](/F:/smartgas-grid/backend/app/services/ai_analysis_orchestrator.py)、[`F:/smartgas-grid/backend/app/services/assistant_tools.py`](/F:/smartgas-grid/backend/app/services/assistant_tools.py)、[`F:/smartgas-grid/backend/app/services/ai_client.py`](/F:/smartgas-grid/backend/app/services/ai_client.py)，知识增强与直连链路在 [`F:/smartgas-grid/backend/app/services/rag_enhanced.py`](/F:/smartgas-grid/backend/app/services/rag_enhanced.py)、[`F:/smartgas-grid/backend/app/services/raw_excel_ai_direct.py`](/F:/smartgas-grid/backend/app/services/raw_excel_ai_direct.py)、[`F:/smartgas-grid/backend/app/services/raw_excel_ai_index.py`](/F:/smartgas-grid/backend/app/services/raw_excel_ai_index.py)。通过标准是前端请求、路由、模型调用、工具执行、知识增强五层都能串起来；失败先查 router，再查 orchestrator 和服务层。
++
++四、前后对比
++
++1. 本轮没有改业务代码，所以没有代码前后对比；用状态表代替截图。
++
++2. 状态表：主目录事实已从“待确认”变成“已确认 `F:\\smartgas-grid` 为主仓顶层”；地图缩放与层级主链已从“只知有地图页”变成“已确认缩放范围、控件和区划层都在”；WE1 主仿真入口已从“已有整改结论”变成“再确认 `/map-topology` 绑定 WE1 pilot”；甪直 AI 分析已从“重点待查”变成“前端上下文已确认、后端分支判定待补”；git 深取证仍因工具层阻断待补。
++
++五、风险与下一步
++
++1. 当前真正未收口的是两项：git 深取证没有拿到实况结果，甪直 AI 的后端 `trace/summary/report` 与 `direct/orchestrated/legacy` 分支命中没有落证。
++
++2. 本轮没有业务代码改动，只新增巡检文档；如需回退，删除本文件即可。
+*** End Patch

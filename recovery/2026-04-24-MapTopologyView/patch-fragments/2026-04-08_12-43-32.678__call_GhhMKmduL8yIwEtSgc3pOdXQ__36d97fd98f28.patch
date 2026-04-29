@@ -1,0 +1,10 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-    const simulationEntryHint = steadyOverlay
+-        ? '第一张图已经接上当前主仿真结果，先看场景摘要，再看覆盖结果清单。'
+-        : '先切场景并运行正式仿真，等结果出来后再做快照、对比和覆盖补跑。'
+     const demoGuideSteps = useMemo(() => {
+         return [
+             `1. 先在场景下拉里选 ${recommendedCoverageScenario?.label ?? '常规稳态'}。`,
+*** End Patch

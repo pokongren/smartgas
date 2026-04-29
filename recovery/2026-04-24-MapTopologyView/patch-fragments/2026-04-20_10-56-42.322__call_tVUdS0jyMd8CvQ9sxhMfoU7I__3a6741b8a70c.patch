@@ -1,0 +1,20 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-                                        <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('宸叉竻绌哄綋鍓嶄富浠跨湡缁撴灉') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">娓呯┖涓讳豢鐪?/button>
+-                                    </div>
++                                        <button onClick={() => { clearSteadyOverlay(); clearSimulationShowcaseSyncContext(); setStatusMsg('宸叉竻绌哄綋鍓嶄富浠跨湡缁撴灉') }} className="rounded-lg border border-slate-600 bg-slate-800/70 px-3 py-2 text-xs font-medium text-slate-200">娓呯┖涓讳豢鐪?/button>
++                                        <button
++                                            onClick={() => {
++                                                if (!steadyOverlay) {
++                                                    setStatusMsg('璇峰厛鍔犺浇鎴栬繍琛屼竴鏉″揩鐓х粨鏋滐紝鍐嶄笂鍥炬樉绀哄帇鍔?')
++                                                    return
++                                                }
++                                                setShowSnapshotPressureOverlay(prev => !prev)
++                                            }}
++                                            className="col-span-2 rounded-lg border border-cyan-500/30 bg-cyan-900/20 px-3 py-2 text-xs font-medium text-cyan-100"
++                                        >
++                                            {showSnapshotPressureOverlay ? '闅愯棌蹇収鍘嬪姏涓婂浘' : '蹇収鍘嬪姏涓婂浘'}
++                                        </button>
++                                    </div>
+*** End Patch

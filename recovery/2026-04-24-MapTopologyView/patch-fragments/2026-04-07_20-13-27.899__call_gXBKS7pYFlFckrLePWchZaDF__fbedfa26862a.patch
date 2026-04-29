@@ -1,0 +1,76 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    const [activeTab, setActiveTab] = useState<PanelTab>('edit')
++    const [activeTab, setActiveTab] = useState<PanelTab>('simulation')
+@@
+     const [simulationHitFocus, setSimulationHitFocus] = useState(true)
+ 
+     // 已高亮的 marker 原始 content，用于恢复
+     const highlightedMarkersRef = useRef<Map<string, string>>(new Map())
++    const simulationSnapshotAutoloadedRef = useRef(false)
+@@
+     useEffect(() => {
+         if (steadySimError) {
+             setStatusMsg(`正式仿真失败：${steadySimError}`)
+         }
+     }, [steadySimError])
++    useEffect(() => {
++        if (activeTab !== 'simulation') return
++        if (simulationSnapshotAutoloadedRef.current) return
++        simulationSnapshotAutoloadedRef.current = true
++        void refreshSteadySnapshots().catch(error => {
++            setStatusMsg(error instanceof Error ? `历史快照自动刷新失败：${error.message}` : '历史快照自动刷新失败')
++        })
++    }, [activeTab, refreshSteadySnapshots])
+@@
+     const trialCoverageSummary = useMemo(() => {
+         const coveredCount = steadyTrialRunItems.filter(item => item.covered).length
+         return {
+             coveredCount,
+             pendingCount: steadyTrialRunItems.length - coveredCount,
+         }
+     }, [steadyTrialRunItems])
++    const simulationRunStateLabel = useMemo(() => {
++        if (steadySimLoading) return '运行中'
++        if (steadyOverlay) return `已运行 ${steadyOverlay.run_id.slice(0, 12)}`
++        return '未运行'
++    }, [steadyOverlay, steadySimLoading])
+@@
+             <div className="absolute top-0 left-0 right-0 z-30 bg-[#0c1218]/90 backdrop-blur-md border-b border-cyan-500/30">
+                 <div className="px-6 py-3 flex justify-between items-center">
+@@
+                     </div>
+                 </div>
+             </div>
++            <div className="absolute top-[70px] left-1/2 -translate-x-1/2 z-25">
++                <div className="flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-[#06111a]/88 px-3 py-2 text-[11px] text-gray-200 shadow-xl backdrop-blur-md">
++                    <span className="rounded-full border border-cyan-400/30 bg-cyan-500/15 px-2 py-0.5 text-[10px] font-semibold text-cyan-200">主仿真入口</span>
++                    <span>场景：{steadyScenarioOption?.label ?? steadyScenarioId}</span>
++                    <span>运行：{simulationRunStateLabel}</span>
++                    <span>命中聚焦：{simulationHitFocus ? '开启' : '关闭'}</span>
++                    <span>快照：{steadySnapshots.length}</span>
++                    <button
++                        onClick={() => setActiveTab('simulation')}
++                        className="rounded-lg border border-cyan-400/30 bg-cyan-500/20 px-2.5 py-1 text-[10px] font-semibold text-cyan-100 transition hover:bg-cyan-500/30"
++                    >
++                        进入主仿真面板
++                    </button>
++                </div>
++            </div>
+ 
+             {/* 纯底图 —— 不传 pipelineData，不渲染任何站场/阀室 */}
+             <MapView onLoad={handleMapLoad} />
+@@
+                     {/* 标签页头 */}
+                     <div className="flex border-b border-gray-700/40 shrink-0">
+                         {([
++                            { id: 'simulation' as PanelTab, label: '主仿真', icon: 'science' },
+                             { id: 'edit' as PanelTab, label: '编辑', icon: 'edit' },
+                             { id: 'validate' as PanelTab, label: '验证', icon: 'verified' },
+                             { id: 'search' as PanelTab, label: '搜索', icon: 'search' },
+-                            { id: 'simulation' as PanelTab, label: '仿真', icon: 'science' },
+                             { id: 'centrality' as PanelTab, label: '枢纽', icon: 'stars' },
+                             { id: 'cutoff' as PanelTab, label: '截断', icon: 'cut' },
+                         ]).map(tab => (
+*** End Patch

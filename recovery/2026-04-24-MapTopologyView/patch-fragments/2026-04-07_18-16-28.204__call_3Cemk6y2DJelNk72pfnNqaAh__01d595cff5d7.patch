@@ -1,0 +1,9 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-        for (const edge of collapsedEdges.values()) {
++        for (const edge of collapsedEdges.values()) {
++            const startId = edge.startNodeId
++            const endId = edge.endNodeId
+             const sNode = importedMap.get(edge.startNodeId)
+*** End Patch

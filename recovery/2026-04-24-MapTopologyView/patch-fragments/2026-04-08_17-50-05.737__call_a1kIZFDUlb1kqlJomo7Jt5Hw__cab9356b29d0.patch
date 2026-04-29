@@ -1,0 +1,71 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+-import { useLocation } from 'react-router-dom'
++import { useLocation, useNavigate } from 'react-router-dom'
+ import MapView from '@/components/map-view/MapView'
+ import ScadaHistoryChart from '@/components/scada/ScadaHistoryChart'
+ import { buildPipelineDataFromPackages, invalidatePipelineCache, loadAllPipelines } from '@/data/pipelines'
+ import type { PipelinePackage } from '@/data/pipelines/types'
+ import { useSimulation } from '@/hooks/useSimulation'
+@@
+ import type { ValidationReport } from '@/utils/topology-validator'
+ import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
+ import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+ import type { CutoffResult } from '@/utils/cutoff-simulator'
++import { writeSimulationShowcaseSyncContext } from '@/utils/simulationShowcaseSync'
+ import { MAINLINE_SCENARIOS } from '@/types/simulation'
+@@
+ const MapTopologyView: React.FC = () => {
+     const location = useLocation()
++    const navigate = useNavigate()
+     const [mapInstance, setMapInstance] = useState<any>(null)
+@@
+     useEffect(() => {
+         if (steadySimError) {
+             setStatusMsg(`姝ｅ紡浠跨湡澶辫触锛?{steadySimError}`)
+         }
+     }, [steadySimError])
++    useEffect(() => {
++        writeSimulationShowcaseSyncContext({
++            source: 'map-topology',
++            pilotId: WE1_PRIMARY_PILOT_ID,
++            scenarioId: steadyOverlay?.scenario_id ?? steadyScenarioId,
++            selectedSnapshotRunId: steadySelectedSnapshotRunId,
++            baselineSnapshotRunId: steadyBaselineSnapshotRunId,
++            overlay: steadyOverlay,
++            updatedAt: new Date().toISOString(),
++        })
++    }, [
++        steadyBaselineSnapshotRunId,
++        steadyOverlay,
++        steadyScenarioId,
++        steadySelectedSnapshotRunId,
++    ])
+@@
+     const applyLatestCoveredSnapshotAsBaseline = useCallback(() => {
+         if (!latestCoveredSnapshotSummary) return
+         setSteadyBaselineSnapshotRunId(latestCoveredSnapshotSummary.run_id)
+         setStatusMsg(`已把最近留档快照设为基线：${latestCoveredSnapshotSummary.scenario_id}`)
+     }, [latestCoveredSnapshotSummary, setSteadyBaselineSnapshotRunId])
++    const openTopologyShowcase = useCallback(() => {
++        writeSimulationShowcaseSyncContext({
++            source: 'map-topology',
++            pilotId: WE1_PRIMARY_PILOT_ID,
++            scenarioId: steadyOverlay?.scenario_id ?? steadyScenarioId,
++            selectedSnapshotRunId: steadySelectedSnapshotRunId,
++            baselineSnapshotRunId: steadyBaselineSnapshotRunId,
++            overlay: steadyOverlay,
++            updatedAt: new Date().toISOString(),
++        })
++        setStatusMsg('已把当前主仿真上下文带到第三张图展示页')
++        navigate('/topology')
++    }, [
++        navigate,
++        steadyBaselineSnapshotRunId,
++        steadyOverlay,
++        steadyScenarioId,
++        steadySelectedSnapshotRunId,
++    ])
+*** End Patch

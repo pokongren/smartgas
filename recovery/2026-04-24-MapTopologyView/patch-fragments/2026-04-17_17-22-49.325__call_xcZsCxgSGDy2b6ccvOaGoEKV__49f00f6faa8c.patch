@@ -1,0 +1,27 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+                                         {selectedNodeSimulationMetrics?.pressure != null
+-                                            ? `进站 ${(selectedNodeSimulationMetrics.pressure * 0.95).toFixed(2)} MPa`
+-                                            : selectedNodeSeedData?.operating_pressure_in != null
+-                                                ? `${selectedNodeSeedData.operating_pressure_in.toFixed(2)} MPa`
+-                                                : '暂无数据'}
++                                            ? `进站 ${(selectedNodeAnimatedInPressure ?? (selectedNodeSimulationMetrics.pressure * 0.95)).toFixed(2)} MPa`
++                                            : selectedNodeAnimatedInPressure != null
++                                                ? `${selectedNodeAnimatedInPressure.toFixed(2)} MPa`
++                                                : selectedNodeSeedData?.operating_pressure_in != null
++                                                    ? `${selectedNodeSeedData.operating_pressure_in.toFixed(2)} MPa`
++                                                    : '暂无数据'}
+@@
+                                         {selectedNodeSimulationMetrics?.pressure != null
+-                                            ? `${selectedNodeSimulationMetrics.pressure.toFixed(2)} MPa`
+-                                            : selectedNodeSeedData?.operating_pressure_out != null
+-                                                ? `${selectedNodeSeedData.operating_pressure_out.toFixed(2)} MPa`
+-                                                : '暂无数据'}
++                                            ? `${(selectedNodeAnimatedOutPressure ?? selectedNodeSimulationMetrics.pressure).toFixed(2)} MPa`
++                                            : selectedNodeAnimatedOutPressure != null
++                                                ? `${selectedNodeAnimatedOutPressure.toFixed(2)} MPa`
++                                                : selectedNodeSeedData?.operating_pressure_out != null
++                                                    ? `${selectedNodeSeedData.operating_pressure_out.toFixed(2)} MPa`
++                                                    : '暂无数据'}
+*** End Patch

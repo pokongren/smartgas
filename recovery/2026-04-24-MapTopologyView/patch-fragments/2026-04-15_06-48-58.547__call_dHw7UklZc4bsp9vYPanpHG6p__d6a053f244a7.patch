@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+                 if (nodeId === from) { setStatusMsg('不能连接自身'); return }
+                 doAddEdge(from, nodeId)
+                 setConnectFrom(null)
+-                setStatusMsg('连线成功，继续点击起点')
++                setStatusMsg('连线成功，可点「保存连线」落盘，或继续点击起点')
+             }
+             return
+         }
+*** End Patch

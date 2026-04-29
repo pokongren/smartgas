@@ -1,0 +1,100 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    const runValidation = useCallback(() => {
++    const cutoffAiAnalysis = useMemo(() => {
++        if (!cutoffResult) return null
++        const cutoffNodeName = topoNodes.find(n => n.id === cutoffResult.cutoffNodeId)?.name ?? cutoffResult.cutoffNodeName
++        const supplyLost = cutoffResult.summary.supplyLost
++        const rerouted = cutoffResult.summary.rerouted
++        const same = cutoffResult.summary.same
++        const analyzedTotal = cutoffResult.totalDistributionNodes
++        const supplyLostRatio = analyzedTotal > 0 ? supplyLost / analyzedTotal : 0
++
++        const riskLevel =
++            supplyLostRatio >= 0.3
++                ? 'high'
++                : supplyLost > 0
++                    ? 'medium'
++                    : rerouted > 0
++                        ? 'low-medium'
++                        : 'low'
++
++        const conclusion =
++            supplyLost > 0
++                ? `截断点 ${cutoffNodeName} 已造成下游失供，当前失供 ${supplyLost} 站。`
++                : rerouted > 0
++                    ? `截断点 ${cutoffNodeName} 未失供，但有 ${rerouted} 站进入绕行状态。`
++                    : `截断点 ${cutoffNodeName} 当前未出现失供或绕行。`
++
++        const lostStations = cutoffResult.affectedNodes
++            .filter(node => node.status === 'supply_lost')
++            .map(node => node.name || node.id)
++            .slice(0, 8)
++        const reroutedStations = cutoffResult.affectedNodes
++            .filter(node => node.status === 'rerouted')
++            .map(node => node.name || node.id)
++            .slice(0, 8)
++
++        const action =
++            supplyLost > 0
++                ? '优先恢复主供气链路或切换替代供气点，再复核失供站入口压力约束。'
++                : rerouted > 0
++                    ? '保留绕行方案并持续监测高负荷管段，必要时做限流分配。'
++                    : '维持当前工况，建议留档为截断演练基线。'
++
++        return {
++            cutoffNodeName,
++            riskLevel,
++            conclusion,
++            action,
++            summaryLine: `分析站点 ${analyzedTotal}，失供 ${supplyLost}，绕行 ${rerouted}，不受影响 ${same}。`,
++            lostText: lostStations.length > 0 ? lostStations.join('、') : '无',
++            reroutedText: reroutedStations.length > 0 ? reroutedStations.join('、') : '无',
++            structured: {
++                cutoff_node_id: cutoffResult.cutoffNodeId,
++                cutoff_node_name: cutoffNodeName,
++                analyzed_distribution_nodes: analyzedTotal,
++                summary: cutoffResult.summary,
++                top_supply_lost_nodes: lostStations,
++                top_rerouted_nodes: reroutedStations,
++                risk_level: riskLevel,
++            },
++        }
++    }, [cutoffResult, topoNodes])
++    const sendCutoffToAiAnalysis = useCallback(() => {
++        if (!cutoffAiAnalysis) return
++        const prompt = [
++            '/数据分析',
++            '请基于以下截断仿真结果做专业分析，给出结论、风险、建议动作：',
++            `截断点：${cutoffAiAnalysis.cutoffNodeName}`,
++            `风险等级：${cutoffAiAnalysis.riskLevel}`,
++            `概览：${cutoffAiAnalysis.summaryLine}`,
++            `失供站点：${cutoffAiAnalysis.lostText}`,
++            `绕行站点：${cutoffAiAnalysis.reroutedText}`,
++            `建议动作：${cutoffAiAnalysis.action}`,
++            '',
++            '结构化结果(JSON)：',
++            JSON.stringify(cutoffAiAnalysis.structured, null, 2),
++        ].join('\n')
++        window.dispatchEvent(
++            new CustomEvent('assistant-send-message', {
++                detail: {
++                    message: prompt,
++                    autoOpen: true,
++                },
++            }),
++        )
++        setShowCutoffAiModal(false)
++        setStatusMsg('已发送截断仿真解读到 AI 助手')
++    }, [cutoffAiAnalysis])
++    useEffect(() => {
++        if (!showCutoffAiModal) return
++        const onEsc = (event: KeyboardEvent) => {
++            if (event.key === 'Escape') setShowCutoffAiModal(false)
++        }
++        window.addEventListener('keydown', onEsc)
++        return () => window.removeEventListener('keydown', onEsc)
++    }, [showCutoffAiModal])
++    const runValidation = useCallback(() => {
+*** End Patch

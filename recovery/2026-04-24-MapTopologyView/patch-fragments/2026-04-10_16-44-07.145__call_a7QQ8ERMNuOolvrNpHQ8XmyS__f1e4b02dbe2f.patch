@@ -1,0 +1,38 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    useEffect(() => {
++    const copySimulationStructuredBrief = useCallback(async () => {
++        try {
++            await navigator.clipboard.writeText(JSON.stringify(simulationStructuredBrief, null, 2))
++            setStatusMsg('仿真结构化简报已复制，可直接贴给 AI 继续分析')
++        } catch (error) {
++            setStatusMsg(error instanceof Error ? error.message : '复制结构化简报失败')
++        }
++    }, [simulationStructuredBrief])
++    useEffect(() => {
+         const cutoffContext: Record<string, any> = {}
+         if (cutoffResult) {
+             cutoffContext.we1_cutoff_node_id = cutoffNodeId || ''
+             cutoffContext.we1_cutoff_supply_lost_nodes = cutoffResult.affectedNodes.filter(n => n.status === 'supply_lost').map(n => n.name || n.id).join(', ') || '鏃?
+             cutoffContext.we1_cutoff_rerouted_nodes = cutoffResult.affectedNodes.filter(n => n.status === 'rerouted').map(n => n.name || n.id).join(', ') || '鏃?
+@@
+             selection: {
+                 we1_simulation_narrative: simulationNarrative,
++                we1_simulation_narrative_plain: simulationNarrativePlain,
++                we1_simulation_structured_brief: simulationStructuredBrief,
+                 we1_scenario_id: steadyScenarioId,
+                 we1_run_id: steadyOverlay?.run_id ?? '',
+                 we1_solver_status: steadyOverlay?.solver_status ?? 'idle',
+                 ...cutoffContext
+             },
+@@
+     }, [
+         simulationNarrative,
++        simulationNarrativePlain,
++        simulationStructuredBrief,
+         steadyBaselineSnapshotRunId,
+         steadyOverlay?.run_id,
+         steadyOverlay?.solver_status,
+         steadyScenarioId,
+*** End Patch

@@ -1,0 +1,28 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+         edges.forEach(edge => {
+             const startNodeId = stationToDisplayId.get(edge.startNodeId) ?? edge.startNodeId
+             const endNodeId = stationToDisplayId.get(edge.endNodeId) ?? edge.endNodeId
+             if (startNodeId === endNodeId) return
+ 
+             const sorted = [startNodeId, endNodeId].sort()
+             const key = `${sorted[0]}__${sorted[1]}`
+             const existing = collapsedEdgeMap.get(key)
++            const nextSourceEdgeIds = edge.sourceEdgeIds?.length ? edge.sourceEdgeIds : [edge.id]
+             if (existing) {
+-                existing.sourceEdgeIds = [...(existing.sourceEdgeIds ?? []), edge.id]
++                existing.sourceEdgeIds = [...new Set([...(existing.sourceEdgeIds ?? []), ...nextSourceEdgeIds])]
+                 return
+             }
+ 
+             collapsedEdgeMap.set(key, {
+                 id: `merged-${key}`,
+                 startNodeId,
+                 endNodeId,
+                 name: edge.name,
+-                sourceEdgeIds: [edge.id],
++                sourceEdgeIds: nextSourceEdgeIds,
+             })
+         })
+*** End Patch

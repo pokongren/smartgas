@@ -1,0 +1,36 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     useEffect(() => {
+         if (!mapInstance) return
+         mapInstance.setDefaultCursor(editMode === 'view' ? 'grab' : 'crosshair')
+         if (editMode === 'draw-point') setStatusMsg(`缁樺埗锛氱偣鍑诲湴鍥炬坊鍔犮€?{TOPO_LABELS[pointType]}銆峘)
+         else if (editMode === 'connect') { setStatusMsg('杩炵嚎锛氱偣鍑昏捣鐐硅妭鐐?); setConnectFrom(null) }
+         else setStatusMsg('娴忚妯″紡')
+     }, [editMode, pointType, mapInstance])
++
++    useEffect(() => {
++        if (editMode !== 'merge') return
++        setConnectFrom(null)
++        setStatusMsg('手工捏合：点击底层站点加入/移除，再在左侧创建枢纽')
++    }, [editMode])
++
++    const paintMergeSelection = useCallback((selectedIds: Set<string>) => {
++        for (const node of nodesRef.current) {
++            if (!node.marker) continue
++            const isSelected = !node.isJunction && selectedIds.has(node.id)
++            node.marker.setContent(createTopoMarkerContent(node.type, node.name, isSelected, !!node.isJunction))
++        }
++    }, [])
++
++    useEffect(() => {
++        if (editMode !== 'merge') {
++            if (selectedMergeNodeIds.length > 0) {
++                setSelectedMergeNodeIds([])
++            }
++            paintMergeSelection(new Set())
++            return
++        }
++        paintMergeSelection(selectedMergeNodeSet)
++    }, [editMode, paintMergeSelection, selectedMergeNodeIds.length, selectedMergeNodeSet, topoNodes])
+*** End Patch

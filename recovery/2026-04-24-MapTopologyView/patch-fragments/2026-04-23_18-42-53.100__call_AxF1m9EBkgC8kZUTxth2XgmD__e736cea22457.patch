@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx.simulation-corrupted-keep
+*** Move to: src/views/MapTopologyView.tsx.backup-1649lines
+@@
+-/**
++/**
+*** End Patch

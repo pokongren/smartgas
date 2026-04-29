@@ -1,0 +1,71 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const simulationMapping = useMemo(() => {
+         return buildSimulationOverlayMapping(topoNodes, topoEdges, steadyOverlay)
+     }, [steadyOverlay, topoEdges, topoNodes])
++    const baselineSimulationMapping = useMemo(() => {
++        return buildSimulationOverlayMapping(topoNodes, topoEdges, steadyBaselineOverlay)
++    }, [steadyBaselineOverlay, topoEdges, topoNodes])
+     const selectedEdge = useMemo(() => {
+         if (!selectedEdgeId) return null
+         return topoEdges.find(edge => edge.id === selectedEdgeId) ?? null
+     }, [selectedEdgeId, topoEdges])
+     const selectedNodeSimulationMatch = useMemo(() => {
+         if (!selectedNode || !simulationMapping) return null
+         return simulationMapping.nodeMatchesByDisplayId.get(selectedNode.id) ?? null
+     }, [selectedNode, simulationMapping])
++    const selectedNodeBaselineMatch = useMemo(() => {
++        if (!selectedNode || !baselineSimulationMapping) return null
++        return baselineSimulationMapping.nodeMatchesByDisplayId.get(selectedNode.id) ?? null
++    }, [baselineSimulationMapping, selectedNode])
+     const selectedEdgeSimulationMatch = useMemo(() => {
+         if (!selectedEdge || !simulationMapping) return null
+         return simulationMapping.edgeMatchesByDisplayId.get(selectedEdge.id) ?? null
+     }, [selectedEdge, simulationMapping])
++    const selectedEdgeBaselineMatch = useMemo(() => {
++        if (!selectedEdge || !baselineSimulationMapping) return null
++        return baselineSimulationMapping.edgeMatchesByDisplayId.get(selectedEdge.id) ?? null
++    }, [baselineSimulationMapping, selectedEdge])
+@@
+     const selectedBaselineSnapshotSummary = useMemo(() => {
+         if (!steadyBaselineSnapshotRunId) return null
+         return steadySnapshots.find(item => item.run_id === steadyBaselineSnapshotRunId) ?? null
+     }, [steadyBaselineSnapshotRunId, steadySnapshots])
++    const selectedNodeComparisonDelta = useMemo(() => {
++        if (!selectedNodeSimulationMatch && !selectedNodeBaselineMatch) return null
++
++        const currentPressure = selectedNodeSimulationMatch?.averagePressureMpa ?? null
++        const baselinePressure = selectedNodeBaselineMatch?.averagePressureMpa ?? null
++        return {
++            currentPressure,
++            baselinePressure,
++            pressureDelta:
++                currentPressure === null || baselinePressure === null
++                    ? null
++                    : currentPressure - baselinePressure,
++        }
++    }, [selectedNodeBaselineMatch, selectedNodeSimulationMatch])
++    const selectedEdgeComparisonDelta = useMemo(() => {
++        if (!selectedEdgeSimulationMatch && !selectedEdgeBaselineMatch) return null
++
++        const currentFlow = selectedEdgeSimulationMatch?.totalFlowRate ?? null
++        const baselineFlow = selectedEdgeBaselineMatch?.totalFlowRate ?? null
++        const currentUtil = selectedEdgeSimulationMatch?.averageUtilization ?? null
++        const baselineUtil = selectedEdgeBaselineMatch?.averageUtilization ?? null
++
++        return {
++            currentFlow,
++            baselineFlow,
++            flowDelta: currentFlow === null || baselineFlow === null ? null : currentFlow - baselineFlow,
++            currentUtil,
++            baselineUtil,
++            utilizationDelta:
++                currentUtil === null || baselineUtil === null ? null : currentUtil - baselineUtil,
++        }
++    }, [selectedEdgeBaselineMatch, selectedEdgeSimulationMatch])
++    const resolveComparisonEdgeLabel = useCallback((edgeId: string) => {
++        const displayEdge = topoEdges.find(edge => edge.sourceEdgeIds?.includes(edgeId))
++        return displayEdge?.name || displayEdge?.id || edgeId
++    }, [topoEdges])
+*** End Patch

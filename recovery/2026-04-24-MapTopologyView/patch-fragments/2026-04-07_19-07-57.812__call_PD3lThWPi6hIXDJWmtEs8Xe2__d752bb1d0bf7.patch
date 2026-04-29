@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+ const LINE_COLOR = '#34d399'
+ const LINE_WEIGHT = 2
++const SIM_DIMMED_OPACITY = 0.18
+*** End Patch

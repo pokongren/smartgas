@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+-        | { type: 'add-node'; nodeId: string }
++    type UndoAction =
++        | { type: 'add-node'; nodeId: string }
+*** End Patch

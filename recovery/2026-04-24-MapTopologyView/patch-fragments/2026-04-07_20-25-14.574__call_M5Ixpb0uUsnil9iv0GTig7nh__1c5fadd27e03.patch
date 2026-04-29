@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-import { topologyAPI, type SimulationResult } from '@/services/api'
++import { SimPanel } from '@/components/topology/SimPanel'
++import { useSimulation } from '@/hooks/useSimulation'
+@@
+ import type { ValidationReport } from '@/utils/topology-validator'
++import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
+ import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+ import type { CutoffResult } from '@/utils/cutoff-simulator'
++import { MAINLINE_SCENARIOS } from '@/types/simulation'
+*** End Patch

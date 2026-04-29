@@ -1,0 +1,26 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     const manualEditableJunctionGroups = useMemo(() => {
+         return junctionGroups.filter(group => !isRuntimeReadonlyGroup(group))
+     }, [junctionGroups, isRuntimeReadonlyGroup])
+ 
+     const selectedMergeNodeSet = useMemo(() => new Set(selectedMergeNodeIds), [selectedMergeNodeIds])
++    const selectedMergeNodes = useMemo(() => {
++        return topoNodes.filter(node => !node.isJunction && selectedMergeNodeSet.has(node.id))
++    }, [selectedMergeNodeSet, topoNodes])
++    const selectedMergeAutoName = useMemo(() => {
++        const names = selectedMergeNodes.map(node => node.name).filter(Boolean)
++        if (names.length === 0) return ''
++        if (names.length === 1) return `${names[0]}枢纽`
++        const preview = names.slice(0, 2).join(' / ')
++        return `${preview}${names.length > 2 ? ` 等 ${names.length} 站` : ''}枢纽`
++    }, [selectedMergeNodes])
++    const selectedJunctionGroup = useMemo(() => {
++        if (!selectedNode?.isJunction || !selectedNode.junctionId) return null
++        return junctionGroups.find(group => group.id === selectedNode.junctionId) ?? null
++    }, [junctionGroups, selectedNode])
++    const canDeleteSelectedJunction = !!(
++        selectedJunctionGroup && !isRuntimeReadonlyGroup(selectedJunctionGroup)
++    )
+*** End Patch

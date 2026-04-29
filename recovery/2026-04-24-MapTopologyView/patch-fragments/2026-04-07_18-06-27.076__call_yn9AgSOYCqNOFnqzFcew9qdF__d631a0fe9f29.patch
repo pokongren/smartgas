@@ -1,0 +1,115 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+ interface BaseTopoEdge {
+     id: string
+     startNodeId: string
+     endNodeId: string
+     name?: string
++    sourceEdgeIds?: string[]
+ }
+@@
+     const canDeleteSelectedJunction = !!(
+         selectedJunctionGroup && !isRuntimeReadonlyGroup(selectedJunctionGroup)
+     )
++    const simulationOverlayMapping = useMemo(() => {
++        return buildSimulationOverlayMapping(topoNodes, topoEdges, steadyOverlay)
++    }, [steadyOverlay, topoEdges, topoNodes])
++    const selectedNodeSimulationMatch = useMemo(() => {
++        if (!selectedNode || !simulationOverlayMapping) return null
++        return simulationOverlayMapping.nodeMatchesByDisplayId.get(selectedNode.id) ?? null
++    }, [selectedNode, simulationOverlayMapping])
+@@
+-        const adj = new Map<string, Set<string>>()
++        const adj = new Map<string, Array<{ nodeId: string; lineId: string }>>()
+         for (const sn of srcN) {
+-            adj.set(sn.id, new Set())
++            adj.set(sn.id, [])
+         }
+         for (const sl of srcL) {
+             if (adj.has(sl.startNodeId) && adj.has(sl.endNodeId)) {
+-                adj.get(sl.startNodeId)!.add(sl.endNodeId)
+-                adj.get(sl.endNodeId)!.add(sl.startNodeId)
++                adj.get(sl.startNodeId)!.push({ nodeId: sl.endNodeId, lineId: sl.id })
++                adj.get(sl.endNodeId)!.push({ nodeId: sl.startNodeId, lineId: sl.id })
+             }
+         }
+@@
+-        const edgePairs: Array<[string, string]> = []
++        const edgePairs = new Map<string, {
++            startId: string
++            endId: string
++            sourceEdgeIds: string[]
++        }>()
+ 
+         for (const sn of srcN) {
+             if (valveIds.has(sn.id)) continue  // 起点必须是非阀室
+ 
+-            const queue = [...(adj.get(sn.id) || [])]
++            const queue = (adj.get(sn.id) || []).map(item => ({
++                nodeId: item.nodeId,
++                sourceEdgeIds: [item.lineId],
++            }))
+             const visited = new Set<string>([sn.id])
+ 
+             while (queue.length > 0) {
+-                const curr = queue.shift()!
+-                if (visited.has(curr)) continue
+-                visited.add(curr)
++                const current = queue.shift()!
++                const curr = current.nodeId
++                if (visited.has(curr)) continue
++                visited.add(curr)
+ 
+                 if (valveIds.has(curr)) {
+                     // 当前是阀室 → 继续穿越
+-                    for (const next of adj.get(curr) || []) {
+-                        if (!visited.has(next)) queue.push(next)
++                    for (const next of adj.get(curr) || []) {
++                        if (!visited.has(next.nodeId)) {
++                            queue.push({
++                                nodeId: next.nodeId,
++                                sourceEdgeIds: [...current.sourceEdgeIds, next.lineId],
++                            })
++                        }
+                     }
+                 } else {
+                     // 找到了另一个非阀室节点 → 生成合并边
+                     const ids = [sn.id, curr].sort()
+                     const key = `${ids[0]}_${ids[1]}`
+-                    if (!collapsedEdges.has(key)) {
+-                        collapsedEdges.add(key)
+-                        edgePairs.push([sn.id, curr])
++                    const sourceEdgeIds = [...new Set(current.sourceEdgeIds)]
++                    if (!collapsedEdges.has(key)) {
++                        collapsedEdges.add(key)
++                        edgePairs.set(key, {
++                            startId: sn.id,
++                            endId: curr,
++                            sourceEdgeIds,
++                        })
++                    } else {
++                        const existing = edgePairs.get(key)
++                        if (existing) {
++                            existing.sourceEdgeIds = [...new Set([...existing.sourceEdgeIds, ...sourceEdgeIds])]
++                        }
+                     }
+                 }
+             }
+@@
+-        for (const [startId, endId] of edgePairs) {
++        for (const { startId, endId, sourceEdgeIds } of edgePairs.values()) {
+             const sNode = importedMap.get(startId)
+             const eNode = importedMap.get(endId)
+             if (!sNode || !eNode) continue
+             const edgeId = `ce-${startId.slice(-4)}-${endId.slice(-4)}`
+-            importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} → ${eNode.name}` })
++            importedEdges.push({
++                id: edgeId,
++                startNodeId: startId,
++                endNodeId: endId,
++                name: `${sNode.name} → ${eNode.name}`,
++                sourceEdgeIds,
++            })
+         }
+*** End Patch

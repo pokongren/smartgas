@@ -1,0 +1,28 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+-        const clickedNode = nodesRef.current.find(n => n.id === nodeId) || null
+-        setSelectedNode(clickedNode)
++        const clickedNode = nodesRef.current.find(n => n.id === nodeId) || null
++
++        if (modeRef.current === 'merge') {
++            if (!clickedNode) return
++            if (clickedNode.isJunction) {
++                setStatusMsg('手工捏合请选底层站点，枢纽节点不能直接捏合')
++                setSelectedNode(clickedNode)
++                return
++            }
++
++            setSelectedNode(clickedNode)
++            setSelectedMergeNodeIds(prev => {
++                const next = prev.includes(nodeId)
++                    ? prev.filter(id => id !== nodeId)
++                    : [...prev, nodeId]
++                setStatusMsg(`已选择 ${next.length} 个站点用于手工捏合`)
++                return next
++            })
++            return
++        }
++
++        setSelectedNode(clickedNode)
+*** End Patch

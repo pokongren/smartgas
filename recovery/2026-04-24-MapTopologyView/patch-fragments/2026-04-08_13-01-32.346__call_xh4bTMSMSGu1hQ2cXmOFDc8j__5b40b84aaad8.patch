@@ -1,0 +1,34 @@
+*** Begin Patch
+*** Update File: src/views/MapTopologyView.tsx
+@@
+     const failureInvestigationLayerLabel = mappingSummary
+         ? FAILURE_LAYER_LABELS[mappingSummary.failureInvestigationLayer]
+         : FAILURE_LAYER_LABELS['frontend-consumption']
+     const steadyOverlayStatusText = steadyOverlay
+         ? `主仿真 ${steadyScenarioOption?.label ?? steadyOverlay.scenario_id} · ${SOLVER_STATUS_LABELS[steadyOverlay.solver_status]}`
+         : '主仿真还没运行'
++    const steadyStatusToneClass = steadySimLoading
++        ? 'border-amber-400/30 bg-amber-500/10 text-amber-100'
++        : steadyOverlay?.solver_status === 'converged'
++            ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'
++            : steadyOverlay?.solver_status === 'max_iter'
++                ? 'border-amber-400/30 bg-amber-500/10 text-amber-100'
++                : steadyOverlay?.solver_status === 'error' || steadySimError
++                    ? 'border-red-400/30 bg-red-500/10 text-red-100'
++                    : 'border-cyan-400/30 bg-cyan-500/10 text-cyan-100'
++    const steadyMetricCards = steadyOverlay ? [
++        { label: '总供给', value: steadyOverlay.summary.total_supply.toFixed(2), tone: 'text-cyan-100' },
++        { label: '总需求', value: steadyOverlay.summary.total_demand.toFixed(2), tone: 'text-sky-100' },
++        { label: '平均利用率', value: steadyOverlay.summary.avg_utilization.toFixed(3), tone: 'text-emerald-100' },
++        { label: '告警数', value: String(steadyOverlay.summary.alert_count), tone: 'text-amber-100' },
++    ] : [
++        { label: '运行编号', value: '未运行', tone: 'text-slate-200' },
++        { label: '当前场景', value: steadyScenarioOption?.label ?? steadyScenarioId, tone: 'text-cyan-100' },
++        { label: '基线快照', value: selectedBaselineSnapshotSummary ? selectedBaselineSnapshotSummary.scenario_id : '未选择', tone: 'text-violet-100' },
++        { label: '快照数量', value: `${steadySnapshots.length} 条`, tone: 'text-sky-100' },
++    ]
+     const demoGuideSteps = useMemo(() => {
+         return [
+             `1. 先在场景下拉里选 ${recommendedCoverageScenario?.label ?? '常规稳态'}。`,
+             '2. 点“运行正式仿真”，确认运行结果摘要里出现 run_id、生成时间和求解状态。',
+*** End Patch

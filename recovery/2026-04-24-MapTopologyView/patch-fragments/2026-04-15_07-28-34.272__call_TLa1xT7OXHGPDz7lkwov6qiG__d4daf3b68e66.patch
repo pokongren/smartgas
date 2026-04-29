@@ -1,0 +1,19 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+     const saveConnectedEdges = useCallback(() => {
+         if (unsavedEdgeIds.size === 0) return
+         const payload = buildTopologyPayload()
+         const savedAt = new Date().toISOString()
+         const draft = { ...payload, savedAt }
+-        localStorage.setItem('smartgas-map-topology-draft-v1', JSON.stringify(draft))
++        localStorage.setItem(TOPOLOGY_DRAFT_STORAGE_KEY, JSON.stringify(draft))
+         const blob = new Blob([JSON.stringify(draft, null, 2)], { type: 'application/json' })
+@@
+         URL.revokeObjectURL(url)
+         setUnsavedEdgeIds(new Set())
++        setHasSavedDraft(true)
+         setStatusMsg(`已保存连线，新增 ${unsavedEdgeIds.size} 条连线已落盘`)
+-    }, [buildTopologyPayload, unsavedEdgeIds])
++    }, [buildTopologyPayload, unsavedEdgeIds])
+*** End Patch

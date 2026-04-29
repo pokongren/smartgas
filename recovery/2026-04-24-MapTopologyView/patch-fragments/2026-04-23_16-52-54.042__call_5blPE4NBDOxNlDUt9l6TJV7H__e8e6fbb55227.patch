@@ -1,0 +1,103 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+-    const cutoffAiAnalysis = useMemo(() => {
+-        if (!cutoffResult) return null
+-
+-        const cutoffNodeName = topoNodes.find(n => n.id === cutoffResult.cutoffNodeId)?.name ?? cutoffResult.cutoffNodeName
+-        const supplyLost = cutoffResult.summary.supplyLost
+-        const rerouted = cutoffResult.summary.rerouted
+-        const same = cutoffResult.summary.same
+-        const analyzedTotal = cutoffResult.totalDistributionNodes
+-        const affectedTotal = cutoffResult.affectedNodes.length
+-        const supplyLostRatio = analyzedTotal > 0 ? supplyLost / analyzedTotal : 0
+-
+-        const riskLevel =
+-            supplyLostRatio >= 0.3
+-                ? '楂橀闄?
+-                : supplyLost > 0
+-                    ? '涓闄?
+-                    : rerouted > 0
+-                        ? '浣庝腑椋庨櫓'
+-                        : '浣庨闄?
+-
+-        const conclusion =
+-            supplyLost > 0
+-                ? `鎴柇鐐?${cutoffNodeName} 瀵逛笅娓镐緵姘斿凡褰㈡垚瀹炶川褰卞搷锛屽綋鍓嶆柇渚?${supplyLost} 绔欙紝浼樺厛澶勭疆澶变緵閾捐矾銆俙
+-                : rerouted > 0
+-                    ? `鎴柇鐐?${cutoffNodeName} 鏈嚭鐜版柇渚涳紝浣嗘湁 ${rerouted} 绔欒繘鍏ョ粫琛岀姸鎬侊紝寤鸿鍘嬮檷璺熻釜銆俙
+-                    : `鎴柇鐐?${cutoffNodeName} 褰撳墠鏈彂鐜版柇渚涘拰缁曡锛岀郴缁熶繚鎸佺ǔ瀹氥€俙
+-
+-        const lostStations = cutoffResult.affectedNodes
+-            .filter(node => node.status === 'supply_lost')
+-            .map(node => node.name || node.id)
+-            .slice(0, 8)
+-        const reroutedStations = cutoffResult.affectedNodes
+-            .filter(node => node.status === 'rerouted')
+-            .map(node => node.name || node.id)
+-            .slice(0, 8)
+-
+-        const action =
+-            supplyLost > 0
+-                ? '鍏堟仮澶嶄富渚涙皵閾捐矾鎴栧垏鎹㈡浛浠ｄ緵姘旂偣锛屽啀鏍℃牳澶变緵绔欏叆鍙ｅ帇鍔涗笌鏈€灏忕害鏉熴€?
+-                : rerouted > 0
+-                    ? '淇濈暀缁曡鏂规骞舵寔缁瀵熼珮璐熻嵎绠℃锛屽繀瑕佹椂闄愭祦鍒嗛厤銆?
+-                    : '缁存寔褰撳墠宸ュ喌锛屽缓璁暀妗ｄ负鎴柇婕旂粌鍩虹嚎銆?
+-
+-        return {
+-            cutoffNodeName,
+-            riskLevel,
+-            conclusion,
+-            action,
+-            summaryLine: `鍒嗘瀽绔欑偣 ${analyzedTotal}锛屾柇渚?${supplyLost}锛岀粫琛?${rerouted}锛屾甯?${same}銆俙,
+-            lostText: lostStations.length > 0 ? lostStations.join('銆?) : '鏃?,
+-            reroutedText: reroutedStations.length > 0 ? reroutedStations.join('銆?) : '鏃?,
+-            structured: {
+-                cutoff_node_id: cutoffResult.cutoffNodeId,
+-                cutoff_node_name: cutoffNodeName,
+-                source_nodes: cutoffResult.sourceNodes.map(item => item.name),
+-                analyzed_distribution_nodes: analyzedTotal,
+-                affected_nodes: affectedTotal,
+-                summary: cutoffResult.summary,
+-                top_supply_lost_nodes: lostStations,
+-                top_rerouted_nodes: reroutedStations,
+-                risk_level: riskLevel,
+-            },
+-        }
+-    }, [cutoffResult, topoNodes])
+-    const sendCutoffToAiAnalysis = useCallback(() => {
+-        if (!cutoffAiAnalysis || !cutoffResult) return
+-        const prompt = [
+-            '/鏁版嵁鍒嗘瀽',
+-            '璇峰熀浜庝互涓嬫埅鏂豢鐪熺粨鏋滃仛涓撲笟鍒嗘瀽锛岀粰鍑虹粨璁恒€侀闄┿€佸缓璁姩浣滐細',
+-            `鎴柇鐐癸細${cutoffAiAnalysis.cutoffNodeName}`,
+-            `椋庨櫓绛夌骇锛?{cutoffAiAnalysis.riskLevel}`,
+-            `姒傝锛?{cutoffAiAnalysis.summaryLine}`,
+-            `鏂緵绔欑偣锛?{cutoffAiAnalysis.lostText}`,
+-            `缁曡绔欑偣锛?{cutoffAiAnalysis.reroutedText}`,
+-            `寤鸿鍔ㄤ綔锛?{cutoffAiAnalysis.action}`,
+-            '',
+-            '缁撴瀯鍖栫粨鏋?JSON)锛?,
+-            JSON.stringify(cutoffAiAnalysis.structured, null, 2),
+-        ].join('\n')
+-
+-        window.dispatchEvent(
+-            new CustomEvent('assistant-send-message', {
+-                detail: {
+-                    message: prompt,
+-                    autoOpen: true,
+-                },
+-            }),
+-        )
+-        setShowCutoffAiModal(false)
+-        setStatusMsg('宸插彂閫佹埅鏂豢鐪熻В璇诲埌 AI 鍔╂墜')
+-    }, [cutoffAiAnalysis, cutoffResult])
+-    useEffect(() => {
+-        if (!showCutoffAiModal) return
+-        const handleEsc = (event: KeyboardEvent) => {
+-            if (event.key === 'Escape') setShowCutoffAiModal(false)
+-        }
+-        window.addEventListener('keydown', handleEsc)
+-        return () => window.removeEventListener('keydown', handleEsc)
+-    }, [showCutoffAiModal])
+*** End Patch

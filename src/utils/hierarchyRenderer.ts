@@ -133,6 +133,7 @@ export function shouldShowNodeAtZoom(
     zoom: number,
     strategy: NodeLODStrategy = getNodeLODStrategy(zoom)
 ): boolean {
+    if (node.properties?.forceVisible === true) return true
     const rawType = readRawType(node)
     if (getNodeImportance(node) > strategy.maxVisibleImportance) return false
     if (!strategy.showValveRooms && isValveLikeNode(node, rawType)) return false

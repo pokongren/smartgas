@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: F:/smartgas-grid/src/views/MapTopologyView.tsx
+@@
+         if (action.type === 'add-edge') {
+             setBaseTopoEdges(prev => prev.filter(e => e.id !== action.edgeId))
++            setUnsavedEdgeIds(prev => {
++                const next = new Set(prev)
++                next.delete(action.edgeId)
++                return next
++            })
+             setStatusMsg('已撤销: 删除连线')
+         } else if (action.type === 'add-node') {
+*** End Patch

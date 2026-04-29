@@ -1,0 +1,63 @@
+*** Begin Patch
+*** Add File: F:\smartgas-grid\docs\2026-04-08-WE1第一张图主仿真入口第1阶段第1轮总结_人话版.md
++# WE1 第一张图主仿真入口第1阶段第1轮总结_人话版
++
++## 1. 这轮结论
++
++这轮已经把第一张图 `MapTopologyView` 的正式仿真入口切到 WE1 正式主链上了。现在这页“仿真”页签走的是 `useSimulation -> /api/pipeline-packages/simulation-overlay -> /topology-simulation/snapshots`，不再把旧的 `/api/emergency/simulate-failure` 当成正式稳态仿真入口。
++
++## 2. 这轮做了什么
++
++1. 在 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 里接入了现成的 `useSimulation` 主链，直接复用正式 WE1 场景和快照能力。
++2. 把第一张图“仿真”页签的主展示块换成了正式 WE1 稳态仿真块，页面上现在能做这几件事：选场景、运行仿真、保存快照、刷新快照、加载历史快照、清除当前结果。
++3. 这页现在会直接显示正式主链返回的摘要结果，包括求解状态、当前场景、总供气、总需求、未满足和告警数。
++4. 页面里明确加了“第 1 阶段第 1 轮口径”说明，告诉后续接手的人：这轮只统一主链和快照，不做地图 overlay 落图，不跨到第 2 阶段。
++
++## 3. 为什么这么做
++
++1. 当前最先要收的是“主入口到底认哪条链”，不是先做地图着色。入口没统一，后面映射层和显示层都容易返工。
++2. 现在正式主链已经在 [src/hooks/useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts) 里跑通了，所以第 1 阶段最省事、也最稳的做法，就是让第一张图先直接复用这一层。
++3. 地图节点、枢纽、显示边和 solver 原始 ID 的对齐还没做完，所以这轮故意不碰地图 overlay，避免把第 2 阶段的事提前做散。
++
++## 4. 影响范围
++
++1. 直接影响页： [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)。
++2. 复用主链： [src/hooks/useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts) 和 [src/types/simulation.ts](/F:/smartgas-grid/src/types/simulation.ts)。
++3. 后端主链没有被改坏，正式接口仍然是 [backend/app/routers/topology_simulation.py](/F:/smartgas-grid/backend/app/routers/topology_simulation.py) 这一套。
++
++## 5. 前后对比
++
++| 项目 | 改之前 | 改之后 |
++| --- | --- | --- |
++| 第一张图仿真入口 | 旧仿真口径，页面语义还是 `simulate-failure` 那套 | 正式 WE1 steady overlay 主链 |
++| 场景 | 不是正式 WE1 场景入口 | 直接复用 `MAINLINE_SCENARIOS` |
++| 快照 | 第一张图没有正式快照链路 | 第一张图可保存、刷新、加载快照 |
++| 页面结果 | 旧接口结果块，业务意义偏旧 | 正式稳态摘要结果块 |
++| 阶段边界 | 页面上看不出当前做到哪层 | 页面上明确写了“本轮只统一主链和快照” |
++
++## 6. 验证方式
++
++1. 主代理本地编译验证：执行 `npm run build`。
++2. 主链脚本验证：执行 `python backend/scripts/verify_we1_phase34_final.py`。
++3. 独立验证代理复核：只读检查 [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx)、[src/hooks/useSimulation.ts](/F:/smartgas-grid/src/hooks/useSimulation.ts)、[src/services/api.ts](/F:/smartgas-grid/src/services/api.ts)，确认第一张图正式块已经不再依赖旧 `topologyAPI.simulate()` 主入口。
++
++## 7. 验证结果
++
++1. `npm run build` 通过。
++2. `python backend/scripts/verify_we1_phase34_final.py` 通过，说明正式 WE1 overlay 主链没有被本轮改坏。
++3. 独立验证代理结论是“基本通过”，确认第 1 阶段目标已经达成，但还留了少量技术债。
++
++## 8. 剩余风险
++
++1. [src/views/MapTopologyView.tsx](/F:/smartgas-grid/src/views/MapTopologyView.tsx) 里旧仿真死代码块还在，只是被 `false &&` 挡住了，后面最好清掉。
++2. [src/services/api.ts](/F:/smartgas-grid/src/services/api.ts) 里的旧 `topologyAPI.simulate` 还在，说明代码资产层还没完全收口。
++3. 当前页面只是把正式仿真控制和摘要接进来了，还没有节点、枢纽、显示边和 overlay 原始 ID 的映射，所以地图上还不能直接看出命中边和压力落点。
++
++## 9. 为什么这轮没有截图
++
++这轮没有做浏览器实截图，因为当前执行是在代码和脚本层完成的，主要验收点是“入口是否统一到正式主链”和“编译、脚本是否通过”。这里用前后对比表和验证结果代替截图，避免给出假截图。
++
++## 10. 下一轮该做什么
++
++下一轮直接进入第 2 阶段第 1 轮，也就是补地图仿真映射层。重点不是再改按钮，而是把第一张图的显示节点、枢纽、显示边，稳定对齐到 overlay 的原始节点和原始边 ID。
+*** End Patch

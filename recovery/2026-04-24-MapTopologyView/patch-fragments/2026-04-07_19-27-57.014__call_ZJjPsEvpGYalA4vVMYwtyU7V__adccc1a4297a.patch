@@ -1,0 +1,30 @@
+*** Begin Patch
+*** Update File: F:\smartgas-grid\src\views\MapTopologyView.tsx
+@@
+     // 保存机制：跟踪拖拽修改的坐标
+     const [dirtyPositions, setDirtyPositions] = useState<Map<string, [number, number]>>(new Map())
+     const [isSaving, setIsSaving] = useState(false)
++    const {
++        overlay: steadyOverlay,
++        isLoading: steadySimLoading,
++        error: steadySimError,
++        currentScenario: steadyScenarioId,
++        snapshots: steadySnapshots,
++        snapshotLoading: steadySnapshotLoading,
++        snapshotError: steadySnapshotError,
++        selectedSnapshotRunId: steadySelectedSnapshotRunId,
++        setScenario: setSteadyScenario,
++        setSelectedSnapshotRunId: setSteadySelectedSnapshotRunId,
++        runSimulation: runSteadySimulation,
++        saveSnapshot: saveSteadySnapshot,
++        refreshSnapshots: refreshSteadySnapshots,
++        loadSelectedSnapshot: loadSteadySelectedSnapshot,
++        clearOverlay: clearSteadyOverlay,
++    } = useSimulation({
++        pilotId: WE1_PRIMARY_PILOT_ID,
++        scenarios: MAINLINE_SCENARIOS,
++    })
+     const [cascadeValves, setCascadeValves] = useState(true)
+     const [positionPreview, setPositionPreview] = useState<PositionPreviewResult | null>(null)
+     const [isPreviewing, setIsPreviewing] = useState(false)
+*** End Patch
