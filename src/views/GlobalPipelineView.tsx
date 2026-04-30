@@ -804,6 +804,17 @@ const PressureTrendChart: React.FC<{
     )
 }
 
+function hasValidPressureData(pipelineId: string): boolean {
+    const source = getTrendSource(pipelineId)
+    if (!source) return false
+
+    return source.entries.some(([, record]) => (
+        Number.isFinite(record.inP)
+        && Number.isFinite(record.outP)
+        && (record.inP > 0.1 || record.outP > 0.1)
+    ))
+}
+
 /**
  * 全管线统一视图 (性能优化版)
  * 使用标准化的 PipelinePackage 数据源
@@ -1169,6 +1180,7 @@ const GlobalPipelineView: React.FC = () => {
         let trendButton: React.ReactNode = <span className={directoryActionPlaceholderClass} aria-hidden="true" />
         let pressureButton: React.ReactNode = <span className={directoryActionPlaceholderClass} aria-hidden="true" />
         const trendSource = getTrendSource(pkg.id)
+        const hasPressureData = hasValidPressureData(pkg.id)
         const isTrendActive = activeTrendPipelineId === pkg.id
         const isPressureActive = Boolean(activePressureOverlayIds[pkg.id])
 
@@ -1248,7 +1260,7 @@ const GlobalPipelineView: React.FC = () => {
             }
         }
 
-        if (trendSource) {
+        if (trendSource && hasPressureData) {
             trendButton = (
                 <button
                     onClick={(e) => { e.stopPropagation(); toggleTrendChart(pkg.id) }}
@@ -1413,6 +1425,41 @@ const GlobalPipelineView: React.FC = () => {
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
         const nextIndex = e.clientY > rect.top + rect.height / 2 ? index + 1 : index
         setPipelineDropIndex(nextIndex)
+    }
+
+    const handlePipelineListDragOver = (e: React.DragEvent) => {
+        if (!pipelineDragId) return
+        e.preventDefault()
+
+        const container = e.currentTarget as HTMLElement
+        const rect = container.getBoundingClientRect()
+        const pointerY = e.clientY
+        const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-pipeline-row]'))
+
+        if (rows.length === 0) {
+            setPipelineDropIndex(0)
+            return
+        }
+
+        if (pointerY <= rect.top + 20) {
+            setPipelineDropIndex(0)
+            return
+        }
+
+        if (pointerY >= rect.bottom - 20) {
+            setPipelineDropIndex(rows.length)
+            return
+        }
+
+        let matchedIndex = rows.length
+        for (let i = 0; i < rows.length; i++) {
+            const rowRect = rows[i].getBoundingClientRect()
+            if (pointerY < rowRect.top + rowRect.height / 2) {
+                matchedIndex = i
+                break
+            }
+        }
+        setPipelineDropIndex(matchedIndex)
     }
 
     const handlePipelineDrop = (e: React.DragEvent) => {
@@ -1823,7 +1870,11 @@ const GlobalPipelineView: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                <div
+                    className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1"
+                    onDragOver={handlePipelineListDragOver}
+                    onDrop={handlePipelineDrop}
+                >
                     {orderedPipelines.map((pkg, pipelineIndex) => {
                         const layerIds = pkg.layers.map((layer, index) => getPipelineLayerId(pkg, layer, index))
                         const isAllVisible = layerIds.every(id => visibleLayers[id])
