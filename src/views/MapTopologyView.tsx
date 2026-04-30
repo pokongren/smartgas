@@ -1477,7 +1477,6 @@ const MapTopologyView: React.FC = () => {
 
                 const isCompressor = node.name.includes('压气')
                 const showInOut = pressureIn != null && (isCompressor || Math.abs(pressureIn - pressureOut) > 0.01)
-
                 const labelHtml = showInOut
                     ? `${node.name} <span style="color:#94a3b8;margin-right:2px;">进${pressureIn.toFixed(2)}</span><span style="color:#475569;margin-right:2px;">|</span><span style="color:#38bdf8;font-weight:600;">出${displayPressure.toFixed(2)}</span> <span style="color:#cbd5e1;font-size:9px;">MPa</span>`
                     : `<span style="font-weight:500;">${node.name}</span> <span style="color:#38bdf8;font-weight:600;">${displayPressure.toFixed(2)}</span> <span style="color:#cbd5e1;font-size:9px;">MPa</span>`

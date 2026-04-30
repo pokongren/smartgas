@@ -9,6 +9,7 @@ import { HubDetailPanel } from '../HubDetailPanel'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
 import type { HubNode } from '@/types/hub'
 import { DEFAULT_HUB_VISUAL_CONFIG } from '@/types/hub'
+import { getNodeRawType, isHubNode, isSourceNode } from '@/utils/pipelineDomain'
 
 /**
  * 默认地图配置
@@ -114,6 +115,8 @@ function MapView({
     onLineClick,
     onDeviceClick,
     simulationOverlay,
+    nodeDisplayMode = 'full',
+    hubNodeTypes = ['source', 'compressor', 'junction', 'distribution'],
 }: MapViewProps) {
     const mapContainerRef = useRef<HTMLDivElement>(null)
     const [mapInstance, setMapInstance] = useState<any>(null)
@@ -147,22 +150,36 @@ function MapView({
             ? pipelineData.lines.slice(0, maxLines)
             : pipelineData.lines
 
+        const hubTypeSet = new Set(hubNodeTypes)
+        const filteredNodes = nodeDisplayMode === 'hub' && Array.isArray(nodes)
+            ? nodes.filter((node) => {
+                if (node.properties?.forceVisible === true) return true
+                if (isSourceNode(node)) return hubTypeSet.has('source')
+                const rawType = getNodeRawType(node)
+                if (isHubNode(node)) return hubTypeSet.has('junction')
+                if (rawType === 'compressor') return hubTypeSet.has('compressor')
+                if (rawType === 'distribution') return hubTypeSet.has('distribution')
+                if (rawType === 'junction') return hubTypeSet.has('junction')
+                return false
+            })
+            : nodes
+
         if (
             Array.isArray(pipelineData.nodes) &&
             Array.isArray(pipelineData.lines) &&
             (pipelineData.nodes.length > maxNodes || pipelineData.lines.length > maxLines)
         ) {
             console.warn(
-                `[MapView] render budget applied: nodes ${pipelineData.nodes.length} -> ${nodes.length}, lines ${pipelineData.lines.length} -> ${lines.length}`,
+                `[MapView] render budget applied: nodes ${pipelineData.nodes.length} -> ${filteredNodes.length}, lines ${pipelineData.lines.length} -> ${lines.length}`,
             )
         }
 
         return {
             ...pipelineData,
-            nodes,
+            nodes: filteredNodes,
             lines,
         }
-    }, [mapConfig.maxRenderLines, mapConfig.maxRenderNodes, pipelineData])
+    }, [hubNodeTypes, mapConfig.maxRenderLines, mapConfig.maxRenderNodes, nodeDisplayMode, pipelineData])
 
     // 使用 ref 存储所有回调函数，避免 useEffect 依赖它们
     const callbacksRef = useRef({
@@ -289,13 +306,15 @@ function MapView({
         isInitializedRef.current = true
 
         const initMap = async () => {
-            const fallbackAmapKey = 'f60a02b69a072cb6b93d7cc4c6b0a42c'
-            const fallbackAmapSecret = 'f33664d5ca92eb775080e76db01f379f'
+            const amapKey = import.meta.env.VITE_AMAP_KEY
+            const amapSecret = import.meta.env.VITE_AMAP_SECRET
+
+            if (!amapKey || !amapSecret) {
+                throw new Error('请在 .env.local 中配置 VITE_AMAP_KEY 和 VITE_AMAP_SECRET')
+            }
 
             try {
                 setLoadingStage('加载地图 SDK...')
-                const amapKey = import.meta.env.VITE_AMAP_KEY || fallbackAmapKey
-                const amapSecret = import.meta.env.VITE_AMAP_SECRET || fallbackAmapSecret
 
                 ; (window as any)._AMapSecurityConfig = {
                     securityJsCode: amapSecret,
@@ -346,20 +365,7 @@ function MapView({
                     throw (lastError instanceof Error ? lastError : new Error(String(lastError)))
                 }
 
-                let AMap
-                try {
-                    AMap = await loadAMapWithRetry(amapKey)
-                } catch (primaryError) {
-                    if (amapKey !== fallbackAmapKey) {
-                        console.warn('[MapView] AMap key load failed, retrying with bundled fallback key.', primaryError)
-                        ; (window as any)._AMapSecurityConfig = {
-                            securityJsCode: fallbackAmapSecret,
-                        }
-                        AMap = await loadAMapWithRetry(fallbackAmapKey)
-                    } else {
-                        throw primaryError
-                    }
-                }
+                const AMap = await loadAMapWithRetry(amapKey)
 
                 setLoadingStage('初始化地图...')
 

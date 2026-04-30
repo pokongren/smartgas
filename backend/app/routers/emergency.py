@@ -73,14 +73,18 @@ def analyze_impact(
         affected_stations = topo.calculate_impact_area(request.failed_pipeline)
         
         logger.info(f"影响范围分析完毕: 共波及 {len(affected_stations)} 个站点")
-        # FIXME: 此处的人口与工业用户数为模拟估算数据，后续迭代需替换为实际业务模型数据
+        # TODO: 人口与工业用户数需接入真实业务模型，当前使用保守估算
+        # 保守估算：每个受影响场站平均服务约5万人口和5个工业用户
+        estimated_population = len(affected_stations) * 50000 if affected_stations else 0
+        estimated_industrial = len(affected_stations) * 5 if affected_stations else 0
+        
         return ImpactAnalysisResponse(
             affected_area=ImpactArea(
                 stations=affected_stations,
-                population=len(affected_stations) * 500000,
-                industrial_users=len(affected_stations) * 50
+                population=estimated_population,
+                industrial_users=estimated_industrial
             ),
-            supply_gap="30%",
+            supply_gap="待计算",
             recommendation="启动应急预案,调配周边管网资源",
             recovery_plan="启动应急预案,调配周边管网资源"
         )

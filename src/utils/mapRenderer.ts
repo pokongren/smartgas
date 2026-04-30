@@ -1,7 +1,7 @@
 import type { PipelineNode, PipelineLine, PipelineDevice } from '@/types'
 import { NodeType, PipelineStatus, PressureLevel, DeviceType } from '@/types'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
-import { getJunctionKind, getLinePipelineKind, getNodeRawType, isCompressorNode, isDistributionNode, isMajorJunctionNode, isValveNode } from '@/utils/pipelineDomain'
+import { getJunctionKind, getLinePipelineKind, getNodeRawType, isCompressorNode, isDistributionNode, isHubNode, isMajorJunctionNode, isSourceNode, isValveNode } from '@/utils/pipelineDomain'
 import { getNodeImportance, getNodeLODStrategy, NODE_LOD_THRESHOLDS, NodeImportance, shouldShowNodeAtZoom } from '@/utils/hierarchyRenderer'
 
 /**
@@ -69,14 +69,30 @@ const COMPRESSOR_ICON_CONFIG = {
     DPR: Math.min(window.devicePixelRatio || 1, 2),
 } as const
 
+const HUB_MARKER_CONFIG = {
+    SIZE: 18,
+    COMPACT_SIZE: 16,
+    CONTAINER_PADDING: 8,
+    COLOR: '#FFD700',
+    GLOW_COLOR: 'rgba(0, 229, 255, 0.46)',
+} as const
+
+const SOURCE_MARKER_CONFIG = {
+    SIZE: 32,
+    COMPACT_SIZE: 24,
+    CONTAINER_PADDING: 6,
+    COLOR: '#FF4500',
+    GLOW_COLOR: 'rgba(255, 100, 0, 0.6)',
+} as const
+
 /**
  * 注入地图标记样式
  */
 function injectMarkerStyles() {
     const styleId = 'pipeline-marker-styles'
-    if (document.getElementById(styleId)) return
+    const existingStyle = document.getElementById(styleId) as HTMLStyleElement | null
 
-    const style = document.createElement('style')
+    const style = existingStyle || document.createElement('style')
     style.id = styleId
     style.textContent = `
         /* 压气站标记容器 - 带呼吸灯动效 */
@@ -151,24 +167,61 @@ function injectMarkerStyles() {
         .cluster-indicator.distribution { background: #f59e0b; }
         .cluster-indicator.valve { background: #64748b; }
 
-        /* 枢纽节点样式 - 强化霓虹感 */
-        .hub-marker {
-            position: relative;
+        /* 枢纽节点样式 - 黄色菱形 */
+        .hub-marker-container {
+            width: ${HUB_MARKER_CONFIG.SIZE + HUB_MARKER_CONFIG.CONTAINER_PADDING}px;
+            height: ${HUB_MARKER_CONFIG.SIZE + HUB_MARKER_CONFIG.CONTAINER_PADDING}px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
+            position: relative;
+            overflow: visible;
+            filter: drop-shadow(0 0 5px ${HUB_MARKER_CONFIG.GLOW_COLOR});
+            transition: transform 0.2s ease, filter 0.2s ease;
         }
-        .hub-marker-diamond {
+        .hub-marker-container:hover {
+            transform: scale(1.12);
+            filter: drop-shadow(0 0 9px rgba(0,229,255,0.82));
+        }
+        .hub-marker-glow {
+            width: ${HUB_MARKER_CONFIG.SIZE}px;
+            height: ${HUB_MARKER_CONFIG.SIZE}px;
+            background: linear-gradient(135deg, #fff7a8 0%, ${HUB_MARKER_CONFIG.COLOR} 48%, #f59e0b 100%);
             transform: rotate(45deg);
-            border: 1px solid rgba(255,255,255,0.8);
+            border: 1px solid rgba(255,255,255,0.6);
+            box-shadow: 0 0 5px ${HUB_MARKER_CONFIG.GLOW_COLOR}, 0 0 10px ${HUB_MARKER_CONFIG.GLOW_COLOR}, inset 0 0 0 1px rgba(255,255,255,0.5);
         }
-        .hub-marker-junction .hub-marker-diamond {
-            animation: hub-pulse 2s ease-in-out infinite;
+        .hub-marker-glow.compact {
+            width: ${HUB_MARKER_CONFIG.COMPACT_SIZE}px;
+            height: ${HUB_MARKER_CONFIG.COMPACT_SIZE}px;
         }
-        @keyframes hub-pulse {
-            0%, 100% { box-shadow: 0 0 4px rgba(0,229,255,0.6); transform: rotate(45deg) scale(0.9); }
-            50% { box-shadow: 0 0 15px rgba(0,229,255,0.9), 0 0 30px rgba(0,229,255,0.3); transform: rotate(45deg) scale(1.1); }
+
+        /* 气源节点样式 - 钻井塔剪影 */
+        .source-marker-container {
+            width: ${SOURCE_MARKER_CONFIG.SIZE + 4}px;
+            height: ${SOURCE_MARKER_CONFIG.SIZE + 10}px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            filter: drop-shadow(0 0 8px ${SOURCE_MARKER_CONFIG.GLOW_COLOR});
+            transition: transform 0.2s ease, filter 0.2s ease;
         }
+        .source-marker-container:hover {
+            transform: scale(1.18);
+            filter: drop-shadow(0 0 14px rgba(255, 120, 0, 0.9));
+        }
+        .source-marker-container.compact {
+            width: ${SOURCE_MARKER_CONFIG.COMPACT_SIZE + 4}px;
+            height: ${SOURCE_MARKER_CONFIG.COMPACT_SIZE + 8}px;
+        }
+        .cluster-indicator.source { background: #FF4500; }
     `
-    document.head.appendChild(style)
+    if (!existingStyle) {
+        document.head.appendChild(style)
+    }
 }
 
 // 立即注入样式
@@ -359,7 +412,7 @@ function groupNodesByCoordinate(nodes: PipelineNode[]): Map<string, ClusterGroup
         // 更新类型统计
         const rawType = getNodeRawType(node)
         const importance = getNodeImportance(node)
-        if (rawType === 'source') {
+        if (isSourceNode(node)) {
             group.typeStats.source++
         } else if (rawType === 'compressor') {
             group.typeStats.compressor++
@@ -621,26 +674,15 @@ function pixelOffsetToLngLat(
 function createClusterMarkerContent(group: ClusterGroup): string {
     const count = group.nodes.length
     const { typeStats } = group
-    const hasJunctionNode = typeStats.majorJunction > 0 || typeStats.junction > 0
+    const hasJunctionNode = group.nodes.some(isHubNode) || typeStats.majorJunction > 0 || typeStats.junction > 0
+    const hasSourceNode = typeStats.source > 0
+
+    if (hasSourceNode) {
+        return createSourceMarkerContent(true)
+    }
 
     if (hasJunctionNode) {
-        return `
-            <div class="hub-marker" title="普通枢纽" style="
-                width: 28px;
-                height: 28px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-            ">
-                <div class="hub-marker-diamond" style="
-                    width: 18px;
-                    height: 18px;
-                    background: #00e5ff;
-                    box-shadow: 0 0 8px rgba(0,229,255,0.65);
-                "></div>
-            </div>
-        `
+        return createHubMarkerContent(true)
     }
 
     let color: string = CLUSTER_CONFIG.CLUSTER_COLORS.FEW
@@ -652,7 +694,7 @@ function createClusterMarkerContent(group: ClusterGroup): string {
 
     const indicators = []
     if (typeStats.source > 0) {
-        indicators.push(`<span class="cluster-indicator compressor" title="气源/首末站">源</span>`)
+        indicators.push(`<span class="cluster-indicator source" title="气源/首末站">源</span>`)
     }
     if (typeStats.compressor > 0) {
         indicators.push(`<span class="cluster-indicator compressor" title="压气站">压</span>`)
@@ -706,8 +748,10 @@ function createClusterMarker(
     const marker = new AMap.Marker({
         position: [group.coordinate.longitude, group.coordinate.latitude],
         content: createClusterMarkerContent(group),
-        offset: group.typeStats.majorJunction > 0 || group.typeStats.junction > 0
-            ? new AMap.Pixel(-14, -14)
+        offset: group.nodes.some(isHubNode) || group.typeStats.majorJunction > 0 || group.typeStats.junction > 0
+            ? new AMap.Pixel(-(HUB_MARKER_CONFIG.SIZE + HUB_MARKER_CONFIG.CONTAINER_PADDING) / 2, -(HUB_MARKER_CONFIG.SIZE + HUB_MARKER_CONFIG.CONTAINER_PADDING) / 2)
+            : group.typeStats.source > 0
+            ? new AMap.Pixel(-(SOURCE_MARKER_CONFIG.SIZE + SOURCE_MARKER_CONFIG.CONTAINER_PADDING) / 2, -(SOURCE_MARKER_CONFIG.SIZE + SOURCE_MARKER_CONFIG.CONTAINER_PADDING) / 2)
             : new AMap.Pixel(-20, -20),
         zIndex: 150,
         extData: { type: 'cluster', group },
@@ -789,6 +833,42 @@ function createLeaderLine(
     })
 }
 
+const PARALLEL_TRUNK_VISUAL_OFFSET_DEGREES = 0.045
+
+function getParallelTrunkOffsetFactor(line: PipelineLine): number {
+    if (getLinePipelineKind(line) !== 'trunk') return 0
+
+    const systemId = String(line.systemId || line.properties?.systemId || '').toLowerCase()
+    const category = String(line.properties?.category || line.layerName || line.properties?.layerName || line.name || '')
+
+    if (systemId === 'we1' || category.includes('西气东输一线') || category.includes('西一线')) return 1
+    if (systemId === 'we2' || category.includes('西气东输二线') || category.includes('西二线')) return -1
+
+    return 0
+}
+
+function buildVisualLinePath(line: PipelineLine): number[][] {
+    const path = line.path.map(p => [p.longitude, p.latitude])
+    const offsetFactor = getParallelTrunkOffsetFactor(line)
+    if (offsetFactor === 0 || path.length < 2) return path
+
+    const first = path[0]
+    const last = path[path.length - 1]
+    const dx = last[0] - first[0]
+    const dy = last[1] - first[1]
+    const length = Math.sqrt(dx * dx + dy * dy)
+    if (length <= 0) return path
+
+    const normalX = -dy / length
+    const normalY = dx / length
+    const offset = PARALLEL_TRUNK_VISUAL_OFFSET_DEGREES * offsetFactor
+
+    return path.map(([lng, lat]) => [
+        lng + normalX * offset,
+        lat + normalY * offset,
+    ])
+}
+
 /**
  * 创建压气站标记内容（Canvas/SVG 高清晰度版）
  */
@@ -811,6 +891,55 @@ function createCompressorMarkerContent(rotation: number = 0): HTMLElement {
     container.appendChild(icon)
 
     return container
+}
+
+export function createHubMarkerContent(isCompact = false): string {
+    const compactClass = isCompact ? ' compact' : ''
+    return `
+        <div class="hub-marker-container" title="枢纽">
+            <div class="hub-marker-glow${compactClass}"></div>
+        </div>
+    `
+}
+
+function createSourceMarkerContent(isCompact = false): string {
+    const w = isCompact ? 26 : 32
+    const h = isCompact ? 34 : 42
+    const legW = isCompact ? 2 : 2.5
+    const braceW = isCompact ? 0.8 : 1
+    return `
+        <div class="source-marker-container${isCompact ? ' compact' : ''}" title="气源">
+            <svg width="${w}" height="${h}" viewBox="0 0 32 42" style="overflow:visible;" xmlns="http://www.w3.org/2000/svg">
+                <!-- 外发光 -->
+                <circle cx="16" cy="30" r="15" fill="none" stroke="rgba(255,140,0,0.18)" stroke-width="1"/>
+                <!-- 地面 -->
+                <ellipse cx="16" cy="40.5" rx="12" ry="1.5" fill="rgba(255,140,0,0.22)"/>
+
+                <!-- 火焰（带内焰镂空） -->
+                <path fill-rule="evenodd" fill="#FF4500" stroke="#FF8C00" stroke-width="0.5"
+                  d="M16,0 C14,2.5 13.3,4.5 14.2,7 C13.2,6 12.3,8 13.3,9.3 C14.3,10.2 15.3,9.3 16,8 C16.7,9.3 17.7,10.2 18.7,9.3 C19.7,8 18.8,6 17.8,7 C18.7,4.5 18,2.5 16,0Z
+                     M16,3.2 C15.5,4 15.4,4.8 15.7,5.5 C15.4,5.2 15.1,5.9 15.4,6.3 C15.7,6.7 16,6.3 16,5.9 C16,6.3 16.3,6.7 16.6,6.3 C16.9,5.9 16.6,5.2 16.3,5.5 C16.6,4.8 16.5,4 16,3.2Z"
+                />
+
+                <!-- 顶部平台 -->
+                <rect x="10" y="11" width="12" height="3" rx="0.5" fill="#e2e8f0"/>
+
+                <!-- 塔腿（向外扩） -->
+                <line x1="10" y1="14" x2="4" y2="39" stroke="#e2e8f0" stroke-width="${legW}" stroke-linecap="round"/>
+                <line x1="22" y1="14" x2="28" y2="39" stroke="#e2e8f0" stroke-width="${legW}" stroke-linecap="round"/>
+
+                <!-- 交叉支撑 X1（上） -->
+                <line x1="7" y1="17" x2="25" y2="22" stroke="#94a3b8" stroke-width="${braceW}"/>
+                <line x1="7" y1="22" x2="25" y2="17" stroke="#94a3b8" stroke-width="${braceW}"/>
+                <!-- 交叉支撑 X2（中） -->
+                <line x1="6" y1="23" x2="26" y2="28" stroke="#94a3b8" stroke-width="${braceW}"/>
+                <line x1="6" y1="28" x2="26" y2="23" stroke="#94a3b8" stroke-width="${braceW}"/>
+                <!-- 交叉支撑 X3（下） -->
+                <line x1="5" y1="29" x2="27" y2="34" stroke="#94a3b8" stroke-width="${braceW}"/>
+                <line x1="5" y1="34" x2="27" y2="29" stroke="#94a3b8" stroke-width="${braceW}"/>
+            </svg>
+        </div>
+    `
 }
 
 /**
@@ -845,18 +974,39 @@ function createOffsetNodeMarker(
     if (!AMap) return []
 
     const rawType = getNodeRawType(node)
+    const isSource = isSourceNode(node)
     const isCompressor = isCompressorNode(node)
     const isDistribution = isDistributionNode(node)
-    // 枢纽判断：API 返回的 isHub 标记
-    const nodeAny = node as any
-    const isHub = nodeAny.isHub === true
-    const isJunction = nodeAny.hubInfo?.isJunction === true || rawType === 'junction'
-    const isMajorJunction = isMajorJunctionNode(node)
+    const isHub = isHubNode(node)
 
     let marker: any
     let markerSize: number  // 用于计算 offset 居中
 
-    if (isCompressor) {
+    if (isSource) {
+        markerSize = SOURCE_MARKER_CONFIG.SIZE + SOURCE_MARKER_CONFIG.CONTAINER_PADDING
+        marker = new AMap.Marker({
+            position: [position.longitude, position.latitude],
+            content: createSourceMarkerContent(false),
+            offset: new AMap.Pixel(-markerSize / 2, -markerSize / 2),
+            draggable: true,
+            cursor: 'move',
+            zIndex: 151,
+            extData: { node },
+        zooms: [2, 30]
+    })
+    } else if (isHub) {
+        markerSize = HUB_MARKER_CONFIG.SIZE + HUB_MARKER_CONFIG.CONTAINER_PADDING
+        marker = new AMap.Marker({
+            position: [position.longitude, position.latitude],
+            content: createHubMarkerContent(false),
+            offset: new AMap.Pixel(-markerSize / 2, -markerSize / 2),
+            draggable: true,
+            cursor: 'move',
+            zIndex: 150,
+            extData: { node },
+        zooms: [2, 30]
+    })
+    } else if (isCompressor) {
         let rotation = 0;
 
         // 自动根据相连的管线计算朝向角度，修正固定90度导致的重叠和错误横置问题
@@ -919,22 +1069,6 @@ function createOffsetNodeMarker(
             extData: { node },
         zooms: [2, 30]
     })
-    } else if (isHub) {
-        // 枢纽节点：菱形图标
-        const hubSize = isMajorJunction ? 22 : isJunction ? 18 : 14
-        const hubColor = isMajorJunction ? '#ffb703' : isJunction ? '#00e5ff' : '#ffd700'
-        const junctionClass = isJunction ? ' hub-marker-junction' : ''
-        markerSize = hubSize + 4
-        marker = new AMap.Marker({
-            position: [position.longitude, position.latitude],
-            content: `<div class="hub-marker${junctionClass}" style="width:${markerSize}px;height:${markerSize}px;display:flex;align-items:center;justify-content:center;"><div class="hub-marker-diamond" style="width:${hubSize}px;height:${hubSize}px;background:${hubColor};"></div></div>`,
-            offset: new AMap.Pixel(-markerSize / 2, -markerSize / 2),
-            draggable: true,
-            cursor: 'move',
-            zIndex: 145,
-            extData: { node },
-        zooms: [2, 30]
-    })
     } else {
         markerSize = 10
         marker = new AMap.Marker({
@@ -956,7 +1090,11 @@ function createOffsetNodeMarker(
     const text = new AMap.Text({
         text: node.name,
         position: [position.longitude, position.latitude],
-        offset: isCompressor
+        offset: isSource
+            ? new AMap.Pixel(0, SOURCE_MARKER_CONFIG.SIZE / 2 + 6)
+            : isHub
+            ? new AMap.Pixel(0, HUB_MARKER_CONFIG.SIZE / 2 + 6)
+            : isCompressor
             ? new AMap.Pixel(0, COMPRESSOR_ICON_CONFIG.HEIGHT / 2 + 5)
             : new AMap.Pixel(0, -15),
         style: {
@@ -1033,7 +1171,7 @@ export function renderPipelineLines(
                     const strokeStyle = line.status === PipelineStatus.MAINTENANCE ? 'dashed' : 'solid'
                     const isBranch = getLinePipelineKind(line) === 'branch'
                     const baseWidth = isBranch ? 3 : (line.pressureLevel === PressureLevel.HIGH ? 7 : 5)
-                    const path = line.path.map(p => [p.longitude, p.latitude])
+                    const path = buildVisualLinePath(line)
 
                     const haloPolyline = new AMap.Polyline({
                         path,
@@ -1125,7 +1263,7 @@ function mergeLinesIntoContinuousPaths(lines: PipelineLine[], nodes: PipelineNod
         nodes.forEach(node => {
             const rawType = getNodeRawType(node)
             // 压气站、分输站、首末站、明确标注为枢纽的点，强制作为打断和发射的起点
-            if (rawType === 'compressor' || rawType === 'distribution' || rawType === 'source' || rawType === 'junction' || isMajorJunctionNode(node)) {
+            if (rawType === 'compressor' || rawType === 'distribution' || isSourceNode(node) || rawType === 'junction' || isMajorJunctionNode(node)) {
                 hubNodeIds.add(node.id)
             }
         })
@@ -1214,7 +1352,7 @@ function mergeLinesIntoContinuousPaths(lines: PipelineLine[], nodes: PipelineNod
             for (let i = 0; i < currentChain.length; i++) {
                 const line = currentChain[i]
                 length += line.length || 10000
-                const pts = line.path.map(p => [p.longitude, p.latitude])
+                const pts = buildVisualLinePath(line)
                 if (i > 0 && pts.length > 0) {
                     pts.shift() // 去除连接点重复坐标
                 }

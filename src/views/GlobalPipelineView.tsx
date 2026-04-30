@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, lazy, Suspense, useEffect } from 'react'
+import React, { useMemo, useState, useCallback, lazy, Suspense, useEffect, useRef } from 'react'
 import MapView from '@/components/map-view/MapView'
 import {
     buildInitialLayerVisibility,
@@ -32,6 +32,31 @@ import { getNodeRawType } from '@/utils/pipelineDomain'
 import { getJunctionKind } from '@/utils/pipelineDomain'
 
 const noop = () => {}
+
+type HubNodeType = 'source' | 'compressor' | 'junction' | 'distribution'
+
+const CORE_SOURCE_STATION_NAMES = [
+    '霍尔果斯',
+    '轮南',
+    '瑞丽',
+    '黑河',
+]
+
+const CORE_HUB_STATION_NAMES = [
+    '中卫',
+    '靖边',
+    '安平',
+    '永清',
+    '贵阳',
+    '广州',
+    '贵港',
+    '南昌',
+    '平顶山',
+    '薛店',
+    '泰安',
+    '甪直',
+    '嘉兴',
+]
 
 type TrendChartStation = {
     name: string
@@ -837,6 +862,10 @@ const GlobalPipelineView: React.FC = () => {
 
     const [mapInstance, setMapInstance] = useState<any>(null)
     const [selectedMapNode, setSelectedMapNode] = useState<PipelineNode | null>(null)
+    const [nodeDisplayMode, setNodeDisplayMode] = useState<'full' | 'hub'>('hub')
+    const [hubNodeTypes, setHubNodeTypes] = useState<HubNodeType[]>(['source', 'compressor', 'junction', 'distribution'])
+    const [isHubMenuOpen, setIsHubMenuOpen] = useState(false)
+    const hubMenuRef = useRef<HTMLDivElement>(null)
 
     const [showScada, setShowScada] = useState(false)
     const [showWe2Scada, setShowWe2Scada] = useState(false)
@@ -871,6 +900,21 @@ const GlobalPipelineView: React.FC = () => {
         setIsDraggingHistory(true)
         historyOffsetRef.current = { x: e.clientX - historyChartPos.x, y: e.clientY - historyChartPos.y }
     }
+
+    useEffect(() => {
+        const onDocumentMouseDown = (event: MouseEvent) => {
+            if (!hubMenuRef.current) return
+            if (!hubMenuRef.current.contains(event.target as Node)) {
+                setIsHubMenuOpen(false)
+            }
+        }
+        document.addEventListener('mousedown', onDocumentMouseDown)
+        return () => document.removeEventListener('mousedown', onDocumentMouseDown)
+    }, [])
+
+    const toggleHubNodeType = useCallback((type: HubNodeType) => {
+        setHubNodeTypes(prev => prev.includes(type) ? prev.filter(item => item !== type) : [...prev, type])
+    }, [])
     // 统一的指标点击处理函数
     const handleMetricClick = useCallback((stationName: string, metricType: 'pressure' | 'temperature' | 'dewpoint', baseValue: number) => {
         setHistoryTarget({ stationName, metricType, baseValue })
@@ -1772,6 +1816,114 @@ const GlobalPipelineView: React.FC = () => {
                     </div>
                     {/* 右侧工具栏 */}
                     <div className="flex items-center gap-3">
+                        <div className="relative" ref={hubMenuRef}>
+                            <button
+                                onClick={() => {
+                                    if (nodeDisplayMode === 'hub') {
+                                        setIsHubMenuOpen(prev => !prev)
+                                    } else {
+                                        setNodeDisplayMode('hub')
+                                    }
+                                }}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border ${nodeDisplayMode === 'hub' ? 'bg-cyan-500/15 border-cyan-400/40 text-cyan-200' : 'bg-emerald-500/10 border-emerald-400/30 text-emerald-200'}`}
+                                title={nodeDisplayMode === 'hub' ? '点击展开枢纽筛选菜单' : '当前显示全量节点，点击切回枢纽精简'}
+                            >
+                                <span className="material-symbols-outlined text-base">hub</span>
+                                <span>枢纽精简</span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/80">
+                                    {hubNodeTypes.length}
+                                </span>
+                                <span className="material-symbols-outlined text-sm">expand_more</span>
+                            </button>
+                            {isHubMenuOpen && nodeDisplayMode === 'hub' && (
+                                <div className="absolute right-0 top-[42px] z-50 w-72 rounded-xl border border-cyan-500/25 bg-[#0c1218]/95 backdrop-blur-md shadow-2xl p-2">
+                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                        <span className="text-[11px] text-cyan-200 font-semibold">保留哪些节点</span>
+                                        <button
+                                            onClick={() => setNodeDisplayMode('full')}
+                                            className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-200 border border-emerald-400/30"
+                                        >
+                                            全量
+                                        </button>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {[
+                                            { type: 'source' as HubNodeType, label: '气源站', color: '#34d399' },
+                                            { type: 'compressor' as HubNodeType, label: '压气站', color: '#f59e0b' },
+                                            { type: 'junction' as HubNodeType, label: '枢纽站', color: '#00e5ff' },
+                                            { type: 'distribution' as HubNodeType, label: '分输站', color: '#22c55e' },
+                                        ].map(item => {
+                                            const checked = hubNodeTypes.includes(item.type)
+                                            return (
+                                                <button
+                                                    key={item.type}
+                                                    onClick={() => toggleHubNodeType(item.type)}
+                                                    className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left text-xs transition-all border ${checked ? 'bg-cyan-500/10 border-cyan-400/30 text-white' : 'bg-white/5 border-white/10 text-gray-400 hover:text-gray-200'}`}
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                                                        {item.label}
+                                                    </span>
+                                                    <span className="material-symbols-outlined text-sm">{checked ? 'check_circle' : 'radio_button_unchecked'}</span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                    <div className="flex gap-2 mt-2">
+                                        <button
+                                            onClick={() => setHubNodeTypes(['source', 'compressor', 'junction', 'distribution'])}
+                                            className="flex-1 px-2 py-1.5 rounded-lg text-[10px] bg-slate-800/80 text-slate-200 border border-white/10"
+                                        >
+                                            全选
+                                        </button>
+                                        <button
+                                            onClick={() => setHubNodeTypes([])}
+                                            className="flex-1 px-2 py-1.5 rounded-lg text-[10px] bg-slate-800/80 text-slate-200 border border-white/10"
+                                        >
+                                            全不选
+                                        </button>
+                                    </div>
+                                    <div className="mt-2 rounded-lg border border-emerald-400/15 bg-emerald-500/5 p-2">
+                                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                                            <span className="text-[11px] text-emerald-200 font-semibold">气源站名单</span>
+                                            <span className="text-[10px] text-emerald-100/70">{CORE_SOURCE_STATION_NAMES.length} 个</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1">
+                                            {CORE_SOURCE_STATION_NAMES.map(name => (
+                                                <span
+                                                    key={name}
+                                                    className={`px-1.5 py-0.5 rounded text-[10px] border ${hubNodeTypes.includes('source') ? 'bg-emerald-400/12 border-emerald-300/25 text-emerald-100' : 'bg-slate-800/60 border-white/10 text-slate-500'}`}
+                                                >
+                                                    {name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <div className="mt-1.5 text-[10px] text-slate-400 leading-relaxed">
+                                            勾选“气源站”时，这些供气入口保留为绿色气滴。
+                                        </div>
+                                    </div>
+                                    <div className="mt-2 rounded-lg border border-cyan-400/15 bg-cyan-500/5 p-2">
+                                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                                            <span className="text-[11px] text-cyan-200 font-semibold">枢纽站名单</span>
+                                            <span className="text-[10px] text-cyan-100/70">{CORE_HUB_STATION_NAMES.length} 个</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1">
+                                            {CORE_HUB_STATION_NAMES.map(name => (
+                                                <span
+                                                    key={name}
+                                                    className={`px-1.5 py-0.5 rounded text-[10px] border ${hubNodeTypes.includes('junction') ? 'bg-yellow-400/12 border-yellow-300/25 text-yellow-100' : 'bg-slate-800/60 border-white/10 text-slate-500'}`}
+                                                >
+                                                    {name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                        <div className="mt-1.5 text-[10px] text-slate-400 leading-relaxed">
+                                            勾选“枢纽站”时，这些核心枢纽保留为黄菱形；不勾选时，只看管线流动，不单独显示枢纽点。
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                         {/* 甪直站历史数据入口 */}
                         <button
                             onClick={() => {
@@ -1820,6 +1972,8 @@ const GlobalPipelineView: React.FC = () => {
             {/* 地图 */}
             <MapView
                 pipelineData={pipelineData}
+                nodeDisplayMode={nodeDisplayMode}
+                hubNodeTypes={hubNodeTypes}
                 onLoad={handleMapLoad}
                 onNodeClick={handleMapNodeClick}
             />

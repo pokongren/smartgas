@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlmodel import Session, select
 
 from app.database import get_session
-from app.models import PipelineSystem, Station, Pipeline
+from app.models import PipelineSystem, Station, Pipeline, GasSource
 from app.services.junction_groups import load_runtime_junction_groups
 from app.services.we1_pilot_service import (
     list_we1_pilots,
@@ -33,6 +33,16 @@ router = APIRouter(prefix="/api")
 PIPELINE_SYSTEM_COLOR_OVERRIDES: Dict[str, str] = {
     "we1": "#10b981",
     "we2": "#3b82f6",
+}
+
+# 国家级干线枢纽白名单（压气站/首末站/关键分输站）
+# 这些站点在地图中统一渲染为黄色菱形枢纽标记
+HUB_STATION_NAMES: set[str] = {
+    "霍尔果斯压气站", "轮南压气站", "中卫压气站", "靖边压气站",
+    "安平压气站", "永清压气站", "黑河压气站", "贵阳压气站",
+    "瑞丽", "广州压气站", "贵港压气站", "南昌压气站",
+    "平顶山压气站", "薛店", "泰安压气站", "甪直",
+    "嘉兴",
 }
 
 
@@ -96,23 +106,30 @@ def get_pipeline_packages(
     if not systems:
         return []
     
-    # 预加载所有站场和管段（避免 N+1 查询）
+    # 预加载所有站场、管段和气源（避免 N+1 查询）
     all_stations = session.exec(select(Station)).all()
     all_pipelines = session.exec(select(Pipeline)).all()
+    all_gas_sources = session.exec(select(GasSource)).all()
     
     # 构建站场索引（按 ID 快速查找）
     station_map: Dict[str, Station] = {s.id: s for s in all_stations}
     
-    # 计算节点度数（用于枢纽标记）
+    # 构建气源索引（按 station_id 快速查找）
+    gas_source_by_station: Dict[str, GasSource] = {
+        gs.station_id: gs for gs in all_gas_sources if gs.station_id
+    }
+    
+    # 计算节点度数（仅用于元数据展示，不再作为枢纽判定条件）
     node_degree: Dict[str, int] = defaultdict(int)
     for p in all_pipelines:
         node_degree[p.start_station_id] += 1
         node_degree[p.end_station_id] += 1
     
-    # 收集 junction_groups 中的枢纽站场，并构造“超级节点”
+    # 收集运行时枢纽白名单，并构造“超级节点”
     junction_station_ids: set[str] = set()
     junction_names: Dict[str, str] = {}  # station_id → 枢纽名
     station_to_junction_id: Dict[str, str] = {}
+    station_to_junction_kind: Dict[str, str] = {}
     junction_nodes: Dict[str, Dict[str, Any]] = {}
     try:
         all_junctions = load_runtime_junction_groups(session)
@@ -121,6 +138,14 @@ def get_pipeline_packages(
             member_stations = [station_map[sid] for sid in ids if sid in station_map]
             if not member_stations:
                 continue
+            for sid in ids:
+                junction_station_ids.add(sid)
+                junction_names[sid] = jg["name"]
+                station_to_junction_kind[sid] = jg.get("junction_kind", "junction")
+
+            if len(member_stations) < 2:
+                continue
+
             junction_id = f"JUNCTION-{jg['id']}"
             center_lng = sum(st.longitude for st in member_stations) / len(member_stations)
             center_lat = sum(st.latitude for st in member_stations) / len(member_stations)
@@ -155,8 +180,6 @@ def get_pipeline_packages(
                 },
             }
             for sid in ids:
-                junction_station_ids.add(sid)
-                junction_names[sid] = jg["name"]
                 station_to_junction_id[sid] = junction_id
     except Exception:
         pass  # junction_groups 表可能未创建
@@ -185,10 +208,14 @@ def get_pipeline_packages(
     result = []
     
     def _build_node(s: Station, layer_name: str) -> Dict[str, Any]:
-        """构建节点字典（含枢纽标记）"""
+        """构建节点字典（含枢纽标记和气源信息）"""
         degree = node_degree.get(s.id, 0)
         is_junction = s.id in junction_station_ids
-        is_hub = (degree >= 3 and s.type != 'valve') or is_junction
+        is_whitelist_hub = s.name in HUB_STATION_NAMES
+        is_hub = is_junction or is_whitelist_hub
+        
+        # 检查是否关联气源
+        gas_source = gas_source_by_station.get(s.id)
         
         node = {
             "id": s.id,
@@ -208,11 +235,31 @@ def get_pipeline_packages(
                 "layerName": layer_name,
             },
         }
+        
+        # 附加气源信息
+        if gas_source:
+            node["properties"]["gasSource"] = {
+                "id": gas_source.id,
+                "name": gas_source.name,
+                "sourceType": gas_source.source_type,
+                "capacityMcmPerDay": gas_source.capacity_mcm_per_day,
+                "currentOutputMcmPerDay": gas_source.current_output_mcm_per_day,
+                "status": gas_source.status,
+            }
+            # 气源节点默认标记为 isHub（供应侧关键节点）
+            if not is_hub:
+                node["isHub"] = True
+                is_hub = True
+        
         if is_hub:
             node["hubInfo"] = {
                 "degree": degree,
                 "isJunction": is_junction,
+                "isWhitelistHub": is_whitelist_hub,
+                "isGasSource": gas_source is not None,
                 "junctionName": junction_names.get(s.id, ""),
+                "junctionKind": station_to_junction_kind.get(s.id, "junction"),
+                "isMajorJunction": station_to_junction_kind.get(s.id) == "major_junction",
             }
         return node
 

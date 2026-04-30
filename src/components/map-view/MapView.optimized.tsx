@@ -127,9 +127,15 @@ function MapView({
     const loadCoreSDK = useCallback(async () => {
         updateLoadingState('sdk', '加载地图 SDK...')
         
-        const amapKey = import.meta.env.VITE_AMAP_KEY || 'f60a02b69a072cb6b93d7cc4c6b0a42c';
+        const amapKey = import.meta.env.VITE_AMAP_KEY
+        const amapSecret = import.meta.env.VITE_AMAP_SECRET
+
+        if (!amapKey || !amapSecret) {
+            throw new Error('请在 .env.local 中配置 VITE_AMAP_KEY 和 VITE_AMAP_SECRET')
+        }
+
         (window as any)._AMapSecurityConfig = {
-            securityJsCode: import.meta.env.VITE_AMAP_SECRET || 'f33664d5ca92eb775080e76db01f379f',
+            securityJsCode: amapSecret,
         }
 
         // 只加载核心插件，控件和行政区划插件延迟加载

@@ -401,3 +401,48 @@ class TopologyCorrectionLog(SQLModel, table=True):
     status: str = Field(default="pending", title="状态", description="pending / applied / rejected")
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     applied_at: Optional[str] = Field(default=None, title="应用时间")
+
+
+class GasSource(SQLModel, table=True):
+    """气源表
+    
+    独立于 stations 表，专门存储天然气气源的供应侧信息。
+    一个气源通常对应一个首站/压气站（通过 station_id 关联）。
+    """
+    __tablename__ = "gas_sources"
+    id: str = Field(primary_key=True, title="气源编号")
+    name: str = Field(index=True, title="气源名称")
+    station_id: Optional[str] = Field(
+        default=None, foreign_key="stations.id", title="关联站场ID"
+    )
+    source_type: str = Field(
+        default="domestic",
+        title="气源类型",
+        description="domestic(国产常规气), imported_pipeline(进口管道气), lng(LNG), shale(页岩气), coalbed(煤层气), synthetic(煤制气/合成气), other(其他)"
+    )
+    capacity_mcm_per_day: Optional[float] = Field(
+        default=None, title="日供气能力(百万立方米)"
+    )
+    current_output_mcm_per_day: Optional[float] = Field(
+        default=None, title="当前日产量(百万立方米)"
+    )
+    proven_reserves_tcm: Optional[float] = Field(
+        default=None, title="探明储量(万亿立方米)"
+    )
+    reserve_years: Optional[float] = Field(
+        default=None, title="可采年限"
+    )
+    operator: Optional[str] = Field(
+        default=None, title="运营方"
+    )
+    province: Optional[str] = Field(
+        default=None, title="所在省份"
+    )
+    status: str = Field(
+        default="active",
+        title="状态",
+        description="active(在产), planned(规划), depleted(枯竭), maintenance(检修)"
+    )
+    properties: Optional[str] = Field(
+        default=None, title="扩展属性(JSON)"
+    )

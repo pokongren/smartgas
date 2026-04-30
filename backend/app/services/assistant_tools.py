@@ -7,12 +7,16 @@ import json
 import logging
 import math
 import re
+import time
 from typing import Any
 from datetime import datetime, timedelta
 
+from sqlalchemy import or_
 from sqlmodel import Session, select
 
 from app.database import scada_history_engine
+from app.models import Pipeline, PipelineSystem, Station
+from app.scada_models import ScadaHistory
 from app.routers.topology_simulation import (
     InitialConditionsInput,
     _apply_initial_conditions,
@@ -54,9 +58,29 @@ SCADA_PIPELINE_PREFIXES = (
     "陕京",
     "忠武",
 )
+SEARCH_ALIAS_MAP = {
+    "压缩机": ("压气站", "机组", "压机"),
+    "压气站": ("压缩机", "机组", "压机"),
+    "分输口": ("分输站", "用户", "下载点", "下载用户"),
+    "分输站": ("分输口", "用户", "下载点", "下载用户"),
+    "鼓浪": ("古浪",),
+    "古浪": ("鼓浪",),
+}
 # ============ 工具定义（供 AI System Prompt 使用） ============
 
 TOOL_DEFINITIONS = [
+    {
+        "name": "universal_search",
+        "description": (
+            "全域检索入口。用户说查不到、搜一下、找某个站/管线/用户/参数/预案时优先调用。"
+            "它会同时检索站场、管线、分输用户、拓扑主库、SCADA 历史站名和规程知识库，并返回每个来源的命中情况。"
+        ),
+        "parameters": {
+            "query": {"description": "用户原始检索词或问题", "required": True},
+            "limit": {"description": "每类最多返回多少条，默认 8", "required": False},
+            "include_knowledge": {"description": "是否同时检索规程/预案知识库，默认 true", "required": False},
+        },
+    },
     {
         "name": "query_stations",
         "description": "查询站场列表。可按类型(type)或名称关键字(keyword)过滤。",
@@ -260,10 +284,12 @@ def build_tools_description() -> str:
     AI 会根据这些描述决定何时调用哪个工具。
     """
     lines = ["你可以使用以下工具来获取事实数据以回答用户的问题。你应该像使用知识库一样使用它们。\n"]
-    lines.append("你的系统接入了【三大知识库】：")
-    lines.append("1. **AI 索引库**（raw_excel_index + JSON cache）：通过 query_stations 等工具进行精确检索；")
-    lines.append("2. **规程向量库**（ChromaDB）：通过 search_knowledge_base 工具检索官方文档原文；")
-    lines.append("3. **拓扑关系库**（NetworkX）：通过 analyze_impact, find_routes, simulate_failure, find_critical_nodes 进行图计算推理。\n")
+    lines.append("你的系统接入了【四大知识库】：")
+    lines.append("1. **全域检索入口**：不确定该查哪个库时，先调用 universal_search；")
+    lines.append("2. **AI 索引库**（raw_excel_index + JSON cache）：通过 query_stations 等工具进行精确检索；")
+    lines.append("3. **规程向量库**（ChromaDB）：通过 search_knowledge_base 工具检索官方文档原文；")
+    lines.append("4. **拓扑关系库**（NetworkX）：通过 analyze_impact, find_routes, simulate_failure, find_critical_nodes 进行图计算推理。\n")
+    lines.append("检索策略：用户说“搜不到、查一下、有没有、在哪里、是什么、参数、压力、站场、管线、预案”且你不确定专用工具时，优先调用 universal_search。")
     lines.append("当需要查询数据或执行分析时，请输出相应的工具调用指令。\n")
     lines.append("## 可用工具\n")
 
@@ -304,6 +330,297 @@ def execute_tool(tool_name: str, args: dict[str, Any], session: Session) -> str:
     except Exception as e:
         logger.error(f"工具 {tool_name} 执行失败: {e}", exc_info=True)
         return f"工具执行出错: {str(e)}"
+
+
+def _search_key(value: Any) -> str:
+    return re.sub(r"[\s\-_/()（）【】\[\]<>《》,，.。:：;；“”\"'‘’·]+", "", str(value or "")).lower()
+
+
+def _contains_query(*values: Any, query_key: str) -> bool:
+    if not query_key:
+        return False
+    return any(query_key in _search_key(value) for value in values)
+
+
+def _expand_query_terms(query: str) -> list[str]:
+    base = str(query or "").strip()
+    if not base:
+        return []
+
+    terms: set[str] = {base}
+    compact = _search_key(base)
+    if compact:
+        terms.add(compact)
+
+    # 去掉常见后缀，提升站名命中率
+    stripped = base
+    for suffix in ("参数列表", "参数清单", "列表", "清单", "分输站", "压气站", "站", "枢纽站", "枢纽"):
+        if stripped.endswith(suffix) and len(stripped) > len(suffix):
+            stripped = stripped[: -len(suffix)]
+    if stripped and stripped != base:
+        terms.add(stripped)
+        terms.add(_search_key(stripped))
+
+    for key, aliases in SEARCH_ALIAS_MAP.items():
+        if key in base or key in compact:
+            for alias in aliases:
+                terms.add(alias)
+                terms.add(_search_key(alias))
+                terms.add(base.replace(key, alias))
+
+    return [item for item in terms if str(item).strip()]
+
+
+def _contains_any_query(values: list[Any], query_keys: list[str]) -> bool:
+    if not query_keys:
+        return False
+    value_keys = [_search_key(v) for v in values]
+    for key in query_keys:
+        if not key:
+            continue
+        for value_key in value_keys:
+            if key in value_key:
+                return True
+    return False
+
+
+def _looks_like_knowledge_query(query: str) -> bool:
+    text = str(query or "").strip()
+    if not text:
+        return False
+    keywords = ("预案", "规程", "应急", "处置", "步骤", "流程", "规范", "标准", "制度", "法规")
+    return any(k in text for k in keywords)
+
+
+def _limit_int(value: Any, default: int = 8, minimum: int = 1, maximum: int = 20) -> int:
+    try:
+        parsed = int(value)
+    except Exception:
+        parsed = default
+    return max(minimum, min(maximum, parsed))
+
+
+def _merge_by_id(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for item in items:
+        item_id = str(item.get("id") or "")
+        if not item_id or item_id in seen:
+            continue
+        seen.add(item_id)
+        merged.append(item)
+    return merged
+
+
+def _handle_universal_search(args: dict, session: Session) -> str:
+    query = str(args.get("query") or "").strip()
+    if not query:
+        return "请提供要检索的关键词。"
+
+    limit = _limit_int(args.get("limit"), default=8)
+    include_knowledge_arg = args.get("include_knowledge", None)
+    if include_knowledge_arg is None:
+        include_knowledge = _looks_like_knowledge_query(query)
+    else:
+        include_knowledge = include_knowledge_arg is not False
+    started_at = time.time()
+    query_terms = _expand_query_terms(query)
+    query_keys = [_search_key(item) for item in query_terms if _search_key(item)]
+    query_key = query_keys[0] if query_keys else _search_key(query)
+    payload: dict[str, Any] = {
+        "query": query,
+        "query_terms": query_terms[:10],
+        "limit_per_source": limit,
+        "sources": {},
+        "hit_summary": {},
+        "missed_sources": [],
+    }
+
+    raw_station_items: list[dict[str, Any]] = []
+    raw_pipeline_items: list[dict[str, Any]] = []
+    raw_user_items: list[dict[str, Any]] = []
+    for term in query_terms[:6]:
+        raw_station_items.extend(raw_excel_ai_index.find_station_candidates(term, limit=limit))
+        raw_station_items.extend(raw_excel_ai_index.query_stations(keyword=term))
+        raw_pipeline_items.extend(raw_excel_ai_index.query_pipelines(keyword=term))
+        raw_user_items.extend(raw_excel_ai_index.query_distributions(keyword=term))
+    raw_stations = _merge_by_id(raw_station_items)[:limit]
+    raw_pipelines = _merge_by_id(raw_pipeline_items)[:limit]
+    raw_users = _merge_by_id(raw_user_items)[:limit]
+
+    payload["sources"]["raw_excel_stations"] = [
+        {
+            "id": item.get("id"),
+            "name": item.get("name"),
+            "type": item.get("type_label") or STATION_TYPE_LABELS.get(item.get("type_code"), item.get("type_code")),
+            "systems": item.get("systems", [])[:3],
+            "branches": item.get("branches", [])[:3],
+        }
+        for item in raw_stations
+    ]
+    payload["sources"]["raw_excel_pipelines"] = [
+        {
+            "id": item.get("id"),
+            "name": item.get("name"),
+            "kind": item.get("kind"),
+            "scope": item.get("scope_name"),
+            "length_km": item.get("length_km"),
+            "design_pressure_mpa": item.get("design_pressure_mpa"),
+        }
+        for item in raw_pipelines
+    ]
+    payload["sources"]["raw_excel_users"] = [
+        {
+            "id": item.get("id"),
+            "name": item.get("name"),
+            "trunk_name": item.get("trunk_name"),
+            "station_abbr": item.get("station_abbr"),
+            "contract_pressure_mpa": item.get("contract_pressure_mpa"),
+        }
+        for item in raw_users
+    ]
+
+    def _sql_or_contains(columns: list[Any], terms: list[str]) -> Any:
+        conditions = []
+        for term in terms[:8]:
+            raw = str(term or "").strip()
+            if not raw:
+                continue
+            for col in columns:
+                conditions.append(col.contains(raw))
+        return or_(*conditions) if conditions else None
+
+    station_where = _sql_or_contains([Station.id, Station.name, Station.type], query_terms)
+    pipeline_where = _sql_or_contains([Pipeline.id, Pipeline.name, Pipeline.start_station_id, Pipeline.end_station_id, Pipeline.category], query_terms)
+    system_where = _sql_or_contains([PipelineSystem.id, PipelineSystem.name], query_terms)
+
+    station_stmt = select(Station)
+    if station_where is not None:
+        station_stmt = station_stmt.where(station_where)
+    db_stations = session.exec(station_stmt.limit(limit)).all()
+
+    pipeline_stmt = select(Pipeline)
+    if pipeline_where is not None:
+        pipeline_stmt = pipeline_stmt.where(pipeline_where)
+    db_pipelines = session.exec(pipeline_stmt.limit(limit)).all()
+
+    system_stmt = select(PipelineSystem)
+    if system_where is not None:
+        system_stmt = system_stmt.where(system_where)
+    db_systems = session.exec(system_stmt.limit(limit)).all()
+
+    payload["sources"]["smartgas_stations"] = [
+        {
+            "id": item.id,
+            "name": item.name,
+            "type": item.type,
+            "longitude": item.longitude,
+            "latitude": item.latitude,
+            "design_pressure": item.design_pressure,
+            "pressure_in": item.operating_pressure_in,
+            "pressure_out": item.operating_pressure_out,
+            "capacity": item.capacity,
+        }
+        for item in db_stations
+    ]
+    payload["sources"]["smartgas_pipelines"] = [
+        {
+            "id": item.id,
+            "name": item.name,
+            "start_station_id": item.start_station_id,
+            "end_station_id": item.end_station_id,
+            "length_km": item.length_km,
+            "diameter_mm": item.diameter_mm,
+            "category": item.category,
+        }
+        for item in db_pipelines
+    ]
+    payload["sources"]["pipeline_systems"] = [
+        {"id": item.id, "name": item.name, "sort_order": item.sort_order}
+        for item in db_systems
+    ]
+
+    try:
+        with Session(scada_history_engine) as scada_session:
+            scada_stmt = select(
+                ScadaHistory.station_name,
+                ScadaHistory.station_id,
+                ScadaHistory.pipeline_id,
+                ScadaHistory.metric_type,
+            ).distinct()
+            scada_where = _sql_or_contains(
+                [
+                    ScadaHistory.station_name,
+                    ScadaHistory.station_id,
+                    ScadaHistory.pipeline_id,
+                    ScadaHistory.metric_type,
+                ],
+                query_terms,
+            )
+            if scada_where is not None:
+                scada_stmt = scada_stmt.where(scada_where)
+            scada_rows = scada_session.exec(scada_stmt.limit(limit * 4)).all()
+        seen_scada: set[tuple[str, str, str, str]] = set()
+        scada_hits = []
+        for station_name, station_id, pipeline_id, metric_type in scada_rows:
+            key_tuple = (
+                str(station_name or ""),
+                str(station_id or ""),
+                str(pipeline_id or ""),
+                str(metric_type or ""),
+            )
+            if key_tuple in seen_scada:
+                continue
+            if not _contains_any_query(list(key_tuple), query_keys):
+                continue
+            seen_scada.add(key_tuple)
+            scada_hits.append(
+                {
+                    "station_name": key_tuple[0],
+                    "station_id": key_tuple[1],
+                    "pipeline_id": key_tuple[2],
+                    "metric_type": key_tuple[3],
+                }
+            )
+            if len(scada_hits) >= limit:
+                break
+        payload["sources"]["scada_history"] = scada_hits
+    except Exception as exc:
+        payload["sources"]["scada_history"] = {"error": str(exc)}
+
+    if include_knowledge:
+        knowledge_started = time.time()
+        knowledge_text = _handle_search_knowledge_base({"query": query}, session)
+        knowledge_found = "未检索到" not in knowledge_text and "执行出错" not in knowledge_text
+        payload["sources"]["knowledge_base"] = {
+            "found": knowledge_found,
+            "preview": knowledge_text[:1200],
+            "elapsed_ms": int((time.time() - knowledge_started) * 1000),
+        }
+
+    for source_name, value in payload["sources"].items():
+        if isinstance(value, list):
+            payload["hit_summary"][source_name] = len(value)
+            if not value:
+                payload["missed_sources"].append(source_name)
+        elif isinstance(value, dict) and "found" in value:
+            payload["hit_summary"][source_name] = 1 if value.get("found") else 0
+            if not value.get("found"):
+                payload["missed_sources"].append(source_name)
+        else:
+            payload["hit_summary"][source_name] = 0
+            payload["missed_sources"].append(source_name)
+
+    total_hits = sum(int(count or 0) for count in payload["hit_summary"].values())
+    payload["total_hits"] = total_hits
+    payload["elapsed_ms"] = int((time.time() - started_at) * 1000)
+    payload["guidance"] = (
+        "有命中时，回答要说明命中来源；没命中的来源也要说清楚，别直接说系统没有。"
+        if total_hits else
+        "所有已接入来源都没命中。建议提示用户换全称、简称、站场后缀或提供管线范围。"
+    )
+
+    return _json_result("全域检索结果", payload)
 
 
 def _handle_get_station_details(args: dict, session: Session) -> str:
@@ -551,10 +868,8 @@ def _handle_search_knowledge_base(args: dict, session: Session) -> str:
             return "抱歉，知识库中未检索到相关的规程与预案记载。"
             
     except Exception as e:
-        import traceback
-        err_msg = traceback.format_exc()
-        logger.error(f"知识库检索失败: {e}\n{err_msg}")
-        return f"知识库检索工具执行出错: {str(e)}\n详细错误信息: {err_msg}"
+        logger.error(f"知识库检索失败: {e}", exc_info=True)
+        return "知识库检索工具执行出错: 当前环境无法完成规程库检索，已自动降级为业务数据库检索。"
 
 
 def _handle_query_users(args: dict, session: Session) -> str:
@@ -1288,6 +1603,7 @@ def _handle_explain_flow_topology_situation(args: dict, session: Session) -> str
 
 # 工具名 → 处理函数的映射
 TOOL_HANDLERS = {
+    "universal_search": _handle_universal_search,
     "query_stations": _handle_query_stations,
     "get_station_details": _handle_get_station_details,
     "query_pipelines": _handle_query_pipelines,

@@ -14,6 +14,7 @@ import type {
   ConnectionClickEvent
 } from '@/types/hub'
 import { PortDirection, DEFAULT_HUB_VISUAL_CONFIG } from '@/types/hub'
+import { createHubMarkerContent } from '@/utils/mapRenderer'
 
 /**
  * 端口标记配置
@@ -266,28 +267,10 @@ function renderHubCenterMarker(
 ): any {
   if (!map) return null
 
-  // 根据节点类型选择颜色
-  const typeColors: Record<string, string> = {
-    'compressor': '#f59e0b',   // 橙色 - 压气站
-    'distribution': '#eab308',  // 黄色 - 分输站
-    'source': '#22c55e',       // 绿色 - 气源
-    'junction': '#3b82f6'      // 蓝色 - 枢纽
-  }
-
-  const color = typeColors[node.type] || '#f59e0b'
-
-  // 创建SVG标记 - 圆形带边框
-  const svgContent = `
-    <svg width="32" height="32" viewBox="0 0 32 32">
-      <circle cx="16" cy="16" r="12" fill="${color}" stroke="#fff" stroke-width="2"/>
-      <text x="16" y="20" text-anchor="middle" fill="#fff" font-size="10" font-weight="bold">枢纽</text>
-    </svg>
-  `
-
   const marker = new (window as any).AMap.Marker({
     position: [node.coordinate.longitude, node.coordinate.latitude],
-    content: svgContent,
-    offset: new (window as any).AMap.Pixel(-16, -16),
+    content: createHubMarkerContent(false),
+    offset: new (window as any).AMap.Pixel(-18, -18),
     zIndex: 200,
     clickable: true,
     title: node.name  // 鼠标悬停显示名称

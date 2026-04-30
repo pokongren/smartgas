@@ -182,6 +182,11 @@ def _apply_yuqian_style(reply: str) -> str:
     return f"{prefixes[0]}{text}"
 
 
+def _is_raw_excel_negative_lookup(reply: str | None) -> bool:
+    text = (reply or "").strip()
+    return "当前没找到" in text and "AI 索引库" in text
+
+
 @router.post("/chat")
 async def chat(
     request: ChatRequest,
@@ -261,12 +266,17 @@ async def chat(
         return StreamingResponse(direct_list_gen(), media_type="text/event-stream")
 
     direct_lookup_reply = try_raw_excel_direct_entity_lookup(msg_clean)
-    if direct_lookup_reply:
+    if direct_lookup_reply and not _is_raw_excel_negative_lookup(direct_lookup_reply):
 
         async def direct_gen():
             yield f"[REPLY] {json.dumps(_apply_yuqian_style(direct_lookup_reply), ensure_ascii=False)}\n"
 
         return StreamingResponse(direct_gen(), media_type="text/event-stream")
+    if _is_raw_excel_negative_lookup(direct_lookup_reply):
+        return StreamingResponse(
+            _universal_search_event_generator(message=msg_clean, session=session),
+            media_type="text/event-stream",
+        )
 
     luzhi_pilot_reply = try_luzhi_pilot_reply(request.context, msg_clean)
     if luzhi_pilot_reply:
@@ -407,7 +417,7 @@ def _resolve_direct_reply(message: str) -> str | None:
         return _apply_yuqian_style(direct_list_reply)
 
     direct_lookup_reply = try_raw_excel_direct_entity_lookup(msg_clean)
-    if direct_lookup_reply:
+    if direct_lookup_reply and not _is_raw_excel_negative_lookup(direct_lookup_reply):
         return _apply_yuqian_style(direct_lookup_reply)
 
     return None
@@ -2491,6 +2501,29 @@ async def _legacy_event_generator(request: ChatRequest, session: Session):
         logger.error("Legacy AI stream failed: %s", exc, exc_info=True)
         err_text = f"处理出错：{exc}"
         yield f"[REPLY] {json.dumps(err_text, ensure_ascii=False)}\n"
+
+
+async def _universal_search_event_generator(message: str, session: Session):
+    yield "[TOOL] universal_search\n"
+    tool_result = execute_tool(
+        "universal_search",
+        {"query": message, "limit": 10, "include_knowledge": True},
+        session,
+    )
+    prompt = (
+        "用户的问题先被 raw_excel 快速索引判定为未命中，所以系统改用全域检索。"
+        "下面是全域检索结果，请用中文人话回答用户。"
+        "要求：先说结论；说明哪些库命中了；如果没命中，要说已经查过哪些来源；"
+        "不要说成系统没有，除非所有来源都没命中。\n\n"
+        f"用户原话：{message}\n\n"
+        f"{tool_result}"
+    )
+    try:
+        async for chunk in ai_client.chat_stream(prompt=prompt, temperature=0.45, max_tokens=1200):
+            yield f"[REPLY] {json.dumps(chunk, ensure_ascii=False)}\n"
+    except Exception as exc:
+        logger.warning("Universal search AI summary failed: %s", exc)
+        yield f"[REPLY] {json.dumps(tool_result, ensure_ascii=False)}\n"
 
 
 async def _orchestrated_event_generator(request: ChatRequest, session: Session):

@@ -141,13 +141,14 @@ def _parse_direct_collection_request(message: str) -> dict[str, str] | None:
     scope = _extract_pipeline_scope(normalized)
 
     station_patterns = [
-        ("compressor", TEXT_COMPRESSOR),
-        ("distribution", TEXT_DISTRIBUTION),
-        ("source", TEXT_SOURCE),
-        ("valve", TEXT_VALVE),
+        ("compressor", (TEXT_COMPRESSOR, "压缩机", "机组", "压机")),
+        ("distribution", (TEXT_DISTRIBUTION, "分输口", "用户", "下载点")),
+        ("source", (TEXT_SOURCE,)),
+        ("valve", (TEXT_VALVE, "阀厅")),
     ]
-    for station_type, label in station_patterns:
-        if label in normalized:
+    for station_type, labels in station_patterns:
+        if any(alias in normalized for alias in labels):
+            label = labels[0]
             request = {"kind": "stations", "station_type": station_type, "label": label}
             if scope:
                 request.update(scope)
@@ -441,11 +442,15 @@ def _extract_entity_lookup_name(message: str) -> str | None:
 
 def _normalize_entity_name(name: str) -> str:
     normalized = re.sub(r"(\u7684\u60c5\u51b5|\u8fd9\u4e2a|\u8fd9\u4e2a\u7ad9)$", "", name.strip())
+    normalized = re.sub(r"(参数列表|参数清单|列表|清单)$", "", normalized)
     generic_names = {
         "\u7ad9",
         TEXT_STATION,
         TEXT_DISTRIBUTION,
         TEXT_COMPRESSOR,
+        "压缩机",
+        "机组",
+        "压机",
         TEXT_VALVE,
         "\u6e05\u7ba1\u7ad9",
         "\u5929\u7136\u6c14\u7ad9",

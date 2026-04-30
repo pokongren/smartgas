@@ -49,6 +49,12 @@ SCOPE_ALIAS_OVERRIDES = {
 STATION_SUFFIXES = ("分输站", "压气站", "清管站", "阀室", "站场", "站")
 MARKER_SUFFIX_RE = re.compile(r"[●▲■◆★☆○◎◇△▽□]+$")
 NON_WORD_RE = re.compile(r"[\s\-_/()（）【】\[\]<>《》,，.。:：;；“”\"'‘’·]+")
+STATION_NAME_VARIANT_MAP = {
+    "鼓浪": {"古浪"},
+    "古浪": {"鼓浪"},
+    "甪直": {"中俄甪直", "甪直枢纽站", "甪直分输站"},
+    "中卫": {"中卫压气站", "中卫分输站"},
+}
 
 
 def _to_text(value: Any) -> str:
@@ -87,6 +93,27 @@ def _root_station_name(name: str) -> str:
         if text.endswith(suffix) and len(text) > len(suffix):
             return text[: -len(suffix)]
     return text
+
+
+def _build_station_lookup_variants(value: str) -> list[str]:
+    text = _clean_station_name(value)
+    if not text:
+        return []
+
+    variants: set[str] = {text, _root_station_name(text)}
+    for suffix in STATION_SUFFIXES:
+        if text.endswith(suffix) and len(text) > len(suffix):
+            variants.add(text[: -len(suffix)])
+        else:
+            variants.add(f"{text}{suffix}")
+
+    # 口语/别名互转：鼓浪<->古浪等
+    for item in list(variants):
+        if item in STATION_NAME_VARIANT_MAP:
+            variants.update(STATION_NAME_VARIANT_MAP[item])
+
+    normalized = {_normalize_text(item) for item in variants if item}
+    return [item for item in normalized if item]
 
 
 def _natural_sort_key(value: str) -> list[object]:
@@ -215,12 +242,8 @@ class RawExcelAiIndex:
         if not lookup_key:
             return []
 
-        variants = {_normalize_text(station_name)}
-        root_name = _root_station_name(station_name)
-        if root_name:
-            variants.add(_normalize_text(root_name))
-        for suffix in STATION_SUFFIXES:
-            variants.add(_normalize_text(f"{root_name or station_name}{suffix}"))
+        variants = set(_build_station_lookup_variants(station_name))
+        variants.add(lookup_key)
 
         scored: list[tuple[tuple[int, int, int], dict[str, Any]]] = []
         for item in self.station_catalog:
@@ -228,6 +251,19 @@ class RawExcelAiIndex:
             if not any(variant and variant in search_text for variant in variants):
                 continue
             scored.append((self._score_station_candidate(station_name, item), item))
+
+        # 第一轮没命中时，给一个弱模糊兜底，避免“完全卡壳”
+        if not scored:
+            fallback_scored: list[tuple[tuple[int, int, int], dict[str, Any]]] = []
+            for item in self.station_catalog:
+                station_key = _normalize_text(_root_station_name(item.get("name", "")))
+                if not station_key:
+                    continue
+                overlap = len(set(lookup_key) & set(station_key))
+                if overlap < max(2, len(lookup_key) // 2):
+                    continue
+                fallback_scored.append((self._score_station_candidate(station_name, item), item))
+            scored = fallback_scored
 
         scored.sort(key=lambda pair: pair[0])
         return [item for _, item in scored[:limit]]
@@ -241,6 +277,34 @@ class RawExcelAiIndex:
             return None
         if len(candidates) == 1:
             return candidates[0]
+
+        # 同名多记录（常见于跨干线同名站）时，优先直接返回最匹配的一条
+        query_norm = _normalize_text(station_name)
+        same_name = [item for item in candidates if _normalize_text(item.get("name", "")) == query_norm]
+        if same_name:
+            ranked_same = sorted(same_name, key=lambda item: self._score_station_candidate(station_name, item))
+            return ranked_same[0]
+
+        query_root = _normalize_text(_root_station_name(station_name))
+        same_root = [item for item in candidates if _normalize_text(_root_station_name(item.get("name", ""))) == query_root]
+        if same_root:
+            ranked_root = sorted(same_root, key=lambda item: self._score_station_candidate(station_name, item))
+            return ranked_root[0]
+
+        # 候选里如果某个站名明显重复出现，说明是高概率命中（只是跨干线多条记录）
+        name_freq: dict[str, int] = {}
+        for item in candidates:
+            key = _normalize_text(item.get("name", ""))
+            if not key:
+                continue
+            name_freq[key] = name_freq.get(key, 0) + 1
+        if name_freq:
+            top_name, top_freq = max(name_freq.items(), key=lambda pair: pair[1])
+            if top_freq >= 2:
+                frequent = [item for item in candidates if _normalize_text(item.get("name", "")) == top_name]
+                frequent_ranked = sorted(frequent, key=lambda item: self._score_station_candidate(station_name, item))
+                if frequent_ranked:
+                    return frequent_ranked[0]
 
         ranked = sorted(candidates, key=lambda item: self._score_station_candidate(station_name, item))
         best_score = self._score_station_candidate(station_name, ranked[0])

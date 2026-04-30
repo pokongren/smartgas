@@ -14,6 +14,8 @@ const SOURCE_KEYWORDS = [
 ]
 const BRANCH_KEYWORDS = ['\u652f\u7ebf']
 const INTERCONNECT_KEYWORDS = ['\u8054\u7edc', '\u4e92\u8054']
+const CORE_SOURCE_STATION_KEYWORDS = ['霍尔果斯', '轮南', '瑞丽', '黑河']
+const SPECIAL_STYLE_EXCLUDED_STATION_KEYWORDS = ['哈密']
 
 function toRawStationType(value: unknown): RawStationType | undefined {
     if (typeof value !== 'string') return undefined
@@ -48,6 +50,14 @@ function includesAnyKeyword(text: string, keywords: string[]): boolean {
     return keywords.some(keyword => text.includes(keyword))
 }
 
+function isCoreSourceStationName(name: string): boolean {
+    return includesAnyKeyword(name || '', CORE_SOURCE_STATION_KEYWORDS)
+}
+
+function isSpecialStyleExcludedStationName(name: string): boolean {
+    return includesAnyKeyword(name || '', SPECIAL_STYLE_EXCLUDED_STATION_KEYWORDS)
+}
+
 function readNodeRawType(node: PipelineNode): RawStationType | undefined {
     const directRawType = toRawStationType(node.rawType)
     if (directRawType) return directRawType
@@ -73,6 +83,8 @@ function readLinePipelineKind(line: PipelineLine): PipelineKind | undefined {
 }
 
 export function getNodeRawType(node: PipelineNode): RawStationType {
+    if (isSpecialStyleExcludedStationName(node.name)) return inferNodeRawTypeFromName(node.name)
+    if (isCoreSourceStationName(node.name)) return 'source'
     return readNodeRawType(node) || inferNodeRawTypeFromName(node.name)
 }
 
@@ -89,6 +101,8 @@ export function getLinePipelineKind(line: PipelineLine): PipelineKind {
 }
 
 export function getJunctionKind(node: PipelineNode): JunctionKind | undefined {
+    if (isSpecialStyleExcludedStationName(node.name)) return undefined
+
     const hubInfo = node.hubInfo
     if (hubInfo?.junctionKind === 'major_junction' || hubInfo?.junctionKind === 'junction') {
         return hubInfo.junctionKind
@@ -117,23 +131,49 @@ export function isMajorJunctionNode(node: PipelineNode): boolean {
     return getJunctionKind(node) === 'major_junction'
 }
 
+export function isHubNode(node: PipelineNode): boolean {
+    if (isSpecialStyleExcludedStationName(node.name)) return false
+    if (isCoreSourceStationName(node.name)) return false
+    if (node.isHub === true) return true
+    if (node.hubInfo?.isJunction === true || node.hubInfo?.isMajorJunction === true) return true
+    if (getJunctionKind(node)) return true
+
+    const properties = node.properties
+    if (!properties || typeof properties !== 'object') return false
+
+    const props = properties as Record<string, unknown>
+    return props.isHub === true
+        || props.isJunction === true
+        || props.rawType === 'junction'
+        || props.junctionKind === 'junction'
+        || props.junctionKind === 'major_junction'
+}
+
 export function isValveNode(node: PipelineNode): boolean {
     return getNodeRawType(node) === 'valve'
 }
 
 export function isCompressorNode(node: PipelineNode): boolean {
+    if (isCoreSourceStationName(node.name)) return false
     return getNodeRawType(node) === 'compressor'
 }
 
 export function isDistributionNode(node: PipelineNode): boolean {
+    if (isCoreSourceStationName(node.name)) return false
     return getNodeRawType(node) === 'distribution'
 }
 
 export function isSourceNode(node: PipelineNode): boolean {
-    return getNodeRawType(node) === 'source'
+    if (isSpecialStyleExcludedStationName(node.name)) return false
+    return isCoreSourceStationName(node.name) || getNodeRawType(node) === 'source'
 }
 
 export function inferNodeRawTypeFromName(name: string): RawStationType {
+    if (isSpecialStyleExcludedStationName(name)) {
+        if (includesAnyKeyword(name, COMPRESSOR_KEYWORDS)) return 'compressor'
+        if (includesAnyKeyword(name, DISTRIBUTION_KEYWORDS)) return 'distribution'
+        return 'other'
+    }
     if (includesAnyKeyword(name, COMPRESSOR_KEYWORDS)) return 'compressor'
     if (includesAnyKeyword(name, DISTRIBUTION_KEYWORDS)) return 'distribution'
     if (includesAnyKeyword(name, VALVE_KEYWORDS) || name.includes('#')) return 'valve'

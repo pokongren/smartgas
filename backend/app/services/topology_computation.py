@@ -422,7 +422,7 @@ class TopologyGraph:
             try:
                 cycles = nx.cycle_basis(self._graph)
                 return cycles
-            except:
+            except nx.NetworkXError:
                 return []
     
     def get_connected_components(self) -> List[List[str]]:
@@ -454,13 +454,13 @@ class TopologyGraph:
         # 接近中心性
         try:
             closeness = nx.closeness_centrality(self._graph)
-        except:
+        except nx.NetworkXError:
             closeness = {node: 0.0 for node in self._graph.nodes()}
         
         # 特征向量中心性
         try:
             eigenvector = nx.eigenvector_centrality(self._graph, max_iter=1000)
-        except:
+        except nx.NetworkXError:
             eigenvector = {node: 0.0 for node in self._graph.nodes()}
         
         return CentralityResult(
@@ -515,7 +515,7 @@ class TopologyGraph:
             else:
                 diameter = nx.diameter(self._graph)
                 avg_shortest_path = nx.average_shortest_path_length(self._graph)
-        except:
+        except (nx.NetworkXError, ValueError):
             diameter = -1
             avg_shortest_path = -1.0
         

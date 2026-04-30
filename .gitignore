@@ -52,3 +52,16 @@ architecture.md
 智脉平台*
 项目介绍.md
 6_三库合一与大模型架构说明.md
+
+# 运行时临时文件
+.tmp_frames/
+recovery/
+
+# 数据库文件（运行时生成）
+*.db
+/backend/data/*.db
+/backend/data/scada_history.db
+/backend/data/raw_excel_index.db
+
+# 后端虚拟环境（如果误放在根目录）
+/.venv/

@@ -17,6 +17,28 @@ MAX_MANUAL_OVERLAY_SPAN_DEG = 0.5
 
 logger = logging.getLogger(__name__)
 
+# 运行时枢纽白名单：只保留这些站点作为枢纽候选。
+# 说明：部分站点在库里存在别名或实际名称略有差异，所以这里保留多个匹配词。
+HUB_WHITE_LIST_RULES: List[Dict[str, Any]] = [
+    {"label": "霍尔果斯压气站", "patterns": ["霍尔果斯压气站"]},
+    {"label": "轮南压气站", "patterns": ["轮南压气站"]},
+    {"label": "中卫压气站", "patterns": ["中卫压气站"]},
+    {"label": "靖边压气站", "patterns": ["西一靖边压气站"]},
+    {"label": "安平压气站", "patterns": ["安平压气站"]},
+    {"label": "永清压气站", "patterns": ["永清压气站"]},
+    {"label": "黑河压气站", "patterns": ["黑河压气站"]},
+    {"label": "贵阳压气站", "patterns": ["贵阳压气站"]},
+    {"label": "瑞丽", "patterns": ["瑞丽分输站"]},
+    {"label": "广州压气站", "patterns": ["广州压气站"]},
+    {"label": "贵港压气站", "patterns": ["贵港压气站"]},
+    {"label": "南昌压气站", "patterns": ["南昌压气站"]},
+    {"label": "平顶山压气站", "patterns": ["平顶山分输站"]},
+    {"label": "薛店", "patterns": ["薛店分输站"]},
+    {"label": "泰安压气站", "patterns": ["泰安压气站"]},
+    {"label": "甪直", "patterns": ["甪直分输站"]},
+    {"label": "嘉兴", "patterns": ["嘉兴分输站"]},
+]
+
 
 def _parse_station_ids(raw_value: str | None) -> List[str]:
     if not raw_value:
@@ -44,6 +66,19 @@ def _dedupe_keep_order(values: List[str]) -> List[str]:
         seen.add(value)
         result.append(value)
     return result
+
+
+def _station_name_matches(name: str, patterns: List[str]) -> bool:
+    text = (name or "").strip()
+    if not text:
+        return False
+    for pattern in patterns:
+        candidate = (pattern or "").strip()
+        if not candidate:
+            continue
+        if candidate == text or candidate in text:
+            return True
+    return False
 
 
 def _normalize_group_name(name: str | None, fallback_station_ids: List[str]) -> str:
@@ -115,11 +150,63 @@ def _decorate_runtime_fields(group: Dict[str, Any]) -> Dict[str, Any]:
     runtime_group["station_ids"] = station_ids
     runtime_group["system_ids"] = system_ids
     runtime_group["member_count"] = len(station_ids)
-    runtime_group["junction_kind"] = (
-        "major_junction" if len(system_ids) >= 3 else "junction" if len(system_ids) >= 2 else "unknown"
-    )
+    explicit_kind = str(runtime_group.get("junction_kind") or "").strip()
+    if explicit_kind not in {"junction", "major_junction"}:
+        runtime_group["junction_kind"] = (
+            "major_junction" if len(system_ids) >= 3 else "junction" if len(system_ids) >= 2 else "junction"
+        )
     runtime_group["source_table"] = runtime_group.get("source_table", "junction_groups")
     return runtime_group
+
+
+def _load_whitelist_junction_groups(session: Session) -> List[Dict[str, Any]]:
+    rows = session.connection().execute(
+        text("SELECT id, name, type FROM stations")
+    ).mappings().all()
+    if not rows:
+        return []
+
+    matched_groups: List[Dict[str, Any]] = []
+    used_station_ids: Set[str] = set()
+    synthetic_id = 1000
+
+    for rule in HUB_WHITE_LIST_RULES:
+        patterns = [str(item) for item in rule.get("patterns", []) if str(item).strip()]
+        if not patterns:
+            continue
+
+        matched_station_ids = []
+        matched_names = []
+        for row in rows:
+            station_id = str(row["id"])
+            station_name = str(row["name"] or station_id)
+            if station_id in used_station_ids:
+                continue
+            if not _station_name_matches(station_name, patterns):
+                continue
+            matched_station_ids.append(station_id)
+            matched_names.append(station_name)
+
+        if not matched_station_ids:
+            continue
+
+        used_station_ids.update(matched_station_ids)
+        synthetic_id += 1
+        matched_groups.append(
+            _decorate_runtime_fields(
+                {
+                    "id": synthetic_id,
+                    "name": str(rule.get("label") or matched_names[0]),
+                    "description": "hub_whitelist=1",
+                    "station_ids": matched_station_ids,
+                    "raw_group_ids": [],
+                    "junction_kind": "major_junction" if len(matched_station_ids) >= 3 else "junction",
+                    "source_table": "junction_groups_whitelist",
+                }
+            )
+        )
+
+    return sorted(matched_groups, key=lambda item: item["id"])
 
 
 def _parse_description_tokens(description: str | None) -> List[str]:
@@ -453,9 +540,13 @@ def find_conflicting_manual_overlay_groups(session: Session, station_ids: List[s
 def load_runtime_junction_groups(session: Session) -> List[Dict[str, Any]]:
     """
     运行时枢纽入口：
-    - 优先读取影子表 junction_groups_rebuilt
-    - 若影子表不存在，再回退到旧 junction_groups 兼容层
+    - 优先按枢纽白名单从 stations 表重建运行时枢纽
+    - 若白名单无法解析，再回退到影子表 / 旧表兼容层
     """
+    whitelist_groups = _load_whitelist_junction_groups(session)
+    if whitelist_groups:
+        return whitelist_groups
+
     manual_groups = load_manual_overlay_junction_groups(session)
     base_groups = load_rebuilt_junction_groups(session)
     if not base_groups:

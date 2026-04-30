@@ -78,3 +78,57 @@ class TopologySummary(BaseModel):
     edges: int
     total_linepack_m3: float
     is_directed: bool
+
+
+# ============ 气源模型 ============
+
+class GasSourceBase(BaseModel):
+    """气源基础模型"""
+    id: str
+    name: str
+    station_id: Optional[str] = None
+    source_type: str = "domestic"
+    capacity_mcm_per_day: Optional[float] = None
+    current_output_mcm_per_day: Optional[float] = None
+    proven_reserves_tcm: Optional[float] = None
+    reserve_years: Optional[float] = None
+    operator: Optional[str] = None
+    province: Optional[str] = None
+    status: str = "active"
+    properties: Optional[str] = None
+
+
+class GasSourceCreate(BaseModel):
+    """创建气源请求"""
+    id: str
+    name: str
+    station_id: Optional[str] = None
+    source_type: str = "domestic"
+    capacity_mcm_per_day: Optional[float] = None
+    current_output_mcm_per_day: Optional[float] = None
+    proven_reserves_tcm: Optional[float] = None
+    reserve_years: Optional[float] = None
+    operator: Optional[str] = None
+    province: Optional[str] = None
+    status: str = "active"
+    properties: Optional[str] = None
+
+
+class GasSourceUpdate(BaseModel):
+    """更新气源请求"""
+    name: Optional[str] = None
+    station_id: Optional[str] = None
+    source_type: Optional[str] = None
+    capacity_mcm_per_day: Optional[float] = None
+    current_output_mcm_per_day: Optional[float] = None
+    proven_reserves_tcm: Optional[float] = None
+    reserve_years: Optional[float] = None
+    operator: Optional[str] = None
+    province: Optional[str] = None
+    status: Optional[str] = None
+    properties: Optional[str] = None
+
+
+class GasSourceResponse(GasSourceBase):
+    """气源响应模型"""
+    pass

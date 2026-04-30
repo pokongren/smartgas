@@ -292,6 +292,35 @@ const trunkLayer: PipelineLayer = {
     visible: true
 }
 
+// FIX: 补充南段干线跨段连接（安平-泰兴 与 南通-甪直 之间里程重置导致连接中断）
+const taixingId = stationIdMap.get('泰兴联络站')
+const nantongId = stationIdMap.get('南通联络站')
+if (taixingId && nantongId) {
+    const hasCrossSegment = trunkLayer.lines.some(l =>
+        (l.startNodeId === taixingId && l.endNodeId === nantongId) ||
+        (l.startNodeId === nantongId && l.endNodeId === taixingId)
+    )
+    if (!hasCrossSegment) {
+        console.warn('[CRED] 补充泰兴-南通跨段连接线')
+        trunkLayer.lines.push({
+            id: 'CRED-L-CROSS-TAIXING-NANTONG',
+            name: '中俄东线干线-泰兴南通跨段',
+            startNodeId: taixingId,
+            endNodeId: nantongId,
+            path: [
+                { longitude: 120.05, latitude: 32.17 },
+                { longitude: 120.86, latitude: 32.01 }
+            ],
+            diameter: 1422,
+            material: 'X80',
+            pressureLevel: PressureLevel.HIGH,
+            status: PipelineStatus.NORMAL,
+            length: 78000,
+            properties: { category: '中俄东线', color: COLOR_TRUNK }
+        })
+    }
+}
+
 // 2. 支线
 const branchLayers: PipelineLayer[] = []
 if (credStructure.branches && credStructure.branch_names) {
