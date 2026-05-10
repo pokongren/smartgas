@@ -14,6 +14,86 @@ def _build_mainline_station_ids(start: int, end: int) -> List[str]:
 
 
 WE1_PILOTS: Dict[str, Dict[str, Any]] = {
+    "zhongwei_shanghai_baihe": {
+        "id": "zhongwei_shanghai_baihe",
+        "system_id": "we1",
+        "name": "主样板：中卫压气站 -> 上海白鹤末站",
+        "summary": "打通西一线中卫到上海白鹤全段稳态仿真，覆盖中游压气站链、华东负荷和末端交付。",
+        "recommended_scope": [
+            "中卫压气站",
+            "郑州压气站",
+            "定远压气站",
+            "白鹤末站",
+        ],
+        "benefits": [
+            "覆盖中卫到华东末端完整主干",
+            "压气站、分输站和末站链路连续",
+            "适合展示全国图入口到局部仿真的主流程",
+            "新 pilot 独立归档，不污染中卫到靖边旧快照",
+        ],
+        "focus": [
+            "全段稳态",
+            "华东末端负荷",
+            "压气站停运",
+            "末端限流",
+        ],
+        "seed_file": "we1_zhongwei_shanghai_baihe_seed.json",
+        "layer_prefixes": ["WE1"],
+        "station_ids": _build_mainline_station_ids(76, 181),
+        "junction_candidate_station_ids": ["WE1-76", "WE1-127", "WE1-152", "WE1-181"],
+        "scenario_templates": [
+            {
+                "id": "steady_base",
+                "name": "常规稳态输气",
+                "description": "验证中卫到上海白鹤全段主干方向、压力梯度和末端交付。",
+            },
+            {
+                "id": "zhongwei_supply_pressure_drop",
+                "name": "中卫出站压力下调",
+                "description": "验证中卫边界压力降低后，全段压力和华东末端承接变化。",
+            },
+            {
+                "id": "zhengzhou_compressor_offline",
+                "name": "郑州压气站停运",
+                "description": "验证中游关键压气站停运后，下游压力恢复能力。",
+            },
+            {
+                "id": "east_china_peak_demand",
+                "name": "华东末端负荷上调",
+                "description": "验证苏锡常沪方向负荷抬升后的主干利用率和告警变化。",
+            },
+            {
+                "id": "baihe_delivery_limited",
+                "name": "白鹤末端交付受限",
+                "description": "验证白鹤前最后管段限流后的末端交付能力。",
+            },
+        ],
+        "data_requirements": {
+            "nodes": [
+                "role",
+                "supply_max",
+                "demand_nominal",
+                "target_pressure_mpa",
+                "min_pressure_mpa",
+                "max_pressure_mpa",
+            ],
+            "edges": [
+                "design_pressure_mpa",
+                "start_pressure_mpa",
+                "end_pressure_mpa",
+                "roughness_mm",
+                "max_flow",
+                "direction_mode",
+                "status",
+            ],
+            "devices": [
+                "compressor_enabled",
+                "compressor_ratio_or_target_pressure",
+                "distribution_demand",
+                "valve_status",
+            ],
+        },
+    },
     "mainline_zhongwei_jingbian": {
         "id": "mainline_zhongwei_jingbian",
         "system_id": "we1",
@@ -240,7 +320,7 @@ def _stable_token(value: str) -> List[Any]:
 def build_pilot_package(system_package: Dict[str, Any], pilot: Dict[str, Any]) -> Dict[str, Any]:
     allowed_station_ids = set(pilot["station_ids"])
     allowed_prefixes = set(pilot["layer_prefixes"])
-    force_visible = pilot["id"] == "mainline_zhongwei_jingbian"
+    force_visible = pilot["id"] in {"mainline_zhongwei_jingbian", "zhongwei_shanghai_baihe"}
 
     filtered_layers: List[Dict[str, Any]] = []
     for layer in system_package.get("layers", []):

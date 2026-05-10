@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import AMapLoader from '@amap/amap-jsapi-loader'
 import type { MapViewProps, MapConfig } from './types'
 import styles from './MapView.module.css'
+import type { PipelineNode } from '@/types'
 import { renderPipelineLines, renderPipelineNodesWithClustering, renderPipelineDevices, clearMapOverlays, clearClusterCache, clearDragMappings } from '@/utils/mapRenderer'
 import { renderHubNode, clearHubNodeRender } from '@/utils/hubRenderer'
 import { ClusterDetailPanel } from '../ClusterDetailPanel'
@@ -9,7 +10,7 @@ import { HubDetailPanel } from '../HubDetailPanel'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
 import type { HubNode } from '@/types/hub'
 import { DEFAULT_HUB_VISUAL_CONFIG } from '@/types/hub'
-import { getNodeRawType, isHubNode, isSourceNode } from '@/utils/pipelineDomain'
+import { getNodeRawType, isHubNode, isSourceNode, isValveNode } from '@/utils/pipelineDomain'
 
 /**
  * 默认地图配置
@@ -117,6 +118,7 @@ function MapView({
     simulationOverlay,
     nodeDisplayMode = 'full',
     hubNodeTypes = ['source', 'compressor', 'junction', 'distribution'],
+    showValveRooms,
 }: MapViewProps) {
     const mapContainerRef = useRef<HTMLDivElement>(null)
     const [mapInstance, setMapInstance] = useState<any>(null)
@@ -141,18 +143,31 @@ function MapView({
         if (!pipelineData) return pipelineData
 
         const maxNodes = Math.max(0, mapConfig.maxRenderNodes ?? DEFAULT_CONFIG.maxRenderNodes ?? 0)
+        const effectiveMaxNodes = showValveRooms === true ? Math.max(maxNodes, 2400) : maxNodes
         const maxLines = Math.max(0, mapConfig.maxRenderLines ?? DEFAULT_CONFIG.maxRenderLines ?? 0)
 
-        const nodes = Array.isArray(pipelineData.nodes)
-            ? pipelineData.nodes.slice(0, maxNodes)
+        const sourceNodes = Array.isArray(pipelineData.nodes)
+            ? pipelineData.nodes
             : pipelineData.nodes
         const lines = Array.isArray(pipelineData.lines)
             ? pipelineData.lines.slice(0, maxLines)
             : pipelineData.lines
 
+        const isValveRoomNode = (node: PipelineNode): boolean => {
+            if (!node) return false
+            if (isValveNode(node)) return true
+            const rawType = getNodeRawType(node)
+            const nodeName = node.name || ''
+            return rawType === 'valve' || nodeName.includes('阀室') || nodeName.includes('阀门') || nodeName.includes('#')
+        }
+
         const hubTypeSet = new Set(hubNodeTypes)
-        const filteredNodes = nodeDisplayMode === 'hub' && Array.isArray(nodes)
-            ? nodes.filter((node) => {
+        const filteredNodes = Array.isArray(sourceNodes)
+            ? sourceNodes.filter((node) => {
+                const isValve = isValveRoomNode(node)
+                if (isValve && showValveRooms === false) return false
+                if (isValve && showValveRooms === true) return true
+                if (nodeDisplayMode !== 'hub') return true
                 if (node.properties?.forceVisible === true) return true
                 if (isSourceNode(node)) return hubTypeSet.has('source')
                 const rawType = getNodeRawType(node)
@@ -162,24 +177,44 @@ function MapView({
                 if (rawType === 'junction') return hubTypeSet.has('junction')
                 return false
             })
-            : nodes
+            : sourceNodes
+
+        const budgetedNodes = Array.isArray(filteredNodes) && filteredNodes.length > effectiveMaxNodes
+            ? [
+                ...filteredNodes.filter(node => !isValveRoomNode(node)),
+                ...filteredNodes.filter(node => isValveRoomNode(node)),
+            ].slice(0, effectiveMaxNodes)
+            : filteredNodes
+
+        const displayNodes = showValveRooms === true && Array.isArray(budgetedNodes)
+            ? budgetedNodes.map((node) => {
+                if (!isValveRoomNode(node)) return node
+                return {
+                    ...node,
+                    properties: {
+                        ...node.properties,
+                        forceVisible: true,
+                    },
+                }
+            })
+            : budgetedNodes
 
         if (
             Array.isArray(pipelineData.nodes) &&
             Array.isArray(pipelineData.lines) &&
-            (pipelineData.nodes.length > maxNodes || pipelineData.lines.length > maxLines)
+            ((Array.isArray(filteredNodes) && filteredNodes.length > effectiveMaxNodes) || pipelineData.lines.length > maxLines)
         ) {
             console.warn(
-                `[MapView] render budget applied: nodes ${pipelineData.nodes.length} -> ${filteredNodes.length}, lines ${pipelineData.lines.length} -> ${lines.length}`,
+                `[MapView] render budget applied: nodes ${pipelineData.nodes.length} -> ${displayNodes.length}, lines ${pipelineData.lines.length} -> ${lines.length}`,
             )
         }
 
         return {
             ...pipelineData,
-            nodes: filteredNodes,
+            nodes: displayNodes,
             lines,
         }
-    }, [hubNodeTypes, mapConfig.maxRenderLines, mapConfig.maxRenderNodes, nodeDisplayMode, pipelineData])
+    }, [hubNodeTypes, mapConfig.maxRenderLines, mapConfig.maxRenderNodes, nodeDisplayMode, pipelineData, showValveRooms])
 
     // 使用 ref 存储所有回调函数，避免 useEffect 依赖它们
     const callbacksRef = useRef({

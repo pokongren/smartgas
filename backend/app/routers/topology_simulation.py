@@ -45,12 +45,18 @@ class NodeInitialOverrideInput(BaseModel):
     target_pressure_mpa: Optional[float] = None
     min_pressure_mpa: Optional[float] = None
     temperature_c: Optional[float] = None
+    supply_max: Optional[float] = None
+    nominal_flow: Optional[float] = None
+    supply_nominal: Optional[float] = None
+    compressor_enabled: Optional[bool] = None
 
 
 class EdgeInitialOverrideInput(BaseModel):
     edge_id: str
     flow_rate: Optional[float] = None
     length_km: Optional[float] = None
+    max_flow: Optional[float] = None
+    status: Optional[str] = None
 
 
 class InitialConditionsInput(BaseModel):
@@ -149,6 +155,14 @@ def _apply_initial_conditions(
             override["min_pressure_mpa"] = float(item.min_pressure_mpa)
         if item.temperature_c is not None:
             override["temperature_c"] = float(item.temperature_c)
+        if item.supply_max is not None:
+            override["supply_max"] = float(item.supply_max)
+        if item.nominal_flow is not None:
+            override["nominal_flow"] = float(item.nominal_flow)
+        if item.supply_nominal is not None:
+            override["supply_nominal"] = float(item.supply_nominal)
+        if item.compressor_enabled is not None:
+            override["compressor_enabled"] = bool(item.compressor_enabled)
         if len(override) > 1:
             node_overrides.append(override)
             explicit_node_ids.add(node_id)
@@ -162,6 +176,10 @@ def _apply_initial_conditions(
             override["flow_rate"] = float(item.flow_rate)
         if item.length_km is not None:
             override["length_km"] = float(item.length_km)
+        if item.max_flow is not None:
+            override["max_flow"] = float(item.max_flow)
+        if item.status in ("open", "limited", "closed"):
+            override["status"] = item.status
         if len(override) > 1:
             edge_overrides.append(override)
             explicit_edge_ids.add(edge_id)

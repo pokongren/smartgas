@@ -75,4 +75,6 @@ export interface MapViewProps {
     nodeDisplayMode?: 'full' | 'hub'
     /** 枢纽精简模式下保留的节点类型 */
     hubNodeTypes?: Array<'source' | 'compressor' | 'junction' | 'distribution'>
+    /** 阀室显示控制；不传时保持缩放 LOD 自动规则，true 强制显示，false 强制隐藏 */
+    showValveRooms?: boolean
 }

@@ -23,8 +23,13 @@ import {
 } from '@/views/global-pipeline/scadaConfig'
 import { EmptyScadaState, ScadaFloatingPanel } from '@/views/global-pipeline/ScadaFloatingPanel'
 import type { ScadaRecord } from '@/views/global-pipeline/scadaConfig'
-import { useNavigate } from 'react-router-dom'
 import { setAssistantRuntimeContext } from '@/components/ai-assistant/runtimeAssistantContext'
+import { useSimulation } from '@/hooks/useSimulation'
+import {
+    DEFAULT_WE1_PILOT_ID,
+    resolveSimulationPilotConfig,
+} from '@/types/simulation'
+import type { SimulationInitialInput, SimulationOverlay } from '@/types/simulation'
 
 import { getNodeMarkerMap } from '@/utils/mapRenderer'
 import { useNewWindow, usePopoutSync } from '@/hooks/useNewWindow'
@@ -93,7 +98,181 @@ type DirectoryLayoutState = {
     trendWidth?: number
 }
 
+type MultiScenarioAiCase = {
+    id: string
+    label: string
+    flowText: string
+    description: string
+    scenarioId: string
+    initialInput?: SimulationInitialInput
+}
+
+type MultiScenarioAiResult = {
+    caseId: string
+    label: string
+    flowText: string
+    description: string
+    overlay: SimulationOverlay
+    sourceFlow: number
+    unservedDemand: number
+    alertCount: number
+    avgUtilization: number
+    minPressure: number
+    minPressureNodeName: string
+    iterations: number
+    runId: string
+}
+
+type MultiScenarioAiStartEventDetail = {
+    skillName?: string
+    message?: string
+    selectedScenarioIds?: string[]
+}
+
+type SimulationPressureChartLayout = {
+    x: number
+    y: number
+    width: number
+    height: number
+}
+
+type SimulationPressureChartEntry = {
+    id: string
+    label: string
+    overlay: SimulationOverlay
+    color: string
+}
+
 const DIRECTORY_LAYOUT_STORAGE_KEY = 'smartgas.globalPipeline.directoryLayout.v1'
+const AI_ASSISTANT_SYNC_CHANNEL = 'ai-assistant-sync'
+const MULTI_SCENARIO_AI_SKILL_NAME = 'multi-scenario-ai'
+const ZHONGWEI_SOURCE_NODE_ID = 'WE1-76'
+const ZHONGWEI_FIRST_TRUNK_EDGE_ID = 'WE1-T-76'
+
+const WE1_PILOT_NODE_NAMES: Record<string, string> = {
+    'WE1-76': '中卫压气站',
+    'WE1-86': '西一盐池压气站',
+    'WE1-92': '西一靖边压气站',
+    'WE1-98': '子长分输站',
+    'WE1-100': '延川压气站',
+    'WE1-102': '延川西分输站',
+    'WE1-108': '蒲县压气站',
+    'WE1-111': '临汾分输站',
+    'WE1-117': '沁水压气站',
+    'WE1-123': '博爱分输站',
+    'WE1-127': '郑州压气站',
+    'WE1-129': '薛店分输站',
+    'WE1-136': '淮阳压气站',
+    'WE1-140': '太和分输站',
+    'WE1-143': '利辛分输站',
+    'WE1-150': '刘巷子分输站',
+    'WE1-152': '定远压气站',
+    'WE1-155': '滁州分输站',
+    'WE1-157': '龙池分输站',
+    'WE1-159': '青山分输站',
+    'WE1-160': '龙潭分输站',
+    'WE1-164': '镇江分输站',
+    'WE1-165': '丹阳分输站',
+    'WE1-168': '常州分输站',
+    'WE1-169': '芙蓉分输站',
+    'WE1-172': '无锡分输站',
+    'WE1-173': '东桥分输站',
+    'WE1-176': '苏州分输站',
+    'WE1-179': '甪直分输站',
+    'WE1-180': '昆山分输站',
+    'WE1-181': '白鹤末站',
+}
+
+const WE1_PILOT_START_MILEAGE_KM = 2008.2399
+const WE1_PILOT_MILEAGE_ANCHORS: Array<[number, number]> = [
+    [76, 2008.2399],
+    [86, 2190.506],
+    [92, 2343.806],
+    [98, 2454.488],
+    [100, 2494.007],
+    [102, 2513.3548],
+    [108, 2635.207],
+    [111, 2697.907],
+    [117, 2787.5069],
+    [123, 2891.4069],
+    [127, 2953.6399],
+    [129, 2997.3459],
+    [136, 3141.3191],
+    [140, 3218.119],
+    [143, 3293.097],
+    [150, 3391.285],
+    [152, 3446.211],
+    [155, 3512.141],
+    [157, 3559.341],
+    [159, 3586.664],
+    [160, 3593.95],
+    [164, 3633.125],
+    [165, 3655.288],
+    [168, 3700.402],
+    [169, 3717.33],
+    [172, 3754.483],
+    [173, 3773.533],
+    [176, 3797.6201],
+    [179, 3819.2541],
+    [180, 3832.3461],
+    [181, 3846.1981],
+]
+
+const MULTI_SCENARIO_AI_CASES: MultiScenarioAiCase[] = [
+    {
+        id: 'zhongwei-3000',
+        label: '中卫 3000 万标方/天',
+        flowText: '3000',
+        description: '基准供气工况，验证常规稳态能跑通。',
+        scenarioId: 'steady_base',
+        initialInput: {
+            node_overrides: [{
+                node_id: ZHONGWEI_SOURCE_NODE_ID,
+                supply_max: 3000,
+                nominal_flow: 3000,
+                supply_nominal: 3000,
+                target_pressure_mpa: 9.8,
+            }],
+        },
+    },
+    {
+        id: 'zhongwei-2000',
+        label: '中卫 2000 万标方/天',
+        flowText: '2000',
+        description: '上游供气下降工况，观察压力、流量和缺口变化。',
+        scenarioId: 'steady_base',
+        initialInput: {
+            node_overrides: [{
+                node_id: ZHONGWEI_SOURCE_NODE_ID,
+                supply_max: 2000,
+                nominal_flow: 2000,
+                supply_nominal: 2000,
+                target_pressure_mpa: 9.8,
+            }],
+        },
+    },
+    {
+        id: 'zhongwei-cutoff',
+        label: '中卫截断',
+        flowText: '0',
+        description: '上游首段关闭工况，演示故障传播和供气缺口。',
+        scenarioId: 'steady_base',
+        initialInput: {
+            node_overrides: [{
+                node_id: ZHONGWEI_SOURCE_NODE_ID,
+                supply_max: 0,
+                nominal_flow: 0,
+                supply_nominal: 0,
+                target_pressure_mpa: 0,
+            }],
+            edge_overrides: [{
+                edge_id: ZHONGWEI_FIRST_TRUNK_EDGE_ID,
+                flow_rate: 0,
+                status: 'closed',
+            }],
+        },
+    },
+]
 
 function readDirectoryLayoutState(): DirectoryLayoutState {
     if (typeof window === 'undefined') return {}
@@ -120,6 +299,237 @@ function normalizeStationMatchKey(name: string): string {
         .replace(/分输压气站|分输联络站|分输清管站|压气站|分输站|清管站|末站/g, '')
 }
 
+function resolvePilotNodeName(nodeId: string): string {
+    return WE1_PILOT_NODE_NAMES[nodeId] || nodeId
+}
+
+function resolvePilotNodeIndex(nodeId: string): number | null {
+    const match = /^WE1-(\d+)$/.exec(nodeId)
+    if (!match) return null
+    const value = Number(match[1])
+    return Number.isFinite(value) ? value : null
+}
+
+function resolvePilotMileageKm(nodeId: string): number | null {
+    const nodeIndex = resolvePilotNodeIndex(nodeId)
+    if (nodeIndex == null) return null
+
+    const exactAnchor = WE1_PILOT_MILEAGE_ANCHORS.find(([index]) => index === nodeIndex)
+    if (exactAnchor) {
+        return Number((exactAnchor[1] - WE1_PILOT_START_MILEAGE_KM).toFixed(1))
+    }
+
+    let previousAnchor: [number, number] | null = null
+    let nextAnchor: [number, number] | null = null
+
+    for (const anchor of WE1_PILOT_MILEAGE_ANCHORS) {
+        if (anchor[0] < nodeIndex) previousAnchor = anchor
+        if (anchor[0] > nodeIndex) {
+            nextAnchor = anchor
+            break
+        }
+    }
+
+    if (!previousAnchor || !nextAnchor || nextAnchor[0] === previousAnchor[0]) return null
+
+    const ratio = (nodeIndex - previousAnchor[0]) / (nextAnchor[0] - previousAnchor[0])
+    const mileage = previousAnchor[1] + (nextAnchor[1] - previousAnchor[1]) * ratio
+    return Number((mileage - WE1_PILOT_START_MILEAGE_KM).toFixed(1))
+}
+
+function inferSimulationStationType(nodeId: string, name: string): string {
+    if (name.includes('压气站')) return 'compressor'
+    if (name.includes('阀室') || !WE1_PILOT_NODE_NAMES[nodeId]) return 'valve'
+    return 'distribution'
+}
+
+function getSimulationPressureChartColor(caseId: string): string {
+    if (caseId.includes('2000')) return '#38bdf8'
+    if (caseId.includes('cutoff')) return '#f97316'
+    return '#10b981'
+}
+
+function buildDefaultSimulationPressureChartLayout(index: number, viewportWidth: number, viewportHeight: number): SimulationPressureChartLayout {
+    const availableWidth = Math.max(760, viewportWidth - 420)
+    const baseWidth = clampNumber(Math.floor(availableWidth / 2), 560, 760)
+    const baseHeight = clampNumber(Math.floor((viewportHeight - 130) / 2), 270, 340)
+    const columnGap = 18
+    const rowGap = 18
+    const startX = 24
+    const startY = 86
+    const col = index % 2
+    const row = Math.floor(index / 2)
+
+    return {
+        x: clampNumber(startX + col * (baseWidth + columnGap), 0, Math.max(0, viewportWidth - baseWidth - 12)),
+        y: clampNumber(startY + row * (baseHeight + rowGap), 64, Math.max(64, viewportHeight - baseHeight - 12)),
+        width: baseWidth,
+        height: baseHeight,
+    }
+}
+
+function buildSimulationPressureTrendConfig(
+    overlay: SimulationOverlay | null,
+    label?: string,
+    color = '#10b981',
+): TrendChartConfig | null {
+    if (!overlay) return null
+
+    const stations = overlay.nodes
+        .map((node): TrendChartStation | null => {
+            const mileage = resolvePilotMileageKm(node.id)
+            if (mileage == null) return null
+
+            const pressureIn = typeof node.pressure_in_mpa === 'number' ? node.pressure_in_mpa : node.pressure_mpa
+            const pressureOut = node.pressure_mpa
+            if (!Number.isFinite(pressureIn) || !Number.isFinite(pressureOut)) return null
+
+            const name = resolvePilotNodeName(node.id)
+            return {
+                name: WE1_PILOT_NODE_NAMES[node.id] ? name : `${node.id}阀室`,
+                inP: pressureIn,
+                outP: pressureOut,
+                type: inferSimulationStationType(node.id, name),
+                mileage,
+            }
+        })
+        .filter((station): station is TrendChartStation => Boolean(station))
+        .sort((left, right) => left.mileage - right.mileage)
+
+    if (stations.length === 0) return null
+
+    const safeRunId = overlay.run_id.replace(/[^a-zA-Z0-9_-]/g, '-')
+    return {
+        pipelineId: `sim-we1-${safeRunId}`,
+        title: label ? `西气东输一线·中卫-上海白鹤仿真 · ${label}` : '西气东输一线·中卫-上海白鹤仿真',
+        color,
+        stations,
+        mileageMode: 'estimated',
+    }
+}
+
+function findPipelineNodeByPilotNodeId(nodeId: string, pipelineData: PipelineData): PipelineNode | null {
+    const pilotName = resolvePilotNodeName(nodeId)
+    const pilotKey = normalizeStationMatchKey(pilotName)
+    return pipelineData.nodes.find(node => {
+        return node.id === nodeId
+            || node.name === pilotName
+            || normalizeStationMatchKey(node.name) === pilotKey
+    }) || null
+}
+
+function buildMultiScenarioRiskScore(result: MultiScenarioAiResult): number {
+    return result.unservedDemand * 1000
+        + result.alertCount * 10
+        + Math.max(0, 8 - result.minPressure) * 100
+}
+
+function formatScenarioDelta(current: number, reference: number, unit = '', digits = 0): string {
+    const delta = current - reference
+    if (Math.abs(delta) < 0.0001) return `持平${unit ? `（${current.toFixed(digits)}${unit}）` : ''}`
+    return `${delta > 0 ? '增加' : '减少'} ${Math.abs(delta).toFixed(digits)}${unit}`
+}
+
+function classifyScenarioIntent(result: MultiScenarioAiResult, reference: MultiScenarioAiResult): string {
+    const label = result.label.toLowerCase()
+    if (/(截断|中断|关闭|关断|停运|停输|故障|破裂|泄漏|offline|break|close|cut)/i.test(label)) {
+        return '故障隔离类工况'
+    }
+    if (/(高峰|负荷|需求|上调|增供|提升|扩供|peak|demand)/i.test(label)) {
+        return '负荷或增供扰动工况'
+    }
+    if (/(限供|受限|限流|下调|减供|下降|低供|limited|drop)/i.test(label) || result.sourceFlow < reference.sourceFlow - 1) {
+        return '供气受限类工况'
+    }
+    if (Math.abs(result.sourceFlow - reference.sourceFlow) <= 1) {
+        return '同入口边界扰动工况'
+    }
+    return result.sourceFlow > reference.sourceFlow ? '增供边界工况' : '边界扰动工况'
+}
+
+function buildMultiScenarioAiConclusion(results: MultiScenarioAiResult[]): string {
+    if (results.length === 0) return '等待已选工况运行完成后生成比对结论。'
+
+    const ranked = [...results].sort((left, right) => buildMultiScenarioRiskScore(right) - buildMultiScenarioRiskScore(left))
+    const worst = ranked[0]
+    const reference = results[0]
+    const intent = classifyScenarioIntent(worst, reference)
+    const supplyDeltaText = reference ? formatScenarioDelta(worst.sourceFlow, reference.sourceFlow, ' 万标方/天') : '暂无对照'
+    const unservedDeltaText = reference ? formatScenarioDelta(worst.unservedDemand, reference.unservedDemand, ' 万标方/天') : '暂无对照'
+    const pressureDeltaText = reference ? formatScenarioDelta(worst.minPressure, reference.minPressure, ' MPa', 2) : '暂无对照'
+
+    return `AI比对结论：本轮 ${results.length} 个已选工况中，“${worst.label}”综合风险最高，属于${intent}。相对首个已选工况，入口供气${supplyDeltaText}，未满足需求${unservedDeltaText}，最低进站压力${pressureDeltaText}，落在 ${worst.minPressureNodeName}（${worst.minPressure.toFixed(2)} MPa）。本演示只验证 AI 能否先选工况、再调用简化稳态模型并自动解释结果，不等同工业级水力精算。`
+}
+
+function buildDetailedMultiScenarioAnalysis(results: MultiScenarioAiResult[]): string {
+    if (results.length === 0) return '等待已选工况运行完成后生成详细参数对比。'
+
+    const reference = results[0]
+    const ranked = [...results].sort((left, right) => buildMultiScenarioRiskScore(right) - buildMultiScenarioRiskScore(left))
+    const worst = ranked[0]
+    const formatUtil = (value: number) => `${(value * 100).toFixed(1)}%`
+    const lowerFlowCase = results.find(result => result.caseId !== reference.caseId && result.sourceFlow < reference.sourceFlow - 1)
+    const lowerFlowNote = lowerFlowCase
+        ? `像“${lowerFlowCase.label}”这类降量工况，流量下降后沿程压降会变小，所以最低压力不一定更低；`
+        : '如果出现降量工况，流量下降后沿程压降可能变小，所以最低压力不一定更低；'
+    const detailLines = results.slice(1).map((result, index) => {
+        const intent = classifyScenarioIntent(result, reference)
+        const pressureDelta = formatScenarioDelta(result.minPressure, reference.minPressure, ' MPa', 2)
+        const riskRank = ranked.findIndex(item => item.caseId === result.caseId) + 1
+        return `${index + 2}. ${result.label} 属于${intent}：入口供气 ${result.sourceFlow.toFixed(0)} 万标方/天，较对照${formatScenarioDelta(result.sourceFlow, reference.sourceFlow, ' 万标方/天')}；未满足需求 ${result.unservedDemand.toFixed(0)} 万标方/天，较对照${formatScenarioDelta(result.unservedDemand, reference.unservedDemand, ' 万标方/天')}；最低进站压力 ${result.minPressure.toFixed(2)} MPa，位置在 ${result.minPressureNodeName}，较对照${pressureDelta}；告警 ${result.alertCount.toFixed(0)} 个，平均利用率 ${formatUtil(result.avgUtilization)}，求解迭代 ${result.iterations} 次；按当前风险评分排第 ${riskRank}。`
+    })
+
+    return [
+        `详细参数对比：本次 AI 先把所选工况转成结构化边界条件，再依次调用简化稳态模型运行 ${results.length} 个工况，统一比较入口供气量、未满足需求、最低进站压力、告警数、平均管段利用率和求解迭代次数。`,
+        `1. ${reference.label} 作为对照工况：入口供气 ${reference.sourceFlow.toFixed(0)} 万标方/天，未满足需求 ${reference.unservedDemand.toFixed(0)} 万标方/天，最低进站压力 ${reference.minPressure.toFixed(2)} MPa，位置在 ${reference.minPressureNodeName}，平均利用率 ${formatUtil(reference.avgUtilization)}，告警 ${reference.alertCount.toFixed(0)} 个，迭代 ${reference.iterations} 次。`,
+        ...detailLines,
+        `读数解释：${worst.label} 的风险最高，主要是供气缺口、低压水平和告警数量叠加更强。${lowerFlowNote}这正好说明仿真读数要结合工况类型一起看，而不是只盯一个数。中卫-上海白鹤压力曲线已同步生成，可横向对比压力坡降、局部抬升和末端压力变化。以上结果仍是概念级稳态推演，重点验证 AI 是否能自动编排工况、调用现有参数并生成可读结论，不替代专业水力精算。`,
+    ].filter(Boolean).join('\n\n')
+}
+
+function formatMultiScenarioAiMessage(results: MultiScenarioAiResult[]): string {
+    const lines = [
+        'multi-scenario-ai skill 已完成。',
+        '',
+        buildMultiScenarioAiConclusion(results),
+        '',
+        '关键指标对比：',
+        '',
+        '| 工况 | 入口量(万方/天) | 未满足(万方/天) | 最低进站(MPa/位置) | 告警 | 利用率 | 迭代 |',
+        '|---|---:|---:|---:|---:|---:|---:|',
+    ]
+    results.forEach(result => {
+        lines.push(
+            `| ${result.label} | ${result.sourceFlow.toFixed(0)} | ${result.unservedDemand.toFixed(0)} | ${result.minPressure.toFixed(2)} ${result.minPressureNodeName} | ${result.alertCount.toFixed(0)} | ${(result.avgUtilization * 100).toFixed(1)}% | ${result.iterations} |`,
+        )
+    })
+    lines.push('')
+    lines.push(buildDetailedMultiScenarioAnalysis(results))
+    return lines.join('\n')
+}
+
+function emitMultiScenarioAiAssistantEvent(type: 'progress' | 'result', detail: Record<string, unknown>): void {
+    const eventType = type === 'progress'
+        ? 'assistant-multi-scenario-ai-progress'
+        : 'assistant-multi-scenario-ai-result'
+    const payload = {
+        type: eventType,
+        detail: {
+            skillName: MULTI_SCENARIO_AI_SKILL_NAME,
+            ...detail,
+        },
+    }
+
+    window.dispatchEvent(new CustomEvent(eventType, { detail: payload.detail }))
+    try {
+        const channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+        channel.postMessage(payload)
+        channel.close()
+    } catch {
+        // 同窗口事件已经足够，BroadcastChannel 只是给弹出 AI 窗口同步。
+    }
+}
+
 function hexToRgba(hex: string, alpha: number): string {
     const normalized = hex.replace('#', '')
     if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
@@ -130,6 +540,48 @@ function hexToRgba(hex: string, alpha: number): string {
     const g = Number.parseInt(normalized.slice(2, 4), 16)
     const b = Number.parseInt(normalized.slice(4, 6), 16)
     return `rgba(${r},${g},${b},${alpha})`
+}
+
+type LngLatTuple = [number, number]
+
+function collectLayerCoordinates(layer: PipelineLayer): LngLatTuple[] {
+    const coordinates: LngLatTuple[] = []
+    const seen = new Set<string>()
+
+    const pushCoordinate = (longitude: unknown, latitude: unknown) => {
+        if (typeof longitude !== 'number' || typeof latitude !== 'number') return
+        if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) return
+
+        const key = `${longitude.toFixed(6)},${latitude.toFixed(6)}`
+        if (seen.has(key)) return
+        seen.add(key)
+        coordinates.push([longitude, latitude])
+    }
+
+    layer.lines.forEach((line) => {
+        line.path.forEach((point) => pushCoordinate(point.longitude, point.latitude))
+    })
+    layer.nodes.forEach((node) => {
+        pushCoordinate(node.coordinate?.longitude, node.coordinate?.latitude)
+    })
+
+    return coordinates
+}
+
+function collectPackageCoordinates(pkg: PipelinePackage): LngLatTuple[] {
+    const coordinates: LngLatTuple[] = []
+    const seen = new Set<string>()
+
+    pkg.layers.forEach((layer) => {
+        collectLayerCoordinates(layer).forEach(([longitude, latitude]) => {
+            const key = `${longitude.toFixed(6)},${latitude.toFixed(6)}`
+            if (seen.has(key)) return
+            seen.add(key)
+            coordinates.push([longitude, latitude])
+        })
+    })
+
+    return coordinates
 }
 
 function buildGraphDistanceIndex(layer: PipelineLayer | undefined) {
@@ -602,8 +1054,11 @@ const PressureTrendChart: React.FC<{
     isDragging?: boolean
     standalone?: boolean
     width?: number
+    height?: number
+    resizeMode?: 'width' | 'both'
+    revealProgress?: number
     onResizeMouseDown?: (e: React.MouseEvent) => void
-}> = ({ config, onClose, onMouseDown, isDragging, standalone = false, width = 920, onResizeMouseDown }) => {
+}> = ({ config, onClose, onMouseDown, isDragging, standalone = false, width = 920, height = 420, resizeMode = 'width', revealProgress = 1, onResizeMouseDown }) => {
     const [hoveredIdx, setHoveredIdx] = useState<number | null>(null)
 
     const stations = config.stations
@@ -612,11 +1067,11 @@ const PressureTrendChart: React.FC<{
     const jumpThreshold = 0.001
 
     const W = 860
-    const H = 320
+    const H = 340
     const padL = 50
     const padR = 25
     const padT = 25
-    const padB = 70
+    const padB = 92
     const chartW = W - padL - padR
     const chartH = H - padT - padB
 
@@ -627,6 +1082,9 @@ const PressureTrendChart: React.FC<{
     const maxP = Math.ceil(Math.max(...allP) * 2) / 2 + 0.5
     const rangeP = Math.max(maxP - minP, 1)
     const maxMileage = hasData ? Math.max(stations[stations.length - 1]?.mileage ?? 0, 1) : 1
+    const safeRevealProgress = clampNumber(revealProgress, 0, 1)
+    const revealWidth = chartW * safeRevealProgress
+    const chartClipId = `hydraulicClip-${config.pipelineId}`
 
     const xScale = (mileage: number) => padL + (mileage / maxMileage) * chartW
     const yScale = (p: number) => padT + chartH - ((p - minP) / rangeP) * chartH
@@ -668,7 +1126,7 @@ const PressureTrendChart: React.FC<{
             className={`${standalone ? 'h-full w-full' : `absolute z-20 ${isDragging ? 'cursor-grabbing' : ''}`} flex flex-col select-none overflow-hidden`}
             style={{
                 width: standalone ? '100%' : `${width}px`,
-                height: standalone ? '100%' : '420px',
+                height: standalone ? '100%' : `${height}px`,
                 background: 'linear-gradient(180deg, rgba(5,10,18,0.97) 0%, rgba(8,15,12,0.97) 100%)',
                 backdropFilter: 'blur(16px)',
                 borderRadius: standalone ? '0' : '12px',
@@ -688,6 +1146,11 @@ const PressureTrendChart: React.FC<{
                     <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 'normal' }}>单位: MPa / km</span>
                     {config.mileageMode === 'estimated' && (
                         <span style={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'normal' }}>主干线累计长度推算</span>
+                    )}
+                    {safeRevealProgress < 1 && (
+                        <span style={{ color: accentColor, fontSize: '10px', fontWeight: 600 }}>
+                            曲线生成 {Math.round(safeRevealProgress * 100)}%
+                        </span>
                     )}
                 </h3>
                 <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10" title="关闭">
@@ -716,6 +1179,9 @@ const PressureTrendChart: React.FC<{
                                 <stop offset="60%" stopColor={accentColor} stopOpacity="0.05" />
                                 <stop offset="100%" stopColor={accentColor} stopOpacity="0.01" />
                             </linearGradient>
+                            <clipPath id={chartClipId}>
+                                <rect x={padL} y={padT - 4} width={revealWidth} height={chartH + padB + 8} />
+                            </clipPath>
                         </defs>
 
                         {gridLines.map(p => (
@@ -725,80 +1191,85 @@ const PressureTrendChart: React.FC<{
                             </g>
                         ))}
 
-                        <path d={areaPath} fill={`url(#hydraulicGrad-${config.pipelineId})`} />
-                        <path d={hydraulicPath} fill="none" stroke={accentColor} strokeWidth={2} strokeLinejoin="round" />
+                        <g clipPath={`url(#${chartClipId})`}>
+                            <path d={areaPath} fill={`url(#hydraulicGrad-${config.pipelineId})`} />
+                            <path d={hydraulicPath} fill="none" stroke={accentColor} strokeWidth={2} strokeLinejoin="round" />
+                        </g>
 
-                        {stations.map((s, i) => {
+                        <g clipPath={`url(#${chartClipId})`}>
+                            {stations.map((s, i) => {
                             const x = xScale(s.mileage)
                             const yIn = yScale(s.inP)
                             const yOut = yScale(s.outP)
                             const hasJump = Math.abs(s.outP - s.inP) > jumpThreshold
                             const isHovered = hoveredIdx === i
-                            const showLabel = isHovered || i === 0 || i === stations.length - 1
+                            const isStationLabel = s.type !== 'valve' && !/^WE1-\d+阀室$/.test(s.name)
+                            const showLabel = isHovered || i === 0 || i === stations.length - 1 || isStationLabel
 
-                            return (
-                                <g
-                                    key={`${config.pipelineId}-${s.name}-${s.mileage}`}
-                                    onMouseEnter={() => setHoveredIdx(i)}
-                                    onMouseLeave={() => setHoveredIdx(null)}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    <rect x={x - 10} y={padT} width={20} height={chartH} fill="transparent" />
-                                    {isHovered && <line x1={x} y1={padT} x2={x} y2={padT + chartH} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />}
+                                return (
+                                    <g
+                                        key={`${config.pipelineId}-${s.name}-${s.mileage}`}
+                                        onMouseEnter={() => setHoveredIdx(i)}
+                                        onMouseLeave={() => setHoveredIdx(null)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <rect x={x - 10} y={padT} width={20} height={chartH} fill="transparent" />
+                                        {isHovered && <line x1={x} y1={padT} x2={x} y2={padT + chartH} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />}
 
-                                    {isHovered && (
-                                        <>
-                                            {hasJump && (
-                                                <line x1={x} y1={yIn} x2={x} y2={yOut} stroke="#ffffff" strokeWidth={2} opacity={0.9} />
-                                            )}
-                                            <circle cx={x} cy={yIn} r={4.5} fill="#f59e0b" stroke="#fde68a" strokeWidth={1.5} />
-                                            <circle cx={x} cy={yOut} r={4.5} fill={accentColor} stroke="#ffffff" strokeWidth={1.5} />
-                                        </>
-                                    )}
+                                        {isHovered && (
+                                            <>
+                                                {hasJump && (
+                                                    <line x1={x} y1={yIn} x2={x} y2={yOut} stroke="#ffffff" strokeWidth={2} opacity={0.9} />
+                                                )}
+                                                <circle cx={x} cy={yIn} r={4.5} fill="#f59e0b" stroke="#fde68a" strokeWidth={1.5} />
+                                                <circle cx={x} cy={yOut} r={4.5} fill={accentColor} stroke="#ffffff" strokeWidth={1.5} />
+                                            </>
+                                        )}
 
-                                    {showLabel && (
-                                        <text
-                                            x={x}
-                                            y={padT + chartH + 14}
-                                            textAnchor="end"
-                                            fill={isHovered ? '#e2e8f0' : '#4b5563'}
-                                            fontSize={isHovered ? '10' : '8'}
-                                            fontWeight={isHovered ? 600 : 400}
-                                            transform={`rotate(-50, ${x}, ${padT + chartH + 14})`}
-                                        >
-                                            {s.name.replace(/压气站|分输压气站|分输站|清管站|分输联络站|分输清管站|末站/g, '')}
-                                        </text>
-                                    )}
+                                        {showLabel && (
+                                            <text
+                                                x={x}
+                                                y={padT + chartH + 14}
+                                                textAnchor="end"
+                                                fill={isHovered ? '#e2e8f0' : '#4b5563'}
+                                                fontSize={isHovered ? '10' : '8'}
+                                                fontWeight={isHovered ? 600 : 400}
+                                                transform={`rotate(-50, ${x}, ${padT + chartH + 14})`}
+                                            >
+                                                {s.name.replace(/压气站|分输压气站|分输站|清管站|分输联络站|分输清管站|末站/g, '')}
+                                            </text>
+                                        )}
 
-                                    {isHovered && (
-                                        <g>
-                                            <rect
-                                                x={Math.min(x - 84, W - padR - 168)}
-                                                y={Math.max(padT, Math.min(yIn, yOut) - 68)}
-                                                width={168}
-                                                height={60}
-                                                rx={6}
-                                                fill="rgba(15,23,42,0.95)"
-                                                stroke={hexToRgba(accentColor, 0.35)}
-                                                strokeWidth={1}
-                                            />
-                                            <text x={Math.min(x, W - padR - 84)} y={Math.max(padT + 14, Math.min(yIn, yOut) - 50)} textAnchor="middle" fill="#e2e8f0" fontSize="11" fontWeight={600}>
-                                                {s.name}
-                                            </text>
-                                            <text x={Math.min(x, W - padR - 84)} y={Math.max(padT + 28, Math.min(yIn, yOut) - 36)} textAnchor="middle" fill="#94a3b8" fontSize="9">
-                                                里程 {s.mileage.toFixed(1)} km
-                                            </text>
-                                            <text x={Math.min(x - 42, W - padR - 126)} y={Math.max(padT + 44, Math.min(yIn, yOut) - 20)} textAnchor="middle" fill="#f59e0b" fontSize="10" fontFamily="monospace">
-                                                进 {s.inP.toFixed(3)}
-                                            </text>
-                                            <text x={Math.min(x + 42, W - padR - 42)} y={Math.max(padT + 44, Math.min(yIn, yOut) - 20)} textAnchor="middle" fill={accentColor} fontSize="10" fontFamily="monospace">
-                                                出 {s.outP.toFixed(3)}
-                                            </text>
-                                        </g>
-                                    )}
-                                </g>
-                            )
-                        })}
+                                        {isHovered && (
+                                            <g>
+                                                <rect
+                                                    x={Math.min(x - 84, W - padR - 168)}
+                                                    y={Math.max(padT, Math.min(yIn, yOut) - 68)}
+                                                    width={168}
+                                                    height={60}
+                                                    rx={6}
+                                                    fill="rgba(15,23,42,0.95)"
+                                                    stroke={hexToRgba(accentColor, 0.35)}
+                                                    strokeWidth={1}
+                                                />
+                                                <text x={Math.min(x, W - padR - 84)} y={Math.max(padT + 14, Math.min(yIn, yOut) - 50)} textAnchor="middle" fill="#e2e8f0" fontSize="11" fontWeight={600}>
+                                                    {s.name}
+                                                </text>
+                                                <text x={Math.min(x, W - padR - 84)} y={Math.max(padT + 28, Math.min(yIn, yOut) - 36)} textAnchor="middle" fill="#94a3b8" fontSize="9">
+                                                    里程 {s.mileage.toFixed(1)} km
+                                                </text>
+                                                <text x={Math.min(x - 42, W - padR - 126)} y={Math.max(padT + 44, Math.min(yIn, yOut) - 20)} textAnchor="middle" fill="#f59e0b" fontSize="10" fontFamily="monospace">
+                                                    进 {s.inP.toFixed(3)}
+                                                </text>
+                                                <text x={Math.min(x + 42, W - padR - 42)} y={Math.max(padT + 44, Math.min(yIn, yOut) - 20)} textAnchor="middle" fill={accentColor} fontSize="10" fontFamily="monospace">
+                                                    出 {s.outP.toFixed(3)}
+                                                </text>
+                                            </g>
+                                        )}
+                                    </g>
+                                )
+                            })}
+                        </g>
 
                         <line x1={padL} y1={padT + chartH} x2={padL + chartW} y2={padT + chartH} stroke="rgba(100,116,139,0.2)" strokeWidth={1} />
                         {mileageTicks.map((tick) => {
@@ -818,12 +1289,21 @@ const PressureTrendChart: React.FC<{
                     </svg>
                 </div>
             )}
-            {!standalone && (
+            {!standalone && resizeMode === 'width' && (
                 <div
                     className="absolute right-0 top-0 h-full w-3 cursor-ew-resize bg-white/[0.02] hover:bg-cyan-400/10"
                     onMouseDown={onResizeMouseDown}
                     title="拖动调整压力图宽度"
                 />
+            )}
+            {!standalone && resizeMode === 'both' && (
+                <div
+                    className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-tl-md border-l border-t border-white/10 bg-white/[0.06] hover:bg-cyan-400/20"
+                    onMouseDown={onResizeMouseDown}
+                    title="拖动扩大或缩小压力图"
+                >
+                    <span className="material-symbols-outlined absolute -right-0.5 -bottom-0.5 text-[16px] text-slate-400">open_in_full</span>
+                </div>
             )}
         </div>
     )
@@ -850,7 +1330,6 @@ function hasValidPressureData(pipelineId: string): boolean {
  * 3. 减少不必要的重新渲染
  */
 const GlobalPipelineView: React.FC = () => {
-    const navigate = useNavigate()
     // 管线数据异步加载
     const [pipelines, setPipelines] = useState<PipelinePackage[]>([])
     const [pipelinesLoaded, setPipelinesLoaded] = useState(false)
@@ -864,8 +1343,26 @@ const GlobalPipelineView: React.FC = () => {
     const [selectedMapNode, setSelectedMapNode] = useState<PipelineNode | null>(null)
     const [nodeDisplayMode, setNodeDisplayMode] = useState<'full' | 'hub'>('hub')
     const [hubNodeTypes, setHubNodeTypes] = useState<HubNodeType[]>(['source', 'compressor', 'junction', 'distribution'])
+    const [showValveRooms, setShowValveRooms] = useState(false)
     const [isHubMenuOpen, setIsHubMenuOpen] = useState(false)
     const hubMenuRef = useRef<HTMLDivElement>(null)
+    const activeSimulationPilot = useMemo(() => resolveSimulationPilotConfig(DEFAULT_WE1_PILOT_ID), [])
+    const globalSimulation = useSimulation({
+        pilotId: activeSimulationPilot.id,
+        scenarios: activeSimulationPilot.scenarios,
+    })
+    const [multiScenarioActive, setMultiScenarioActive] = useState(false)
+    const [multiScenarioStepId, setMultiScenarioStepId] = useState('')
+    const [multiScenarioResults, setMultiScenarioResults] = useState<MultiScenarioAiResult[]>([])
+    const [multiScenarioPanelOpen, setMultiScenarioPanelOpen] = useState(false)
+    const [multiScenarioError, setMultiScenarioError] = useState<string | null>(null)
+    const [multiScenarioSelectedCaseIds, setMultiScenarioSelectedCaseIds] = useState<string[]>(() => MULTI_SCENARIO_AI_CASES.map(item => item.id))
+    const multiScenarioActiveRef = useRef(false)
+    const [simulationPressureChartOpen, setSimulationPressureChartOpen] = useState(false)
+    const [simulationPressureChartOverlay, setSimulationPressureChartOverlay] = useState<SimulationOverlay | null>(null)
+    const [hiddenSimulationPressureChartIds, setHiddenSimulationPressureChartIds] = useState<Record<string, boolean>>({})
+    const [simulationPressureChartRevealProgress, setSimulationPressureChartRevealProgress] = useState<Record<string, number>>({})
+    const lastSimulationPressureChartRunIdRef = useRef('')
 
     const [showScada, setShowScada] = useState(false)
     const [showWe2Scada, setShowWe2Scada] = useState(false)
@@ -996,9 +1493,22 @@ const GlobalPipelineView: React.FC = () => {
         setAssistantRuntimeContext({
             selection: {
                 history_target_station: stationHistoryTarget?.stationName || historyTarget?.stationName || '',
+                simulationRunId: globalSimulation.overlay?.run_id || '',
+                simulationScenario: globalSimulation.overlay?.scenario_id || '',
+                simulationSummary: globalSimulation.overlay?.summary || null,
+                multiScenarioSkillActive: multiScenarioActive,
+                multiScenarioResultCount: multiScenarioResults.length,
             },
         })
-    }, [historyTarget?.stationName, stationHistoryTarget?.stationName])
+    }, [
+        globalSimulation.overlay?.run_id,
+        globalSimulation.overlay?.scenario_id,
+        globalSimulation.overlay?.summary,
+        historyTarget?.stationName,
+        multiScenarioActive,
+        multiScenarioResults.length,
+        stationHistoryTarget?.stationName,
+    ])
 
     const [we2ScadaPos, setWe2ScadaPos] = useState({
         x: typeof window !== 'undefined' ? Math.max(10, window.innerWidth - 450) : 800,
@@ -1043,6 +1553,11 @@ const GlobalPipelineView: React.FC = () => {
     const [trendWidth, setTrendWidth] = useState(() => clampNumber(initialDirectoryLayoutRef.current.trendWidth || 920, 720, 1280))
     const [isResizingTrend, setIsResizingTrend] = useState(false)
     const trendResizeStartRef = React.useRef({ x: 0, width: 920 })
+    const [simulationPressureChartLayouts, setSimulationPressureChartLayouts] = useState<Record<string, SimulationPressureChartLayout>>({})
+    const [draggingSimulationPressureChartId, setDraggingSimulationPressureChartId] = useState<string | null>(null)
+    const [resizingSimulationPressureChartId, setResizingSimulationPressureChartId] = useState<string | null>(null)
+    const simulationPressureChartDragOffsetRef = React.useRef({ x: 0, y: 0 })
+    const simulationPressureChartResizeStartRef = React.useRef({ x: 0, y: 0, width: 700, height: 320 })
 
     // 西一线西段 SCADA 面板（放在西一线东段面板右侧）
     const [we1WestPos, setWe1WestPos] = useState({ x: 330, y: H - 340 })
@@ -1084,11 +1599,201 @@ const GlobalPipelineView: React.FC = () => {
         setIsResizingTrend(true)
         trendResizeStartRef.current = { x: e.clientX, width: trendWidth }
     }
+    const handleSimulationPressureChartMouseDown = useCallback((chartId: string, e: React.MouseEvent) => {
+        const layout = simulationPressureChartLayouts[chartId]
+        if (!layout) return
+
+        setDraggingSimulationPressureChartId(chartId)
+        simulationPressureChartDragOffsetRef.current = {
+            x: e.clientX - layout.x,
+            y: e.clientY - layout.y,
+        }
+    }, [simulationPressureChartLayouts])
+    const handleSimulationPressureChartResizeMouseDown = useCallback((chartId: string, e: React.MouseEvent) => {
+        e.stopPropagation()
+        const layout = simulationPressureChartLayouts[chartId]
+        if (!layout) return
+
+        setResizingSimulationPressureChartId(chartId)
+        simulationPressureChartResizeStartRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            width: layout.width,
+            height: layout.height,
+        }
+    }, [simulationPressureChartLayouts])
+    const animateSimulationPressureChartReveal = useCallback(async (chartId: string, durationMs = 1700) => {
+        setSimulationPressureChartRevealProgress(prev => ({ ...prev, [chartId]: 0 }))
+
+        const startedAt = performance.now()
+        await new Promise<void>((resolve) => {
+            const tick = (now: number) => {
+                const linear = Math.min(1, (now - startedAt) / durationMs)
+                const eased = 1 - Math.pow(1 - linear, 3)
+                setSimulationPressureChartRevealProgress(prev => ({ ...prev, [chartId]: eased }))
+
+                if (linear >= 1) {
+                    resolve()
+                    return
+                }
+                requestAnimationFrame(tick)
+            }
+            requestAnimationFrame(tick)
+        })
+
+        setSimulationPressureChartRevealProgress(prev => ({ ...prev, [chartId]: 1 }))
+    }, [])
 
     // 使用 useCallback 稳定回调引用，避免触发 MapView 无限循环
     const handleMapLoad = useCallback((map: any) => {
         setMapInstance(map)
     }, [])
+
+    const focusMapCoordinates = useCallback((coordinates: LngLatTuple[], maxZoom = 11) => {
+        if (!mapInstance || coordinates.length === 0) return
+
+        let minLng = coordinates[0][0]
+        let maxLng = coordinates[0][0]
+        let minLat = coordinates[0][1]
+        let maxLat = coordinates[0][1]
+
+        coordinates.forEach(([longitude, latitude]) => {
+            minLng = Math.min(minLng, longitude)
+            maxLng = Math.max(maxLng, longitude)
+            minLat = Math.min(minLat, latitude)
+            maxLat = Math.max(maxLat, latitude)
+        })
+
+        const center: LngLatTuple = [(minLng + maxLng) / 2, (minLat + maxLat) / 2]
+        const span = Math.max(maxLng - minLng, maxLat - minLat)
+        const leftPadding = Math.min(Math.max(directorySize.width + 56, 120), 420)
+        const padding = [88, 96, 88, leftPadding]
+
+        try {
+            const AMap = (window as any).AMap
+            if (AMap?.Bounds && AMap?.LngLat && typeof mapInstance.setBounds === 'function' && span > 0.0001) {
+                const bounds = new AMap.Bounds(
+                    new AMap.LngLat(minLng, minLat),
+                    new AMap.LngLat(maxLng, maxLat),
+                )
+                mapInstance.setBounds(bounds, false, padding, maxZoom)
+                return
+            }
+        } catch (error) {
+            console.warn('[GlobalPipelineView] 管线视野聚焦失败，使用中心点兜底:', error)
+        }
+
+        const fallbackZoom = span < 0.12 ? 11 : span < 0.45 ? 9 : span < 1.6 ? 7 : span < 5 ? 5 : 4
+        mapInstance.setZoomAndCenter?.(Math.min(fallbackZoom, maxZoom), center)
+        mapInstance.setCenter?.(center)
+    }, [directorySize.width, mapInstance])
+
+    const focusPipelinePackage = useCallback((pkg: PipelinePackage) => {
+        requestAnimationFrame(() => {
+            focusMapCoordinates(collectPackageCoordinates(pkg), pkg.layers.length > 1 ? 9 : 11)
+        })
+    }, [focusMapCoordinates])
+
+    const focusPipelineLayer = useCallback((layer: PipelineLayer) => {
+        requestAnimationFrame(() => {
+            focusMapCoordinates(collectLayerCoordinates(layer), layer.type === 'trunk' ? 9 : 11)
+        })
+    }, [focusMapCoordinates])
+
+    const locateStationOnMap = useCallback((stationName: string) => {
+        const query = stationName.trim()
+        if (!query || !mapInstance) return false
+
+        const queryKey = normalizeStationMatchKey(query)
+        let bestMatch: {
+            node: PipelineNode
+            pkg: PipelinePackage
+            layerIndex: number
+            score: number
+        } | null = null
+
+        pipelines.forEach((pkg) => {
+            pkg.layers.forEach((layer, layerIndex) => {
+                layer.nodes.forEach((node) => {
+                    const names = [
+                        node.name,
+                        node.id,
+                        node.hubInfo?.junctionName,
+                        typeof node.properties?.displayName === 'string' ? node.properties.displayName : '',
+                        typeof node.properties?.rawName === 'string' ? node.properties.rawName : '',
+                        typeof node.properties?.stationName === 'string' ? node.properties.stationName : '',
+                    ].filter(Boolean) as string[]
+
+                    let score = 0
+                    for (const name of names) {
+                        const nameKey = normalizeStationMatchKey(name)
+                        if (name === query) {
+                            score = Math.max(score, 100)
+                        } else if (nameKey && nameKey === queryKey) {
+                            score = Math.max(score, 90)
+                        } else if (queryKey && nameKey && (nameKey.includes(queryKey) || queryKey.includes(nameKey))) {
+                            score = Math.max(score, 70 - Math.abs(nameKey.length - queryKey.length))
+                        } else if (name.includes(query) || query.includes(name)) {
+                            score = Math.max(score, 55)
+                        }
+                    }
+
+                    if (score > 0 && (!bestMatch || score > bestMatch.score)) {
+                        bestMatch = { node, pkg, layerIndex, score }
+                    }
+                })
+            })
+        })
+
+        if (!bestMatch) {
+            console.warn(`[GlobalPipelineView] AI 请求定位站点失败，地图中未找到：${query}`)
+            return false
+        }
+
+        const { node, pkg } = bestMatch
+        setVisibleLayers((prev) => {
+            const next = { ...prev }
+            pkg.layers.forEach((layer, index) => {
+                next[getPipelineLayerId(pkg, layer, index)] = true
+            })
+            return next
+        })
+        setExpandedGroups((prev) => ({ ...prev, [pkg.id]: true }))
+        setSelectedMapNode(node)
+
+        const center: LngLatTuple = [node.coordinate.longitude, node.coordinate.latitude]
+        requestAnimationFrame(() => {
+            mapInstance.setZoomAndCenter?.(11, center, true, 600)
+            mapInstance.setCenter?.(center)
+        })
+        return true
+    }, [mapInstance, pipelines])
+
+    useEffect(() => {
+        const handleAssistantLocateStation = (event: Event) => {
+            const detail = (event as CustomEvent).detail as { station?: string } | undefined
+            const stationName = detail?.station?.trim()
+            if (!stationName) return
+            locateStationOnMap(stationName)
+        }
+        const handleAssistantLocateMessage = (event: MessageEvent) => {
+            const payload = event.data as {
+                type?: string
+                detail?: {
+                    station?: string
+                }
+            } | undefined
+            if (!payload || payload.type !== 'assistant-locate-station') return
+            handleAssistantLocateStation({ detail: payload.detail } as CustomEvent)
+        }
+
+        window.addEventListener('assistant-locate-station', handleAssistantLocateStation as EventListener)
+        window.addEventListener('message', handleAssistantLocateMessage)
+        return () => {
+            window.removeEventListener('assistant-locate-station', handleAssistantLocateStation as EventListener)
+            window.removeEventListener('message', handleAssistantLocateMessage)
+        }
+    }, [locateStationOnMap])
 
     const activeTrendChart = useMemo(() => {
         if (!activeTrendPipelineId) return null
@@ -1131,6 +1836,21 @@ const GlobalPipelineView: React.FC = () => {
         if (isDraggingCred)    setCredPos({    x: e.clientX - credOffsetRef.current.x,    y: e.clientY - credOffsetRef.current.y    })
         if (isDraggingPt)      setPtPos({      x: e.clientX - ptOffsetRef.current.x,      y: e.clientY - ptOffsetRef.current.y      })
         if (isDraggingTrend)   setTrendPos({   x: e.clientX - trendOffsetRef.current.x,   y: e.clientY - trendOffsetRef.current.y   })
+        if (draggingSimulationPressureChartId) {
+            const chartId = draggingSimulationPressureChartId
+            setSimulationPressureChartLayouts(prev => {
+                const layout = prev[chartId]
+                if (!layout) return prev
+                return {
+                    ...prev,
+                    [chartId]: {
+                        ...layout,
+                        x: clampNumber(e.clientX - simulationPressureChartDragOffsetRef.current.x, 0, Math.max(0, W - layout.width - 12)),
+                        y: clampNumber(e.clientY - simulationPressureChartDragOffsetRef.current.y, 60, Math.max(60, H - layout.height - 12)),
+                    },
+                }
+            })
+        }
         if (isDraggingHistory) setHistoryChartPos({ x: e.clientX - historyOffsetRef.current.x, y: e.clientY - historyOffsetRef.current.y })
         if (isDraggingStationHistory) setStationHistoryPos({ x: e.clientX - stationHistoryOffsetRef.current.x, y: e.clientY - stationHistoryOffsetRef.current.y })
         if (isDraggingDirectory) {
@@ -1150,6 +1870,31 @@ const GlobalPipelineView: React.FC = () => {
         if (isResizingTrend) {
             setTrendWidth(clampNumber(trendResizeStartRef.current.width + e.clientX - trendResizeStartRef.current.x, 720, 1280))
         }
+        if (resizingSimulationPressureChartId) {
+            const chartId = resizingSimulationPressureChartId
+            setSimulationPressureChartLayouts(prev => {
+                const layout = prev[chartId]
+                if (!layout) return prev
+                const nextWidth = clampNumber(
+                    simulationPressureChartResizeStartRef.current.width + e.clientX - simulationPressureChartResizeStartRef.current.x,
+                    520,
+                    Math.min(1180, W - layout.x - 12),
+                )
+                const nextHeight = clampNumber(
+                    simulationPressureChartResizeStartRef.current.height + e.clientY - simulationPressureChartResizeStartRef.current.y,
+                    260,
+                    Math.min(620, H - layout.y - 12),
+                )
+                return {
+                    ...prev,
+                    [chartId]: {
+                        ...layout,
+                        width: nextWidth,
+                        height: nextHeight,
+                    },
+                }
+            })
+        }
     }
 
     const handleGlobalMouseUp = () => {
@@ -1162,8 +1907,10 @@ const GlobalPipelineView: React.FC = () => {
         if (isDraggingHistory)  setIsDraggingHistory(false)
         if (isDraggingStationHistory) setIsDraggingStationHistory(false)
         if (isDraggingDirectory) setIsDraggingDirectory(false)
+        if (draggingSimulationPressureChartId) setDraggingSimulationPressureChartId(null)
         if (isResizingDirectory) setIsResizingDirectory(false)
         if (isResizingTrend) setIsResizingTrend(false)
+        if (resizingSimulationPressureChartId) setResizingSimulationPressureChartId(null)
         if (pipelineDragId) {
             setPipelineDragId(null)
             setPipelineDropIndex(null)
@@ -1547,6 +2294,9 @@ const GlobalPipelineView: React.FC = () => {
             newState[layerIds[i]] = !allVisible
         }
         setVisibleLayers(newState)
+        if (!allVisible) {
+            focusPipelinePackage(pkg)
+        }
     }
 
     // 全选 / 全部取消功能
@@ -1581,6 +2331,234 @@ const GlobalPipelineView: React.FC = () => {
         pipelines: pipelineData.lines.length,
         groups: pipelines.length
     }), [pipelineData, pipelines])
+
+    const currentMultiScenarioCase = useMemo(() => {
+        return MULTI_SCENARIO_AI_CASES.find(item => item.id === multiScenarioStepId) || null
+    }, [multiScenarioStepId])
+
+    const multiScenarioDisplayCases = useMemo(() => {
+        const selectedSet = new Set(multiScenarioSelectedCaseIds)
+        const selectedCases = MULTI_SCENARIO_AI_CASES.filter(item => selectedSet.has(item.id))
+        return selectedCases.length > 0 ? selectedCases : MULTI_SCENARIO_AI_CASES
+    }, [multiScenarioSelectedCaseIds])
+
+    const multiScenarioConclusion = useMemo(() => {
+        return buildMultiScenarioAiConclusion(multiScenarioResults)
+    }, [multiScenarioResults])
+
+    const simulationPressureChartEntries = useMemo<SimulationPressureChartEntry[]>(() => {
+        if (multiScenarioResults.length > 0) {
+            return multiScenarioResults.map(result => ({
+                id: result.caseId,
+                label: result.label,
+                overlay: result.overlay,
+                color: getSimulationPressureChartColor(result.caseId),
+            }))
+        }
+
+        const overlay = simulationPressureChartOverlay ?? globalSimulation.overlay
+        if (!overlay) return []
+        return [{
+            id: 'latest',
+            label: currentMultiScenarioCase?.label || '当前工况',
+            overlay,
+            color: '#10b981',
+        }]
+    }, [currentMultiScenarioCase?.label, globalSimulation.overlay, multiScenarioResults, simulationPressureChartOverlay])
+
+    const visibleSimulationPressureChartEntries = useMemo(() => {
+        return simulationPressureChartEntries.filter(entry => !hiddenSimulationPressureChartIds[entry.id])
+    }, [hiddenSimulationPressureChartIds, simulationPressureChartEntries])
+
+    const simulationPressureChartConfigs = useMemo(() => {
+        return visibleSimulationPressureChartEntries
+            .map(entry => ({
+                ...entry,
+                config: buildSimulationPressureTrendConfig(entry.overlay, entry.label, entry.color),
+            }))
+            .filter((entry): entry is SimulationPressureChartEntry & { config: TrendChartConfig } => Boolean(entry.config))
+    }, [visibleSimulationPressureChartEntries])
+
+    const simulationPressureTrendChart = simulationPressureChartConfigs[0]?.config ?? null
+
+    useEffect(() => {
+        if (simulationPressureChartEntries.length === 0) return
+
+        setSimulationPressureChartLayouts(prev => {
+            let changed = false
+            const next = { ...prev }
+            simulationPressureChartEntries.forEach((entry, index) => {
+                if (next[entry.id]) return
+                next[entry.id] = buildDefaultSimulationPressureChartLayout(index, W, H)
+                changed = true
+            })
+            return changed ? next : prev
+        })
+    }, [H, W, simulationPressureChartEntries])
+
+    useEffect(() => {
+        if (multiScenarioActiveRef.current) return
+
+        const overlay = globalSimulation.overlay
+        const runId = overlay?.run_id
+        if (!runId || lastSimulationPressureChartRunIdRef.current === runId) return
+
+        lastSimulationPressureChartRunIdRef.current = runId
+        setSimulationPressureChartOverlay(overlay)
+        setHiddenSimulationPressureChartIds({})
+        setSimulationPressureChartRevealProgress(prev => ({ ...prev, latest: 1 }))
+        setSimulationPressureChartOpen(true)
+    }, [globalSimulation.overlay])
+
+    const buildGlobalMultiScenarioResult = useCallback((demoCase: MultiScenarioAiCase, overlay: SimulationOverlay): MultiScenarioAiResult => {
+        const minPressureNode = overlay.nodes.reduce((currentMin, node) => {
+            const currentPressure = currentMin.pressure_in_mpa ?? currentMin.pressure_mpa
+            const nextPressure = node.pressure_in_mpa ?? node.pressure_mpa
+            return nextPressure < currentPressure ? node : currentMin
+        }, overlay.nodes[0])
+        const sourceNode = overlay.nodes.find(node => node.id === ZHONGWEI_SOURCE_NODE_ID)
+        const minPressurePipelineNode = minPressureNode ? findPipelineNodeByPilotNodeId(minPressureNode.id, pipelineData) : null
+
+        return {
+            caseId: demoCase.id,
+            label: demoCase.label,
+            flowText: demoCase.flowText,
+            description: demoCase.description,
+            overlay,
+            sourceFlow: sourceNode?.supply_actual ?? overlay.summary.total_supply,
+            unservedDemand: overlay.summary.unserved_demand,
+            alertCount: overlay.summary.alert_count,
+            avgUtilization: overlay.summary.avg_utilization,
+            minPressure: minPressureNode ? (minPressureNode.pressure_in_mpa ?? minPressureNode.pressure_mpa) : 0,
+            minPressureNodeName: minPressurePipelineNode?.name || (minPressureNode ? resolvePilotNodeName(minPressureNode.id) : '-'),
+            iterations: overlay.iterations,
+            runId: overlay.run_id,
+        }
+    }, [pipelineData])
+
+    const runGlobalMultiScenarioAi = useCallback(async (selectedScenarioIds?: string[]) => {
+        if (multiScenarioActiveRef.current) return
+
+        const selectedSet = selectedScenarioIds?.length
+            ? new Set(selectedScenarioIds)
+            : null
+        const selectedCases = selectedSet
+            ? MULTI_SCENARIO_AI_CASES.filter(item => selectedSet.has(item.id))
+            : MULTI_SCENARIO_AI_CASES
+        const casesToRun = selectedCases.length > 0 ? selectedCases : MULTI_SCENARIO_AI_CASES
+
+        multiScenarioActiveRef.current = true
+        setMultiScenarioActive(true)
+        setMultiScenarioSelectedCaseIds(casesToRun.map(item => item.id))
+        setMultiScenarioError(null)
+        setMultiScenarioResults([])
+        setMultiScenarioPanelOpen(false)
+        setHiddenSimulationPressureChartIds({})
+        setSimulationPressureChartLayouts({})
+        setSimulationPressureChartOverlay(null)
+        setSimulationPressureChartRevealProgress({})
+        setSimulationPressureChartOpen(false)
+        setNodeDisplayMode('hub')
+        setHubNodeTypes(['source', 'compressor', 'junction', 'distribution'])
+        setExpandedGroups(prev => ({ ...prev, we1: true }))
+        setVisibleLayers(prev => {
+            const next = { ...prev }
+            pipelines.forEach(pkg => {
+                if (pkg.id !== 'we1') return
+                pkg.layers.forEach((layer, index) => {
+                    next[getPipelineLayerId(pkg, layer, index)] = true
+                })
+            })
+            return next
+        })
+
+        const collected: MultiScenarioAiResult[] = []
+        try {
+            emitMultiScenarioAiAssistantEvent('progress', {
+                message: `已调用 multi-scenario-ai skill，已确认 ${casesToRun.length} 个工况，准备在全国一张网依次运行。`,
+            })
+
+            for (const demoCase of casesToRun) {
+                setMultiScenarioStepId(demoCase.id)
+                emitMultiScenarioAiAssistantEvent('progress', {
+                    message: `正在运行 ${demoCase.label}：${demoCase.description}`,
+                })
+
+                const overlay = await globalSimulation.runSimulation({
+                    scenarioId: demoCase.scenarioId,
+                    initialInput: demoCase.initialInput,
+                    waitForAnimation: true,
+                })
+
+                if (!overlay) {
+                    throw new Error(`${demoCase.label} 仿真没有返回结果`)
+                }
+
+                const result = buildGlobalMultiScenarioResult(demoCase, overlay)
+                collected.push(result)
+                setMultiScenarioResults([...collected])
+                setHiddenSimulationPressureChartIds(prev => ({ ...prev, [result.caseId]: false }))
+                setSimulationPressureChartRevealProgress(prev => ({ ...prev, [result.caseId]: 0 }))
+                setSimulationPressureChartOpen(true)
+                emitMultiScenarioAiAssistantEvent('progress', {
+                    message: `${demoCase.label} 已完成，run_id=${result.runId}，正在生成中卫-上海白鹤压力曲线。`,
+                })
+                await new Promise(resolve => setTimeout(resolve, 80))
+                await animateSimulationPressureChartReveal(result.caseId)
+                emitMultiScenarioAiAssistantEvent('progress', {
+                    message: `${demoCase.label} 压力曲线已生成，未满足需求 ${result.unservedDemand.toFixed(0)} 万方/天，准备进入下一组工况。`,
+                })
+                await new Promise(resolve => setTimeout(resolve, 320))
+            }
+
+            setMultiScenarioPanelOpen(true)
+            emitMultiScenarioAiAssistantEvent('result', {
+                message: formatMultiScenarioAiMessage(collected),
+            })
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '多工况 AI 仿真失败'
+            setMultiScenarioError(message)
+            emitMultiScenarioAiAssistantEvent('result', { error: message })
+        } finally {
+            setMultiScenarioStepId('')
+            multiScenarioActiveRef.current = false
+            setMultiScenarioActive(false)
+        }
+    }, [animateSimulationPressureChartReveal, buildGlobalMultiScenarioResult, globalSimulation, pipelines])
+
+    useEffect(() => {
+        const handleStart = (event: Event) => {
+            const detail = (event as CustomEvent<MultiScenarioAiStartEventDetail>).detail
+            void runGlobalMultiScenarioAi(detail?.selectedScenarioIds)
+        }
+        const handleMessage = (event: MessageEvent) => {
+            const payload = event.data as { type?: string; detail?: MultiScenarioAiStartEventDetail } | undefined
+            if (payload?.type === 'assistant-start-multi-scenario-ai') {
+                void runGlobalMultiScenarioAi(payload.detail?.selectedScenarioIds)
+            }
+        }
+
+        let channel: BroadcastChannel | null = null
+        try {
+            channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+            channel.onmessage = (event) => {
+                const payload = event.data as { type?: string; detail?: MultiScenarioAiStartEventDetail } | undefined
+                if (payload?.type === 'assistant-start-multi-scenario-ai') {
+                    void runGlobalMultiScenarioAi(payload.detail?.selectedScenarioIds)
+                }
+            }
+        } catch {
+            channel = null
+        }
+
+        window.addEventListener('assistant-start-multi-scenario-ai', handleStart)
+        window.addEventListener('message', handleMessage)
+        return () => {
+            window.removeEventListener('assistant-start-multi-scenario-ai', handleStart)
+            window.removeEventListener('message', handleMessage)
+            channel?.close()
+        }
+    }, [runGlobalMultiScenarioAi])
 
     const selectedMapNodeMeta = useMemo(() => {
         if (!selectedMapNode) return null
@@ -1702,6 +2680,71 @@ const GlobalPipelineView: React.FC = () => {
         return () => clearInterval(timer)
     }, [activePressureOverlayIds, mapInstance])
 
+    useEffect(() => {
+        if (!mapInstance) return
+
+        const activeOverlay = globalSimulation.overlay
+        const simByStationKey = new Map<string, SimulationOverlay['nodes'][number]>()
+        activeOverlay?.nodes.forEach(node => {
+            simByStationKey.set(normalizeStationMatchKey(resolvePilotNodeName(node.id)), node)
+        })
+
+        const timer = setInterval(() => {
+            const markerMap = getNodeMarkerMap()
+            if (markerMap.size === 0) return
+
+            markerMap.forEach((marker) => {
+                if (!marker || !marker.getContent) return
+
+                const node = marker.getExtData()?.node as PipelineNode
+                if (!node) return
+
+                let originalContent = typeof marker.getContent === 'function' ? marker.getContent() : marker.getContent?.() || ''
+                if (typeof originalContent !== 'string') return
+
+                const hasSimLabel = originalContent.includes('<!--sim-label-->')
+                if (hasSimLabel) {
+                    originalContent = originalContent.split('<!--sim-label-->')[0]
+                }
+
+                const simNode = simByStationKey.get(normalizeStationMatchKey(node.name))
+                if (!simNode) {
+                    if (hasSimLabel) marker.setContent(originalContent)
+                    return
+                }
+
+                const pressureIn = simNode.pressure_in_mpa ?? simNode.pressure_mpa
+                const pressureOut = simNode.pressure_mpa
+                const alertColor = simNode.alert_level === 'critical'
+                    ? '#f87171'
+                    : simNode.alert_level === 'warning'
+                        ? '#fbbf24'
+                        : '#67e8f9'
+                const shadow = '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000'
+                const simHTML = `
+                    <!--sim-label-->
+                    <div class="absolute left-1/2 -top-7 -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none whitespace-nowrap z-50 overflow-visible"
+                         style="line-height:1.08; display:flex;">
+                        <span style="font-size:10px; font-weight:bold; color:${alertColor}; text-shadow:${shadow};">
+                            仿真 入:${pressureIn.toFixed(2)} 出:${pressureOut.toFixed(2)}
+                        </span>
+                        <span style="font-size:9px; color:#a5f3fc; text-shadow:${shadow};">
+                            ${currentMultiScenarioCase?.label || activeOverlay?.scenario_id || ''}
+                        </span>
+                    </div>
+                `
+
+                if (originalContent.includes('style="position:relative; overflow:visible;"')) {
+                    marker.setContent(originalContent + simHTML)
+                } else if (originalContent.startsWith('<div')) {
+                    marker.setContent(originalContent.replace('<div', '<div style="position:relative; overflow:visible;"') + simHTML)
+                }
+            })
+        }, 500)
+
+        return () => clearInterval(timer)
+    }, [currentMultiScenarioCase?.label, globalSimulation.overlay, mapInstance])
+
     const fixedScadaPanels = [
         {
             id: 'we1',
@@ -1816,6 +2859,16 @@ const GlobalPipelineView: React.FC = () => {
                     </div>
                     {/* 右侧工具栏 */}
                     <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setShowValveRooms(prev => !prev)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border ${showValveRooms ? 'bg-yellow-500/15 border-yellow-300/40 text-yellow-100' : 'bg-slate-800/75 border-white/10 text-slate-300 hover:text-white hover:border-white/20'}`}
+                            title={showValveRooms ? '当前显示阀室，点击隐藏' : '当前隐藏阀室，点击显示'}
+                        >
+                            <span className="material-symbols-outlined text-base">
+                                {showValveRooms ? 'visibility' : 'visibility_off'}
+                            </span>
+                            <span>{showValveRooms ? '隐藏阀室' : '显示阀室'}</span>
+                        </button>
                         <div className="relative" ref={hubMenuRef}>
                             <button
                                 onClick={() => {
@@ -1974,9 +3027,176 @@ const GlobalPipelineView: React.FC = () => {
                 pipelineData={pipelineData}
                 nodeDisplayMode={nodeDisplayMode}
                 hubNodeTypes={hubNodeTypes}
+                showValveRooms={showValveRooms}
                 onLoad={handleMapLoad}
                 onNodeClick={handleMapNodeClick}
             />
+
+            {(multiScenarioActive || globalSimulation.isLoading || globalSimulation.animatingState?.active || multiScenarioResults.length > 0 || multiScenarioError) && (
+                <div className="absolute top-[92px] right-6 z-30 w-[360px] rounded-2xl border border-emerald-400/25 bg-slate-950/92 backdrop-blur-md shadow-2xl shadow-emerald-950/40 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-white/10 bg-gradient-to-r from-emerald-950/70 to-cyan-950/50">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 text-white font-bold text-sm">
+                                <span className="material-symbols-outlined text-emerald-300">
+                                    {multiScenarioActive ? 'sync' : 'psychology_alt'}
+                                </span>
+                                全国图 · 多工况AI仿真
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                {simulationPressureChartEntries.length > 0 && (
+                                    <button
+                                        onClick={() => {
+                                            if (!simulationPressureChartOpen || simulationPressureChartConfigs.length === 0) {
+                                                setHiddenSimulationPressureChartIds({})
+                                            }
+                                            setSimulationPressureChartOpen(prev => simulationPressureChartConfigs.length === 0 ? true : !prev)
+                                        }}
+                                        className="text-[10px] px-2 py-1 rounded border border-cyan-400/25 bg-cyan-500/10 text-cyan-100"
+                                    >
+                                        {simulationPressureChartOpen && simulationPressureChartConfigs.length > 0 ? '隐藏曲线' : '压力曲线'}
+                                    </button>
+                                )}
+                                {multiScenarioResults.length === multiScenarioDisplayCases.length && (
+                                    <button
+                                        onClick={() => setMultiScenarioPanelOpen(prev => !prev)}
+                                        className="text-[10px] px-2 py-1 rounded border border-emerald-400/25 bg-emerald-500/10 text-emerald-100"
+                                    >
+                                        {multiScenarioPanelOpen ? '收起' : '比对'}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-400">
+                            {currentMultiScenarioCase
+                                ? `正在运行：${currentMultiScenarioCase.label}`
+                                : multiScenarioResults.length > 0
+                                    ? `${multiScenarioResults.length} 组工况已完成`
+                                    : '等待 AI 文本框触发'}
+                        </div>
+                    </div>
+
+                    <div className="p-4 space-y-3">
+                        <div className="space-y-1.5">
+                            {multiScenarioDisplayCases.map(item => {
+                                const done = multiScenarioResults.some(result => result.caseId === item.id)
+                                const active = multiScenarioStepId === item.id
+                                return (
+                                    <div key={item.id} className="flex items-center gap-2 text-[11px]">
+                                        <span className={`w-2.5 h-2.5 rounded-full ${done ? 'bg-emerald-400' : active ? 'bg-cyan-400 animate-pulse' : 'bg-slate-600'}`} />
+                                        <span className={active ? 'text-cyan-100 font-semibold' : done ? 'text-emerald-100' : 'text-slate-400'}>{item.label}</span>
+                                        <span className="ml-auto text-slate-500 font-mono">{item.flowText} 万方/天</span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+
+                        {(globalSimulation.isLoading || globalSimulation.animatingState?.active) && (
+                            <div className="rounded-xl border border-cyan-400/15 bg-cyan-950/20 p-3">
+                                <div className="flex items-center justify-between text-[10px] text-cyan-100 mb-1">
+                                    <span>{globalSimulation.isLoading ? '求解器装配中' : '压力场演化中'}</span>
+                                    <span>
+                                        {globalSimulation.animatingState
+                                            ? `${globalSimulation.animatingState.iteration}/${globalSimulation.animatingState.total}`
+                                            : '--'}
+                                    </span>
+                                </div>
+                                <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                                    <div
+                                        className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-blue-400 to-emerald-400 transition-all duration-200"
+                                        style={{
+                                            width: globalSimulation.animatingState
+                                                ? `${Math.min(100, (globalSimulation.animatingState.iteration / globalSimulation.animatingState.total) * 100)}%`
+                                                : '16%',
+                                        }}
+                                    />
+                                </div>
+                                <div className="mt-2 text-[10px] text-slate-400">
+                                    真实求解迭代 {globalSimulation.animatingState?.solverIterations ?? globalSimulation.overlay?.iterations ?? '--'} 次
+                                </div>
+                            </div>
+                        )}
+
+                        {multiScenarioPanelOpen && multiScenarioResults.length > 0 && (
+                            <div className="rounded-xl border border-white/10 overflow-hidden">
+                                <div className="grid grid-cols-[1.1fr_0.7fr_0.7fr_0.7fr] bg-slate-900/90 text-[10px] text-slate-400 px-2 py-1.5">
+                                    <span>工况</span>
+                                    <span className="text-right">未满足</span>
+                                    <span className="text-right">最低压</span>
+                                    <span className="text-right">告警</span>
+                                </div>
+                                <div className="divide-y divide-white/5">
+                                    {multiScenarioResults.map(result => (
+                                        <button
+                                            key={result.caseId}
+                                            onClick={() => {
+                                                setSimulationPressureChartOverlay(result.overlay)
+                                                setHiddenSimulationPressureChartIds(prev => ({ ...prev, [result.caseId]: false }))
+                                                setSimulationPressureChartOpen(true)
+                                            }}
+                                            className="grid grid-cols-[1.1fr_0.7fr_0.7fr_0.7fr] w-full px-2 py-1.5 text-[10px] text-left hover:bg-white/[0.04] transition-colors"
+                                            title={`查看${result.label}压力曲线`}
+                                        >
+                                            <span className="text-slate-100 truncate">{result.label}</span>
+                                            <span className={`text-right font-mono ${result.unservedDemand > 0 ? 'text-red-300' : 'text-slate-400'}`}>{result.unservedDemand.toFixed(0)}</span>
+                                            <span className="text-right font-mono text-cyan-300">{result.minPressure.toFixed(2)}</span>
+                                            <span className="text-right font-mono text-amber-300">{result.alertCount.toFixed(0)}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {multiScenarioResults.length === multiScenarioDisplayCases.length && (
+                            <div className="rounded-xl border border-emerald-400/20 bg-emerald-950/20 p-3 text-[11px] leading-relaxed text-emerald-100">
+                                {multiScenarioConclusion}
+                            </div>
+                        )}
+
+                        {multiScenarioError && (
+                            <div className="rounded-xl border border-red-400/20 bg-red-950/30 p-3 text-[11px] text-red-200">
+                                {multiScenarioError}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {simulationPressureChartOpen && simulationPressureChartConfigs.map((entry, index) => {
+                const layout = simulationPressureChartLayouts[entry.id]
+                    || buildDefaultSimulationPressureChartLayout(index, W, H)
+                const isActiveChart = draggingSimulationPressureChartId === entry.id || resizingSimulationPressureChartId === entry.id
+                return (
+                    <div
+                        key={entry.id}
+                        className="absolute"
+                        style={{
+                            left: `${layout.x}px`,
+                            top: `${layout.y}px`,
+                            zIndex: isActiveChart ? 55 : 40 + index,
+                            width: `${layout.width}px`,
+                            height: `${layout.height}px`,
+                        }}
+                    >
+                        <PressureTrendChart
+                            config={entry.config}
+                            onClose={() => {
+                                if (simulationPressureChartConfigs.length <= 1) {
+                                    setSimulationPressureChartOpen(false)
+                                } else {
+                                    setHiddenSimulationPressureChartIds(prev => ({ ...prev, [entry.id]: true }))
+                                }
+                            }}
+                            onMouseDown={(event) => handleSimulationPressureChartMouseDown(entry.id, event)}
+                            isDragging={draggingSimulationPressureChartId === entry.id}
+                            width={layout.width}
+                            height={layout.height}
+                            resizeMode="both"
+                            revealProgress={simulationPressureChartRevealProgress[entry.id] ?? 1}
+                            onResizeMouseDown={(event) => handleSimulationPressureChartResizeMouseDown(entry.id, event)}
+                        />
+                    </div>
+                )
+            })}
 
             {/* 图层控制面板 - 树形结构 */}
             <div
@@ -2056,7 +3276,10 @@ const GlobalPipelineView: React.FC = () => {
                                 {/* 组头部 (管线名) */}
                                 <div
                                     className="flex items-center gap-2 hover:bg-white/5 p-1.5 rounded transition-colors select-none cursor-grab active:cursor-grabbing group"
-                                    onClick={() => hasBranches && toggleGroupExpand(pkg.id)}
+                                    onClick={() => {
+                                        if (hasBranches) toggleGroupExpand(pkg.id)
+                                        focusPipelinePackage(pkg)
+                                    }}
                                 >
                                     {/* 展开/收起箭头 */}
                                     <div className="w-5 h-5 flex items-center justify-center shrink-0">
@@ -2109,7 +3332,11 @@ const GlobalPipelineView: React.FC = () => {
                                             <div
                                                 key={layerId}
                                                 className="flex items-center gap-2 p-1.5 hover:bg-white/5 rounded cursor-pointer select-none group/item"
-                                                onClick={() => toggleLayer(layerId)}
+                                                onClick={() => {
+                                                    const willShow = !visibleLayers[layerId]
+                                                    toggleLayer(layerId)
+                                                    if (willShow) focusPipelineLayer(layer)
+                                                }}
                                             >
                                                 {/* 自定义复选框 - 子图层 */}
                                                 <div className="relative flex items-center justify-center w-[16px] h-[16px]">
@@ -2326,25 +3553,16 @@ const GlobalPipelineView: React.FC = () => {
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
+                        <div>
                             <button
                                 onClick={() => {
                                     if (mapInstance) {
                                         mapInstance.setZoomAndCenter(13, [selectedMapNode.coordinate.longitude, selectedMapNode.coordinate.latitude])
                                     }
                                 }}
-                                className="bg-gray-800 hover:bg-gray-700 text-gray-200 py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                                className="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
                             >
                                 <span className="material-symbols-outlined text-sm">my_location</span>地图定位
-                            </button>
-                            <button
-                                onClick={() => {
-                                    navigate(`/map-topology?focusNode=${encodeURIComponent(selectedMapNode.id)}`)
-                                    setSelectedMapNode(null)
-                                }}
-                                className="bg-cyan-700/80 hover:bg-cyan-600 text-white py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
-                            >
-                                <span className="material-symbols-outlined text-sm">conversion_path</span>地图拓扑
                             </button>
                         </div>
                     </div>

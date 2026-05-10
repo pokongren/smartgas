@@ -461,8 +461,9 @@ def _normalize_entity_name(name: str) -> str:
 
 
 def _build_station_lookup_reply(station: dict[str, Any]) -> str:
+    station_name = str(station.get("name") or "").strip()
     details = [
-        f"{station.get('name')}\u662f AI \u7d22\u5f15\u5e93\u91cc\u767b\u8bb0\u7684\u4e00\u4e2a{station.get('type_label') or TEXT_STATION}\u3002",
+        f"{station_name or TEXT_UNKNOWN}\u662f AI \u7d22\u5f15\u5e93\u91cc\u767b\u8bb0\u7684\u4e00\u4e2a{station.get('type_label') or TEXT_STATION}\u3002",
         f"\u7d22\u5f15 ID \u662f {station.get('id')}\u3002",
     ]
     if station.get("systems"):
@@ -475,6 +476,8 @@ def _build_station_lookup_reply(station: dict[str, Any]) -> str:
         details.append(f"\u538b\u7f29\u673a\u7ec4\u8bb0\u5f55\u6570 {station.get('compressor_unit_count')} \u53f0\u3002")
     if station.get("compressor_configs"):
         details.append(f"\u673a\u7ec4\u914d\u7f6e\u8bb0\u5f55\u6709 {'、'.join(station.get('compressor_configs', []))}\u3002")
+    if station_name:
+        details.append(f"\n\n{_build_locate_station_action_token(station_name)}")
     details.append(
         _build_evidence_block(
             sample_size="1 \u6761\u7ad9\u573a\u7d22\u5f15\u8bb0\u5f55",
@@ -486,6 +489,11 @@ def _build_station_lookup_reply(station: dict[str, Any]) -> str:
         )
     )
     return "".join(details)
+
+
+def _build_locate_station_action_token(station_name: str) -> str:
+    safe_station = str(station_name or "").replace("|", " ").replace("]", " ").strip()
+    return f"[ACTION:LOCATE_STATION|station={safe_station}]"
 
 
 def _build_pipeline_lookup_reply(pipeline: dict[str, Any]) -> str:

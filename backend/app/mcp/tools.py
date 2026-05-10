@@ -147,7 +147,7 @@ def simulate_failure(
 
 @mcp.tool()
 def run_steady_sim(
-    pilot_id: str = "mainline_zhongwei_jingbian",
+    pilot_id: str = "zhongwei_shanghai_baihe",
     scenario_id: str = "steady_base",
     initial_conditions_json: str = "",
 ) -> str:

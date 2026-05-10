@@ -24,8 +24,8 @@ const PAGE_CONTEXT_MAP: Record<string, Omit<AssistantChatContext, 'route' | 'tit
     },
     '/global': {
         page: 'global-pipeline',
-        module: 'pipeline-analysis',
-        summary: 'Nationwide pipeline overview for network scope, history trends, and station status.',
+        module: 'pipeline-analysis-and-simulation',
+        summary: 'Nationwide pipeline overview and primary simulation showcase entry for AI-triggered WE1 multi-scenario runs, result animation, history trends, and station status.',
     },
     '/topology': {
         page: 'topology-canvas',
@@ -35,7 +35,7 @@ const PAGE_CONTEXT_MAP: Record<string, Omit<AssistantChatContext, 'route' | 'tit
     '/map-topology': {
         page: 'map-topology',
         module: 'we1-simulation',
-        summary: 'Primary WE1 simulation entry on the first map for scenario runs, snapshots, baseline comparison, and coverage review.',
+        summary: 'Topology editing and troubleshooting view for WE1 simulation overlays, snapshots, baseline comparison, and coverage review.',
     },
     '/topology-demo': {
         page: 'topology-demo',

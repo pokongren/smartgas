@@ -120,22 +120,31 @@ def _expand_valve_templates(seed_valves: Iterable[Dict[str, Any]]) -> Dict[str, 
 
 
 def _default_target_pressure(raw_type: str) -> float:
-    if raw_type == "compressor":
+    normalized_type = raw_type.lower()
+    if normalized_type == "compressor":
         return 9.2
-    if raw_type == "distribution":
+    if normalized_type == "distribution":
         return 8.0
+    if normalized_type == "valve":
+        return 7.4
     return 8.8
 
 
 def _default_min_pressure(raw_type: str) -> float:
-    if raw_type == "distribution":
+    normalized_type = raw_type.lower()
+    if normalized_type == "distribution":
         return 7.0
+    if normalized_type == "valve":
+        return 6.4
     return 7.8
 
 
 def _default_max_pressure(raw_type: str) -> float:
-    if raw_type == "distribution":
+    normalized_type = raw_type.lower()
+    if normalized_type == "distribution":
         return 9.2
+    if normalized_type == "valve":
+        return 8.8
     return 10.5
 
 

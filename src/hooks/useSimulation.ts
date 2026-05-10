@@ -20,6 +20,17 @@ interface UseSimulationOptions {
   scenarios: ScenarioOption[]
 }
 
+interface RunSimulationOptions {
+  initialInput?: SimulationInitialInput
+  scenarioId?: string
+  waitForAnimation?: boolean
+  failure?: {
+    failureNodeId: string
+    failureType: 'compressor_offline' | 'pipe_break' | 'valve_close'
+    baseScenarioId?: string
+  }
+}
+
 interface UseSimulationReturn {
   overlay: SimulationOverlay | null
   baselineOverlay: SimulationOverlay | null
@@ -36,11 +47,17 @@ interface UseSimulationReturn {
   bulkTrialRunActive: boolean
   comparison: SimulationComparison | null
   trialRunItems: SimulationTrialRunItem[]
-  animatingState: { active: boolean; iteration: number; total: number; prevOverlay: SimulationOverlay | null } | null
+  animatingState: {
+    active: boolean
+    iteration: number
+    total: number
+    solverIterations: number
+    prevOverlay: SimulationOverlay | null
+  } | null
   setScenario: (id: string) => void
   setSelectedSnapshotRunId: (id: string) => void
   setBaselineSnapshotRunId: (id: string) => void
-  runSimulation: (options?: { initialInput?: SimulationInitialInput }) => Promise<void>
+  runSimulation: (options?: RunSimulationOptions) => Promise<SimulationOverlay | null>
   saveSnapshot: () => Promise<void>
   refreshSnapshots: () => Promise<void>
   loadSelectedSnapshot: () => Promise<void>
@@ -185,7 +202,13 @@ export function useSimulation({
   const [trialRunScenarioId, setTrialRunScenarioId] = useState('')
   const [bulkTrialRunActive, setBulkTrialRunActive] = useState(false)
   const [baselineSnapshot, setBaselineSnapshot] = useState<SimulationSnapshotRecord | null>(null)
-  const [animatingState, setAnimatingState] = useState<{ active: boolean; iteration: number; total: number; prevOverlay: SimulationOverlay | null } | null>(null)
+  const [animatingState, setAnimatingState] = useState<{
+    active: boolean
+    iteration: number
+    total: number
+    solverIterations: number
+    prevOverlay: SimulationOverlay | null
+  } | null>(null)
 
   const overlayCacheRef = useRef<Map<string, SimulationOverlay>>(new Map())
   const snapshotRecordCacheRef = useRef<Map<string, SimulationSnapshotRecord>>(new Map())
@@ -207,9 +230,16 @@ export function useSimulation({
     [pilotId],
   )
 
-  const runSimulation = useCallback(async (options?: { initialInput?: SimulationInitialInput }) => {
-    const cacheKey = `${pilotId}::${currentScenario}`
+  const runSimulation = useCallback(async (options?: RunSimulationOptions): Promise<SimulationOverlay | null> => {
+    const scenarioId = options?.scenarioId ?? currentScenario
+    const cacheKey = options?.failure
+      ? `${pilotId}::${scenarioId}::failure::${options.failure.failureNodeId}::${options.failure.failureType}`
+      : `${pilotId}::${scenarioId}`
     const cached = overlayCacheRef.current.get(cacheKey)
+
+    if (scenarioId !== currentScenario) {
+      setCurrentScenario(scenarioId)
+    }
 
     // 先回显缓存，避免空白闪烁；但仍然强制拉取最新结果，确保每次“运行主仿真”都有新 run。
     if (cached) {
@@ -220,45 +250,69 @@ export function useSimulation({
     setIsLoading(true)
     setError(null)
     setSnapshotError(null)
+    setAnimatingState(null)
 
     try {
       const data = USE_MOCK
         ? await (async () => {
             await new Promise(resolve => setTimeout(resolve, 600))
-            return buildMockOverlay(pilotId, currentScenario)
+            return buildMockOverlay(pilotId, scenarioId)
           })()
-        : await fetchJson<SimulationOverlay>('/topology-simulation/solve-steady', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              pilot_id: pilotId,
-              scenario_id: currentScenario,
-              initial_conditions: options?.initialInput,
-            }),
-          })
+        : options?.failure
+          ? await fetchJson<SimulationOverlay>('/topology-simulation/solve-failure', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                pilot_id: pilotId,
+                base_scenario_id: options.failure.baseScenarioId ?? scenarioId,
+                failure_node_id: options.failure.failureNodeId,
+                failure_type: options.failure.failureType,
+              }),
+            })
+          : await fetchJson<SimulationOverlay>('/topology-simulation/solve-steady', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                pilot_id: pilotId,
+                scenario_id: scenarioId,
+                initial_conditions: options?.initialInput,
+              }),
+            })
 
       const prevOverlay = overlayCacheRef.current.get(cacheKey) ?? null
       overlayCacheRef.current.set(cacheKey, data)
       setOverlay(data)
       setSelectedSnapshotRunId('')
+      setIsLoading(false)
 
       // Start animation loop
-      const totalIters = Math.max(5, data.iterations ?? 1)
-      setAnimatingState({ active: true, iteration: 1, total: totalIters, prevOverlay })
+      const solverIterations = Math.max(1, data.iterations ?? 1)
+      const totalIters = Math.max(6, solverIterations * 3)
+      setAnimatingState({ active: true, iteration: 1, total: totalIters, solverIterations, prevOverlay })
       
       const animateTicks = async () => {
         for (let i = 1; i <= totalIters; i++) {
-          setAnimatingState({ active: true, iteration: i, total: totalIters, prevOverlay })
+          setAnimatingState({ active: true, iteration: i, total: totalIters, solverIterations, prevOverlay })
           await new Promise(r => setTimeout(r, 200)) // 200ms per tick
         }
         setAnimatingState(null)
       }
-      void animateTicks()
+      const animationPromise = animateTicks()
+      if (options?.waitForAnimation) {
+        await animationPromise
+      } else {
+        void animationPromise
+      }
+      return data
 
     } catch (requestError) {
+      setAnimatingState(null)
       setError(getErrorMessage(requestError, '仿真运行失败，请稍后再试'))
+      return null
     } finally {
       setIsLoading(false)
     }

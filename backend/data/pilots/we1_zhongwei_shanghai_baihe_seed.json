@@ -1,0 +1,693 @@
+{
+  "pilot_id": "zhongwei_shanghai_baihe",
+  "system_id": "we1",
+  "name": "WE1 主样板：中卫压气站 -> 上海白鹤末站",
+  "description": "西气东输一线中卫压气站至上海白鹤末站全段主干稳态仿真",
+  "parameter_basis": {
+    "version": "trial-default-zhongwei-baihe-v1",
+    "updated_at": "2026-05-05",
+    "pressure_unit": "MPa",
+    "flow_unit": "10^4 Nm3/d",
+    "mileage_scope_km": {
+      "start": 2008.2399,
+      "end": 3846.1981,
+      "length": 1837.9582
+    },
+    "notes": [
+      "当前是二阶段试点默认值口径，用来先打通中卫到上海白鹤全段稳态求解，不代表真实生产参数。",
+      "中卫默认进气按 3000 万标方/天作为二阶段入口边界，站点需求、压气站目标压力和管段能力后续应由 SCADA、调度计划和站场台账回填。"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "WE1-76",
+      "name": "中卫压气站",
+      "type": "compressor",
+      "role": "source",
+      "supply_max": 3000.0,
+      "nominal_flow": 3000.0,
+      "demand_nominal": 0.0,
+      "target_pressure_mpa": 9.8,
+      "min_pressure_mpa": 8.6,
+      "max_pressure_mpa": 10.2,
+      "capacity": 573.5,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.06,
+      "notes": "本 pilot 上游边界点，默认中卫进气按 3000 万标方/天处理。"
+    },
+    {
+      "id": "WE1-86",
+      "name": "西一盐池压气站",
+      "type": "compressor",
+      "role": "transit",
+      "target_pressure_mpa": 9.6,
+      "min_pressure_mpa": 8.4,
+      "max_pressure_mpa": 10.1,
+      "capacity": 1659.5,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.05
+    },
+    {
+      "id": "WE1-92",
+      "name": "西一靖边压气站",
+      "type": "compressor",
+      "role": "transit",
+      "target_pressure_mpa": 9.45,
+      "min_pressure_mpa": 8.3,
+      "max_pressure_mpa": 10.0,
+      "coordinate": {
+        "longitude": 108.79,
+        "latitude": 37.59
+      },
+      "capacity": 1581.5,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.04
+    },
+    {
+      "id": "WE1-98",
+      "name": "子长分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 12.0,
+      "target_pressure_mpa": 8.6,
+      "min_pressure_mpa": 7.4,
+      "max_pressure_mpa": 9.4
+    },
+    {
+      "id": "WE1-100",
+      "name": "延川压气站",
+      "type": "compressor",
+      "role": "transit",
+      "target_pressure_mpa": 9.35,
+      "min_pressure_mpa": 8.2,
+      "max_pressure_mpa": 9.9,
+      "capacity": 1207.1,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.04
+    },
+    {
+      "id": "WE1-102",
+      "name": "延川西分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 10.0,
+      "target_pressure_mpa": 8.5,
+      "min_pressure_mpa": 7.3,
+      "max_pressure_mpa": 9.4
+    },
+    {
+      "id": "WE1-108",
+      "name": "蒲县压气站",
+      "type": "compressor",
+      "role": "transit",
+      "target_pressure_mpa": 9.25,
+      "min_pressure_mpa": 8.1,
+      "max_pressure_mpa": 9.8,
+      "capacity": 1865.4,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.04
+    },
+    {
+      "id": "WE1-111",
+      "name": "临汾分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 14.0,
+      "target_pressure_mpa": 8.4,
+      "min_pressure_mpa": 7.2,
+      "max_pressure_mpa": 9.3
+    },
+    {
+      "id": "WE1-117",
+      "name": "沁水压气站",
+      "type": "compressor",
+      "role": "transit",
+      "target_pressure_mpa": 9.1,
+      "min_pressure_mpa": 8.0,
+      "max_pressure_mpa": 9.7,
+      "capacity": 694.4,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.035
+    },
+    {
+      "id": "WE1-123",
+      "name": "博爱分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 12.0,
+      "target_pressure_mpa": 8.3,
+      "min_pressure_mpa": 7.1,
+      "max_pressure_mpa": 9.2
+    },
+    {
+      "id": "WE1-127",
+      "name": "郑州压气站",
+      "type": "compressor",
+      "role": "transit",
+      "target_pressure_mpa": 8.95,
+      "min_pressure_mpa": 7.9,
+      "max_pressure_mpa": 9.6,
+      "capacity": 1699.3,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.035
+    },
+    {
+      "id": "WE1-129",
+      "name": "薛店分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 18.0,
+      "target_pressure_mpa": 8.2,
+      "min_pressure_mpa": 7.0,
+      "max_pressure_mpa": 9.2
+    },
+    {
+      "id": "WE1-136",
+      "name": "淮阳压气站",
+      "type": "compressor",
+      "role": "transit",
+      "target_pressure_mpa": 8.85,
+      "min_pressure_mpa": 7.8,
+      "max_pressure_mpa": 9.5,
+      "capacity": 1109.9,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.03
+    },
+    {
+      "id": "WE1-140",
+      "name": "太和分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 12.0,
+      "target_pressure_mpa": 8.1,
+      "min_pressure_mpa": 6.9,
+      "max_pressure_mpa": 9.1
+    },
+    {
+      "id": "WE1-143",
+      "name": "利辛分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 10.0,
+      "target_pressure_mpa": 8.1,
+      "min_pressure_mpa": 6.9,
+      "max_pressure_mpa": 9.1
+    },
+    {
+      "id": "WE1-150",
+      "name": "刘巷子分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 13.0,
+      "target_pressure_mpa": 8.0,
+      "min_pressure_mpa": 6.8,
+      "max_pressure_mpa": 9.0
+    },
+    {
+      "id": "WE1-152",
+      "name": "定远压气站",
+      "type": "compressor",
+      "role": "transit",
+      "target_pressure_mpa": 8.65,
+      "min_pressure_mpa": 7.7,
+      "max_pressure_mpa": 9.4,
+      "capacity": 599.3,
+      "compressor_enabled": true,
+      "compressor_ratio": 1.03
+    },
+    {
+      "id": "WE1-155",
+      "name": "滁州分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 16.0,
+      "target_pressure_mpa": 7.9,
+      "min_pressure_mpa": 6.8,
+      "max_pressure_mpa": 9.0
+    },
+    {
+      "id": "WE1-157",
+      "name": "龙池分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 16.0,
+      "target_pressure_mpa": 7.9,
+      "min_pressure_mpa": 6.8,
+      "max_pressure_mpa": 9.0
+    },
+    {
+      "id": "WE1-159",
+      "name": "青山分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 10.0,
+      "target_pressure_mpa": 7.9,
+      "min_pressure_mpa": 6.8,
+      "max_pressure_mpa": 9.0
+    },
+    {
+      "id": "WE1-160",
+      "name": "龙潭分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 18.0,
+      "target_pressure_mpa": 7.9,
+      "min_pressure_mpa": 6.8,
+      "max_pressure_mpa": 9.0
+    },
+    {
+      "id": "WE1-164",
+      "name": "镇江分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 12.0,
+      "target_pressure_mpa": 7.8,
+      "min_pressure_mpa": 6.7,
+      "max_pressure_mpa": 8.9
+    },
+    {
+      "id": "WE1-165",
+      "name": "丹阳分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 10.0,
+      "target_pressure_mpa": 7.8,
+      "min_pressure_mpa": 6.7,
+      "max_pressure_mpa": 8.9
+    },
+    {
+      "id": "WE1-168",
+      "name": "常州分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 16.0,
+      "target_pressure_mpa": 7.8,
+      "min_pressure_mpa": 6.7,
+      "max_pressure_mpa": 8.9
+    },
+    {
+      "id": "WE1-169",
+      "name": "芙蓉分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 22.0,
+      "target_pressure_mpa": 7.8,
+      "min_pressure_mpa": 6.7,
+      "max_pressure_mpa": 8.9
+    },
+    {
+      "id": "WE1-172",
+      "name": "无锡分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 15.0,
+      "target_pressure_mpa": 7.7,
+      "min_pressure_mpa": 6.6,
+      "max_pressure_mpa": 8.8
+    },
+    {
+      "id": "WE1-173",
+      "name": "东桥分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 14.0,
+      "target_pressure_mpa": 7.7,
+      "min_pressure_mpa": 6.6,
+      "max_pressure_mpa": 8.8
+    },
+    {
+      "id": "WE1-176",
+      "name": "苏州分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 18.0,
+      "target_pressure_mpa": 7.7,
+      "min_pressure_mpa": 6.6,
+      "max_pressure_mpa": 8.8
+    },
+    {
+      "id": "WE1-179",
+      "name": "甪直分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 16.0,
+      "target_pressure_mpa": 7.6,
+      "min_pressure_mpa": 6.5,
+      "max_pressure_mpa": 8.7,
+      "coordinate": {
+        "longitude": 120.87,
+        "latitude": 31.27
+      }
+    },
+    {
+      "id": "WE1-180",
+      "name": "昆山分输站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 20.0,
+      "target_pressure_mpa": 7.6,
+      "min_pressure_mpa": 6.5,
+      "max_pressure_mpa": 8.7
+    },
+    {
+      "id": "WE1-181",
+      "name": "白鹤末站",
+      "type": "distribution",
+      "role": "sink",
+      "demand_nominal": 35.0,
+      "target_pressure_mpa": 7.5,
+      "min_pressure_mpa": 6.5,
+      "max_pressure_mpa": 8.7,
+      "capacity": 135.4,
+      "notes": "项目内标准站名为白鹤末站，此处作为上海白鹤末端交付点。"
+    }
+  ],
+  "edges": [
+    {
+      "id_range": [
+        "WE1-T-76",
+        "WE1-T-180"
+      ],
+      "diameter_mm_default": 1016.0,
+      "design_pressure_mpa_default": 10.0,
+      "roughness_mm_default": 0.03,
+      "direction_mode_default": "fixed",
+      "status_default": "open",
+      "start_pressure_mpa": 9.8,
+      "end_pressure_mpa": 7.5,
+      "max_flow": 4000.0,
+      "notes": "二阶段先按统一主干管径和能力口径打通全段，具体分段能力待生产参数回填。"
+    }
+  ],
+  "valves": [
+    {
+      "id_range": [
+        "WE1-77",
+        "WE1-85"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-87",
+        "WE1-91"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-93",
+        "WE1-99"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-93",
+        "WE1-97"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id": "WE1-99",
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id": "WE1-101",
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-103",
+        "WE1-107"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-109",
+        "WE1-110"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-112",
+        "WE1-116"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-118",
+        "WE1-122"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-124",
+        "WE1-126"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id": "WE1-128",
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-130",
+        "WE1-135"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-137",
+        "WE1-139"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-141",
+        "WE1-142"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-144",
+        "WE1-149"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id": "WE1-151",
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-153",
+        "WE1-154"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id": "WE1-156",
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id": "WE1-158",
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-161",
+        "WE1-163"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-166",
+        "WE1-167"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-170",
+        "WE1-171"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-174",
+        "WE1-175"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    },
+    {
+      "id_range": [
+        "WE1-177",
+        "WE1-178"
+      ],
+      "valve_status": "open",
+      "valve_opening": 1.0,
+      "solver_enabled": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "steady_base",
+      "name": "常规稳态输气",
+      "compressor_overrides": [],
+      "edge_overrides": [],
+      "node_overrides": [],
+      "notes": "验证中卫到上海白鹤全段主干方向、压力梯度和末端交付。"
+    },
+    {
+      "id": "zhongwei_supply_pressure_drop",
+      "name": "中卫出站压力下调",
+      "compressor_overrides": [],
+      "edge_overrides": [],
+      "node_overrides": [
+        {
+          "node_id": "WE1-76",
+          "target_pressure_mpa": 8.8,
+          "supply_max": 2400.0,
+          "nominal_flow": 2400.0
+        }
+      ],
+      "notes": "用边界压力和供给能力下调模拟中卫侧扰动。"
+    },
+    {
+      "id": "zhengzhou_compressor_offline",
+      "name": "郑州压气站停运",
+      "compressor_overrides": [
+        {
+          "node_id": "WE1-127",
+          "compressor_enabled": false
+        }
+      ],
+      "edge_overrides": [],
+      "node_overrides": [],
+      "notes": "验证郑州压气站停运后对河南到华东段压力的影响。"
+    },
+    {
+      "id": "east_china_peak_demand",
+      "name": "华东末端负荷上调",
+      "compressor_overrides": [],
+      "edge_overrides": [],
+      "node_overrides": [
+        {
+          "node_id": "WE1-168",
+          "demand_nominal": 24.0
+        },
+        {
+          "node_id": "WE1-169",
+          "demand_nominal": 32.0
+        },
+        {
+          "node_id": "WE1-172",
+          "demand_nominal": 22.0
+        },
+        {
+          "node_id": "WE1-176",
+          "demand_nominal": 26.0
+        },
+        {
+          "node_id": "WE1-180",
+          "demand_nominal": 28.0
+        },
+        {
+          "node_id": "WE1-181",
+          "demand_nominal": 45.0
+        }
+      ],
+      "notes": "验证苏锡常沪方向负荷抬升后的主干利用率和末端压力。"
+    },
+    {
+      "id": "baihe_delivery_limited",
+      "name": "白鹤末端交付受限",
+      "compressor_overrides": [],
+      "edge_overrides": [
+        {
+          "edge_id": "WE1-T-180",
+          "status": "limited",
+          "max_flow": 360.0
+        }
+      ],
+      "node_overrides": [],
+      "notes": "验证白鹤末站前最后管段限流后的末端交付能力。"
+    }
+  ],
+  "cross_system_hints": [
+    {
+      "anchor_node_id": "WE1-76",
+      "related_systems": [
+        "we2",
+        "zg"
+      ],
+      "notes": "中卫附近存在跨系统候选点，二阶段先只保留标记，不直接联算。"
+    },
+    {
+      "anchor_node_id": "WE1-181",
+      "related_systems": [
+        "shanghai_city_gate"
+      ],
+      "notes": "白鹤末站作为上海方向交付边界，二阶段先按单系统末端负荷处理。"
+    }
+  ]
+}

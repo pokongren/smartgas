@@ -62,6 +62,11 @@ function filterLayers(pipelines: PipelinePackage[]): void {
             if (layer.nodes.length === 0 && layer.lines.length === 0) return false
             // 南昌-上海支干线：保留全部支线
             if (pkg.id === 'ncsh') return true
+            // 广深支干线：取消樟木头支线，只保留深圳 LNG 接入支线
+            if (pkg.id === 'gs') {
+                const isZhangmutouBranch = layer.name.includes('樟木头') || layer.id?.endsWith(':GS-B1')
+                return !isZhangmutouBranch
+            }
             // 陕京四线：只保留宝坻-西集、密云-香河
             if (pkg.id === 'sj4') return sj4BranchKeywords.some(kw => layer.name.includes(kw))
             return false

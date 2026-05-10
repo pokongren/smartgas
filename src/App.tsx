@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AiAssistant from './components/ai-assistant/AiAssistant';
+import { DEFAULT_WE1_PILOT_ID } from './types/simulation';
 
 // ✅ 路由级代码分割 - 动态导入视图组件
 const CorpView = lazy(() => import('./views/CorpView'));
@@ -122,7 +123,7 @@ const ViewSwitcher: React.FC = () => {
       </div>
 
       <button
-        onClick={() => navigate('/map-topology')}
+        onClick={() => navigate(`/map-topology?pilotId=${DEFAULT_WE1_PILOT_ID}`)}
         className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isMapTopology
           ? 'bg-teal-600 text-white shadow-teal-500/50'
           : 'bg-gray-700 text-white hover:bg-teal-500'
@@ -133,7 +134,7 @@ const ViewSwitcher: React.FC = () => {
       </button>
 
       <button
-        onClick={() => navigate('/topology')}
+        onClick={() => navigate(`/topology?pilotId=${DEFAULT_WE1_PILOT_ID}`)}
         className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isTopology
           ? 'bg-cyan-600 text-white shadow-cyan-500/50'
           : 'bg-gray-700 text-white hover:bg-cyan-500'

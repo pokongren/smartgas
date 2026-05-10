@@ -753,7 +753,7 @@ class SteadyStateSolver:
         segments = self._build_station_segments(nodes, edges)
         logger.info(f"场景 {scenario_id}: 构建了 {len(segments)} 个站间区段")
 
-        # 估算主干流量
+        # 估算主干流量（沿程递减：每经过 sink 节点扣除其需求）
         total_supply = sum(
             float(n.get("supply_max", 0.0))
             for n in nodes.values()
@@ -764,7 +764,32 @@ class SteadyStateSolver:
             for n in nodes.values()
             if n.get("role") == "sink"
         )
-        trunk_flow = min(total_supply, total_demand * 1.5) if total_demand > 0 else total_supply * 0.85
+        explicit_source_flow = sum(
+            float(n.get("nominal_flow", 0.0) or n.get("supply_nominal", 0.0) or 0.0)
+            for n in nodes.values()
+            if n.get("role") == "source"
+        )
+        if explicit_source_flow > 0:
+            trunk_flow = min(total_supply, explicit_source_flow) if total_supply > 0 else explicit_source_flow
+        else:
+            trunk_flow = min(total_supply, total_demand * 1.5) if total_demand > 0 else total_supply * 0.85
+
+        # === 沿程流量分配 ===
+        # 从上游到下游，每经过一个分输站(sink)，流量减去该站需求
+        remaining_flow = trunk_flow
+        for seg in segments:
+            down_id = seg["downstream_id"]
+            down_node = nodes.get(down_id, {})
+            # 该区段的实际流量 = 当前剩余流量
+            seg["actual_flow"] = remaining_flow
+            # 如果下游是分输站，扣除其需求
+            if down_node.get("role") == "sink":
+                demand = float(down_node.get("demand_nominal", 0.0))
+                remaining_flow = max(0.0, remaining_flow - demand)
+            # 如果下游是压气站，一般不减流量（只是增压）
+            # 如果 closed，流量为0
+            if seg["status"] == "closed":
+                seg["actual_flow"] = 0.0
 
         # 初始化
         pressure: Dict[str, float] = {}
@@ -804,7 +829,7 @@ class SteadyStateSolver:
                     new_pressure[down_id] = 0.0
                     continue
 
-                flow = trunk_flow
+                flow = seg.get("actual_flow", trunk_flow)
                 if seg_status == "limited":
                     flow = min(flow, seg["max_flow"])
 
@@ -858,10 +883,10 @@ class SteadyStateSolver:
             solver_status = "max_iter"
             logger.warning(f"场景 {scenario_id} 未在 {self.MAX_ITER} 轮内收敛，max_delta={max_delta:.4f}")
 
-        # 管段流量分配
+        # 管段流量分配（使用沿程递减后的实际流量）
         segment_flows: Dict[str, float] = {}
         for seg in segments:
-            flow = trunk_flow
+            flow = seg.get("actual_flow", trunk_flow)
             if seg["status"] == "closed":
                 flow = 0.0
             elif seg["status"] == "limited":

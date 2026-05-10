@@ -20,8 +20,11 @@ import {
 } from '@/services/topologyEditorApi'
 import type { PipelineNode, PipelineLine } from '@/types'
 import { useSimulation } from '@/hooks/useSimulation'
-import { MAINLINE_SCENARIOS } from '@/types/simulation'
-import type { SimulationInitialInput } from '@/types/simulation'
+import {
+    DEFAULT_WE1_PILOT_ID,
+    resolveSimulationPilotConfig,
+} from '@/types/simulation'
+import type { SimulationInitialInput, SimulationOverlay } from '@/types/simulation'
 import { buildSimulationOverlayMapping } from '@/utils/simulationOverlayMapping'
 import {
     writeSimulationShowcaseSyncContext,
@@ -62,6 +65,7 @@ interface TopoEdge {
     endNodeId: string
     name?: string
     sourceEdgeIds?: string[]
+    persisted?: boolean
     /** 从原始管线数据汇总的默认长度（km），未被用户覆盖时作为仿真入参 */
     defaultLengthKm?: number
     poly?: any
@@ -80,11 +84,12 @@ interface BaseTopoEdge {
     endNodeId: string
     name?: string
     sourceEdgeIds?: string[]
+    persisted?: boolean
     /** 从原始管线数据汇总的默认长度（km） */
     defaultLengthKm?: number
 }
 
-const WE1_PRIMARY_PILOT_ID = 'mainline_zhongwei_jingbian'
+const WE1_PRIMARY_PILOT_ID = DEFAULT_WE1_PILOT_ID
 const TOPOLOGY_DRAFT_STORAGE_KEY = 'smartgas-map-topology-draft-v1'
 
 function formatDateTimeLabel(value?: string): string {
@@ -229,9 +234,37 @@ const MAINLINE_SCENARIO_PLAYBOOK: Record<string, {
         risk: '如果当前场景没留快照，只靠一次运行结果，不适合拿来做稳定验收。',
         talk: '这一幕讲限流，不是断辟，而是主干还能跑但运行边界开始变紧。',
     },
+    zhongwei_supply_pressure_drop: {
+        focus: '重点看中卫出站压力下调后，全段压力梯度和下游告警有没有抬升。',
+        success: '中卫侧扰动能沿主干传到华东，节点压力和告警数有清晰变化。',
+        risk: '如果边界压力变化不明显，优先核对 seed 里的中卫 source 覆盖参数。',
+        talk: '这一幕讲上游边界变弱后，长距离主干是怎么把影响传到华东末端的。',
+    },
+    zhengzhou_compressor_offline: {
+        focus: '重点看郑州压气站停运后，河南到华东段压力恢复能力。',
+        success: '郑州下游节点能出现可解释的压力变化，告警集中在中下游。',
+        risk: '当前 solver 是线性近似，不能把它讲成生产级水力模型。',
+        talk: '这一幕讲中游压气站异常，适合说明全段仿真能看传播范围。',
+    },
+    east_china_peak_demand: {
+        focus: '重点看苏锡常沪方向负荷上调后，主干利用率和末端压力。',
+        success: '华东段流量利用率抬升，末端压力仍能给出可对比结果。',
+        risk: '负荷值是二阶段演示口径，正式验收前要接 SCADA 和调度计划。',
+        talk: '这一幕讲华东负荷高峰，能把仿真结果落到末端保供上。',
+    },
+    baihe_delivery_limited: {
+        focus: '重点看白鹤前最后管段限流后，末站交付和告警变化。',
+        success: '白鹤相关边的利用率和末端压力能明显区别于常规稳态。',
+        risk: '单段限流只代表演示工况，不代表真实事故处置策略。',
+        talk: '这一幕讲末端交付受限，适合做前后对比和风险点评。',
+    },
 }
 
 const COVERAGE_RECOMMENDATION_ORDER = [
+    'east_china_peak_demand',
+    'baihe_delivery_limited',
+    'zhengzhou_compressor_offline',
+    'zhongwei_supply_pressure_drop',
     'zhongwei_trunk_break',
     'zhongwei_compressor_offline',
     'yanchi_jingbian_limited',
@@ -385,6 +418,10 @@ const MapTopologyView: React.FC = () => {
         junctionId?: string
         displayName?: string
     }>(null)
+    const [pressurePopupOverlay, setPressurePopupOverlay] = useState<SimulationOverlay | null>(null)
+    const [pressurePopupVisible, setPressurePopupVisible] = useState(false)
+    const pressurePopupPendingRef = useRef(false)
+    const lastPressurePopupRunIdRef = useRef('')
 
     // Tooltip 悬浮框状态
     const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
@@ -392,8 +429,60 @@ const MapTopologyView: React.FC = () => {
     const activeTabRef = useRef<PanelTab>(activeTab)
 
     // ================== 稳态仿真 (useSimulation) ==================
-    const PILOT_ID = WE1_PRIMARY_PILOT_ID
-    const sim = useSimulation({ pilotId: PILOT_ID, scenarios: MAINLINE_SCENARIOS })
+    const queryPilotId = useMemo(() => {
+        return new URLSearchParams(location.search).get('pilotId') || WE1_PRIMARY_PILOT_ID
+    }, [location.search])
+    const activePilot = useMemo(() => resolveSimulationPilotConfig(queryPilotId), [queryPilotId])
+    const PILOT_ID = activePilot.id
+    const scenarioOptions = activePilot.scenarios
+    const sim = useSimulation({ pilotId: PILOT_ID, scenarios: scenarioOptions })
+
+    const simulationSourceInfo = useMemo(() => {
+        if (!sim.overlay) return null
+        const sourceNode = sim.overlay.nodes.find(node => node.supply_actual > 0) || sim.overlay.nodes[0]
+        if (!sourceNode) return null
+        const matchedTopoNode = topoNodes.find(node => node.id === sourceNode.id || node.sourceNodeIds?.includes(sourceNode.id))
+        const firstFlowEdge = sim.overlay.edges.find(edge => edge.flow_rate > 0)
+        return {
+            id: sourceNode.id,
+            name: matchedTopoNode?.name || sourceNode.id,
+            pressureIn: sourceNode.pressure_in_mpa ?? sourceNode.pressure_mpa,
+            pressureOut: sourceNode.pressure_mpa,
+            supplyActual: sourceNode.supply_actual,
+            firstFlowRate: firstFlowEdge?.flow_rate ?? 0,
+        }
+    }, [sim.overlay, topoNodes])
+
+    const pressurePopupRows = useMemo(() => {
+        if (!pressurePopupOverlay) return []
+
+        const findName = (nodeId: string): string => {
+            const matchedTopoNode = topoNodes.find(node => node.id === nodeId || node.sourceNodeIds?.includes(nodeId))
+            return matchedTopoNode?.name || nodeId
+        }
+
+        const rows = pressurePopupOverlay.nodes.map(node => ({
+            id: node.id,
+            name: findName(node.id),
+            pressureIn: node.pressure_in_mpa ?? node.pressure_mpa,
+            pressureOut: node.pressure_mpa,
+            delta: node.pressure_mpa - (node.pressure_in_mpa ?? node.pressure_mpa),
+            supplyActual: node.supply_actual,
+            demandServed: node.demand_served,
+            alertLevel: node.alert_level,
+        }))
+
+        const keyIds = ['WE1-76', 'WE1-86', 'WE1-92', 'WE1-127', 'WE1-152', 'WE1-176', 'WE1-180', 'WE1-181']
+        const keyRows = keyIds
+            .map(id => rows.find(row => row.id === id))
+            .filter((row): row is NonNullable<typeof row> => Boolean(row))
+        const keySet = new Set(keyRows.map(row => row.id))
+        const alertRows = rows
+            .filter(row => !keySet.has(row.id) && row.alertLevel !== 'normal')
+            .slice(0, 6)
+
+        return [...keyRows, ...alertRows]
+    }, [pressurePopupOverlay, topoNodes])
 
     // SimParamEditor 状态
     const [nodeOverrides, setNodeOverrides] = useState<Record<string, { target_pressure_mpa?: number; min_pressure_mpa?: number }>>({})
@@ -760,9 +849,8 @@ const MapTopologyView: React.FC = () => {
                 setStatusMsg(`起点「${nd?.name}」→ 点击终点`)
             } else {
                 if (nodeId === from) { setStatusMsg('不能连接自身'); return }
-                doAddEdge(from, nodeId)
+                void doAddEdge(from, nodeId)
                 setConnectFrom(null)
-                setStatusMsg('连线成功，继续点击起点')
             }
             return
         }
@@ -807,13 +895,58 @@ const MapTopologyView: React.FC = () => {
         }
     }
 
-    const doAddEdge = (startId: string, endId: string) => {
+    const resolvePersistStationId = (nodeId: string): string | null => {
+        const node = nodesRef.current.find(item => item.id === nodeId)
+        if (!node || node.isJunction) return null
+        if (node.id.startsWith('tn-')) return null
+        const source = node.sourceNodeIds?.[0] || node.id
+        if (!source || source.startsWith('tn-') || source.startsWith('junction-')) return null
+        return source
+    }
+
+    const doAddEdge = async (startId: string, endId: string) => {
         const s = baseTopoNodes.find(n => n.id === startId)
         const e = baseTopoNodes.find(n => n.id === endId)
         if (!s || !e) return
-        const id = `te-${Date.now()}`
-        setBaseTopoEdges(prev => [...prev, { id, startNodeId: startId, endNodeId: endId, name: '新建管线' }])
-        setUndoStack(prev => [...prev, { type: 'add-edge', edgeId: id }])
+
+        const startStationId = resolvePersistStationId(startId)
+        const endStationId = resolvePersistStationId(endId)
+
+        if (!startStationId || !endStationId) {
+            const id = `te-${Date.now()}`
+            setBaseTopoEdges(prev => [...prev, {
+                id,
+                startNodeId: startId,
+                endNodeId: endId,
+                name: '新建临时连线',
+                persisted: false,
+            }])
+            setUndoStack(prev => [...prev, { type: 'add-edge', edgeId: id }])
+            setStatusMsg('连线已添加（临时），当前节点不在数据库主站点中，无法持久化保存。')
+            return
+        }
+
+        try {
+            const created = await topologyEditorApi.createConnection({
+                start_station_id: startStationId,
+                end_station_id: endStationId,
+                name: `${s.name} → ${e.name}`,
+                category: 'branch',
+            })
+            setBaseTopoEdges(prev => [...prev, {
+                id: created.id,
+                startNodeId: startId,
+                endNodeId: endId,
+                name: created.name || `${s.name} → ${e.name}`,
+                persisted: true,
+            }])
+            setUndoStack(prev => [...prev, { type: 'add-edge', edgeId: created.id }])
+            invalidatePipelineCache()
+            setStatusMsg('连线已保存到数据库，刷新后仍可见。')
+        } catch (error) {
+            console.error(error)
+            setStatusMsg(error instanceof Error ? `连线保存失败：${error.message}` : '连线保存失败')
+        }
     }
 
     // ================== 导入：将 ALL_PIPELINES 数据转为纯拓扑点+线（阀室链路合并） ==================
@@ -826,8 +959,19 @@ const MapTopologyView: React.FC = () => {
         setUndoStack(stack)
 
         if (action.type === 'add-edge') {
+            const target = baseTopoEdges.find(e => e.id === action.edgeId)
+            if (target?.persisted) {
+                try {
+                    await topologyEditorApi.deleteConnection(action.edgeId)
+                    invalidatePipelineCache()
+                } catch (error) {
+                    console.error(error)
+                    setStatusMsg(error instanceof Error ? `撤销连线失败：${error.message}` : '撤销连线失败')
+                    return
+                }
+            }
             setBaseTopoEdges(prev => prev.filter(e => e.id !== action.edgeId))
-            setStatusMsg('已撤销: 删除连线')
+            setStatusMsg(target?.persisted ? '已撤销并删除已保存连线' : '已撤销: 删除临时连线')
         } else if (action.type === 'add-node') {
             const node = baseTopoNodes.find(n => n.id === action.nodeId)
             setBaseTopoEdges(prev => prev.filter(e => e.startNodeId !== action.nodeId && e.endNodeId !== action.nodeId))
@@ -860,7 +1004,7 @@ const MapTopologyView: React.FC = () => {
                 setStatusMsg(error instanceof Error ? `撤销枢纽拆分失败：${error.message}` : '撤销枢纽拆分失败')
             }
         }
-    }, [baseTopoNodes, loadJunctionGroups, undoStack])
+    }, [baseTopoEdges, baseTopoNodes, loadJunctionGroups, undoStack])
 
     // Ctrl+Z 快捷键
     useEffect(() => {
@@ -961,7 +1105,13 @@ const MapTopologyView: React.FC = () => {
                 const eNode = importedMap.get(endId)
                 if (!sNode || !eNode) continue
                 const edgeId = `ce-${startId.slice(-4)}-${endId.slice(-4)}`
-                importedEdges.push({ id: edgeId, startNodeId: startId, endNodeId: endId, name: `${sNode.name} → ${eNode.name}` })
+                importedEdges.push({
+                    id: edgeId,
+                    startNodeId: startId,
+                    endNodeId: endId,
+                    name: `${sNode.name} → ${eNode.name}`,
+                    persisted: true,
+                })
             }
 
             setBaseTopoNodes(imported)
@@ -1551,6 +1701,21 @@ const MapTopologyView: React.FC = () => {
         })
     }, [sim.overlay, sim.currentScenario, sim.selectedSnapshotRunId, sim.baselineSnapshotRunId])
 
+    useEffect(() => {
+        if (sim.error) {
+            pressurePopupPendingRef.current = false
+            return
+        }
+        if (!pressurePopupPendingRef.current || !sim.overlay) return
+        if (sim.isLoading || sim.animatingState?.active) return
+        if (lastPressurePopupRunIdRef.current === sim.overlay.run_id) return
+
+        pressurePopupPendingRef.current = false
+        lastPressurePopupRunIdRef.current = sim.overlay.run_id
+        setPressurePopupOverlay(sim.overlay)
+        setPressurePopupVisible(true)
+    }, [sim.animatingState, sim.error, sim.isLoading, sim.overlay])
+
     // 带参数运行仿真
     const handleRunSimulation = useCallback(() => {
         const initialInput: SimulationInitialInput = {}
@@ -1561,6 +1726,7 @@ const MapTopologyView: React.FC = () => {
         if (globalDefaults.default_pressure_mpa != null) initialInput.default_pressure_mpa = globalDefaults.default_pressure_mpa
         if (globalDefaults.default_flow_rate != null) initialInput.default_flow_rate = globalDefaults.default_flow_rate
         if (globalDefaults.apply_to_sources) initialInput.apply_to_sources = true
+        pressurePopupPendingRef.current = true
         void sim.runSimulation({ initialInput: Object.keys(initialInput).length > 0 ? initialInput : undefined })
     }, [globalDefaults, nodeOverrides, sim])
 
@@ -1616,6 +1782,127 @@ const MapTopologyView: React.FC = () => {
 
             {/* 纯底图 —— 不传 pipelineData，不渲染任何站场/阀室 */}
             <MapView onLoad={handleMapLoad} />
+
+            {(sim.isLoading || sim.animatingState?.active) && (
+                <div className="absolute top-[82px] right-4 z-40 w-80 rounded-xl border border-cyan-400/30 bg-slate-950/90 backdrop-blur-md shadow-2xl shadow-cyan-950/40 p-3">
+                    <div className="flex items-center gap-2 text-cyan-100 font-bold text-sm">
+                        <span className="material-symbols-outlined text-lg text-cyan-300 animate-spin">progress_activity</span>
+                        正在仿真
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
+                        <div className="rounded-lg bg-white/5 border border-white/10 px-2 py-1.5">
+                            <div className="text-slate-500">起始压力</div>
+                            <div className="text-cyan-300 font-mono font-bold">
+                                {simulationSourceInfo ? `${simulationSourceInfo.pressureOut.toFixed(2)} MPa` : '读取中'}
+                            </div>
+                        </div>
+                        <div className="rounded-lg bg-white/5 border border-white/10 px-2 py-1.5">
+                            <div className="text-slate-500">真实迭代</div>
+                            <div className="text-indigo-300 font-mono font-bold">
+                                {sim.animatingState?.solverIterations ?? sim.overlay?.iterations ?? '--'} 次
+                            </div>
+                        </div>
+                    </div>
+                    <div className="mt-3">
+                        <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                            <span>{sim.isLoading ? '求解器装配中' : '压力场演化中'}</span>
+                            <span>{sim.animatingState ? `${sim.animatingState.iteration}/${sim.animatingState.total}` : '--'}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                            <div
+                                className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-blue-400 to-emerald-400 transition-all duration-200"
+                                style={{ width: sim.animatingState ? `${Math.min(100, (sim.animatingState.iteration / sim.animatingState.total) * 100)}%` : '18%' }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {pressurePopupVisible && pressurePopupOverlay && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-sm px-4">
+                    <div className="w-full max-w-3xl rounded-2xl border border-cyan-400/25 bg-slate-950/95 shadow-2xl shadow-cyan-950/50 overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-gradient-to-r from-cyan-950/70 to-indigo-950/50">
+                            <div>
+                                <div className="flex items-center gap-2 text-white font-bold">
+                                    <span className="material-symbols-outlined text-cyan-300">monitor_heart</span>
+                                    仿真完成 · 压力结果
+                                </div>
+                                <div className="text-[11px] text-slate-400 mt-1">
+                                    {SOLVER_STATUS_LABELS[pressurePopupOverlay.solver_status] || pressurePopupOverlay.solver_status}
+                                    <span className="mx-2">|</span>
+                                    真实迭代 {pressurePopupOverlay.iterations} 次
+                                    <span className="mx-2">|</span>
+                                    run_id {pressurePopupOverlay.run_id}
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setPressurePopupVisible(false)}
+                                className="w-8 h-8 rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center justify-center"
+                                title="关闭"
+                            >
+                                <span className="material-symbols-outlined text-lg">close</span>
+                            </button>
+                        </div>
+
+                        <div className="p-5">
+                            <div className="grid grid-cols-4 gap-3 text-[11px] mb-4">
+                                <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                                    <div className="text-slate-500">起始压力</div>
+                                    <div className="text-cyan-300 text-lg font-mono font-bold">
+                                        {simulationSourceInfo ? simulationSourceInfo.pressureOut.toFixed(2) : '--'}
+                                        <span className="text-[10px] text-slate-500 ml-1">MPa</span>
+                                    </div>
+                                </div>
+                                <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                                    <div className="text-slate-500">入口流量</div>
+                                    <div className="text-emerald-300 text-lg font-mono font-bold">
+                                        {simulationSourceInfo ? simulationSourceInfo.firstFlowRate.toFixed(0) : '--'}
+                                        <span className="text-[10px] text-slate-500 ml-1">万标方/天</span>
+                                    </div>
+                                </div>
+                                <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                                    <div className="text-slate-500">总需求</div>
+                                    <div className="text-blue-300 text-lg font-mono font-bold">
+                                        {pressurePopupOverlay.summary.total_demand.toFixed(0)}
+                                        <span className="text-[10px] text-slate-500 ml-1">万标方/天</span>
+                                    </div>
+                                </div>
+                                <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                                    <div className="text-slate-500">告警数</div>
+                                    <div className={`text-lg font-mono font-bold ${pressurePopupOverlay.summary.alert_count > 0 ? 'text-amber-300' : 'text-slate-300'}`}>
+                                        {pressurePopupOverlay.summary.alert_count}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border border-white/10 overflow-hidden">
+                                <div className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr_0.8fr] bg-slate-900/90 text-[10px] text-slate-400 px-3 py-2 uppercase tracking-wider">
+                                    <span>站场</span>
+                                    <span className="text-right">进站 MPa</span>
+                                    <span className="text-right">出站 MPa</span>
+                                    <span className="text-right">压差</span>
+                                    <span className="text-right">状态</span>
+                                </div>
+                                <div className="max-h-80 overflow-y-auto divide-y divide-white/5">
+                                    {pressurePopupRows.map(row => (
+                                        <div key={row.id} className="grid grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr_0.8fr] px-3 py-2 text-[11px] items-center hover:bg-white/[0.03]">
+                                            <span className="text-slate-100 truncate">{row.name}</span>
+                                            <span className="text-right text-slate-300 font-mono">{row.pressureIn.toFixed(2)}</span>
+                                            <span className="text-right text-cyan-300 font-mono font-bold">{row.pressureOut.toFixed(2)}</span>
+                                            <span className={`text-right font-mono ${Math.abs(row.delta) > 0.005 ? row.delta > 0 ? 'text-emerald-300' : 'text-red-300' : 'text-slate-500'}`}>
+                                                {Math.abs(row.delta) > 0.005 ? `${row.delta > 0 ? '+' : ''}${row.delta.toFixed(2)}` : '-'}
+                                            </span>
+                                            <span className={`text-right font-semibold ${row.alertLevel === 'critical' ? 'text-red-300' : row.alertLevel === 'warning' ? 'text-amber-300' : 'text-emerald-300'}`}>
+                                                {row.alertLevel === 'critical' ? '严重' : row.alertLevel === 'warning' ? '预警' : '正常'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 左侧面板 */}
             <div className="absolute top-[68px] left-4 bottom-4 z-20 w-72 flex flex-col">
@@ -1942,7 +2229,7 @@ const MapTopologyView: React.FC = () => {
                                             onChange={e => sim.setScenario(e.target.value)}
                                             className="flex-1 bg-slate-800/80 border border-indigo-500/25 rounded-lg text-[11px] text-slate-200 px-2.5 py-1.5 outline-none hover:border-cyan-500/50 transition-colors"
                                         >
-                                            {MAINLINE_SCENARIOS.map(s => (
+                                            {scenarioOptions.map(s => (
                                                 <option key={s.id} value={s.id}>{s.label}</option>
                                             ))}
                                         </select>
@@ -2016,14 +2303,56 @@ const MapTopologyView: React.FC = () => {
                                             <div className="w-8 h-8 rounded-full bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors shadow-inner">
                                                 <span className="material-symbols-outlined text-[20px] text-cyan-400">{sim.isLoading || sim.animatingState?.active ? 'hourglass_top' : 'play_circle'}</span>
                                             </div>
-                                            {sim.isLoading ? '求解中...' : sim.animatingState?.active ? `迭代中 (${sim.animatingState.iteration}/${sim.animatingState.total})` : '场景参数仿真'}
+                                            {sim.isLoading ? '求解中...' : sim.animatingState?.active ? `迭代动画 ${sim.animatingState.iteration}/${sim.animatingState.total}` : '场景参数仿真'}
                                         </button>
                                     </div>
                                     {/* 运行状态 */}
                                     <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
                                         <span className="material-symbols-outlined text-sm">terminal</span>
-                                        {sim.isLoading ? '正在求解...' : sim.animatingState?.active ? '正在渲染演化过程...' : sim.overlay ? `已完成 (${SOLVER_STATUS_LABELS[sim.overlay.solver_status] || sim.overlay.solver_status})` : '未运行'}
+                                        {sim.isLoading ? '正在求解...' : sim.animatingState?.active ? `正在渲染演化过程，真实求解迭代 ${sim.animatingState.solverIterations} 次` : sim.overlay ? `已完成 (${SOLVER_STATUS_LABELS[sim.overlay.solver_status] || sim.overlay.solver_status})` : '未运行'}
                                     </div>
+                                    {(sim.isLoading || sim.animatingState?.active || sim.overlay) && (
+                                        <div className="rounded-lg border border-cyan-500/15 bg-slate-900/50 p-2.5 space-y-2">
+                                            <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                                <div className="rounded-md bg-black/20 px-2 py-1.5">
+                                                    <div className="text-gray-500">起始站</div>
+                                                    <div className="text-slate-100 font-semibold truncate">{simulationSourceInfo?.name || '中卫入口读取中'}</div>
+                                                </div>
+                                                <div className="rounded-md bg-black/20 px-2 py-1.5">
+                                                    <div className="text-gray-500">起始压力</div>
+                                                    <div className="text-cyan-300 font-mono font-bold">
+                                                        {simulationSourceInfo ? `${simulationSourceInfo.pressureOut.toFixed(2)} MPa` : '--'}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-md bg-black/20 px-2 py-1.5">
+                                                    <div className="text-gray-500">入口流量</div>
+                                                    <div className="text-emerald-300 font-mono font-bold">
+                                                        {simulationSourceInfo ? `${simulationSourceInfo.firstFlowRate.toFixed(0)} 万标方/天` : '--'}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-md bg-black/20 px-2 py-1.5">
+                                                    <div className="text-gray-500">求解迭代</div>
+                                                    <div className="text-indigo-300 font-mono font-bold">
+                                                        {sim.animatingState?.solverIterations ?? sim.overlay?.iterations ?? '--'} 次
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {sim.animatingState?.active && (
+                                                <div>
+                                                    <div className="flex items-center justify-between text-[9px] text-gray-500 mb-1">
+                                                        <span>动画演化</span>
+                                                        <span>{sim.animatingState.iteration}/{sim.animatingState.total}</span>
+                                                    </div>
+                                                    <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                                                        <div
+                                                            className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-indigo-400 to-emerald-400 transition-all duration-200"
+                                                            style={{ width: `${Math.min(100, (sim.animatingState.iteration / sim.animatingState.total) * 100)}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* OUTPUT VIEW */}

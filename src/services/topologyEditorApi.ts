@@ -69,6 +69,28 @@ export interface PositionPreviewResult {
 
 export interface PositionCommitResult extends PositionPreviewResult {}
 
+export interface CreateConnectionPayload {
+    start_station_id: string
+    end_station_id: string
+    name?: string
+    length_km?: number
+    diameter_mm?: number
+    category?: string
+}
+
+export interface PipelineEdgeResult {
+    id: string
+    name: string
+    start_station_id: string
+    end_station_id: string
+    start_station_name?: string
+    end_station_name?: string
+    length_km?: number
+    diameter_mm?: number | null
+    category?: string
+    is_orphan?: boolean
+}
+
 function extractApiErrorMessage(error: unknown): string {
     if (axios.isAxiosError(error)) {
         const responseData = error.response?.data
@@ -141,6 +163,18 @@ export const topologyEditorApi = {
     commitPositions(payload: PositionCommitPayload): Promise<PositionCommitResult> {
         return unwrap<PositionCommitResult>(
             api.put('/api/topology/positions/commit', payload)
+        )
+    },
+
+    createConnection(payload: CreateConnectionPayload): Promise<PipelineEdgeResult> {
+        return unwrap<PipelineEdgeResult>(
+            api.post('/api/topology/connection', payload)
+        )
+    },
+
+    deleteConnection(pipelineId: string): Promise<{ message: string; pipeline_id: string }> {
+        return unwrap<{ message: string; pipeline_id: string }>(
+            api.delete(`/api/topology/connection/${pipelineId}`)
         )
     },
 }

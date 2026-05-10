@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import re
+import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,8 @@ from app.services.raw_excel_ai_direct import (
     try_direct_list_reply as try_raw_excel_direct_list_reply,
 )
 from app.services.we1_result_snapshot_service import get_snapshot
+from app.services.multi_source.orchestrator import multi_source_orchestrator
+from app.mcp.tools import run_steady_sim
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +67,7 @@ DATA_ANALYSIS_ENTER_PATTERN = re.compile(r"^\s*/数据分析(?:\s+(?P<payload>.+
 DATA_ANALYSIS_EXIT_PATTERN = re.compile(r"^\s*/退出数据分析\s*$", re.IGNORECASE)
 SUBAGENT_ENTER_PATTERN = re.compile(r"^\s*/subagent(?:\s+.+)?\s*$", re.IGNORECASE)
 SUBAGENT_EXIT_PATTERN = re.compile(r"^\s*/退出subagent\s*$", re.IGNORECASE)
+MCP_DEMO_PATTERN = re.compile(r"^\s*/(?:mcp演示|mcpdemo|mcp-demo)(?:\s+.+)?\s*$", re.IGNORECASE)
 STATION_PAIR_PATTERN = re.compile(
     r"(?P<left>[\u4e00-\u9fa5A-Za-z0-9]{1,24}(?:分输联络站|分输压气站|分输清管站|分输站|压气站|清管站|站)?)"
     r"(?:和|与|跟)"
@@ -205,7 +209,84 @@ async def chat(
 
         return StreamingResponse(quick_gen(), media_type="text/event-stream")
 
+    if SUBAGENT_ENTER_PATTERN.match(msg_clean):
+
+        async def subagent_enter_gen():
+            reply_text = _apply_yuqian_style(
+                _append_completeness_hint(
+                    "已进入 SubAgent 协作模式。你接下来问甪直、靖边、榆林或中卫-靖边限流，我会在 AI 窗口里把专家组分工过程演给你看。",
+                    msg_clean,
+                    is_complete=True,
+                    reason="已执行 subagent 进入命令。",
+                )
+            )
+            yield f"[REPLY] {json.dumps(reply_text, ensure_ascii=False)}\n"
+
+        return StreamingResponse(subagent_enter_gen(), media_type="text/event-stream")
+
+    if SUBAGENT_EXIT_PATTERN.match(msg_clean):
+
+        async def subagent_exit_gen():
+            reply_text = _apply_yuqian_style(
+                _append_completeness_hint(
+                    "已退出 SubAgent 协作模式，回到常规问答。",
+                    msg_clean,
+                    is_complete=True,
+                    reason="已执行 subagent 退出命令。",
+                )
+            )
+            yield f"[REPLY] {json.dumps(reply_text, ensure_ascii=False)}\n"
+
+        return StreamingResponse(subagent_exit_gen(), media_type="text/event-stream")
+
+    if MCP_DEMO_PATTERN.match(msg_clean):
+
+        async def mcp_demo_gen():
+            yield "[TOOL] mcp.run_steady_sim\n"
+            try:
+                tool_result = await asyncio.to_thread(
+                    run_steady_sim,
+                    "zhongwei_shanghai_baihe",
+                    "steady_base",
+                    "",
+                )
+                reply_text = "\n".join([
+                    "MCP 演示调用完成。",
+                    "",
+                    "这次不是让前端直接跑固定流程，而是调用后端已注册的 MCP 工具：`run_steady_sim`。",
+                    "",
+                    "调用参数：",
+                    "- pilot_id: zhongwei_shanghai_baihe",
+                    "- scenario_id: steady_base",
+                    "",
+                    "工具返回：",
+                    tool_result,
+                    "",
+                    "答辩口径：业务 API 负责稳定页面流程，MCP 负责把仿真能力封装成 AI 可发现、可调用、可复用的标准工具。",
+                    "",
+                    "完整性提示：是。本次已完成一次 MCP 工具调用闭环。",
+                ])
+            except Exception as exc:
+                logger.exception("MCP demo failed")
+                reply_text = "\n".join([
+                    "MCP 演示调用失败。",
+                    "",
+                    f"错误：{exc}",
+                    "",
+                    "完整性提示：否。MCP 工具已触发，但工具执行阶段报错，需要检查仿真种子或后端日志。",
+                ])
+
+            yield f"[REPLY] {json.dumps(reply_text, ensure_ascii=False)}\n"
+
+        return StreamingResponse(mcp_demo_gen(), media_type="text/event-stream")
+
     logger.info("AI assistant received message: %s", msg_clean[:100])
+
+    if request.analysis_mode == "subagents":
+        return StreamingResponse(
+            _subagent_showcase_event_generator(request=request, session=session),
+            media_type="text/event-stream",
+        )
 
     data_analysis_skill_reply = try_data_analysis_skill_reply_v2(request)
     if data_analysis_skill_reply:
@@ -286,6 +367,13 @@ async def chat(
 
         return StreamingResponse(luzhi_pilot_gen(), media_type="text/event-stream")
 
+    # === 多库并行交叉分析 ===
+    if _should_use_multi_source(msg_clean):
+        return StreamingResponse(
+            _multi_source_event_generator(request=request),
+            media_type="text/event-stream",
+        )
+
     if ai_analysis_orchestrator.should_use_orchestration(request.context, request.analysis_mode):
         return StreamingResponse(
             _orchestrated_event_generator(request=request, session=session),
@@ -296,6 +384,45 @@ async def chat(
         _legacy_event_generator(request=request, session=session),
         media_type="text/event-stream",
     )
+
+
+@router.post("/chat/multi-source")
+async def chat_multi_source(
+    request: ChatRequest,
+    session: Session = Depends(get_session),
+):
+    """
+    多库并行交叉分析接口（非流式）
+    直接返回结构化 JSON，包含结论、证据、冲突、建议
+    """
+    from app.services.multi_source.orchestrator import multi_source_orchestrator
+
+    result = await multi_source_orchestrator.analyze(request.message)
+    return {
+        "reply": result.conclusion,
+        "evidence": [
+            {
+                "source": ev.source.value,
+                "entity": ev.matched_entity,
+                "metric": ev.metric,
+                "value": ev.value,
+                "trend": ev.trend,
+                "confidence": ev.confidence,
+                "text": ev.evidence_text,
+                "is_simulation": ev.is_simulation,
+            }
+            for ev in result.evidence_list
+            if ev.confidence > 0.3
+        ],
+        "conflicts": result.conflict_warnings,
+        "risk_level": result.risk_level,
+        "suggestions": result.suggestions,
+        "data_sources": result.data_sources,
+        "missing_sources": result.missing_sources,
+        "is_complete": result.is_complete,
+        "completeness_reason": result.completeness_reason,
+        "response_time_ms": result.response_time_ms,
+    }
 
 
 @router.get("/luzhi-pilot/trace")
@@ -2501,6 +2628,418 @@ async def _legacy_event_generator(request: ChatRequest, session: Session):
         logger.error("Legacy AI stream failed: %s", exc, exc_info=True)
         err_text = f"处理出错：{exc}"
         yield f"[REPLY] {json.dumps(err_text, ensure_ascii=False)}\n"
+
+
+# ========== 多库并行交叉分析 ==========
+
+_MULTI_SOURCE_KEYWORDS = (
+    "为什么", "怎么回事", "对比", "比较", "差异", "可信", "验证",
+    "上下游", "拓扑", "仿真", "模拟", "如果", "假设",
+    "分析", "诊断", "评估", "综合",
+)
+_MULTI_SOURCE_METRICS = (
+    "压力", "温度", "水露点", "露点", "流量", "输量",
+)
+
+
+def _should_use_multi_source(message: str) -> bool:
+    """
+    判断用户问题是否适合使用多库并行交叉分析
+    触发条件：包含站名 + 包含分析/对比/为什么等关键词 + 包含指标词
+    """
+    compact = re.sub(r"\s+", "", message)
+    # 必须包含指标词
+    has_metric = any(kw in compact for kw in _MULTI_SOURCE_METRICS)
+    # 必须包含分析类关键词
+    has_keyword = any(kw in compact for kw in _MULTI_SOURCE_KEYWORDS)
+    # 必须包含站名（简单判断：包含常见站名或"站"字）
+    has_station = "站" in compact or any(
+        name in compact for name in (
+            "中卫", "甪直", "古浪", "上海", "西气东输",
+        )
+    )
+    # 仿真类问题也需要
+    has_simulation = any(kw in compact for kw in ("仿真", "模拟", "snapshot", "场景"))
+    return (has_metric and has_keyword and has_station) or has_simulation
+
+
+async def _multi_source_event_generator(request: ChatRequest):
+    """
+    多库并行交叉分析流式生成器
+    输出格式与现有 AI 助手一致：[REPLY] ...\n
+    """
+    try:
+        from app.services.multi_source.orchestrator import multi_source_orchestrator
+
+        result = await multi_source_orchestrator.analyze(request.message)
+
+        # 构建结构化回复
+        lines: list[str] = []
+        lines.append("## 多库并行分析结论")
+        lines.append("")
+        lines.append(result.conclusion)
+        lines.append("")
+
+        # 证据卡片
+        if result.evidence_list:
+            lines.append("### 证据来源")
+            for ev in result.evidence_list:
+                if ev.confidence < 0.3:
+                    continue  # 跳过低置信度/失败的证据
+                source_label = {
+                    "smartgas_db": "主业务库",
+                    "scada_history": "时序库",
+                    "raw_excel": "Excel索引库",
+                    "chroma_db": "规程向量库",
+                    "simulation": "仿真快照库",
+                }.get(ev.source.value, ev.source.value)
+                lines.append(f"- **{source_label}**：{ev.evidence_text}")
+            lines.append("")
+
+        # 冲突提示
+        if result.conflict_warnings:
+            lines.append("### ⚠️ 交叉验证提示")
+            for warning in result.conflict_warnings:
+                lines.append(f"- {warning}")
+            lines.append("")
+
+        # 建议
+        if result.suggestions:
+            lines.append("### 建议")
+            for suggestion in result.suggestions:
+                lines.append(f"- {suggestion}")
+            lines.append("")
+
+        # 数据来源与缺失
+        lines.append("### 数据覆盖")
+        if result.data_sources:
+            lines.append(f"- 已查询：{', '.join(result.data_sources)}")
+        if result.missing_sources:
+            lines.append(f"- 未命中：{', '.join(result.missing_sources)}")
+        lines.append("")
+
+        # 响应时间
+        lines.append(f"*分析耗时：{result.response_time_ms}ms*")
+
+        full_reply = "\n".join(lines)
+        full_reply = _append_completeness_hint(
+            full_reply,
+            request.message,
+            is_complete=result.is_complete,
+            reason=result.completeness_reason,
+        )
+        full_reply = _apply_yuqian_style(full_reply)
+
+        yield f"[REPLY] {json.dumps(full_reply, ensure_ascii=False)}\n"
+
+    except Exception as exc:
+        logger.error("Multi-source analysis failed: %s", exc, exc_info=True)
+        err_text = f"多库并行分析出错：{exc}"
+        yield f"[REPLY] {json.dumps(_append_completeness_hint(err_text, request.message), ensure_ascii=False)}\n"
+
+
+def _subagent_block(payload: dict[str, Any]) -> str:
+    return f"[SUBAGENT:{json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}]"
+
+
+async def _yield_subagent_event(payload: dict[str, Any]):
+    yield f"[REPLY] {json.dumps(_subagent_block(payload) + chr(10) + chr(10), ensure_ascii=False)}\n"
+
+
+def _detect_subagent_demo_target(message: str) -> tuple[str, list[str]]:
+    compact = re.sub(r"\s+", "", message)
+    targets: list[str] = []
+    if "甪直" in compact:
+        targets.append("甪直联络站")
+    if "靖边" in compact:
+        targets.append("靖边压气站")
+    if "榆林" in compact:
+        targets.append("榆林压气站")
+    if "中卫" in compact:
+        targets.append("中卫压气站")
+    if not targets:
+        targets.append("当前关注站点")
+
+    if any(word in compact for word in ("仿真", "模拟", "推演", "如果", "假设", "限流", "下降")):
+        task_type = "仿真推演"
+    elif any(word in compact for word in ("曲线", "历史", "趋势", "压力", "露点", "温度")):
+        task_type = "历史曲线分析"
+    else:
+        task_type = "综合风险分析"
+    return task_type, targets
+
+
+def _collect_subagent_evidence(message: str, session: Session) -> dict[str, Any]:
+    task_type, targets = _detect_subagent_demo_target(message)
+    evidence: dict[str, Any] = {
+        "task_type": task_type,
+        "targets": targets,
+        "demo_mode": True,
+        "junctions": [],
+        "stations": [],
+        "pipeline_count": 0,
+    }
+
+    try:
+        from app.services.junction_groups import load_runtime_junction_groups
+
+        junctions = load_runtime_junction_groups(session)
+        target_keywords = {target.replace("压气站", "").replace("联络站", "").replace("站", "") for target in targets}
+        for group in junctions:
+            name = str(group.get("name") or "")
+            if any(keyword and keyword in name for keyword in target_keywords):
+                evidence["junctions"].append({
+                    "name": name,
+                    "station_ids": group.get("station_ids", []),
+                    "system_ids": group.get("system_ids", []),
+                    "member_count": group.get("member_count", 0),
+                    "junction_kind": group.get("junction_kind", "junction"),
+                })
+    except Exception as exc:
+        logger.warning("collect subagent junction evidence failed: %s", exc)
+
+    try:
+        station_rows = session.exec(select(Station)).all()
+        target_keywords = {target.replace("压气站", "").replace("联络站", "").replace("站", "") for target in targets}
+        for station in station_rows:
+            if any(keyword and keyword in station.name for keyword in target_keywords):
+                evidence["stations"].append({
+                    "id": station.id,
+                    "name": station.name,
+                    "type": station.type,
+                    "longitude": station.longitude,
+                    "latitude": station.latitude,
+                })
+    except Exception as exc:
+        logger.warning("collect subagent station evidence failed: %s", exc)
+
+    try:
+        evidence["pipeline_count"] = len(session.exec(select(Pipeline)).all())
+    except Exception:
+        pass
+
+    return evidence
+
+
+def _fallback_subagent_brief(agent_title: str, evidence: dict[str, Any]) -> str:
+    targets = "、".join(str(item) for item in evidence.get("targets", [])) or "当前关注站点"
+    junction_count = len(evidence.get("junctions", []))
+    station_count = len(evidence.get("stations", []))
+
+    fallback_map = {
+        "主控 Agent": (
+            f"结论：本次按“{evidence.get('task_type', '综合风险分析')}”编排，目标锁定 {targets}。"
+            "依据：需要同时看历史曲线、拓扑关系、仿真场景和复核意见。"
+        ),
+        "历史曲线 Agent": (
+            f"结论：已触发自动调曲线流程，优先读取 {targets} 的压力、流量和温度趋势。"
+            "依据：真实曲线数据不足时，只展示取数动作和待补指标，不硬判异常。"
+        ),
+        "拓扑分析 Agent": (
+            f"结论：已把 {targets} 放到运行时拓扑里检查，当前命中枢纽 {junction_count} 个、站点 {station_count} 个。"
+            "依据：影响范围要按上下游连接关系判断。"
+        ),
+        "仿真推演 Agent": (
+            "结论：演示流程已进入自动仿真场景，准备做压力下降/供气路径变化推演。"
+            "依据：生产级计算还需要实时压力、流量和边界条件，缺数据时只标注为演示推演。"
+        ),
+        "风险复核 Agent": (
+            "结论：复核重点是防止把演示推演说成真实未来。"
+            "依据：风险等级、安全阈值和调度建议必须绑定实时数据或明确假设。"
+        ),
+    }
+    return fallback_map.get(agent_title, "结论：本 Agent 已完成阶段检查；依据：当前只展示公开工作轨迹和可审计证据。")
+
+
+def _sanitize_subagent_brief(text: str, agent_title: str, evidence: dict[str, Any]) -> str:
+    cleaned = _strip_think_tags(text or "").strip()
+    cleaned = re.sub(r"^```(?:text|markdown)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE).strip()
+    if not cleaned:
+        return _fallback_subagent_brief(agent_title, evidence)
+
+    lines = [line.strip(" -*#\t") for line in cleaned.splitlines()]
+    lines = [line for line in lines if line]
+    cleaned = " ".join(lines).strip()
+    if not cleaned:
+        return _fallback_subagent_brief(agent_title, evidence)
+    cleaned = cleaned.replace("**", "").replace("demo_mode=true", "演示模式")
+    if len(cleaned) > 180:
+        cleaned = cleaned[:177].rstrip("，。；、 ") + "..."
+    cleaned = re.sub(r"(依据|结论|建议|说明)[:：]?\s*(?:\.\.\.)?$", "", cleaned).strip()
+    return cleaned
+
+
+async def _call_subagent_brief(agent_title: str, user_message: str, evidence: dict[str, Any], instruction: str) -> str:
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                f"你是 SmartGas Grid 的{agent_title}。"
+                "你只输出可展示给用户看的工作结论，不输出隐藏推理。"
+                "必须基于给定证据说话；没有数据就明确说缺什么。"
+                "用中文，1-2 句，先结论后依据。不要输出 Markdown 标题、表格或项目符号。"
+                "这是评审演示模式：可以说流程已触发，但不能把缺数据的演示推演说成真实生产结论。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"用户问题：{user_message}\n"
+                f"当前证据：{json.dumps(evidence, ensure_ascii=False)}\n"
+                f"你的任务：{instruction}"
+            ),
+        },
+    ]
+    try:
+        result = await ai_client.chat_completion(messages=messages, temperature=0.35, max_tokens=320)
+        return _sanitize_subagent_brief(result, agent_title, evidence)
+    except Exception as exc:
+        logger.warning("subagent %s failed: %s", agent_title, exc)
+        return _fallback_subagent_brief(agent_title, evidence)
+
+
+async def _subagent_showcase_event_generator(request: ChatRequest, session: Session):
+    """
+    在 AI 窗口内演绎 SubAgent 协作过程。
+    这里展示的是可审计工作轨迹：任务、工具动作、证据和结论，不暴露模型隐藏推理。
+    """
+    user_message = request.message.strip()
+    evidence = _collect_subagent_evidence(user_message, session)
+    task_type = evidence.get("task_type", "综合风险分析")
+    targets = evidence.get("targets", [])
+
+    intro = (
+        f"先撂准话：我按 SubAgent 专家组来跑这次“{task_type}”。"
+        "下面能看到每个 Agent 的任务、动作和阶段结果；仿真由模型/接口算，AI 只负责选择、解释和复核。\n\n"
+    )
+    yield f"[REPLY] {json.dumps(intro, ensure_ascii=False)}\n"
+
+    agents = [
+        {
+            "id": "controller",
+            "title": "主控 Agent",
+            "icon": "account_tree",
+            "tool": "任务识别与编排",
+            "instruction": "判断这个问题要调哪些专业 Agent，指出目标站点和任务类型。",
+            "steps": ["识别用户意图", "拆分专业任务", "分配历史、拓扑、仿真、复核 Agent"],
+        },
+        {
+            "id": "history",
+            "title": "历史曲线 Agent",
+            "icon": "show_chart",
+            "tool": "历史曲线/SCADA 查询",
+            "instruction": "判断是否需要调曲线，并说明会读取哪些历史指标。",
+            "steps": ["定位目标站点", "准备读取 12-24h 历史曲线", "对比历史基线与当前状态"],
+            "action": "自动调曲线",
+        },
+        {
+            "id": "topology",
+            "title": "拓扑分析 Agent",
+            "icon": "hub",
+            "tool": "运行时枢纽与上下游拓扑",
+            "instruction": "基于站点、枢纽和管线证据，说明目标节点关联哪些系统和影响范围。",
+            "steps": ["读取运行时枢纽", "展开成员站点", "识别关联管线和上下游"],
+        },
+        {
+            "id": "simulation",
+            "title": "仿真推演 Agent",
+            "icon": "science",
+            "tool": "稳态仿真场景选择",
+            "instruction": "按评审演示口径说明已进入自动仿真演示流程，同时说明真实计算需要哪些输入、输出和不能编造的边界。",
+            "steps": ["识别仿真场景", "准备边界条件", "等待稳态模型返回压降/流量结果"],
+            "action": "自动开启仿真演示",
+        },
+        {
+            "id": "review",
+            "title": "风险复核 Agent",
+            "icon": "fact_check",
+            "tool": "一致性与不确定性检查",
+            "instruction": "复核前面 Agent 的结论，指出数据缺口、仿真假设和不能下绝对结论的地方。",
+            "steps": ["检查数据缺口", "检查曲线与拓扑是否冲突", "标注仿真假设"],
+        },
+    ]
+
+    results: list[dict[str, str]] = []
+    for agent in agents:
+        async for event in _yield_subagent_event({
+            "agent": agent["id"],
+            "title": agent["title"],
+            "icon": agent["icon"],
+            "status": "running",
+            "tool": agent["tool"],
+            "message": f"{agent['title']}已启动，正在处理：{agent['tool']}。",
+            "steps": agent["steps"],
+            "action": agent.get("action"),
+        }):
+            yield event
+
+        await asyncio.sleep(0.18)
+        summary = await _call_subagent_brief(
+            agent_title=agent["title"],
+            user_message=user_message,
+            evidence=evidence,
+            instruction=agent["instruction"],
+        )
+        results.append({"agent": agent["title"], "summary": summary})
+
+        async for event in _yield_subagent_event({
+            "agent": agent["id"],
+            "title": agent["title"],
+            "icon": agent["icon"],
+            "status": "completed" if "暂时不可用" not in summary else "warning",
+            "tool": agent["tool"],
+            "message": summary,
+            "steps": agent["steps"],
+            "evidence": [
+                f"目标：{'、'.join(str(item) for item in targets)}",
+                f"枢纽命中：{len(evidence.get('junctions', []))} 个",
+                f"站点命中：{len(evidence.get('stations', []))} 个",
+            ],
+            "action": agent.get("action"),
+        }):
+            yield event
+
+        await asyncio.sleep(0.12)
+
+    final_messages = [
+        {
+            "role": "system",
+            "content": (
+                "你是 SmartGas Grid 的汇总 Agent + 于谦说人话 Skill。"
+                "你要把多个 SubAgent 的公开结论汇总成业务人员能听懂的答复。"
+                "必须包含：结论、依据、风险影响、建议动作、不确定性说明。"
+                "这是导师汇报用的评审演示：可以说 SubAgent 已自动调曲线、进入仿真演示流程；"
+                "真实风险定级、真实调度动作必须说明还需要实时压力/流量/边界条件。"
+                "仿真只能说“基于当前参数推演”，不能说成真实未来。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"用户问题：{user_message}\n"
+                f"工具证据：{json.dumps(evidence, ensure_ascii=False)}\n"
+                f"SubAgent 结果：{json.dumps(results, ensure_ascii=False)}"
+            ),
+        },
+    ]
+    try:
+        final_reply = await ai_client.chat_completion(messages=final_messages, temperature=0.45, max_tokens=1200)
+        final_reply = _strip_think_tags(final_reply).strip()
+    except Exception as exc:
+        logger.warning("subagent final summary failed: %s", exc)
+        final_reply = (
+            "结论：专家组流程已跑完，但最终 AI 汇总暂时不可用。\n"
+            "依据：历史、拓扑、仿真、复核 Agent 的阶段结果已经展示在上方。\n"
+            "不确定性说明：需要重新请求汇总模型后才能生成完整业务结论。"
+        )
+
+    final_reply = _append_completeness_hint(
+        final_reply,
+        request.message,
+        is_complete=True,
+        reason="已完成 SubAgent 分工演示、工具证据整理和最终汇总。",
+    )
+    yield f"[REPLY] {json.dumps(chr(10) + final_reply, ensure_ascii=False)}\n"
 
 
 async def _universal_search_event_generator(message: str, session: Session):

@@ -1,7 +1,7 @@
 import type { PipelineNode, PipelineLine, PipelineDevice } from '@/types'
 import { NodeType, PipelineStatus, PressureLevel, DeviceType } from '@/types'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
-import { getJunctionKind, getLinePipelineKind, getNodeRawType, isCompressorNode, isDistributionNode, isHubNode, isMajorJunctionNode, isSourceNode, isValveNode } from '@/utils/pipelineDomain'
+import { getJunctionKind, getLinePipelineKind, getNodeRawType, isCompressorNode, isDistributionNode, isHubNode, isLngSourceNode, isMajorJunctionNode, isSourceNode, isValveNode } from '@/utils/pipelineDomain'
 import { getNodeImportance, getNodeLODStrategy, NODE_LOD_THRESHOLDS, NodeImportance, shouldShowNodeAtZoom } from '@/utils/hierarchyRenderer'
 
 /**
@@ -83,6 +83,16 @@ const SOURCE_MARKER_CONFIG = {
     CONTAINER_PADDING: 6,
     COLOR: '#FF4500',
     GLOW_COLOR: 'rgba(255, 100, 0, 0.6)',
+} as const
+
+const LNG_MARKER_CONFIG = {
+    WIDTH: 42,
+    HEIGHT: 32,
+    COMPACT_WIDTH: 34,
+    COMPACT_HEIGHT: 26,
+    CONTAINER_PADDING: 6,
+    COLOR: '#0ea5e9',
+    GLOW_COLOR: 'rgba(14, 165, 233, 0.62)',
 } as const
 
 /**
@@ -217,7 +227,46 @@ function injectMarkerStyles() {
             width: ${SOURCE_MARKER_CONFIG.COMPACT_SIZE + 4}px;
             height: ${SOURCE_MARKER_CONFIG.COMPACT_SIZE + 8}px;
         }
+        /* 火焰跳动动画 */
+        .source-flame {
+            animation: flame-flicker 1.2s ease-in-out infinite;
+            transform-origin: 16px 10px;
+        }
+        @keyframes flame-flicker {
+            0%, 100% { opacity: 1; }
+            25% { opacity: 0.8; }
+            50% { opacity: 1; }
+            75% { opacity: 0.9; }
+        }
         .cluster-indicator.source { background: #FF4500; }
+        .lng-ship-marker-container {
+            width: ${LNG_MARKER_CONFIG.WIDTH + LNG_MARKER_CONFIG.CONTAINER_PADDING}px;
+            height: ${LNG_MARKER_CONFIG.HEIGHT + LNG_MARKER_CONFIG.CONTAINER_PADDING}px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            overflow: visible;
+            filter: drop-shadow(0 0 7px ${LNG_MARKER_CONFIG.GLOW_COLOR});
+            transition: transform 0.2s ease, filter 0.2s ease;
+        }
+        .lng-ship-marker-container:hover {
+            transform: scale(1.14);
+            filter: drop-shadow(0 0 13px rgba(56, 189, 248, 0.9));
+        }
+        .lng-ship-marker-container.compact {
+            width: ${LNG_MARKER_CONFIG.COMPACT_WIDTH + LNG_MARKER_CONFIG.CONTAINER_PADDING}px;
+            height: ${LNG_MARKER_CONFIG.COMPACT_HEIGHT + LNG_MARKER_CONFIG.CONTAINER_PADDING}px;
+        }
+        .lng-ship-wave {
+            animation: lng-wave 1.8s ease-in-out infinite;
+        }
+        @keyframes lng-wave {
+            0%, 100% { opacity: 0.55; transform: translateY(0); }
+            50% { opacity: 0.95; transform: translateY(1px); }
+        }
+        .cluster-indicator.lng { background: #0ea5e9; }
     `
     if (!existingStyle) {
         document.head.appendChild(style)
@@ -676,6 +725,11 @@ function createClusterMarkerContent(group: ClusterGroup): string {
     const { typeStats } = group
     const hasJunctionNode = group.nodes.some(isHubNode) || typeStats.majorJunction > 0 || typeStats.junction > 0
     const hasSourceNode = typeStats.source > 0
+    const hasLngSourceNode = group.nodes.some(isLngSourceNode)
+
+    if (hasLngSourceNode) {
+        return createLngShipMarkerContent(true)
+    }
 
     if (hasSourceNode) {
         return createSourceMarkerContent(true)
@@ -750,6 +804,8 @@ function createClusterMarker(
         content: createClusterMarkerContent(group),
         offset: group.nodes.some(isHubNode) || group.typeStats.majorJunction > 0 || group.typeStats.junction > 0
             ? new AMap.Pixel(-(HUB_MARKER_CONFIG.SIZE + HUB_MARKER_CONFIG.CONTAINER_PADDING) / 2, -(HUB_MARKER_CONFIG.SIZE + HUB_MARKER_CONFIG.CONTAINER_PADDING) / 2)
+            : group.nodes.some(isLngSourceNode)
+            ? new AMap.Pixel(-(LNG_MARKER_CONFIG.COMPACT_WIDTH + LNG_MARKER_CONFIG.CONTAINER_PADDING) / 2, -(LNG_MARKER_CONFIG.COMPACT_HEIGHT + LNG_MARKER_CONFIG.CONTAINER_PADDING) / 2)
             : group.typeStats.source > 0
             ? new AMap.Pixel(-(SOURCE_MARKER_CONFIG.SIZE + SOURCE_MARKER_CONFIG.CONTAINER_PADDING) / 2, -(SOURCE_MARKER_CONFIG.SIZE + SOURCE_MARKER_CONFIG.CONTAINER_PADDING) / 2)
             : new AMap.Pixel(-20, -20),
@@ -769,6 +825,14 @@ function createClusterMarker(
     }
 
     return marker
+}
+
+function shouldUseClusterMarker(group: ClusterGroup): boolean {
+    return group.nodes.some(isLngSourceNode)
+        || group.typeStats.source > 0
+        || group.nodes.some(isHubNode)
+        || group.typeStats.majorJunction > 0
+        || group.typeStats.junction > 0
 }
 
 function shouldPreferCompactFanout(group: ClusterGroup, zoom: number): boolean {
@@ -833,40 +897,8 @@ function createLeaderLine(
     })
 }
 
-const PARALLEL_TRUNK_VISUAL_OFFSET_DEGREES = 0.045
-
-function getParallelTrunkOffsetFactor(line: PipelineLine): number {
-    if (getLinePipelineKind(line) !== 'trunk') return 0
-
-    const systemId = String(line.systemId || line.properties?.systemId || '').toLowerCase()
-    const category = String(line.properties?.category || line.layerName || line.properties?.layerName || line.name || '')
-
-    if (systemId === 'we1' || category.includes('西气东输一线') || category.includes('西一线')) return 1
-    if (systemId === 'we2' || category.includes('西气东输二线') || category.includes('西二线')) return -1
-
-    return 0
-}
-
 function buildVisualLinePath(line: PipelineLine): number[][] {
-    const path = line.path.map(p => [p.longitude, p.latitude])
-    const offsetFactor = getParallelTrunkOffsetFactor(line)
-    if (offsetFactor === 0 || path.length < 2) return path
-
-    const first = path[0]
-    const last = path[path.length - 1]
-    const dx = last[0] - first[0]
-    const dy = last[1] - first[1]
-    const length = Math.sqrt(dx * dx + dy * dy)
-    if (length <= 0) return path
-
-    const normalX = -dy / length
-    const normalY = dx / length
-    const offset = PARALLEL_TRUNK_VISUAL_OFFSET_DEGREES * offsetFactor
-
-    return path.map(([lng, lat]) => [
-        lng + normalX * offset,
-        lat + normalY * offset,
-    ])
+    return line.path.map(p => [p.longitude, p.latitude])
 }
 
 /**
@@ -907,6 +939,7 @@ function createSourceMarkerContent(isCompact = false): string {
     const h = isCompact ? 34 : 42
     const legW = isCompact ? 2 : 2.5
     const braceW = isCompact ? 0.8 : 1
+    const flameScale = isCompact ? 1.15 : 1.35
     return `
         <div class="source-marker-container${isCompact ? ' compact' : ''}" title="气源">
             <svg width="${w}" height="${h}" viewBox="0 0 32 42" style="overflow:visible;" xmlns="http://www.w3.org/2000/svg">
@@ -915,28 +948,57 @@ function createSourceMarkerContent(isCompact = false): string {
                 <!-- 地面 -->
                 <ellipse cx="16" cy="40.5" rx="12" ry="1.5" fill="rgba(255,140,0,0.22)"/>
 
-                <!-- 火焰（带内焰镂空） -->
-                <path fill-rule="evenodd" fill="#FF4500" stroke="#FF8C00" stroke-width="0.5"
-                  d="M16,0 C14,2.5 13.3,4.5 14.2,7 C13.2,6 12.3,8 13.3,9.3 C14.3,10.2 15.3,9.3 16,8 C16.7,9.3 17.7,10.2 18.7,9.3 C19.7,8 18.8,6 17.8,7 C18.7,4.5 18,2.5 16,0Z
-                     M16,3.2 C15.5,4 15.4,4.8 15.7,5.5 C15.4,5.2 15.1,5.9 15.4,6.3 C15.7,6.7 16,6.3 16,5.9 C16,6.3 16.3,6.7 16.6,6.3 C16.9,5.9 16.6,5.2 16.3,5.5 C16.6,4.8 16.5,4 16,3.2Z"
-                />
+                <!-- 火焰（放大 + 动态） -->
+                <g transform="translate(16, 11) scale(${flameScale}) translate(-16, -11)">
+                    <path class="source-flame" fill-rule="evenodd" fill="#FF4500" stroke="#FF8C00" stroke-width="0.5"
+                      d="M16,0 C14,2.5 13.3,4.5 14.2,7 C13.2,6 12.3,8 13.3,9.3 C14.3,10.2 15.3,9.3 16,8 C16.7,9.3 17.7,10.2 18.7,9.3 C19.7,8 18.8,6 17.8,7 C18.7,4.5 18,2.5 16,0Z
+                         M16,3.2 C15.5,4 15.4,4.8 15.7,5.5 C15.4,5.2 15.1,5.9 15.4,6.3 C15.7,6.7 16,6.3 16,5.9 C16,6.3 16.3,6.7 16.6,6.3 C16.9,5.9 16.6,5.2 16.3,5.5 C16.6,4.8 16.5,4 16,3.2Z"
+                    />
+                </g>
 
                 <!-- 顶部平台 -->
-                <rect x="10" y="11" width="12" height="3" rx="0.5" fill="#e2e8f0"/>
+                <rect x="10" y="12" width="12" height="3" rx="0.5" fill="#e2e8f0"/>
 
-                <!-- 塔腿（向外扩） -->
-                <line x1="10" y1="14" x2="4" y2="39" stroke="#e2e8f0" stroke-width="${legW}" stroke-linecap="round"/>
-                <line x1="22" y1="14" x2="28" y2="39" stroke="#e2e8f0" stroke-width="${legW}" stroke-linecap="round"/>
+                <!-- 塔身实心背景（遮挡后面管道） -->
+                <polygon points="10,15 22,15 28,40 4,40" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+
+                <!-- 塔腿 -->
+                <line x1="10" y1="15" x2="4" y2="40" stroke="#e2e8f0" stroke-width="${legW}" stroke-linecap="round"/>
+                <line x1="22" y1="15" x2="28" y2="40" stroke="#e2e8f0" stroke-width="${legW}" stroke-linecap="round"/>
 
                 <!-- 交叉支撑 X1（上） -->
-                <line x1="7" y1="17" x2="25" y2="22" stroke="#94a3b8" stroke-width="${braceW}"/>
-                <line x1="7" y1="22" x2="25" y2="17" stroke="#94a3b8" stroke-width="${braceW}"/>
+                <line x1="7" y1="18" x2="25" y2="23" stroke="#64748b" stroke-width="${braceW}"/>
+                <line x1="7" y1="23" x2="25" y2="18" stroke="#64748b" stroke-width="${braceW}"/>
                 <!-- 交叉支撑 X2（中） -->
-                <line x1="6" y1="23" x2="26" y2="28" stroke="#94a3b8" stroke-width="${braceW}"/>
-                <line x1="6" y1="28" x2="26" y2="23" stroke="#94a3b8" stroke-width="${braceW}"/>
+                <line x1="6" y1="24" x2="26" y2="29" stroke="#64748b" stroke-width="${braceW}"/>
+                <line x1="6" y1="29" x2="26" y2="24" stroke="#64748b" stroke-width="${braceW}"/>
                 <!-- 交叉支撑 X3（下） -->
-                <line x1="5" y1="29" x2="27" y2="34" stroke="#94a3b8" stroke-width="${braceW}"/>
-                <line x1="5" y1="34" x2="27" y2="29" stroke="#94a3b8" stroke-width="${braceW}"/>
+                <line x1="5" y1="30" x2="27" y2="35" stroke="#64748b" stroke-width="${braceW}"/>
+                <line x1="5" y1="35" x2="27" y2="30" stroke="#64748b" stroke-width="${braceW}"/>
+            </svg>
+        </div>
+    `
+}
+
+function createLngShipMarkerContent(isCompact = false): string {
+    const w = isCompact ? LNG_MARKER_CONFIG.COMPACT_WIDTH : LNG_MARKER_CONFIG.WIDTH
+    const h = isCompact ? LNG_MARKER_CONFIG.COMPACT_HEIGHT : LNG_MARKER_CONFIG.HEIGHT
+    return `
+        <div class="lng-ship-marker-container${isCompact ? ' compact' : ''}" title="LNG接收站">
+            <svg width="${w}" height="${h}" viewBox="0 0 84 64" style="overflow:visible;" xmlns="http://www.w3.org/2000/svg">
+                <ellipse cx="42" cy="54" rx="32" ry="6" fill="rgba(14,165,233,0.18)"/>
+                <path class="lng-ship-wave" d="M12 52 C20 47 28 57 36 52 C44 47 52 57 60 52 C66 48 72 51 76 54"
+                    fill="none" stroke="rgba(125,211,252,0.9)" stroke-width="3" stroke-linecap="round"/>
+                <path d="M7 38 L58 38 L76 27 L66 49 L20 49 C14 49 9 44 7 38Z"
+                    fill="#062f4f" stroke="#38bdf8" stroke-width="4" stroke-linejoin="round"/>
+                <path d="M18 32 H33 L33 20 H47 L47 32 H60"
+                    fill="none" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M34 20 L42 10 L50 20"
+                    fill="none" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M19 39 H54 L68 31" fill="none" stroke="#bae6fd" stroke-width="2.5" stroke-linecap="round"/>
+                <circle cx="25" cy="43" r="2" fill="#e0f2fe"/>
+                <circle cx="36" cy="43" r="2" fill="#e0f2fe"/>
+                <circle cx="47" cy="43" r="2" fill="#e0f2fe"/>
             </svg>
         </div>
     `
@@ -975,6 +1037,7 @@ function createOffsetNodeMarker(
 
     const rawType = getNodeRawType(node)
     const isSource = isSourceNode(node)
+    const isLngSource = isLngSourceNode(node)
     const isCompressor = isCompressorNode(node)
     const isDistribution = isDistributionNode(node)
     const isHub = isHubNode(node)
@@ -982,7 +1045,19 @@ function createOffsetNodeMarker(
     let marker: any
     let markerSize: number  // 用于计算 offset 居中
 
-    if (isSource) {
+    if (isLngSource) {
+        markerSize = LNG_MARKER_CONFIG.WIDTH + LNG_MARKER_CONFIG.CONTAINER_PADDING
+        marker = new AMap.Marker({
+            position: [position.longitude, position.latitude],
+            content: createLngShipMarkerContent(false),
+            offset: new AMap.Pixel(-markerSize / 2, -markerSize / 2),
+            draggable: true,
+            cursor: 'move',
+            zIndex: 152,
+            extData: { node },
+        zooms: [2, 30]
+    })
+    } else if (isSource) {
         markerSize = SOURCE_MARKER_CONFIG.SIZE + SOURCE_MARKER_CONFIG.CONTAINER_PADDING
         marker = new AMap.Marker({
             position: [position.longitude, position.latitude],
@@ -1090,7 +1165,9 @@ function createOffsetNodeMarker(
     const text = new AMap.Text({
         text: node.name,
         position: [position.longitude, position.latitude],
-        offset: isSource
+        offset: isLngSource
+            ? new AMap.Pixel(0, LNG_MARKER_CONFIG.HEIGHT / 2 + 5)
+            : isSource
             ? new AMap.Pixel(0, SOURCE_MARKER_CONFIG.SIZE / 2 + 6)
             : isHub
             ? new AMap.Pixel(0, HUB_MARKER_CONFIG.SIZE / 2 + 6)
@@ -1588,57 +1665,43 @@ export function renderPipelineNodesWithClustering(
                         }
                     }
                     else if (lodStrategy.clusterDisplayMode === 'expanded' || shouldPreferCompactFanout(group, currentZoom)) {
-                        // 高缩放级别：使用轻量化极简黄金螺旋展开（极简高效，自适应任意多的密度）
+                        // 高缩放级别：站点仍按真实坐标绘制，避免标记脱离管线造成拓扑误读。
                         const nodeCount = group.nodes.length
-                        const useCompactFanout = shouldPreferCompactFanout(group, currentZoom)
-                        const fanoutPositions = useCompactFanout ? calculateCompactFanoutPositions(map, group) : []
-                        const scale = Math.pow(2, currentZoom) * 256 / 360
-
-                        // 黄金角（约 137.5 度），用于生成向日葵式均匀螺旋布局
-                        const goldenAngle = Math.PI * (3 - Math.sqrt(5))
 
                         for (let idx = 0; idx < nodeCount; idx++) {
-                            const node = useCompactFanout ? fanoutPositions[idx].node : group.nodes[idx]
+                            const node = group.nodes[idx]
 
                             // 阀室隐藏机制：低缩放级别下阀室节点跳过创建
                             if (!shouldShowNodeAtZoom(node, currentZoom, lodStrategy)) {
                                 continue
                             }
 
-                            // 轻量级自适应不重叠算法：角度步进黄金角，距离按索引平方根递增
-                            const newPosition = useCompactFanout
-                                ? fanoutPositions[idx].position
-                                : (() => {
-                                    const angle = idx * goldenAngle
-                                    const offsetDistance = nodeCount <= 1 ? 0 : 28 + Math.sqrt(idx) * 20
-                                    const offsetX = Math.cos(angle) * offsetDistance
-                                    const offsetY = Math.sin(angle) * offsetDistance
-
-                                    return {
-                                        longitude: node.coordinate.longitude + offsetX / scale,
-                                        latitude: node.coordinate.latitude - offsetY / scale
-                                    }
-                                })()
-
-                            const markers = createOffsetNodeMarker(map, node, newPosition, onNodeClick)
+                            const markers = createOffsetNodeMarker(map, node, node.coordinate, onNodeClick)
                             if (markers && markers.length > 0) {
-                                const line = createLeaderLine(node.coordinate, newPosition)
-                                if (line) {
-                                    map.add(line)
-                                    overlays.push(line)
-                                }
-
                                 map.add(markers)
                                 overlays.push(...markers)
                             }
                         }
                     }
-                    else {
-                        // 低缩放级别：显示聚合标记
+                    else if (shouldUseClusterMarker(group)) {
+                        // 气源/LNG/枢纽保留专用聚合图标，普通站场/阀室不再使用数字气泡。
                         const clusterMarker = createClusterMarker(map, group, onClusterClick)
                         if (clusterMarker) {
                             map.add(clusterMarker)
                             overlays.push(clusterMarker)
+                        }
+                    }
+                    else {
+                        for (const node of group.nodes) {
+                            if (!shouldShowNodeAtZoom(node, currentZoom, lodStrategy)) {
+                                continue
+                            }
+
+                            const markers = createOffsetNodeMarker(map, node, node.coordinate, onNodeClick)
+                            if (markers && markers.length > 0) {
+                                map.add(markers)
+                                overlays.push(...markers)
+                            }
                         }
                     }
                 } catch (error) {

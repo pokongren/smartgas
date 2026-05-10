@@ -41,7 +41,7 @@ HUB_STATION_NAMES: set[str] = {
     "霍尔果斯压气站", "轮南压气站", "中卫压气站", "靖边压气站",
     "安平压气站", "永清压气站", "黑河压气站", "贵阳压气站",
     "瑞丽", "广州压气站", "贵港压气站", "南昌压气站",
-    "平顶山压气站", "薛店", "泰安压气站", "甪直",
+    "平顶山压气站", "薛店", "泰安压气站", "甪直", "红柳压气站",
     "嘉兴",
 }
 
@@ -84,6 +84,16 @@ def _resolve_pipeline_kind(raw_category: Optional[str], layer_type: Optional[str
         return layer_kind
 
     return "interconnect"
+
+
+def _parse_properties_json(raw_properties: Optional[str]) -> Dict[str, Any]:
+    if not raw_properties:
+        return {}
+    try:
+        parsed = json.loads(raw_properties)
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
 
 
 @router.get("/pipeline-packages")
@@ -233,6 +243,7 @@ def get_pipeline_packages(
                 "pipeline": layer_name,
                 "rawType": s.type,
                 "layerName": layer_name,
+                "rawSource": _parse_properties_json(s.properties),
             },
         }
         
@@ -351,6 +362,7 @@ def get_pipeline_packages(
                         "systemId": system.id,
                         "layerName": layer_cfg["name"],
                         "rawCategory": p.category,
+                        "rawSource": _parse_properties_json(p.properties),
                     },
                 })
             

@@ -146,17 +146,29 @@ export interface ScenarioOption {
   label: string
 }
 
+export interface SimulationPilotConfig {
+  id: string
+  label: string
+  scenarios: ScenarioOption[]
+}
+
 export interface SimulationInitialInput {
   node_overrides?: Array<{
     node_id: string
     target_pressure_mpa?: number
     min_pressure_mpa?: number
     temperature_c?: number
+    supply_max?: number
+    nominal_flow?: number
+    supply_nominal?: number
+    compressor_enabled?: boolean
   }>
   edge_overrides?: Array<{
     edge_id: string
     flow_rate?: number
     length_km?: number
+    max_flow?: number
+    status?: 'open' | 'limited' | 'closed'
   }>
   default_pressure_mpa?: number
   default_temperature_c?: number
@@ -172,6 +184,17 @@ export const MAINLINE_SCENARIOS: ScenarioOption[] = [
   { id: 'yanchi_jingbian_limited', label: '盐池→靖边段限流' },
 ]
 
+/** 中卫到上海白鹤全段主样板场景列表 */
+export const ZHONGWEI_BAIHE_PILOT_ID = 'zhongwei_shanghai_baihe'
+
+export const ZHONGWEI_BAIHE_SCENARIOS: ScenarioOption[] = [
+  { id: 'steady_base', label: '常规稳态输气' },
+  { id: 'zhongwei_supply_pressure_drop', label: '中卫出站压力下调' },
+  { id: 'zhengzhou_compressor_offline', label: '郑州压气站停运' },
+  { id: 'east_china_peak_demand', label: '华东末端负荷上调' },
+  { id: 'baihe_delivery_limited', label: '白鹤末端交付受限' },
+]
+
 /** 辅样板场景列表 */
 export const BRANCH_SCENARIOS: ScenarioOption[] = [
   { id: 'steady_branch_base', label: '常规分输' },
@@ -179,3 +202,23 @@ export const BRANCH_SCENARIOS: ScenarioOption[] = [
   { id: 'changlv_load_up', label: '长铝支线负荷上调' },
   { id: 'branch_limited', label: '支线限流' },
 ]
+
+export const DEFAULT_WE1_PILOT_ID = ZHONGWEI_BAIHE_PILOT_ID
+
+export const SIMULATION_PILOT_CONFIGS: Record<string, SimulationPilotConfig> = {
+  [ZHONGWEI_BAIHE_PILOT_ID]: {
+    id: ZHONGWEI_BAIHE_PILOT_ID,
+    label: '中卫-上海白鹤',
+    scenarios: ZHONGWEI_BAIHE_SCENARIOS,
+  },
+  mainline_zhongwei_jingbian: {
+    id: 'mainline_zhongwei_jingbian',
+    label: '中卫-靖边旧样板',
+    scenarios: MAINLINE_SCENARIOS,
+  },
+}
+
+export function resolveSimulationPilotConfig(pilotId?: string | null): SimulationPilotConfig {
+  const id = (pilotId || '').trim()
+  return SIMULATION_PILOT_CONFIGS[id] || SIMULATION_PILOT_CONFIGS[DEFAULT_WE1_PILOT_ID]
+}

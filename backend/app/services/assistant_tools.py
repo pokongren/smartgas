@@ -187,6 +187,13 @@ TOOL_DEFINITIONS = [
         },
     },
     {
+        "name": "compare_zhongwei_multi_scenarios",
+        "description": "按多工况 AI skill 依次运行中卫 3000 万方、中卫 2000 万方、中卫截断三组简化稳态仿真，并输出自动比对结论。",
+        "parameters": {
+            "pilot_id": {"description": "试点 ID，默认中卫-上海白鹤", "required": False},
+        },
+    },
+    {
         "name": "evaluate_sim_result",
         "description": "评价稳态仿真结果，支持按 run_id 或直接传 overlay JSON。可选基线快照做对比。",
         "parameters": {
@@ -1449,7 +1456,7 @@ def _handle_simulate_cutoff(args: dict, session: Session) -> str:
 
 
 def _handle_run_steady_sim(args: dict, session: Session) -> str:
-    pilot_id = str(args.get("pilot_id") or "mainline_zhongwei_jingbian").strip() or "mainline_zhongwei_jingbian"
+    pilot_id = str(args.get("pilot_id") or "zhongwei_shanghai_baihe").strip() or "zhongwei_shanghai_baihe"
     scenario_id = str(args.get("scenario_id") or "steady_base").strip() or "steady_base"
     initial_conditions_json = str(args.get("initial_conditions_json") or "").strip()
 
@@ -1477,6 +1484,122 @@ def _handle_run_steady_sim(args: dict, session: Session) -> str:
         "AI 评价：",
         evaluation or "暂无可评价内容",
     ]
+    return "\n".join(lines)
+
+
+def _handle_compare_zhongwei_multi_scenarios(args: dict, session: Session) -> str:
+    pilot_id = str(args.get("pilot_id") or "zhongwei_shanghai_baihe").strip() or "zhongwei_shanghai_baihe"
+    cases = [
+        {
+            "label": "中卫 3000 万标方/天",
+            "input": {
+                "node_overrides": [{
+                    "node_id": "WE1-76",
+                    "supply_max": 3000,
+                    "nominal_flow": 3000,
+                    "supply_nominal": 3000,
+                    "target_pressure_mpa": 9.8,
+                }],
+            },
+        },
+        {
+            "label": "中卫 2000 万标方/天",
+            "input": {
+                "node_overrides": [{
+                    "node_id": "WE1-76",
+                    "supply_max": 2000,
+                    "nominal_flow": 2000,
+                    "supply_nominal": 2000,
+                    "target_pressure_mpa": 9.8,
+                }],
+            },
+        },
+        {
+            "label": "中卫截断",
+            "input": {
+                "node_overrides": [{
+                    "node_id": "WE1-76",
+                    "supply_max": 0,
+                    "nominal_flow": 0,
+                    "supply_nominal": 0,
+                    "target_pressure_mpa": 0,
+                }],
+                "edge_overrides": [{
+                    "edge_id": "WE1-T-76",
+                    "flow_rate": 0,
+                    "status": "closed",
+                }],
+            },
+        },
+    ]
+
+    rows: list[dict[str, Any]] = []
+    for case in cases:
+        solver_input = _build_solver_input_or_raise(pilot_id, session)
+        raw_initial = case["input"]
+        if hasattr(InitialConditionsInput, "model_validate"):
+            initial_conditions = InitialConditionsInput.model_validate(raw_initial)
+        else:
+            initial_conditions = InitialConditionsInput(**raw_initial)
+
+        _apply_initial_conditions(solver_input, "steady_base", initial_conditions)
+        result = solve_steady(seed=solver_input, scenario_id="steady_base", pilot_id=pilot_id)
+        payload = _finalize_result_payload(result.to_dict(), solver_input, pilot_id, "steady_base")
+        saved = save_snapshot(payload, solver_input)
+        result_data = saved.get("result") or payload
+        nodes = result_data.get("nodes") or []
+        min_node = min(
+            nodes,
+            key=lambda node: float(node.get("pressure_in_mpa", node.get("pressure_mpa", 0.0))),
+            default={},
+        )
+        summary = result_data.get("summary") or {}
+        rows.append({
+            "label": case["label"],
+            "run_id": saved.get("run_id"),
+            "total_supply": float(summary.get("total_supply", 0.0)),
+            "unserved_demand": float(summary.get("unserved_demand", 0.0)),
+            "alert_count": float(summary.get("alert_count", 0.0)),
+            "avg_utilization": float(summary.get("avg_utilization", 0.0)),
+            "min_pressure": float(min_node.get("pressure_in_mpa", min_node.get("pressure_mpa", 0.0)) or 0.0),
+            "min_pressure_node": min_node.get("id") or "-",
+            "iterations": saved.get("iterations", result_data.get("iterations", 0)),
+        })
+
+    worst = max(
+        rows,
+        key=lambda row: (
+            row["unserved_demand"] * 1000
+            + row["alert_count"] * 10
+            + max(0.0, 8.0 - row["min_pressure"]) * 100
+        ),
+    )
+    base = rows[0] if rows else {}
+
+    lines = [
+        "多工况 AI skill 已完成：依次运行中卫 3000 万方、2000 万方、截断三组简化稳态仿真。",
+        "",
+        "| 工况 | run_id | 总供气(万方/天) | 未满足(万方/天) | 最低进站(MPa) | 告警 | 平均利用率 | 迭代 |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for row in rows:
+        lines.append(
+            f"| {row['label']} | {row['run_id']} | {row['total_supply']:.0f} | "
+            f"{row['unserved_demand']:.0f} | {row['min_pressure']:.2f}({row['min_pressure_node']}) | "
+            f"{row['alert_count']:.0f} | {row['avg_utilization'] * 100:.1f}% | {row['iterations']} |"
+        )
+
+    lines.extend([
+        "",
+        (
+            "AI比对结论："
+            f"三组中“{worst['label']}”风险最高，相对基准供气减少 "
+            f"{max(0.0, float(base.get('total_supply', 0.0)) - worst['total_supply']):.0f} 万方/天，"
+            f"未满足需求增加 {max(0.0, worst['unserved_demand'] - float(base.get('unserved_demand', 0.0))):.0f} 万方/天，"
+            f"最低进站压力为 {worst['min_pressure']:.2f} MPa。"
+        ),
+        "说明：这是简化稳态推演，当前主要验证 AI 自动组织工况、调用已有压力流量模型和解释结果，不替代工业级水力精算。",
+    ])
     return "\n".join(lines)
 
 
@@ -1618,6 +1741,7 @@ TOOL_HANDLERS = {
     "analyze_correlation": _handle_analyze_correlation,
     "simulate_cutoff": _handle_simulate_cutoff,
     "run_steady_sim": _handle_run_steady_sim,
+    "compare_zhongwei_multi_scenarios": _handle_compare_zhongwei_multi_scenarios,
     "evaluate_sim_result": _handle_evaluate_sim_result,
     "query_we1_data_alignment": _handle_query_we1_data_alignment,
     "get_we1_pressure_profile": _handle_get_we1_pressure_profile,

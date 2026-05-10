@@ -6,7 +6,10 @@ import { resolveApiPath } from '@/services/apiBase';
 import { findIsolatedNodes, computeBetweennessCentrality, countComponents } from '@/utils/topology-validator';
 import { useSimulation } from '@/hooks/useSimulation';
 import { SimPanel } from '@/components/topology/SimPanel';
-import { MAINLINE_SCENARIOS } from '@/types/simulation';
+import {
+    DEFAULT_WE1_PILOT_ID,
+    resolveSimulationPilotConfig,
+} from '@/types/simulation';
 import type { SimulationOverlay } from '@/types/simulation';
 import { readSimulationShowcaseSyncContext } from '@/utils/simulationShowcaseSync';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -505,11 +508,16 @@ function drawGraph(
                 ctx.globalAlpha = 1;
             }
             const pc = simNode.alert_level === 'critical' ? '#f87171' : simNode.alert_level === 'warning' ? '#fdba74' : '#34d399';
+            const pressureIn = simNode.pressure_in_mpa ?? simNode.pressure_mpa;
+            const pressureOut = simNode.pressure_mpa;
+            const pressureDelta = pressureOut - pressureIn;
             ctx.textAlign = 'center';
             ctx.font = `bold ${9 / zoom}px Inter, sans-serif`;
             ctx.fillStyle = pc;
-            ctx.fillText(`${simNode.pressure_mpa.toFixed(2)} MPa`, node.x, node.y - radius - 14 / zoom);
-            const nodeTemp = simNode.temperature_c ?? estimateNodeTemperatureC(simNode.pressure_mpa);
+            ctx.fillText(`进:${pressureIn.toFixed(2)} 出:${pressureOut.toFixed(2)}`, node.x, node.y - radius - 24 / zoom);
+            ctx.font = `${8 / zoom}px Inter, sans-serif`;
+            ctx.fillText(`Δ:${pressureDelta >= 0 ? '+' : ''}${pressureDelta.toFixed(2)} MPa`, node.x, node.y - radius - 14 / zoom);
+            const nodeTemp = simNode.temperature_c ?? estimateNodeTemperatureC(pressureOut);
             ctx.font = `${8 / zoom}px Inter, sans-serif`;
             ctx.fillStyle = '#93c5fd';
             ctx.fillText(`T:${nodeTemp.toFixed(1)}°C`, node.x, node.y - radius - 4 / zoom);
@@ -536,6 +544,12 @@ function drawGraph(
 const TopologyView: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const queryPilotId = useMemo(() => {
+        return new URLSearchParams(location.search).get('pilotId') || DEFAULT_WE1_PILOT_ID;
+    }, [location.search]);
+    const activePilot = useMemo(() => resolveSimulationPilotConfig(queryPilotId), [queryPilotId]);
+    const pilotId = activePilot.id;
+    const scenarioOptions = activePilot.scenarios;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const animFrameRef = useRef<number>(0);
     const nodesRef = useRef<TopoNode[]>([]);
@@ -1031,7 +1045,7 @@ const TopologyView: React.FC = () => {
         hydrateFromContext,
         clearOverlay,
     } =
-        useSimulation({ pilotId: 'mainline_zhongwei_jingbian', scenarios: MAINLINE_SCENARIOS });
+        useSimulation({ pilotId, scenarios: scenarioOptions });
     useEffect(() => { simOverlayRef.current = overlay; }, [overlay]);
     const showcaseSyncAppliedRef = useRef(false);
     const [showcaseSyncUpdatedAt, setShowcaseSyncUpdatedAt] = useState<string | null>(null);
@@ -1436,7 +1450,7 @@ const TopologyView: React.FC = () => {
     useEffect(() => {
         if (showcaseSyncAppliedRef.current) return;
 
-        const syncedContext = readSimulationShowcaseSyncContext('mainline_zhongwei_jingbian');
+        const syncedContext = readSimulationShowcaseSyncContext(pilotId);
         if (!syncedContext) return;
 
         showcaseSyncAppliedRef.current = true;
@@ -1453,10 +1467,10 @@ const TopologyView: React.FC = () => {
                 // Keep the hydrated overlay as a fallback if snapshot reload fails.
             });
         }
-    }, [hydrateFromContext, loadSnapshotByRunId]);
+    }, [hydrateFromContext, loadSnapshotByRunId, pilotId]);
     const currentScenarioOption = useMemo(() => {
-        return MAINLINE_SCENARIOS.find(item => item.id === currentScenario) || null;
-    }, [currentScenario]);
+        return scenarioOptions.find(item => item.id === currentScenario) || null;
+    }, [currentScenario, scenarioOptions]);
     const selectedSnapshotSummary = useMemo(() => {
         if (!selectedSnapshotRunId) return null;
         return snapshots.find(item => item.run_id === selectedSnapshotRunId) || null;
@@ -1707,14 +1721,14 @@ const TopologyView: React.FC = () => {
                 <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                     <button
                         className="control-btn"
-                        onClick={() => navigate('/map-topology')}
+                        onClick={() => navigate(`/map-topology?pilotId=${pilotId}`)}
                     >
                         返回第一张图主仿真入口
                     </button>
                     {debugActionsEnabled ? (
                         <button
                             className="control-btn"
-                            onClick={() => navigate('/topology')}
+                            onClick={() => navigate(`/topology?pilotId=${pilotId}`)}
                         >
                             收起调试操作面
                         </button>
@@ -1898,8 +1912,24 @@ const TopologyView: React.FC = () => {
                         <div className="detail-section">
                             <h4>仿真状态</h4>
                             <div className="detail-row">
-                                <span className="label">当前压力</span>
+                                <span className="label">进站压力</span>
+                                <span className="value">
+                                    {selectedSimulationNode
+                                        ? `${(selectedSimulationNode.pressure_in_mpa ?? selectedSimulationNode.pressure_mpa).toFixed(2)} MPa`
+                                        : '未运行仿真'}
+                                </span>
+                            </div>
+                            <div className="detail-row">
+                                <span className="label">出站压力</span>
                                 <span className="value">{selectedSimulationNode ? `${selectedSimulationNode.pressure_mpa.toFixed(2)} MPa` : '未运行仿真'}</span>
+                            </div>
+                            <div className="detail-row">
+                                <span className="label">站内压差</span>
+                                <span className="value">
+                                    {selectedSimulationNode
+                                        ? `${(selectedSimulationNode.pressure_mpa - (selectedSimulationNode.pressure_in_mpa ?? selectedSimulationNode.pressure_mpa)).toFixed(2)} MPa`
+                                        : '未运行仿真'}
+                                </span>
                             </div>
                             <div className="detail-row">
                                 <span className="label">当前温度</span>
@@ -2013,7 +2043,7 @@ const TopologyView: React.FC = () => {
         {debugActionsEnabled && (
             <SimPanel
                 scenarioId={currentScenario}
-                scenarios={MAINLINE_SCENARIOS}
+                scenarios={scenarioOptions}
                 isLoading={simLoading}
                 snapshotLoading={snapshotLoading}
                 baselineSnapshotLoading={baselineSnapshotLoading}

@@ -168,6 +168,20 @@ export function isSourceNode(node: PipelineNode): boolean {
     return isCoreSourceStationName(node.name) || getNodeRawType(node) === 'source'
 }
 
+export function isLngSourceNode(node: PipelineNode): boolean {
+    if (!isSourceNode(node)) return false
+
+    const props = node.properties
+    const gasSource = props && typeof props === 'object'
+        ? (props as Record<string, any>).gasSource
+        : undefined
+    const sourceType = gasSource && typeof gasSource === 'object'
+        ? String((gasSource as Record<string, unknown>).sourceType || '').toLowerCase()
+        : ''
+
+    return sourceType === 'lng' || /lng/i.test(node.name)
+}
+
 export function inferNodeRawTypeFromName(name: string): RawStationType {
     if (isSpecialStyleExcludedStationName(name)) {
         if (includesAnyKeyword(name, COMPRESSOR_KEYWORDS)) return 'compressor'

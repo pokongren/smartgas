@@ -116,6 +116,7 @@ export interface PipelineNode {
         isMajorJunction?: boolean
         systemIds?: string[]
         memberCount?: number
+        isGasSource?: boolean
     }
 }
 

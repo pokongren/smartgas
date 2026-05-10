@@ -23,7 +23,8 @@ HUB_WHITE_LIST_RULES: List[Dict[str, Any]] = [
     {"label": "霍尔果斯压气站", "patterns": ["霍尔果斯压气站"]},
     {"label": "轮南压气站", "patterns": ["轮南压气站"]},
     {"label": "中卫压气站", "patterns": ["中卫压气站"]},
-    {"label": "靖边压气站", "patterns": ["西一靖边压气站"]},
+    {"label": "靖边压气站", "patterns": ["西一靖边压气站", "陕京靖边首站"]},
+    {"label": "榆林压气站", "patterns": ["榆林压气站"]},
     {"label": "安平压气站", "patterns": ["安平压气站"]},
     {"label": "永清压气站", "patterns": ["永清压气站"]},
     {"label": "黑河压气站", "patterns": ["黑河压气站"]},
@@ -35,7 +36,7 @@ HUB_WHITE_LIST_RULES: List[Dict[str, Any]] = [
     {"label": "平顶山压气站", "patterns": ["平顶山分输站"]},
     {"label": "薛店", "patterns": ["薛店分输站"]},
     {"label": "泰安压气站", "patterns": ["泰安压气站"]},
-    {"label": "甪直", "patterns": ["甪直分输站"]},
+    {"label": "甪直联络站", "patterns": ["甪直分输站", "甪直联络站"]},
     {"label": "嘉兴", "patterns": ["嘉兴分输站"]},
 ]
 
