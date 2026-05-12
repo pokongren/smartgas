@@ -38,7 +38,7 @@ import {
     findIsolatedNodes,
 } from '@/utils/topology-validator'
 import type { ValidationReport } from '@/utils/topology-validator'
-import { simulateCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
+import { simulateCutoff, simulateEdgeCutoff, searchNodes, pathIdsToNames } from '@/utils/cutoff-simulator'
 import type { CutoffResult } from '@/utils/cutoff-simulator'
 
 // ================== 类型 ==================
@@ -507,6 +507,9 @@ const MapTopologyView: React.FC = () => {
 
     // 截断仿真状态
     const [cutoffNodeId, setCutoffNodeId] = useState<string | null>(null)
+    const [cutoffEdgeId, setCutoffEdgeId] = useState<string | null>(null)
+    const [cutoffClosedEdgeIds, setCutoffClosedEdgeIds] = useState<string[]>([])
+    const [cutoffStoppedEdgeIds, setCutoffStoppedEdgeIds] = useState<string[]>([])
     const [cutoffResult, setCutoffResult] = useState<CutoffResult | null>(null)
     const [cutoffSearch, setCutoffSearch] = useState('')
 
@@ -530,6 +533,7 @@ const MapTopologyView: React.FC = () => {
     useEffect(() => { nodesRef.current = topoNodes; edgesRef.current = topoEdges }, [topoNodes, topoEdges])
     useEffect(() => { modeRef.current = editMode; ptRef.current = pointType }, [editMode, pointType])
     useEffect(() => { cfRef.current = connectFrom }, [connectFrom])
+    useEffect(() => { activeTabRef.current = activeTab }, [activeTab])
 
     // ================== 收集全部管线原始数据（不传给 MapView，仅供导入用） ==================
     const rawPipelineData = useMemo(() => {
@@ -614,6 +618,41 @@ const MapTopologyView: React.FC = () => {
     const canDeleteSelectedJunction = !!(
         selectedJunctionGroup && !isRuntimeReadonlyGroup(selectedJunctionGroup)
     )
+
+    const selectCutoffNode = useCallback((nodeId: string, nodeName?: string) => {
+        setCutoffNodeId(nodeId)
+        setCutoffEdgeId(null)
+        setCutoffClosedEdgeIds([])
+        setCutoffStoppedEdgeIds([])
+        setCutoffResult(null)
+        setStatusMsg(`截断点已选：${nodeName || nodeId}`)
+    }, [])
+
+    const selectCutoffEdge = useCallback((edge: TopoEdge) => {
+        if (activeTabRef.current !== 'cutoff') {
+            setStatusMsg(`已选中连线：${edge.name || edge.id}`)
+            return
+        }
+        setCutoffNodeId(null)
+        setCutoffEdgeId(edge.id)
+        setCutoffClosedEdgeIds([])
+        setCutoffStoppedEdgeIds([])
+        setCutoffResult(null)
+        setStatusMsg(`截断管段已选：${edge.name || edge.id}`)
+    }, [])
+
+    const buildClosedEdgeOverrides = useCallback((edgeIds: string[]) => {
+        const idSet = new Set(edgeIds)
+        const sourceIds = topoEdges
+            .filter(edge => idSet.has(edge.id))
+            .flatMap(edge => edge.sourceEdgeIds?.length ? edge.sourceEdgeIds : [edge.id])
+
+        return [...new Set(sourceIds)].map(edgeId => ({
+            edge_id: edgeId,
+            flow_rate: 0,
+            status: 'closed' as const,
+        }))
+    }, [topoEdges])
 
     const buildCollapsedGraph = useCallback((
         nodes: BaseTopoNode[],
@@ -739,6 +778,7 @@ const MapTopologyView: React.FC = () => {
                             zIndex: 100 + index,
                         })
                         polyline.setMap(mapInstance)
+                        polyline.on('click', () => selectCutoffEdge(edge))
                         return polyline
                     })
                     return { ...edge, poly: parallelCount === 1 ? polylines[0] : polylines }
@@ -753,7 +793,7 @@ const MapTopologyView: React.FC = () => {
         } catch (error) {
             console.warn('[MapTopologyView] renderCollapsedGraph failed', error)
         }
-    }, [clearRenderedTopology, mapInstance])
+    }, [clearRenderedTopology, mapInstance, selectCutoffEdge])
 
     useEffect(() => {
         void loadJunctionGroups()
@@ -882,9 +922,7 @@ const MapTopologyView: React.FC = () => {
         if (modeRef.current === 'view' && activeTab === 'cutoff') {
             const nd = clickedNode
             if (!nd) return
-            setCutoffNodeId(nodeId)
-            setCutoffResult(null)
-            setStatusMsg(`截断点已选：${nd.name}`)
+            selectCutoffNode(nodeId, nd.name)
             return
         }
 
@@ -1202,11 +1240,15 @@ const MapTopologyView: React.FC = () => {
 
     // ================== 截断仿真 ==================
     const runCutoffSimulation = useCallback(() => {
-        if (!cutoffNodeId || topoNodes.length === 0) return
+        if ((!cutoffNodeId && !cutoffEdgeId) || topoNodes.length === 0) return
         const gn = topoNodes.map(n => ({ id: n.id, name: n.name, type: n.type }))
         const ge = topoEdges.map(e => ({ id: e.id, startNodeId: e.startNodeId, endNodeId: e.endNodeId }))
-        const result = simulateCutoff(gn, ge, cutoffNodeId)
+        const result = cutoffEdgeId
+            ? simulateEdgeCutoff(gn, ge, cutoffEdgeId)
+            : simulateCutoff(gn, ge, cutoffNodeId!)
         setCutoffResult(result)
+        setCutoffClosedEdgeIds(result.cutoffEdgeIds)
+        setCutoffStoppedEdgeIds(result.stoppedEdgeIds)
 
         // ---- 地图高亮渲染 ----
         // 先恢复所有已高亮节点
@@ -1217,8 +1259,8 @@ const MapTopologyView: React.FC = () => {
         highlightedMarkersRef.current.clear()
 
         // 截断节点：大红圆
-        const cutNode = nodesRef.current.find(n => n.id === cutoffNodeId)
-        if (cutNode?.marker) {
+        const cutNode = cutoffNodeId ? nodesRef.current.find(n => n.id === cutoffNodeId) : null
+        if (cutoffNodeId && cutNode?.marker) {
             const orig = cutNode.marker.getContent()
             highlightedMarkersRef.current.set(cutoffNodeId, orig)
             cutNode.marker.setContent(
@@ -1248,8 +1290,15 @@ const MapTopologyView: React.FC = () => {
         }
 
         const lostCount = result.summary.supplyLost
-        setStatusMsg(`仿真完成：${lostCount} 个断供，${result.summary.rerouted} 个绕行，${result.summary.same} 个不受影响`)
-    }, [cutoffNodeId, topoNodes, topoEdges])
+        const closedEdgeOverrides = buildClosedEdgeOverrides(result.cutoffEdgeIds)
+        if (closedEdgeOverrides.length > 0) {
+            void sim.runSimulation({
+                scenarioId: sim.currentScenario || 'steady_base',
+                initialInput: { edge_overrides: closedEdgeOverrides },
+            })
+        }
+        setStatusMsg(`仿真完成：${lostCount} 个断供，${result.summary.rerouted} 个绕行，${result.stoppedEdgeIds.length} 条管段停流`)
+    }, [buildClosedEdgeOverrides, cutoffEdgeId, cutoffNodeId, sim, topoNodes, topoEdges])
 
     /** 清除截断仿真高亮，恢复原始样式 */
     const clearCutoffHighlight = useCallback(() => {
@@ -1259,6 +1308,9 @@ const MapTopologyView: React.FC = () => {
         }
         highlightedMarkersRef.current.clear()
         setCutoffNodeId(null)
+        setCutoffEdgeId(null)
+        setCutoffClosedEdgeIds([])
+        setCutoffStoppedEdgeIds([])
         setCutoffResult(null)
         setStatusMsg('截断仿真已清除')
     }, [])
@@ -1323,6 +1375,9 @@ const MapTopologyView: React.FC = () => {
         setSelectedNode(null)
         setSelectedMergeNodeIds([])
         setCutoffNodeId(null)
+        setCutoffEdgeId(null)
+        setCutoffClosedEdgeIds([])
+        setCutoffStoppedEdgeIds([])
         setCutoffResult(null)
         setStatusMsg('已清空')
     }
@@ -1652,13 +1707,45 @@ const MapTopologyView: React.FC = () => {
         }
     }, [overlayMapping, topoNodes, sim.animatingState, lineFlowPhase, damageFlashVisible, sim.currentScenario])
 
-    // 仿真管段利用率着色
+    const cutoffClosedEdgeSet = useMemo(() => new Set(cutoffClosedEdgeIds), [cutoffClosedEdgeIds])
+    const cutoffStoppedEdgeSet = useMemo(() => new Set(cutoffStoppedEdgeIds), [cutoffStoppedEdgeIds])
+
+    // 仿真管段利用率着色 + 前端截断停流
     useEffect(() => {
-        if (!overlayMapping || topoEdges.length === 0) return
+        if (topoEdges.length === 0) return
         for (const edge of topoEdges) {
             try {
-                const match = overlayMapping.edgeMatchesByDisplayId.get(edge.id)
-                if (!match || match.matchedEdges.length === 0) continue
+                const isCutoffClosed = cutoffClosedEdgeSet.has(edge.id)
+                const isStoppedByCutoff = cutoffStoppedEdgeSet.has(edge.id)
+                if (isCutoffClosed || isStoppedByCutoff) {
+                    forEachEdgePolyline(edge, polyline => {
+                        polyline?.setOptions({
+                            strokeColor: isCutoffClosed ? '#ef4444' : '#475569',
+                            strokeWeight: isCutoffClosed ? LINE_WEIGHT + 3 : LINE_WEIGHT + 1,
+                            strokeOpacity: isCutoffClosed ? 0.95 : 0.38,
+                            strokeStyle: 'dashed',
+                            strokeDasharray: isCutoffClosed ? [10, 8] : [4, 8],
+                            zIndex: isCutoffClosed ? 170 : 104,
+                        })
+                    })
+                    continue
+                }
+
+                const match = overlayMapping?.edgeMatchesByDisplayId.get(edge.id)
+                if (!match || match.matchedEdges.length === 0) {
+                    forEachEdgePolyline(edge, polyline => {
+                        polyline?.setOptions({
+                            strokeColor: LINE_COLOR,
+                            strokeWeight: LINE_WEIGHT,
+                            strokeOpacity: 0.98,
+                            strokeStyle: 'solid',
+                            strokeDasharray: undefined,
+                            zIndex: 100,
+                        })
+                    })
+                    continue
+                }
+
                 const util = match.averageUtilization ?? 0
                 const color = util < 0.7 ? '#22c55e' : util < 0.85 ? '#eab308' : util < 0.95 ? '#f97316' : '#ef4444'
                 const weight = Math.max(2, Math.min(6, 2 + util * 4))
@@ -1674,7 +1761,7 @@ const MapTopologyView: React.FC = () => {
                 console.warn('[MapTopologyView] update edge style failed', edge.id, error)
             }
         }
-    }, [overlayMapping, topoEdges, lineFlowPhase, damageFlashVisible])
+    }, [cutoffClosedEdgeSet, cutoffStoppedEdgeSet, overlayMapping, topoEdges, lineFlowPhase, damageFlashVisible])
 
     // 仿真状态同步到展示页 & AI 助手上下文
     useEffect(() => {
@@ -2506,10 +2593,10 @@ const MapTopologyView: React.FC = () => {
                             <div className="space-y-2">
                                 {/* 搜索截断点 */}
                                 <div>
-                                    <p className="text-[10px] text-gray-500 mb-1 uppercase tracking-wider">选择截断节点</p>
+                                    <p className="text-[10px] text-gray-500 mb-1 uppercase tracking-wider">选择截断位置</p>
                                     <input
                                         className="w-full bg-gray-900/60 border border-gray-700/60 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500/50"
-                                        placeholder="搜索节点名称..."
+                                        placeholder="搜索节点名称，或直接点击地图管段..."
                                         value={cutoffSearch}
                                         onChange={e => setCutoffSearch(e.target.value)}
                                     />
@@ -2522,10 +2609,8 @@ const MapTopologyView: React.FC = () => {
                                             ).map(node => (
                                                 <button key={node.id}
                                                     onClick={() => {
-                                                        setCutoffNodeId(node.id)
-                                                        setCutoffResult(null)
+                                                        selectCutoffNode(node.id, node.name)
                                                         setCutoffSearch('')
-                                                        setStatusMsg(`截断点已选：${node.name}`)
                                                     }}
                                                     className="w-full flex items-center gap-2 p-1.5 rounded text-xs hover:bg-white/5 text-left">
                                                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: TOPO_COLORS[node.type as keyof typeof TOPO_COLORS] || '#888' }} />
@@ -2538,11 +2623,13 @@ const MapTopologyView: React.FC = () => {
                                 </div>
 
                                 {/* 当前截断点 */}
-                                {cutoffNodeId && (
+                                {(cutoffNodeId || cutoffEdgeId) && (
                                     <div className="bg-red-900/20 border border-red-700/40 rounded-lg p-2">
-                                        <p className="text-[10px] text-red-400 mb-0.5">截断点</p>
+                                        <p className="text-[10px] text-red-400 mb-0.5">{cutoffEdgeId ? '截断管段' : '截断点'}</p>
                                         <p className="text-xs text-white font-medium truncate">
-                                            {topoNodes.find(n => n.id === cutoffNodeId)?.name ?? cutoffNodeId}
+                                            {cutoffEdgeId
+                                                ? (topoEdges.find(edge => edge.id === cutoffEdgeId)?.name || cutoffEdgeId)
+                                                : (topoNodes.find(n => n.id === cutoffNodeId)?.name ?? cutoffNodeId)}
                                         </p>
                                     </div>
                                 )}
@@ -2551,13 +2638,13 @@ const MapTopologyView: React.FC = () => {
                                 <div className="flex gap-1.5">
                                     <button
                                         onClick={runCutoffSimulation}
-                                        disabled={!cutoffNodeId || topoNodes.length === 0}
+                                        disabled={(!cutoffNodeId && !cutoffEdgeId) || topoNodes.length === 0}
                                         className="flex-1 bg-red-800/50 hover:bg-red-700 text-red-300 py-2 rounded-lg text-xs border border-red-700/40 transition-colors disabled:opacity-40 flex items-center justify-center gap-1">
                                         <span className="material-symbols-outlined text-sm">play_arrow</span>运行仿真
                                     </button>
                                     <button
                                         onClick={clearCutoffHighlight}
-                                        disabled={!cutoffNodeId}
+                                        disabled={!cutoffNodeId && !cutoffEdgeId}
                                         className="bg-gray-800/60 hover:bg-gray-700 text-gray-400 py-2 px-3 rounded-lg text-xs border border-gray-700/40 transition-colors disabled:opacity-40">
                                         <span className="material-symbols-outlined text-sm">undo</span>
                                     </button>
@@ -2594,6 +2681,10 @@ const MapTopologyView: React.FC = () => {
                                                     <span className="block text-lg font-bold text-green-400">{cutoffResult.summary.same}</span>
                                                     <span className="text-gray-500">正常</span>
                                                 </span>
+                                            </div>
+                                            <div className="mt-2 flex items-center justify-between rounded bg-red-950/25 px-2 py-1 text-[10px] text-red-200">
+                                                <span>停流管段</span>
+                                                <b>{cutoffResult.stoppedEdgeIds.length}</b>
                                             </div>
                                         </div>
 
@@ -2640,6 +2731,11 @@ const MapTopologyView: React.FC = () => {
                                 {/* 提示 */}
                                 {topoNodes.length === 0 && (
                                     <p className="text-center text-gray-600 text-[10px] py-4">请先点击「导入拓扑」</p>
+                                )}
+                                {topoNodes.length > 0 && !cutoffNodeId && !cutoffEdgeId && (
+                                    <p className="text-[10px] text-gray-500 leading-relaxed">
+                                        进入截断页后，可搜索节点截断，也可以直接点地图上的管段；运行后红色为关闭位置，灰色虚线为前端停流段。
+                                    </p>
                                 )}
                             </div>
                         )}

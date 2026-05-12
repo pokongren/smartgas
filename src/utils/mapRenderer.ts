@@ -1,6 +1,7 @@
 import type { PipelineNode, PipelineLine, PipelineDevice } from '@/types'
 import { NodeType, PipelineStatus, PressureLevel, DeviceType } from '@/types'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
+import type { SimulationOverlay, SimEdgeResult } from '@/types/simulation'
 import { getJunctionKind, getLinePipelineKind, getNodeRawType, isCompressorNode, isDistributionNode, isHubNode, isLngSourceNode, isMajorJunctionNode, isSourceNode, isValveNode } from '@/utils/pipelineDomain'
 import { getNodeImportance, getNodeLODStrategy, NODE_LOD_THRESHOLDS, NodeImportance, shouldShowNodeAtZoom } from '@/utils/hierarchyRenderer'
 
@@ -63,8 +64,8 @@ export const PRESSURE_COLORS = {
  * 压气站图标配置 - 右小左宽梯形
  */
 const COMPRESSOR_ICON_CONFIG = {
-    WIDTH: 22,
-    HEIGHT: 16,
+    WIDTH: 20,
+    HEIGHT: 14,
     COLOR: '#00d4ff',
     DPR: Math.min(window.devicePixelRatio || 1, 2),
 } as const
@@ -86,14 +87,152 @@ const SOURCE_MARKER_CONFIG = {
 } as const
 
 const LNG_MARKER_CONFIG = {
-    WIDTH: 42,
-    HEIGHT: 32,
-    COMPACT_WIDTH: 34,
-    COMPACT_HEIGHT: 26,
+    WIDTH: 50,
+    HEIGHT: 38,
+    COMPACT_WIDTH: 40,
+    COMPACT_HEIGHT: 30,
     CONTAINER_PADDING: 6,
     COLOR: '#0ea5e9',
     GLOW_COLOR: 'rgba(14, 165, 233, 0.62)',
 } as const
+
+interface PipelineRenderOptions {
+    simulationOverlay?: SimulationOverlay | null
+    cutoffEdgeIds?: string[]
+}
+
+interface MergedFlowPath {
+    path: number[][]
+    color: string
+    totalLength: number
+    flowIntensity: number
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value))
+}
+
+function buildSimulationEdgeMap(overlay?: SimulationOverlay | null): Map<string, SimEdgeResult> {
+    const edgeMap = new Map<string, SimEdgeResult>()
+    overlay?.edges.forEach(edge => edgeMap.set(edge.id, edge))
+    return edgeMap
+}
+
+function resolveSimulationEdge(line: PipelineLine, edgeMap?: Map<string, SimEdgeResult>): SimEdgeResult | undefined {
+    if (!edgeMap || edgeMap.size === 0) return undefined
+
+    const properties = line.properties as Record<string, unknown> | undefined
+    const candidateIds = [
+        line.id,
+        properties?.simulationEdgeId,
+        properties?.solverEdgeId,
+        properties?.sourceEdgeId,
+        properties?.edgeId,
+    ].filter((id): id is string => typeof id === 'string' && id.length > 0)
+
+    for (const id of candidateIds) {
+        const edge = edgeMap.get(id)
+        if (edge) return edge
+    }
+
+    const sourceEdgeIds = properties?.sourceEdgeIds
+    if (Array.isArray(sourceEdgeIds)) {
+        for (const id of sourceEdgeIds) {
+            if (typeof id !== 'string') continue
+            const edge = edgeMap.get(id)
+            if (edge) return edge
+        }
+    }
+
+    return undefined
+}
+
+function getLineSimulationCandidateIds(line: PipelineLine): string[] {
+    const properties = line.properties as Record<string, unknown> | undefined
+    const ids = [
+        line.id,
+        properties?.simulationEdgeId,
+        properties?.solverEdgeId,
+        properties?.sourceEdgeId,
+        properties?.edgeId,
+    ].filter((id): id is string => typeof id === 'string' && id.length > 0)
+
+    const sourceEdgeIds = properties?.sourceEdgeIds
+    if (Array.isArray(sourceEdgeIds)) {
+        sourceEdgeIds.forEach(id => {
+            if (typeof id === 'string' && id.length > 0) ids.push(id)
+        })
+    }
+
+    return ids
+}
+
+function lineMatchesEdgeIds(line: PipelineLine, edgeIds?: Set<string>): boolean {
+    if (!edgeIds || edgeIds.size === 0) return false
+    return getLineSimulationCandidateIds(line).some(id => edgeIds.has(id))
+}
+
+function isSimulationEdgeClosed(edge?: SimEdgeResult): boolean {
+    if (!edge) return false
+    return edge.direction === 'zero' || edge.flow_rate <= 0.001
+}
+
+function getSimulationFlowIntensity(line: PipelineLine, edgeMap?: Map<string, SimEdgeResult>): number {
+    const edge = resolveSimulationEdge(line, edgeMap)
+    if (!edge) return 1
+    if (isSimulationEdgeClosed(edge)) return 0
+    return clampNumber(edge.utilization > 0 ? edge.utilization : edge.flow_rate / 3000, 0.18, 1.25)
+}
+
+function getChainFlowIntensity(lines: PipelineLine[], edgeMap?: Map<string, SimEdgeResult>): number {
+    if (!edgeMap || edgeMap.size === 0) return 1
+    const values = lines
+        .map(line => getSimulationFlowIntensity(line, edgeMap))
+        .filter(value => value > 0)
+
+    if (values.length === 0) return 0
+    return clampNumber(values.reduce((sum, value) => sum + value, 0) / values.length, 0.18, 1.25)
+}
+
+function createCutoffMarker(map: any, path: number[][], line: PipelineLine): any | null {
+    const AMap = (window as any).AMap
+    if (!AMap || path.length === 0) return null
+
+    const midpoint = path[Math.floor(path.length / 2)]
+    if (!midpoint) return null
+
+    const marker = new AMap.Marker({
+        position: midpoint,
+        content: `
+            <div style="
+                display:flex;
+                align-items:center;
+                gap:4px;
+                height:24px;
+                padding:0 8px;
+                border-radius:999px;
+                background:rgba(127,29,29,0.92);
+                border:1px solid rgba(248,113,113,0.9);
+                color:#fee2e2;
+                font-size:11px;
+                font-weight:700;
+                box-shadow:0 0 16px rgba(239,68,68,0.7);
+                white-space:nowrap;
+                pointer-events:none;
+            ">
+                <span style="font-size:15px;line-height:1;">×</span>
+                <span>截断</span>
+            </div>
+        `,
+        offset: new AMap.Pixel(-28, -12),
+        zIndex: 180,
+        zooms: [2, 30],
+        extData: { line, isCutoffMarker: true },
+    })
+
+    map.add(marker)
+    return marker
+}
 
 /**
  * 注入地图标记样式
@@ -1046,11 +1185,13 @@ function createOffsetNodeMarker(
     let markerSize: number  // 用于计算 offset 居中
 
     if (isLngSource) {
-        markerSize = LNG_MARKER_CONFIG.WIDTH + LNG_MARKER_CONFIG.CONTAINER_PADDING
+        const markerWidth = LNG_MARKER_CONFIG.WIDTH + LNG_MARKER_CONFIG.CONTAINER_PADDING
+        const markerHeight = LNG_MARKER_CONFIG.HEIGHT + LNG_MARKER_CONFIG.CONTAINER_PADDING
+        markerSize = markerWidth
         marker = new AMap.Marker({
             position: [position.longitude, position.latitude],
             content: createLngShipMarkerContent(false),
-            offset: new AMap.Pixel(-markerSize / 2, -markerSize / 2),
+            offset: new AMap.Pixel(-markerWidth / 2, -markerHeight / 2),
             draggable: true,
             cursor: 'move',
             zIndex: 152,
@@ -1219,7 +1360,8 @@ export function renderPipelineLines(
     lines: PipelineLine[],
     nodes: PipelineNode[] = [],
     onLineClick?: (event: { line: PipelineLine; position: { longitude: number; latitude: number } }) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options: PipelineRenderOptions = {}
 ): Promise<any[]> {
     return new Promise((resolve) => {
         const AMap = (window as any).AMap
@@ -1229,6 +1371,8 @@ export function renderPipelineLines(
         }
 
         const polylines: any[] = []
+        const simulationEdgeMap = buildSimulationEdgeMap(options.simulationOverlay)
+        const cutoffEdgeIds = new Set(options.cutoffEdgeIds || [])
         const BATCH_SIZE = 50 // 每批渲染50条管线
         let index = 0
 
@@ -1245,34 +1389,44 @@ export function renderPipelineLines(
                 try {
                     const category = line.properties?.category as string || '其他'
                     const color = line.properties?.color || getPipelineCategoryColor(category)
-                    const strokeStyle = line.status === PipelineStatus.MAINTENANCE ? 'dashed' : 'solid'
+                    const simEdge = resolveSimulationEdge(line, simulationEdgeMap)
+                    const isNoFlow = isSimulationEdgeClosed(simEdge)
+                    const isCutoff = lineMatchesEdgeIds(line, cutoffEdgeIds)
+                    const lineColor = isCutoff ? '#ef4444' : (isNoFlow && simEdge ? '#475569' : (simEdge?.color || color))
+                    const haloColor = isCutoff ? 'rgba(127, 29, 29, 0.92)' : 'rgba(8, 15, 23, 0.95)'
+                    const strokeStyle = line.status === PipelineStatus.MAINTENANCE || isCutoff ? 'dashed' : 'solid'
                     const isBranch = getLinePipelineKind(line) === 'branch'
                     const baseWidth = isBranch ? 3 : (line.pressureLevel === PressureLevel.HIGH ? 7 : 5)
+                    const simWidth = simEdge
+                        ? Math.max(2, Math.min(9, Math.round(3 + simEdge.width_factor * 4)))
+                        : baseWidth
+                    const visualWidth = isCutoff ? Math.max(baseWidth, simWidth) : simWidth
                     const path = buildVisualLinePath(line)
 
                     const haloPolyline = new AMap.Polyline({
                         path,
-                        strokeColor: 'rgba(8, 15, 23, 0.95)',
-                        strokeWeight: baseWidth + 4,
-                        strokeOpacity: 0.75,
+                        strokeColor: haloColor,
+                        strokeWeight: visualWidth + 4,
+                        strokeOpacity: isCutoff ? 0.88 : (isNoFlow && simEdge ? 0.42 : 0.75),
                         zIndex: 46,
                         lineJoin: 'round',
                         lineCap: 'round',
                         zooms: [2, 30],
-                        extData: { line, isHalo: true },
+                        extData: { line, isHalo: true, simEdge, isCutoff },
                     })
 
                     const polyline = new AMap.Polyline({
                         path,
-                        strokeColor: color,
-                        strokeWeight: baseWidth,
+                        strokeColor: lineColor,
+                        strokeWeight: visualWidth,
                         strokeStyle: strokeStyle,
-                        strokeOpacity: 0.98,
-                        zIndex: 52,
+                        strokeDasharray: isCutoff ? [10, 8] : undefined,
+                        strokeOpacity: isCutoff ? 0.92 : (isNoFlow && simEdge ? 0.42 : 0.98),
+                        zIndex: isCutoff ? 72 : 52,
                         lineJoin: 'round',
                         lineCap: 'round',
                         zooms: [2, 30],
-                        extData: { line, isHalo: false },
+                        extData: { line, isHalo: false, simEdge, isCutoff },
                     })
 
                     map.add(haloPolyline)
@@ -1290,6 +1444,11 @@ export function renderPipelineLines(
                     map.add(polyline)
                     polylines.push(polyline)
 
+                    if (isCutoff) {
+                        const marker = createCutoffMarker(map, path, line)
+                        if (marker) polylines.push(marker)
+                    }
+
                     // 不再在这里为单根极短管段创建光效，改在全部渲染完后基于合并长路径创建
                 } catch (error) {
                     // 渲染失败，继续下一条
@@ -1303,12 +1462,12 @@ export function renderPipelineLines(
                 requestAnimationFrame(renderBatch)
             } else {
                 // 1. 基础管线全部渲染完成，现在执行路径缝合算法，提取出贯穿全国的超长干线！
-                const mergedPaths = mergeLinesIntoContinuousPaths(lines, nodes)
+                const mergedPaths = mergeLinesIntoContinuousPaths(lines, nodes, simulationEdgeMap)
 
                 // 2. 在这些超长干线上施加流动光效
-                mergedPaths.forEach(({ path, color, totalLength }) => {
+                mergedPaths.forEach(({ path, color, totalLength, flowIntensity }) => {
                     if (totalLength > 20000) { // 只在大于20km的连续干线上运行动画
-                        const flowMarkers = createLongFlowAnimation(map, path, color, totalLength)
+                        const flowMarkers = createLongFlowAnimation(map, path, color, totalLength, { flowIntensity })
                         if (flowMarkers && flowMarkers.length > 0) {
                             polylines.push(...flowMarkers)
                         }
@@ -1331,8 +1490,12 @@ export function renderPipelineLines(
 /**
  * 核心算法：将原本被阀室/站点打断的零散管段，根据连通性（拓扑）无缝缝合成一条条完整的干线路径
  */
-function mergeLinesIntoContinuousPaths(lines: PipelineLine[], nodes: PipelineNode[]): { path: number[][], color: string, totalLength: number }[] {
-    const paths: { path: number[][], color: string, totalLength: number }[] = []
+function mergeLinesIntoContinuousPaths(
+    lines: PipelineLine[],
+    nodes: PipelineNode[],
+    simulationEdgeMap?: Map<string, SimEdgeResult>
+): MergedFlowPath[] {
+    const paths: MergedFlowPath[] = []
 
     // 找出所有具备“打断/发射”资格的重点站点
     const hubNodeIds = new Set<string>()
@@ -1350,6 +1513,7 @@ function mergeLinesIntoContinuousPaths(lines: PipelineLine[], nodes: PipelineNod
     const nodeDegree = new Map<string, number>()
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
+        if (isSimulationEdgeClosed(resolveSimulationEdge(line, simulationEdgeMap))) continue
         if (line.startNodeId) nodeDegree.set(line.startNodeId, (nodeDegree.get(line.startNodeId) || 0) + 1)
         if (line.endNodeId) nodeDegree.set(line.endNodeId, (nodeDegree.get(line.endNodeId) || 0) + 1)
     }
@@ -1358,7 +1522,9 @@ function mergeLinesIntoContinuousPaths(lines: PipelineLine[], nodes: PipelineNod
     const linesByColor = new Map<string, PipelineLine[]>()
     for (const line of lines) {
         if (!line.path || line.path.length < 2) continue
-        const color = line.properties?.color || '#00e5ff' // default fallback
+        if (isSimulationEdgeClosed(resolveSimulationEdge(line, simulationEdgeMap))) continue
+        const simEdge = resolveSimulationEdge(line, simulationEdgeMap)
+        const color = simEdge?.color || line.properties?.color || '#00e5ff' // default fallback
 
         if (!linesByColor.has(color)) linesByColor.set(color, [])
         linesByColor.get(color)!.push(line)
@@ -1436,16 +1602,30 @@ function mergeLinesIntoContinuousPaths(lines: PipelineLine[], nodes: PipelineNod
                 mergedPath.push(...pts)
             }
 
-            paths.push({ path: mergedPath, color, totalLength: length })
+            paths.push({
+                path: mergedPath,
+                color,
+                totalLength: length,
+                flowIntensity: getChainFlowIntensity(currentChain, simulationEdgeMap),
+            })
         }
     }
 
     return paths
 }
 
-function createLongFlowAnimation(map: any, points: number[][], color: string, fallbackLength: number): any[] {
+function createLongFlowAnimation(
+    map: any,
+    points: number[][],
+    color: string,
+    fallbackLength: number,
+    options: { flowIntensity?: number } = {}
+): any[] {
     const AMap = (window as any).AMap
     if (!AMap || points.length < 2) return []
+
+    const flowIntensity = clampNumber(options.flowIntensity ?? 1, 0, 1.25)
+    if (flowIntensity <= 0.01) return []
 
     // 1. 计算长距离
     const distances = [0]
@@ -1468,18 +1648,18 @@ function createLongFlowAnimation(map: any, points: number[][], color: string, fa
     if (totalLength <= 0) return []
 
     // 3. 恢复之前的样式尺寸（更大气）
-    const flowLength = Math.max(5000, Math.min(50000, totalLength * 0.10))
+    const flowLength = Math.max(5000, Math.min(50000, totalLength * (0.07 + flowIntensity * 0.04)))
 
     // 全局统一速度：例如 100 km/s (100,000 m/s -> 100 m/ms)
     // 保证长短管线上的光束跑得一样快
-    const SPEED_M_PER_MS = 100;
+    const SPEED_M_PER_MS = 45 + flowIntensity * 55;
 
     // 跑完这根管线需要的时间
     const durationMs = totalLength / SPEED_M_PER_MS;
 
     // 全局统一发射周期（按您的要求，2秒一发）
     // 这保证了只要是从同一个枢纽出发的管线，必定在同一绝对时间点同时发射光束
-    const GLOBAL_CYCLE_MS = 2000;
+    const GLOBAL_CYCLE_MS = 2600 - flowIntensity * 600;
 
     // 只要起点坐标相同，globalOffset 就完全一致！
     const startX = Math.round(points[0][0] * 1000)
@@ -1497,11 +1677,11 @@ function createLongFlowAnimation(map: any, points: number[][], color: string, fa
         const flowPolyline = new AMap.Polyline({
             path: [],
             strokeColor: '#ffffff', // 核心高亮白
-            strokeWeight: 2,
+            strokeWeight: flowIntensity < 0.4 ? 1 : 2,
             isOutline: true,
             outlineColor: color,
-            borderWeight: 3,
-            strokeOpacity: 1.0,
+            borderWeight: flowIntensity < 0.4 ? 2 : 3,
+            strokeOpacity: clampNumber(0.35 + flowIntensity * 0.65, 0.35, 1),
             zIndex: 100,
             lineJoin: 'round',
             lineCap: 'round',

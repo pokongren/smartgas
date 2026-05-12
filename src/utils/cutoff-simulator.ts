@@ -27,6 +27,10 @@ export interface AffectedNode {
 export interface CutoffResult {
   cutoffNodeId: string
   cutoffNodeName: string
+  /** 被截断的节点/管段对应边 ID */
+  cutoffEdgeIds: string[]
+  /** 截断后停止流动的边 ID */
+  stoppedEdgeIds: string[]
   /** 图中识别到的气源节点 */
   sourceNodes: Array<{ id: string; name: string }>
   /** 截断前可达的分输站总数 */
@@ -45,14 +49,16 @@ export interface CutoffResult {
 function buildAdjacency(
   nodes: GraphNode[],
   edges: GraphEdge[],
-  excludeIds: Set<string> = new Set()
+  excludeNodeIds: Set<string> = new Set(),
+  excludeEdgeIds: Set<string> = new Set()
 ): Map<string, string[]> {
   const adj = new Map<string, string[]>()
   for (const n of nodes) {
-    if (!excludeIds.has(n.id)) adj.set(n.id, [])
+    if (!excludeNodeIds.has(n.id)) adj.set(n.id, [])
   }
   for (const e of edges) {
-    if (excludeIds.has(e.startNodeId) || excludeIds.has(e.endNodeId)) continue
+    if (excludeEdgeIds.has(e.id)) continue
+    if (excludeNodeIds.has(e.startNodeId) || excludeNodeIds.has(e.endNodeId)) continue
     if (!adj.has(e.startNodeId) || !adj.has(e.endNodeId)) continue
     adj.get(e.startNodeId)!.push(e.endNodeId)
     adj.get(e.endNodeId)!.push(e.startNodeId)
@@ -85,7 +91,14 @@ function identifySources(
   }
 
   // 退化策略：所有压气站
-  return new Set(nodes.filter(n => n.type === 'compressor').map(n => n.id))
+  const compressors = nodes.filter(n => n.type === 'compressor')
+  if (compressors.length > 0) {
+    return new Set(compressors.map(n => n.id))
+  }
+
+  // 再退化：没有压气站时，用拓扑端点作为前端演示气源
+  const terminalNodes = nodes.filter(n => (adj.get(n.id)?.length ?? 0) === 1)
+  return new Set(terminalNodes.map(n => n.id))
 }
 
 // ==================== BFS 路径查找 ====================
@@ -185,6 +198,42 @@ function bfsPathFromSources(
   return null
 }
 
+function bfsReachableFromSources(
+  sources: Set<string>,
+  adj: Map<string, string[]>
+): Set<string> {
+  const visited = new Set<string>()
+  const queue: string[] = []
+
+  for (const src of sources) {
+    if (!adj.has(src) || visited.has(src)) continue
+    visited.add(src)
+    queue.push(src)
+  }
+
+  while (queue.length > 0) {
+    const curr = queue.shift()!
+    for (const neighbor of adj.get(curr) || []) {
+      if (visited.has(neighbor)) continue
+      visited.add(neighbor)
+      queue.push(neighbor)
+    }
+  }
+
+  return visited
+}
+
+function pathContainsEdge(path: string[], startNodeId: string, endNodeId: string): boolean {
+  for (let i = 0; i < path.length - 1; i++) {
+    const left = path[i]
+    const right = path[i + 1]
+    if ((left === startNodeId && right === endNodeId) || (left === endNodeId && right === startNodeId)) {
+      return true
+    }
+  }
+  return false
+}
+
 // ==================== 主仿真函数 ====================
 
 /**
@@ -200,22 +249,39 @@ export function simulateCutoff(
   edges: GraphEdge[],
   cutoffNodeId: string
 ): CutoffResult {
+  return simulateNodeCutoff(nodes, edges, cutoffNodeId)
+}
+
+export function simulateEdgeCutoff(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  cutoffEdgeId: string
+): CutoffResult {
+  return simulateEdgeCutoffInternal(nodes, edges, cutoffEdgeId)
+}
+
+function simulateNodeCutoff(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  cutoffNodeId: string
+): CutoffResult {
   const cutoffNode = nodes.find(n => n.id === cutoffNodeId)
   const cutoffName = cutoffNode?.name ?? cutoffNodeId
 
   // 构建邻接表
+  const cutoffEdgeIds = new Set<string>()
+  for (const edge of edges) {
+    if (edge.startNodeId === cutoffNodeId || edge.endNodeId === cutoffNodeId) {
+      cutoffEdgeIds.add(edge.id)
+    }
+  }
+
   const adjBefore = buildAdjacency(nodes, edges)
-  const adjAfter = buildAdjacency(nodes, edges, new Set([cutoffNodeId]))
+  const adjAfter = buildAdjacency(nodes, edges, new Set([cutoffNodeId]), cutoffEdgeIds)
 
   // 识别气源（截断前全部气源；截断后若气源本身是截断点，则排除）
   const sourcesBefore = identifySources(nodes, adjBefore)
   const sourcesAfter = new Set([...sourcesBefore].filter(id => id !== cutoffNodeId))
-  // 若排除截断节点后没有气源，补充使用截断节点的邻居作为临时气源
-  if (sourcesAfter.size === 0) {
-    for (const neighbor of adjBefore.get(cutoffNodeId) || []) {
-      sourcesAfter.add(neighbor)
-    }
-  }
 
   // 气源节点信息（供 UI 展示）
   const sourceNodeInfos = [...sourcesBefore].map(id => ({
@@ -228,6 +294,7 @@ export function simulateCutoff(
     n => n.type === 'distribution' && n.id !== cutoffNodeId
   )
 
+  const reachableAfter = bfsReachableFromSources(sourcesAfter, adjAfter)
   const affectedNodes: AffectedNode[] = []
   let supplyLost = 0
   let rerouted = 0
@@ -280,6 +347,10 @@ export function simulateCutoff(
     }
   }
 
+  const stoppedEdgeIds = edges
+    .filter(edge => cutoffEdgeIds.has(edge.id) || !reachableAfter.has(edge.startNodeId) || !reachableAfter.has(edge.endNodeId))
+    .map(edge => edge.id)
+
   // 断供排前面，绕行排后面，同名按字母排
   affectedNodes.sort((a, b) => {
     if (a.status === 'supply_lost' && b.status !== 'supply_lost') return -1
@@ -290,6 +361,94 @@ export function simulateCutoff(
   return {
     cutoffNodeId,
     cutoffNodeName: cutoffName,
+    cutoffEdgeIds: [...cutoffEdgeIds],
+    stoppedEdgeIds,
+    sourceNodes: sourceNodeInfos,
+    totalDistributionNodes: distributionNodes.length,
+    affectedNodes,
+    summary: { supplyLost, rerouted, same },
+  }
+}
+
+function simulateEdgeCutoffInternal(
+  nodes: GraphNode[],
+  edges: GraphEdge[],
+  cutoffEdgeId: string
+): CutoffResult {
+  const cutoffEdge = edges.find(edge => edge.id === cutoffEdgeId)
+  const cutoffNodeId = cutoffEdge?.startNodeId ?? cutoffEdgeId
+  const cutoffName = cutoffEdge?.name ?? cutoffEdgeId
+
+  const adjBefore = buildAdjacency(nodes, edges)
+  const adjAfter = buildAdjacency(nodes, edges, new Set(), new Set([cutoffEdgeId]))
+
+  const sourcesBefore = identifySources(nodes, adjBefore)
+  const sourcesAfter = new Set(sourcesBefore)
+  const sourceNodeInfos = [...sourcesBefore].map(id => ({
+    id,
+    name: nodes.find(n => n.id === id)?.name ?? id,
+  }))
+
+  const distributionNodes = nodes.filter(
+    n => n.type === 'distribution' && n.id !== cutoffNodeId
+  )
+
+  const reachableAfter = bfsReachableFromSources(sourcesAfter, adjAfter)
+  const affectedNodes: AffectedNode[] = []
+  let supplyLost = 0
+  let rerouted = 0
+  let same = 0
+
+  for (const distNode of distributionNodes) {
+    const resultBefore = bfsPathFromSources(sourcesBefore, distNode.id, adjBefore)
+    if (!resultBefore) continue
+
+    const pathBefore = resultBefore.path
+    const passedCutoff = cutoffEdge ? pathContainsEdge(pathBefore, cutoffEdge.startNodeId, cutoffEdge.endNodeId) : false
+    if (!passedCutoff) {
+      same++
+      continue
+    }
+
+    const resultAfter = bfsPathFromSources(sourcesAfter, distNode.id, adjAfter)
+    if (resultAfter) {
+      rerouted++
+      affectedNodes.push({
+        id: distNode.id,
+        name: distNode.name,
+        type: distNode.type,
+        status: 'rerouted',
+        pathBefore,
+        pathAfter: resultAfter.path,
+      })
+    } else {
+      supplyLost++
+      affectedNodes.push({
+        id: distNode.id,
+        name: distNode.name,
+        type: distNode.type,
+        status: 'supply_lost',
+        pathBefore,
+        pathAfter: [],
+      })
+    }
+  }
+
+  affectedNodes.sort((a, b) => {
+    if (a.status === 'supply_lost' && b.status !== 'supply_lost') return -1
+    if (a.status !== 'supply_lost' && b.status === 'supply_lost') return 1
+    return a.name.localeCompare(b.name, 'zh')
+  })
+
+  const stoppedEdgeIds = edges
+    .filter(edge => edge.id === cutoffEdgeId || !reachableAfter.has(edge.startNodeId) || !reachableAfter.has(edge.endNodeId))
+    .map(edge => edge.id)
+
+  return {
+    cutoffNodeId,
+    cutoffNodeName: cutoffName,
+    cutoffEdgeIds: [cutoffEdgeId],
+    stoppedEdgeIds,
     sourceNodes: sourceNodeInfos,
     totalDistributionNodes: distributionNodes.length,
     affectedNodes,

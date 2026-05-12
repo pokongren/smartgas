@@ -116,6 +116,7 @@ function MapView({
     onLineClick,
     onDeviceClick,
     simulationOverlay,
+    simulationCutoffEdgeIds,
     nodeDisplayMode = 'full',
     hubNodeTypes = ['source', 'compressor', 'junction', 'distribution'],
     showValveRooms,
@@ -568,7 +569,8 @@ function MapView({
                             data: e.line,
                             originalEvent: e
                         }) : undefined,
-                        abortController.signal
+                        abortController.signal,
+                        { simulationOverlay, cutoffEdgeIds: simulationCutoffEdgeIds }
                     )
                     if (!abortController.signal.aborted) {
                         lineOverlaysRef.current = lineOverlays
@@ -606,7 +608,7 @@ function MapView({
         return () => {
             abortController.abort()
         }
-    }, [effectivePipelineData, mapInstance])
+    }, [effectivePipelineData, mapInstance, simulationOverlay, simulationCutoffEdgeIds])
 
     /**
      * 仿真覆盖层着色
@@ -623,8 +625,12 @@ function MapView({
             const simEdge = overlayLineMap.get(line.id)
             if (!simEdge) return
 
-            const baseColor = simEdge.color || '#22c55e'
-            const lineColor = extData?.isHalo ? 'rgba(8, 15, 23, 0.92)' : baseColor
+            const isNoFlow = simEdge.direction === 'zero' || simEdge.flow_rate <= 0.001
+            const isCutoff = Boolean(extData?.isCutoff)
+            const baseColor = isCutoff ? '#ef4444' : (isNoFlow ? '#475569' : (simEdge.color || '#22c55e'))
+            const lineColor = extData?.isHalo
+                ? (isCutoff ? 'rgba(127, 29, 29, 0.92)' : 'rgba(8, 15, 23, 0.92)')
+                : baseColor
             const strokeWeight = extData?.isHalo
                 ? 10
                 : Math.max(2, Math.min(8, Math.round(3 + simEdge.width_factor * 4)))
@@ -633,7 +639,8 @@ function MapView({
                 overlay.setOptions?.({
                     strokeColor: lineColor,
                     strokeWeight,
-                    strokeOpacity: extData?.isHalo ? 0.78 : 0.98,
+                    strokeOpacity: isCutoff ? 0.9 : (isNoFlow ? 0.42 : (extData?.isHalo ? 0.78 : 0.98)),
+                    strokeStyle: isCutoff || extData?.line?.status === 'maintenance' ? 'dashed' : 'solid',
                 })
             } catch (error) {
                 console.warn('[MapView] simulation overlay color failed', error)

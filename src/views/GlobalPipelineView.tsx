@@ -1357,6 +1357,7 @@ const GlobalPipelineView: React.FC = () => {
     const [multiScenarioPanelOpen, setMultiScenarioPanelOpen] = useState(false)
     const [multiScenarioError, setMultiScenarioError] = useState<string | null>(null)
     const [multiScenarioSelectedCaseIds, setMultiScenarioSelectedCaseIds] = useState<string[]>(() => MULTI_SCENARIO_AI_CASES.map(item => item.id))
+    const [simulationCutoffEdgeIds, setSimulationCutoffEdgeIds] = useState<string[]>([])
     const multiScenarioActiveRef = useRef(false)
     const [simulationPressureChartOpen, setSimulationPressureChartOpen] = useState(false)
     const [simulationPressureChartOverlay, setSimulationPressureChartOverlay] = useState<SimulationOverlay | null>(null)
@@ -2458,6 +2459,7 @@ const GlobalPipelineView: React.FC = () => {
         setSimulationPressureChartOverlay(null)
         setSimulationPressureChartRevealProgress({})
         setSimulationPressureChartOpen(false)
+        setSimulationCutoffEdgeIds([])
         setNodeDisplayMode('hub')
         setHubNodeTypes(['source', 'compressor', 'junction', 'distribution'])
         setExpandedGroups(prev => ({ ...prev, we1: true }))
@@ -2480,6 +2482,7 @@ const GlobalPipelineView: React.FC = () => {
 
             for (const demoCase of casesToRun) {
                 setMultiScenarioStepId(demoCase.id)
+                setSimulationCutoffEdgeIds(demoCase.id === 'zhongwei-cutoff' ? [ZHONGWEI_FIRST_TRUNK_EDGE_ID] : [])
                 emitMultiScenarioAiAssistantEvent('progress', {
                     message: `正在运行 ${demoCase.label}：${demoCase.description}`,
                 })
@@ -3018,6 +3021,21 @@ const GlobalPipelineView: React.FC = () => {
                             <span>中卫历史</span>
                             <span style={{ fontSize: '9px', color: '#facc15', background: 'rgba(250,204,21,0.12)', padding: '0 4px', borderRadius: '4px', border: '1px solid rgba(250,204,21,0.28)' }}>新接入</span>
                         </button>
+                        <button
+                            onClick={() => void runGlobalMultiScenarioAi(['zhongwei-cutoff'])}
+                            disabled={multiScenarioActive || globalSimulation.isLoading}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                                background: 'rgba(127,29,29,0.72)',
+                                border: '1px solid rgba(248,113,113,0.48)',
+                                color: '#fee2e2',
+                            }}
+                            title="在全国一张网运行中卫截断仿真，并联动管线粒子流"
+                        >
+                            <span className="material-symbols-outlined text-base">content_cut</span>
+                            <span>截断流动</span>
+                            <span style={{ fontSize: '9px', color: '#fecaca', background: 'rgba(248,113,113,0.14)', padding: '0 4px', borderRadius: '4px', border: '1px solid rgba(248,113,113,0.28)' }}>演示</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -3028,6 +3046,8 @@ const GlobalPipelineView: React.FC = () => {
                 nodeDisplayMode={nodeDisplayMode}
                 hubNodeTypes={hubNodeTypes}
                 showValveRooms={showValveRooms}
+                simulationOverlay={globalSimulation.overlay}
+                simulationCutoffEdgeIds={simulationCutoffEdgeIds}
                 onLoad={handleMapLoad}
                 onNodeClick={handleMapNodeClick}
             />

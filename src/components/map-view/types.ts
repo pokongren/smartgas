@@ -71,6 +71,8 @@ export interface MapViewProps {
     onDeviceClick?: (event: PipelineEvent) => void
     /** 仿真覆盖层 */
     simulationOverlay?: SimulationOverlay | null
+    /** 仿真中被主动截断的管段 ID，用于和下游零流量区分 */
+    simulationCutoffEdgeIds?: string[]
     /** 节点显示模式：full 保持全量，hub 只保留少数枢纽 */
     nodeDisplayMode?: 'full' | 'hub'
     /** 枢纽精简模式下保留的节点类型 */
