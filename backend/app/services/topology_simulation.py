@@ -960,6 +960,8 @@ class SteadyStateSolver:
             status = edata.get("status", "open")
 
             max_flow = float(edata.get("max_flow", 150.0))
+            source_id = str(edata.get("source_id") or "")
+            target_id = str(edata.get("target_id") or "")
 
             if status == "closed":
                 flow = 0.0
@@ -968,7 +970,17 @@ class SteadyStateSolver:
                 if status == "limited":
                     flow = min(flow, max_flow)
 
-            utilization = flow / max_flow if max_flow > 0 else 0.0
+                p_source = float(pressure.get(source_id, 0.0)) if source_id else 0.0
+                p_target = float(pressure.get(target_id, 0.0)) if target_id else 0.0
+                if p_source > 0 and p_target > 0:
+                    if abs(p_source - p_target) < 1e-6:
+                        flow = 0.0
+                    elif p_target > p_source:
+                        flow = -abs(flow)
+                    else:
+                        flow = abs(flow)
+
+            utilization = abs(flow) / max_flow if max_flow > 0 else 0.0
             direction = "forward" if flow > 0 else ("reverse" if flow < 0 else "zero")
 
             alert = "normal"

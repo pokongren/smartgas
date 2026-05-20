@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import './ai-assistant.css'
 import { useNewWindow, usePopoutSync } from '../../hooks/useNewWindow'
-import { useAiAssistantChat } from './useAiAssistantChat'
+import { stripPrivateThinkBlocks, useAiAssistantChat } from './useAiAssistantChat'
 import type { ChatMessage, HandleSendOptions } from './useAiAssistantChat'
 
 const TOOL_LABELS: Record<string, string> = {
@@ -77,11 +77,11 @@ const SLASH_SKILLS: SlashSkill[] = [
     },
     {
         id: 'subagent',
-        label: 'SubAgent Skill',
-        description: '进入多代理拆解、实施和验证模式。',
+        label: 'SubAgent 专家组',
+        description: '进入多代理拆解、实施、验证和表达复核模式。',
         prompt: '/subagent',
         icon: 'hub',
-        keywords: ['subagent', '代理', '方案', '验证'],
+        keywords: ['subagent', '代理', '方案', '验证', '表达复核'],
     },
     {
         id: 'mcp-demo',
@@ -348,6 +348,25 @@ function parseMultiScenarioSelectorBlock(block: string): MultiScenarioSelectorBl
     }
 }
 
+function dedupeSubagentBlocks(blocks: string[]): string[] {
+    const lastIndexByKey = new Map<string, number>()
+    blocks.forEach((block, index) => {
+        const subagentBlock = parseSubagentBlock(block)
+        if (!subagentBlock) return
+        const key = String(subagentBlock.agent || subagentBlock.title || '').trim()
+        if (!key) return
+        lastIndexByKey.set(key, index)
+    })
+
+    return blocks.filter((block, index) => {
+        const subagentBlock = parseSubagentBlock(block)
+        if (!subagentBlock) return true
+        const key = String(subagentBlock.agent || subagentBlock.title || '').trim()
+        if (!key) return true
+        return lastIndexByKey.get(key) === index
+    })
+}
+
 function getDefaultSelectorCaseIds(cases: MultiScenarioSelectorCase[]): string[] {
     return cases
         .filter((item) => item.selected !== false)
@@ -541,7 +560,7 @@ function renderMessageContentDeprecated(
     content: string,
     onAction: (payload: AssistantActionPayload) => void,
 ): React.ReactNode {
-    const blocks = content.split(/\n\s*\n/)
+    const blocks = dedupeSubagentBlocks(content.split(/\n\s*\n/))
     return blocks.map((block, index) => {
         const subagentBlock = parseSubagentBlock(block)
         if (subagentBlock) {
@@ -604,7 +623,7 @@ function renderMessageContent(
     onAction: (payload: AssistantActionPayload) => void,
     onSend?: (text?: string, options?: HandleSendOptions) => void,
 ): React.ReactNode {
-    const blocks = content.split(/\n\s*\n/)
+    const blocks = dedupeSubagentBlocks(stripPrivateThinkBlocks(content).split(/\n\s*\n/))
     return blocks.map((block, index) => {
         const selectorBlock = parseMultiScenarioSelectorBlock(block)
         if (selectorBlock) {
@@ -696,13 +715,41 @@ function renderMessageContent(
 const ThinkingPanel: React.FC<{
     content: string
     isStreaming?: boolean
+    answer?: string
     onAction: (payload: AssistantActionPayload) => void
     onSend?: (text?: string, options?: HandleSendOptions) => void
-}> = ({ content, isStreaming, onAction, onSend }) => {
-    const trimmed = content.trim()
+}> = ({ content, isStreaming, answer = '', onAction, onSend }) => {
+    const trimmed = stripPrivateThinkBlocks(content).trim()
     if (!trimmed) return null
 
-    const stepCount = trimmed.split(/\n\s*\n/).filter(Boolean).length
+    const stepCount = dedupeSubagentBlocks(trimmed.split(/\n\s*\n/)).filter(Boolean).length
+    const assessmentText = `${trimmed}\n${answer}`
+    const hasCompleteHint = /完整性提示[:：]\s*是/.test(assessmentText)
+    const hasIncompleteHint = /完整性提示[:：]\s*否/.test(assessmentText)
+    const hasExactEntityMatch = /(索引\s*ID\s*是|RAW-ST-\d+|唯一命中|确定为|已定位|登记的一个(?:压气站|分输站|输气站|阀室|门站|末站|首站)|是\s*[^。；\n]*(?:压气站|分输站|输气站|阀室|门站|末站|首站|LNG))/i.test(assessmentText)
+    const hasEvidence = /(证据[:：]|数据来源|检索证据|命中|SubAgent|\[SUBAGENT:|仿真|SCADA|raw_excel|知识库|完整性提示)/i.test(assessmentText)
+    const hasMissing = /(未命中|缺少|不足|无法|未找到|不确定|非实时)/.test(assessmentText)
+    const hasAction = /\[ACTION:|建议|可操作|调度/.test(assessmentText)
+    const shouldShowConfidence = hasEvidence || hasExactEntityMatch || hasCompleteHint || hasIncompleteHint || hasAction
+    const evidenceMissingPenalty = hasMissing ? (hasExactEntityMatch ? 4 : 14) : 0
+    const completenessMissingPenalty = hasMissing ? (hasExactEntityMatch ? 4 : 12) : 0
+    const evidenceConfidence = Math.max(
+        32,
+        Math.min(96, 48 + stepCount * 7 + (hasEvidence ? 18 : 0) + (hasExactEntityMatch ? 16 : 0) + (hasAction ? 5 : 0) - evidenceMissingPenalty),
+    )
+    const completenessConfidence = Math.max(
+        25,
+        Math.min(98, 54 + (hasCompleteHint ? 28 : 0) + (hasExactEntityMatch ? 12 : 0) - (hasIncompleteHint ? 30 : 0) - completenessMissingPenalty + Math.min(stepCount * 3, 12)),
+    )
+    const overallConfidence = Math.round((evidenceConfidence * 0.55) + (completenessConfidence * 0.45))
+    const stageLabel = stepCount <= 1
+        ? '理解问题'
+        : stepCount <= 3
+            ? '检索证据'
+            : stepCount <= 5
+                ? '交叉分析'
+                : '整理结论'
+
     return (
         <details className="ai-thinking-panel" open={Boolean(isStreaming)}>
             <summary>
@@ -711,6 +758,54 @@ const ThinkingPanel: React.FC<{
                 <em>{stepCount} 步</em>
             </summary>
             <div className="ai-thinking-content">
+                {isStreaming && (
+                    <div className="ai-thinking-hero">
+                        <div className="ai-thinking-hero-icon">
+                            <span className="material-symbols-outlined">psychology</span>
+                        </div>
+                        <div className="ai-thinking-hero-title">AI 思考中...</div>
+                        <div className="ai-thinking-hero-subtitle">
+                            {stageLabel} · 正在读取证据、调用工具并整理可展示过程
+                        </div>
+                        <div className="ai-thinking-progress" aria-label="AI 思考进度">
+                            <div className="ai-thinking-progress-track">
+                                <div className="ai-thinking-progress-fill" />
+                                <div className="ai-thinking-progress-glow" />
+                            </div>
+                            <div className="ai-thinking-progress-label">
+                                <span>PROCESSING</span>
+                                <span>{String(Math.min(stepCount, 99)).padStart(2, '0')} STEPS</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {shouldShowConfidence && (
+                    <div className="ai-confidence-card">
+                        <div className="ai-confidence-head">
+                            <div>
+                                <span className="ai-confidence-kicker">CONFIDENCE</span>
+                                <strong>置信度评估</strong>
+                            </div>
+                            <span className="material-symbols-outlined">verified</span>
+                        </div>
+                        <div className="ai-confidence-metrics">
+                            <div>
+                                <span>{Math.round(evidenceConfidence)}%</span>
+                                <em>证据置信度</em>
+                            </div>
+                            <div>
+                                <span>{Math.round(completenessConfidence)}%</span>
+                                <em>完整性置信度</em>
+                            </div>
+                        </div>
+                        <div className="ai-confidence-track">
+                            <div style={{ width: `${overallConfidence}%` }} />
+                        </div>
+                        <div className="ai-confidence-note">
+                            综合评估 {overallConfidence}% · {hasExactEntityMatch ? '实体已定位，可作为当前站点结论使用' : hasMissing ? '存在数据缺口，结论需保守使用' : '证据链较完整，可用于当前演示'}
+                        </div>
+                    </div>
+                )}
                 {renderMessageContent(trimmed, onAction, onSend)}
             </div>
         </details>
@@ -847,6 +942,30 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
                 </button>
             </div>
 
+            {loading && (
+                <div className="ai-live-thinking-bar" role="status" aria-live="polite">
+                    <div className="ai-live-thinking-icon">
+                        <span className="material-symbols-outlined">psychology</span>
+                    </div>
+                    <div className="ai-live-thinking-copy">
+                        <strong>AI 思考中...</strong>
+                        <span>
+                            {activeToolName
+                                ? `正在${TOOL_LABELS[activeToolName] || activeToolName}`
+                                : subagentMode
+                                    ? 'SubAgent 正在分工分析、调用仿真并复核结论'
+                                    : '正在检索证据、组织推理并生成结果'}
+                        </span>
+                    </div>
+                    <div className="ai-live-progress" aria-label="AI 思考进度">
+                        <div className="ai-live-progress-track">
+                            <div className="ai-live-progress-fill" />
+                        </div>
+                        <span>PROCESSING</span>
+                    </div>
+                </div>
+            )}
+
             <div className="ai-messages">
                 {messages.length === 0 ? (
                     <WelcomeScreen onExampleClick={handleExampleClick} dataAnalysisMode={dataAnalysisMode} subagentMode={subagentMode} />
@@ -858,6 +977,7 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
                                     <ThinkingPanel
                                         content={message.thinking}
                                         isStreaming={message.isStreaming}
+                                        answer={message.content}
                                         onAction={onAction}
                                         onSend={handleSend}
                                     />
@@ -977,7 +1097,7 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
                     <div className={`ai-skill-card ${subagentMode ? 'active subagent' : ''}`}>
                         <div className="ai-skill-title">
                             <span className="material-symbols-outlined">hub</span>
-                            SubAgent Skill
+                            SubAgent 专家组
                         </div>
                         <div className="ai-skill-actions">
                             {subagentMode ? (

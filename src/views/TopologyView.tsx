@@ -350,7 +350,8 @@ function drawGraph(
         const arrowLen = 8 / zoom;
         const midX = (source.x + target.x) / 2;
         const midY = (source.y + target.y) / 2;
-        if (simEdge && simEdge.flow_rate > 0 && flowLen > 1) {
+        const hasSimulatedFlow = Boolean(simEdge && simEdge.direction !== 'zero' && Math.abs(simEdge.flow_rate) > 0 && flowLen > 1);
+        if (hasSimulatedFlow) {
             const speed = 0.18 + Math.min(simEdge.utilization, 1) * 0.45;
             const pulseT = (animationMs / 1000) * speed;
             const tracerRadius = (edge.category === 'trunk' ? 3.6 : 2.6) / zoom;
@@ -376,15 +377,17 @@ function drawGraph(
             });
             ctx.restore();
         }
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.85;
-        ctx.beginPath();
-        ctx.moveTo(midX + arrowLen * Math.cos(angle), midY + arrowLen * Math.sin(angle));
-        ctx.lineTo(midX + arrowLen * Math.cos(angle + 2.5), midY + arrowLen * Math.sin(angle + 2.5));
-        ctx.lineTo(midX + arrowLen * Math.cos(angle - 2.5), midY + arrowLen * Math.sin(angle - 2.5));
-        ctx.closePath();
-        ctx.fill();
-        if (simEdge && simEdge.flow_rate > 0 && zoom > 0.8) {
+        if (hasSimulatedFlow) {
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.85;
+            ctx.beginPath();
+            ctx.moveTo(midX + arrowLen * Math.cos(angle), midY + arrowLen * Math.sin(angle));
+            ctx.lineTo(midX + arrowLen * Math.cos(angle + 2.5), midY + arrowLen * Math.sin(angle + 2.5));
+            ctx.lineTo(midX + arrowLen * Math.cos(angle - 2.5), midY + arrowLen * Math.sin(angle - 2.5));
+            ctx.closePath();
+            ctx.fill();
+        }
+        if (hasSimulatedFlow && zoom > 0.8) {
             ctx.font = `${8 / zoom}px Inter, sans-serif`;
             ctx.fillStyle = color;
             ctx.globalAlpha = 0.9;

@@ -23,7 +23,7 @@ const DEFAULT_CONFIG: MapConfig = {
     zoom: 4,
     zoomControl: true,
     draggable: true,
-    theme: 'light',
+    theme: 'dark',
     minZoom: 3,
     maxZoom: 18,
     showScale: true,
@@ -139,6 +139,7 @@ function MapView({
     const hubRenderRef = useRef<{ ports: any[]; connections: any[] }[]>([])
 
     const mapConfig = { ...DEFAULT_CONFIG, ...config }
+    const mapStyle = mapConfig.theme === 'light' ? 'amap://styles/light' : 'amap://styles/dark'
     const showDemoHubNodes = useMemo(() => shouldEnableDemoHubNodes(), [])
     const effectivePipelineData = useMemo(() => {
         if (!pipelineData) return pipelineData
@@ -415,14 +416,14 @@ function MapView({
                     const options: Record<string, unknown> = {
                         center: [mapConfig.center.longitude, mapConfig.center.latitude],
                         zoom: mapConfig.zoom,
-                        mapStyle: 'amap://styles/dark',
+                        mapStyle,
                         features: ['bg', 'road'],
                         viewMode,
                     }
 
                     if (viewMode === '3D') {
                         options.pitch = 0
-                        options.skyColor = '#1f263a'
+                        options.skyColor = mapConfig.theme === 'light' ? '#dbeafe' : '#1f263a'
                     }
 
                     return new AMap.Map(mapContainerRef.current, options)
@@ -539,6 +540,15 @@ function MapView({
         }
         // 注意：只依赖稳定的值，回调函数通过 ref 访问
     }, [mapConfig.center.longitude, mapConfig.center.latitude, mapConfig.zoom, mapConfig.showDistrictLayer, mapConfig.showProvinceLabels, debouncedZoomEnd, loadControls, loadDistrictLayer, loadProvinceLabels])
+
+    useEffect(() => {
+        if (!mapInstanceRef.current) return
+        try {
+            mapInstanceRef.current.setMapStyle?.(mapStyle)
+        } catch (error) {
+            console.warn('[MapView] update map style failed', error)
+        }
+    }, [mapStyle])
 
     /**
      * 管线渲染

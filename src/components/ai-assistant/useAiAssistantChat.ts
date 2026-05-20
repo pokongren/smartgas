@@ -19,7 +19,7 @@ export interface ChatRequestPayload {
     analysis_mode?: 'default' | 'subagents'
 }
 
-type StreamChunkType = 'REPLY' | 'TOOL' | 'LOG' | 'THINK' | 'ERROR'
+type StreamChunkType = 'REPLY' | 'TOOL' | 'LOG' | 'THINK' | 'ERROR' | 'DONE'
 
 const AI_ASSISTANT_API_URL = resolveApiPath('/api/ai-assistant/chat')
 const DATA_ANALYSIS_ENTER_PATTERN = /^\s*\/\u6570\u636e\u5206\u6790(?:\s+.+)?\s*$/i
@@ -135,6 +135,12 @@ async function* fetchChatStream(
 
             if (line.startsWith('[ERROR] ')) {
                 yield { type: 'ERROR', content: line.substring(8) }
+                continue
+            }
+
+            if (line.trim() === '[DONE]') {
+                yield { type: 'DONE', content: '' }
+                return
             }
         }
     }
@@ -177,9 +183,85 @@ function resolveModesByCommand(
 function appendThinkingText(current: string | undefined, next: string): string {
     const text = next.trim()
     if (!text) return current || ''
+    const mergedSubagentText = mergeSubagentProcessText(current, text)
+    if (mergedSubagentText !== null) return mergedSubagentText
     if (!current?.trim()) return text
     if (current.includes(text)) return current
     return `${current.trim()}\n\n${text}`
+}
+
+function parseSubagentProcessText(content: string): { key: string; status?: string } | null {
+    const match = content.trim().match(/^\[SUBAGENT:(.+)\]$/s)
+    if (!match) return null
+
+    try {
+        const parsed = JSON.parse(match[1]) as { agent?: string; title?: string; status?: string }
+        const key = String(parsed.agent || parsed.title || '').trim()
+        if (!key) return null
+        return { key, status: parsed.status }
+    } catch {
+        return null
+    }
+}
+
+function mergeSubagentProcessText(current: string | undefined, next: string): string | null {
+    const nextSubagent = parseSubagentProcessText(next)
+    if (!nextSubagent) return null
+
+    if (!current?.trim()) return next
+
+    const blocks = current
+        .trim()
+        .split(/\n\s*\n/)
+        .filter((block) => block.trim())
+    const existingIndex = blocks.findIndex((block) => parseSubagentProcessText(block)?.key === nextSubagent.key)
+
+    if (existingIndex >= 0) {
+        blocks[existingIndex] = next
+    } else {
+        blocks.push(next)
+    }
+
+    return blocks.join('\n\n')
+}
+
+export function stripPrivateThinkBlocks(content: string): string {
+    return content
+        .replace(/<think>[\s\S]*?<\/think>\s*/gi, '')
+        .replace(/<\/?think>/gi, '')
+}
+
+function splitPrivateThinkFromChunk(
+    content: string,
+    insidePrivateThink: boolean,
+): { publicContent: string; insidePrivateThink: boolean } {
+    let remaining = content
+    let publicContent = ''
+    let hidden = insidePrivateThink
+
+    while (remaining) {
+        if (hidden) {
+            const endMatch = remaining.match(/<\/think>/i)
+            if (!endMatch || endMatch.index === undefined) {
+                return { publicContent, insidePrivateThink: true }
+            }
+            remaining = remaining.slice(endMatch.index + endMatch[0].length)
+            hidden = false
+            continue
+        }
+
+        const startMatch = remaining.match(/<think>/i)
+        if (!startMatch || startMatch.index === undefined) {
+            publicContent += remaining
+            break
+        }
+
+        publicContent += remaining.slice(0, startMatch.index)
+        remaining = remaining.slice(startMatch.index + startMatch[0].length)
+        hidden = true
+    }
+
+    return { publicContent, insidePrivateThink: hidden }
 }
 
 function isSubagentProcessBlock(content: string): boolean {
@@ -188,6 +270,9 @@ function isSubagentProcessBlock(content: string): boolean {
 
 function findFinalReplyStart(content: string): number {
     const patterns = [
+        /^\s*#{1,3}\s*(?:结论|汇总答复|答复|结果)/,
+        /^\s*\*\*结论[:：]?\*\*/,
+        /^\s*结论[:：]/,
         /\n\s*#{1,3}\s*(?:结论|汇总答复|答复|结果)/,
         /\n\s*\*\*结论[:：]?\*\*/,
         /\n\s*结论[:：]/,
@@ -212,28 +297,33 @@ function splitReplyForDisplay(
     content: string,
     answerStarted: boolean,
 ): { reply: string; thinking: string; answerStarted: boolean } {
-    if (isSubagentProcessBlock(content)) {
-        return { reply: '', thinking: content.trim(), answerStarted }
+    const cleanedContent = stripPrivateThinkBlocks(content)
+    if (!cleanedContent.trim()) {
+        return { reply: '', thinking: '', answerStarted }
+    }
+
+    if (isSubagentProcessBlock(cleanedContent)) {
+        return { reply: '', thinking: cleanedContent.trim(), answerStarted }
     }
 
     if (answerStarted) {
-        return { reply: content, thinking: '', answerStarted: true }
+        return { reply: cleanedContent, thinking: '', answerStarted: true }
     }
 
-    const finalStart = findFinalReplyStart(content)
+    const finalStart = findFinalReplyStart(cleanedContent)
     if (finalStart >= 0) {
         return {
-            thinking: content.slice(0, finalStart).trim(),
-            reply: content.slice(finalStart),
+            thinking: cleanedContent.slice(0, finalStart).trim(),
+            reply: cleanedContent.slice(finalStart),
             answerStarted: true,
         }
     }
 
-    if (looksLikePublicProcess(content)) {
-        return { reply: '', thinking: content.trim(), answerStarted: false }
+    if (looksLikePublicProcess(cleanedContent)) {
+        return { reply: '', thinking: cleanedContent.trim(), answerStarted: false }
     }
 
-    return { reply: content, thinking: '', answerStarted: true }
+    return { reply: cleanedContent, thinking: '', answerStarted: true }
 }
 
 function shouldStartMultiScenarioAi(message: string): boolean {
@@ -480,10 +570,13 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
             const stream = fetchChatStream(nextMessage, historySnapshot, pageContext, analysisMode)
             let fullReply = ''
             let answerStarted = false
+            let insidePrivateThink = false
 
             for await (const chunk of stream) {
                 if (chunk.type === 'REPLY') {
-                    const split = splitReplyForDisplay(chunk.content, answerStarted)
+                    const filtered = splitPrivateThinkFromChunk(chunk.content, insidePrivateThink)
+                    insidePrivateThink = filtered.insidePrivateThink
+                    const split = splitReplyForDisplay(filtered.publicContent, answerStarted)
                     answerStarted = split.answerStarted
                     if (split.reply) {
                         fullReply += split.reply
@@ -539,6 +632,10 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
 
                 if (chunk.type === 'ERROR') {
                     throw new Error(chunk.content)
+                }
+
+                if (chunk.type === 'DONE') {
+                    break
                 }
             }
 

@@ -1341,6 +1341,7 @@ const GlobalPipelineView: React.FC = () => {
 
     const [mapInstance, setMapInstance] = useState<any>(null)
     const [selectedMapNode, setSelectedMapNode] = useState<PipelineNode | null>(null)
+    const [mapTheme, setMapTheme] = useState<'light' | 'dark'>('dark')
     const [nodeDisplayMode, setNodeDisplayMode] = useState<'full' | 'hub'>('hub')
     const [hubNodeTypes, setHubNodeTypes] = useState<HubNodeType[]>(['source', 'compressor', 'junction', 'distribution'])
     const [showValveRooms, setShowValveRooms] = useState(false)
@@ -1413,6 +1414,14 @@ const GlobalPipelineView: React.FC = () => {
     const toggleHubNodeType = useCallback((type: HubNodeType) => {
         setHubNodeTypes(prev => prev.includes(type) ? prev.filter(item => item !== type) : [...prev, type])
     }, [])
+
+    const activatePresentationNodeMode = useCallback(() => {
+        setNodeDisplayMode('hub')
+        setHubNodeTypes(['source', 'junction'])
+        setShowValveRooms(false)
+        setIsHubMenuOpen(false)
+    }, [])
+
     // 统一的指标点击处理函数
     const handleMetricClick = useCallback((stationName: string, metricType: 'pressure' | 'temperature' | 'dewpoint', baseValue: number) => {
         setHistoryTarget({ stationName, metricType, baseValue })
@@ -2863,14 +2872,22 @@ const GlobalPipelineView: React.FC = () => {
                     {/* 右侧工具栏 */}
                     <div className="flex items-center gap-3">
                         <button
-                            onClick={() => setShowValveRooms(prev => !prev)}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border ${showValveRooms ? 'bg-yellow-500/15 border-yellow-300/40 text-yellow-100' : 'bg-slate-800/75 border-white/10 text-slate-300 hover:text-white hover:border-white/20'}`}
-                            title={showValveRooms ? '当前显示阀室，点击隐藏' : '当前隐藏阀室，点击显示'}
+                            onClick={activatePresentationNodeMode}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border bg-amber-500/15 border-amber-300/35 text-amber-100 hover:bg-amber-500/22 hover:border-amber-300/55"
+                            title="展示模式：只保留气源站和枢纽站，并隐藏阀室"
+                        >
+                            <span className="material-symbols-outlined text-base">filter_alt</span>
+                            <span>展示</span>
+                        </button>
+                        <button
+                            onClick={() => setMapTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border ${mapTheme === 'dark' ? 'bg-slate-800/75 border-cyan-300/35 text-cyan-100 hover:bg-slate-700/80' : 'bg-white/80 border-amber-300/60 text-amber-800 hover:bg-amber-50'}`}
+                            title={mapTheme === 'dark' ? '当前深色底图，点击切换浅色' : '当前浅色底图，点击切换深色'}
                         >
                             <span className="material-symbols-outlined text-base">
-                                {showValveRooms ? 'visibility' : 'visibility_off'}
+                                {mapTheme === 'dark' ? 'dark_mode' : 'light_mode'}
                             </span>
-                            <span>{showValveRooms ? '隐藏阀室' : '显示阀室'}</span>
+                            <span>{mapTheme === 'dark' ? '深色' : '浅色'}</span>
                         </button>
                         <div className="relative" ref={hubMenuRef}>
                             <button
@@ -2939,6 +2956,19 @@ const GlobalPipelineView: React.FC = () => {
                                             全不选
                                         </button>
                                     </div>
+                                    <button
+                                        onClick={() => setShowValveRooms(prev => !prev)}
+                                        className={`mt-2 w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs transition-all border ${showValveRooms ? 'bg-yellow-500/12 border-yellow-300/35 text-yellow-100' : 'bg-white/5 border-white/10 text-gray-400 hover:text-gray-200'}`}
+                                        title={showValveRooms ? '当前显示阀室，点击隐藏' : '当前隐藏阀室，点击显示'}
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-sm">
+                                                {showValveRooms ? 'visibility' : 'visibility_off'}
+                                            </span>
+                                            {showValveRooms ? '隐藏阀室' : '显示阀室'}
+                                        </span>
+                                        <span className="material-symbols-outlined text-sm">{showValveRooms ? 'toggle_on' : 'toggle_off'}</span>
+                                    </button>
                                     <div className="mt-2 rounded-lg border border-emerald-400/15 bg-emerald-500/5 p-2">
                                         <div className="flex items-center justify-between gap-2 mb-1.5">
                                             <span className="text-[11px] text-emerald-200 font-semibold">气源站名单</span>
@@ -3042,6 +3072,7 @@ const GlobalPipelineView: React.FC = () => {
 
             {/* 地图 */}
             <MapView
+                config={{ theme: mapTheme }}
                 pipelineData={pipelineData}
                 nodeDisplayMode={nodeDisplayMode}
                 hubNodeTypes={hubNodeTypes}

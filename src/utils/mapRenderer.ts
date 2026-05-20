@@ -106,6 +106,7 @@ interface MergedFlowPath {
     color: string
     totalLength: number
     flowIntensity: number
+    flowDirection: 'forward' | 'reverse' | 'zero'
 }
 
 function clampNumber(value: number, min: number, max: number): number {
@@ -121,27 +122,9 @@ function buildSimulationEdgeMap(overlay?: SimulationOverlay | null): Map<string,
 function resolveSimulationEdge(line: PipelineLine, edgeMap?: Map<string, SimEdgeResult>): SimEdgeResult | undefined {
     if (!edgeMap || edgeMap.size === 0) return undefined
 
-    const properties = line.properties as Record<string, unknown> | undefined
-    const candidateIds = [
-        line.id,
-        properties?.simulationEdgeId,
-        properties?.solverEdgeId,
-        properties?.sourceEdgeId,
-        properties?.edgeId,
-    ].filter((id): id is string => typeof id === 'string' && id.length > 0)
-
-    for (const id of candidateIds) {
+    for (const id of getLineSimulationCandidateIds(line)) {
         const edge = edgeMap.get(id)
         if (edge) return edge
-    }
-
-    const sourceEdgeIds = properties?.sourceEdgeIds
-    if (Array.isArray(sourceEdgeIds)) {
-        for (const id of sourceEdgeIds) {
-            if (typeof id !== 'string') continue
-            const edge = edgeMap.get(id)
-            if (edge) return edge
-        }
     }
 
     return undefined
@@ -177,9 +160,19 @@ function isSimulationEdgeClosed(edge?: SimEdgeResult): boolean {
     return edge.direction === 'zero' || edge.flow_rate <= 0.001
 }
 
+function hasSimulationEdgeMap(edgeMap?: Map<string, SimEdgeResult>): boolean {
+    return Boolean(edgeMap && edgeMap.size > 0)
+}
+
+function shouldRenderFlowForLine(line: PipelineLine, edgeMap?: Map<string, SimEdgeResult>): boolean {
+    if (!hasSimulationEdgeMap(edgeMap)) return true
+    const edge = resolveSimulationEdge(line, edgeMap)
+    return Boolean(edge && !isSimulationEdgeClosed(edge))
+}
+
 function getSimulationFlowIntensity(line: PipelineLine, edgeMap?: Map<string, SimEdgeResult>): number {
     const edge = resolveSimulationEdge(line, edgeMap)
-    if (!edge) return 1
+    if (!edge) return hasSimulationEdgeMap(edgeMap) ? 0 : 1
     if (isSimulationEdgeClosed(edge)) return 0
     return clampNumber(edge.utilization > 0 ? edge.utilization : edge.flow_rate / 3000, 0.18, 1.25)
 }
@@ -194,39 +187,47 @@ function getChainFlowIntensity(lines: PipelineLine[], edgeMap?: Map<string, SimE
     return clampNumber(values.reduce((sum, value) => sum + value, 0) / values.length, 0.18, 1.25)
 }
 
+function getChainFlowDirection(lines: PipelineLine[], edgeMap?: Map<string, SimEdgeResult>): 'forward' | 'reverse' | 'zero' {
+    if (!edgeMap || edgeMap.size === 0) return 'forward'
+
+    let forwardCount = 0
+    let reverseCount = 0
+    let zeroCount = 0
+
+    for (const line of lines) {
+        const direction = resolveSimulationEdge(line, edgeMap)?.direction
+        if (direction === 'reverse') reverseCount++
+        else if (direction === 'zero') zeroCount++
+        else forwardCount++
+    }
+
+    if (forwardCount === 0 && reverseCount === 0) return zeroCount > 0 ? 'zero' : 'forward'
+    return reverseCount > forwardCount ? 'reverse' : 'forward'
+}
+
 function createCutoffMarker(map: any, path: number[][], line: PipelineLine): any | null {
     const AMap = (window as any).AMap
-    if (!AMap || path.length === 0) return null
+    const position = path[Math.floor(path.length / 2)]
+    if (!AMap || !position) return null
 
-    const midpoint = path[Math.floor(path.length / 2)]
-    if (!midpoint) return null
-
-    const marker = new AMap.Marker({
-        position: midpoint,
-        content: `
-            <div style="
-                display:flex;
-                align-items:center;
-                gap:4px;
-                height:24px;
-                padding:0 8px;
-                border-radius:999px;
-                background:rgba(127,29,29,0.92);
-                border:1px solid rgba(248,113,113,0.9);
-                color:#fee2e2;
-                font-size:11px;
-                font-weight:700;
-                box-shadow:0 0 16px rgba(239,68,68,0.7);
-                white-space:nowrap;
-                pointer-events:none;
-            ">
-                <span style="font-size:15px;line-height:1;">×</span>
-                <span>截断</span>
-            </div>
-        `,
-        offset: new AMap.Pixel(-28, -12),
+    const marker = new AMap.Text({
+        text: '× 截断',
+        position,
+        offset: new AMap.Pixel(-24, -12),
         zIndex: 180,
         zooms: [2, 30],
+        style: {
+            'height': '24px',
+            'line-height': '22px',
+            'padding': '0 8px',
+            'border-radius': '999px',
+            'background': 'rgba(127,29,29,0.92)',
+            'border': '1px solid rgba(248,113,113,0.9)',
+            'color': '#fee2e2',
+            'font-size': '11px',
+            'font-weight': '700',
+            'box-shadow': '0 0 16px rgba(239,68,68,0.7)',
+        },
         extData: { line, isCutoffMarker: true },
     })
 
@@ -326,20 +327,47 @@ function injectMarkerStyles() {
             cursor: pointer;
             position: relative;
             overflow: visible;
-            filter: drop-shadow(0 0 5px ${HUB_MARKER_CONFIG.GLOW_COLOR});
+            perspective: 140px;
+            filter: drop-shadow(0 5px 4px rgba(0,0,0,0.38)) drop-shadow(0 0 6px ${HUB_MARKER_CONFIG.GLOW_COLOR});
             transition: transform 0.2s ease, filter 0.2s ease;
         }
         .hub-marker-container:hover {
-            transform: scale(1.12);
-            filter: drop-shadow(0 0 9px rgba(0,229,255,0.82));
+            transform: scale(1.12) translateY(-1px);
+            filter: drop-shadow(0 8px 6px rgba(0,0,0,0.46)) drop-shadow(0 0 10px rgba(0,229,255,0.82));
         }
         .hub-marker-glow {
             width: ${HUB_MARKER_CONFIG.SIZE}px;
             height: ${HUB_MARKER_CONFIG.SIZE}px;
-            background: linear-gradient(135deg, #fff7a8 0%, ${HUB_MARKER_CONFIG.COLOR} 48%, #f59e0b 100%);
-            transform: rotate(45deg);
-            border: 1px solid rgba(255,255,255,0.6);
-            box-shadow: 0 0 5px ${HUB_MARKER_CONFIG.GLOW_COLOR}, 0 0 10px ${HUB_MARKER_CONFIG.GLOW_COLOR}, inset 0 0 0 1px rgba(255,255,255,0.5);
+            position: relative;
+            background: linear-gradient(135deg, #fffbe8 0%, #ffe84f 34%, ${HUB_MARKER_CONFIG.COLOR} 58%, #d97706 100%);
+            transform: rotate(45deg) rotateX(16deg);
+            border: 1px solid rgba(255,255,255,0.76);
+            border-radius: 3px;
+            box-shadow:
+                0 0 5px ${HUB_MARKER_CONFIG.GLOW_COLOR},
+                0 0 10px ${HUB_MARKER_CONFIG.GLOW_COLOR},
+                3px 4px 0 rgba(120,53,15,0.42),
+                inset 2px 2px 3px rgba(255,255,255,0.68),
+                inset -3px -3px 4px rgba(146,64,14,0.44);
+            overflow: hidden;
+        }
+        .hub-marker-glow::before {
+            content: '';
+            position: absolute;
+            inset: 2px 5px 9px 2px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.82), rgba(255,255,255,0.04));
+            opacity: 0.78;
+            pointer-events: none;
+        }
+        .hub-marker-glow::after {
+            content: '';
+            position: absolute;
+            right: 1px;
+            bottom: 1px;
+            width: 46%;
+            height: 46%;
+            background: linear-gradient(135deg, rgba(245,158,11,0), rgba(120,53,15,0.36));
+            pointer-events: none;
         }
         .hub-marker-glow.compact {
             width: ${HUB_MARKER_CONFIG.COMPACT_SIZE}px;
@@ -1445,8 +1473,8 @@ export function renderPipelineLines(
                     polylines.push(polyline)
 
                     if (isCutoff) {
-                        const marker = createCutoffMarker(map, path, line)
-                        if (marker) polylines.push(marker)
+                        const cutoffMarker = createCutoffMarker(map, path, line)
+                        if (cutoffMarker) polylines.push(cutoffMarker)
                     }
 
                     // 不再在这里为单根极短管段创建光效，改在全部渲染完后基于合并长路径创建
@@ -1465,9 +1493,12 @@ export function renderPipelineLines(
                 const mergedPaths = mergeLinesIntoContinuousPaths(lines, nodes, simulationEdgeMap)
 
                 // 2. 在这些超长干线上施加流动光效
-                mergedPaths.forEach(({ path, color, totalLength, flowIntensity }) => {
+                mergedPaths.forEach(({ path, color, totalLength, flowIntensity, flowDirection }) => {
                     if (totalLength > 20000) { // 只在大于20km的连续干线上运行动画
-                        const flowMarkers = createLongFlowAnimation(map, path, color, totalLength, { flowIntensity })
+                        const flowMarkers = createLongFlowAnimation(map, path, color, totalLength, {
+                            flowIntensity,
+                            reverse: flowDirection === 'reverse',
+                        })
                         if (flowMarkers && flowMarkers.length > 0) {
                             polylines.push(...flowMarkers)
                         }
@@ -1513,7 +1544,7 @@ function mergeLinesIntoContinuousPaths(
     const nodeDegree = new Map<string, number>()
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
-        if (isSimulationEdgeClosed(resolveSimulationEdge(line, simulationEdgeMap))) continue
+        if (!shouldRenderFlowForLine(line, simulationEdgeMap)) continue
         if (line.startNodeId) nodeDegree.set(line.startNodeId, (nodeDegree.get(line.startNodeId) || 0) + 1)
         if (line.endNodeId) nodeDegree.set(line.endNodeId, (nodeDegree.get(line.endNodeId) || 0) + 1)
     }
@@ -1522,7 +1553,7 @@ function mergeLinesIntoContinuousPaths(
     const linesByColor = new Map<string, PipelineLine[]>()
     for (const line of lines) {
         if (!line.path || line.path.length < 2) continue
-        if (isSimulationEdgeClosed(resolveSimulationEdge(line, simulationEdgeMap))) continue
+        if (!shouldRenderFlowForLine(line, simulationEdgeMap)) continue
         const simEdge = resolveSimulationEdge(line, simulationEdgeMap)
         const color = simEdge?.color || line.properties?.color || '#00e5ff' // default fallback
 
@@ -1607,6 +1638,7 @@ function mergeLinesIntoContinuousPaths(
                 color,
                 totalLength: length,
                 flowIntensity: getChainFlowIntensity(currentChain, simulationEdgeMap),
+                flowDirection: getChainFlowDirection(currentChain, simulationEdgeMap),
             })
         }
     }
@@ -1619,11 +1651,12 @@ function createLongFlowAnimation(
     points: number[][],
     color: string,
     fallbackLength: number,
-    options: { flowIntensity?: number } = {}
+    options: { flowIntensity?: number; reverse?: boolean } = {}
 ): any[] {
     const AMap = (window as any).AMap
     if (!AMap || points.length < 2) return []
 
+    const flowPoints = options.reverse ? [...points].reverse() : points
     const flowIntensity = clampNumber(options.flowIntensity ?? 1, 0, 1.25)
     if (flowIntensity <= 0.01) return []
 
@@ -1631,13 +1664,13 @@ function createLongFlowAnimation(
     const distances = [0]
     let totalLength = 0
 
-    for (let i = 1; i < points.length; i++) {
+    for (let i = 1; i < flowPoints.length; i++) {
         let d = 0
         try {
-            d = AMap.GeometryUtil.distance(points[i - 1], points[i])
+            d = AMap.GeometryUtil.distance(flowPoints[i - 1], flowPoints[i])
         } catch (e) {
-            const dx = points[i][0] - points[i - 1][0]
-            const dy = points[i][1] - points[i - 1][1]
+            const dx = flowPoints[i][0] - flowPoints[i - 1][0]
+            const dy = flowPoints[i][1] - flowPoints[i - 1][1]
             d = Math.sqrt(dx * dx + dy * dy) * 111000
         }
         totalLength += d
@@ -1662,8 +1695,8 @@ function createLongFlowAnimation(
     const GLOBAL_CYCLE_MS = 2600 - flowIntensity * 600;
 
     // 只要起点坐标相同，globalOffset 就完全一致！
-    const startX = Math.round(points[0][0] * 1000)
-    const startY = Math.round(points[0][1] * 1000)
+    const startX = Math.round(flowPoints[0][0] * 1000)
+    const startY = Math.round(flowPoints[0][1] * 1000)
     const globalOffset = Math.floor((startX * 12345 + startY * 67890) % GLOBAL_CYCLE_MS)
 
     // 根据管线总耗时和发射周期，计算这根管线上同时会存在几条光束
@@ -1712,7 +1745,7 @@ function createLongFlowAnimation(
                     const headDist = progress * (totalLength + flowLength)
                     const tailDist = headDist - flowLength
 
-                    const subPath = getSubPath(points, distances, tailDist, headDist)
+                    const subPath = getSubPath(flowPoints, distances, tailDist, headDist)
 
                     if (subPath.length < 2) {
                         flowPolyline.hide()

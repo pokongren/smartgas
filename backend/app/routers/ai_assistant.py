@@ -2847,6 +2847,10 @@ def _fallback_subagent_brief(agent_title: str, evidence: dict[str, Any]) -> str:
             "结论：复核重点是防止把演示推演说成真实未来。"
             "依据：风险等级、安全阈值和调度建议必须绑定实时数据或明确假设。"
         ),
+        "业务表达复核 Agent": (
+            "结论：已把前面 Agent 的结果统一成业务口径。"
+            "依据：最终答复按“结论、依据、影响、建议、待复核项、边界说明”收口，数据不足处必须明说。"
+        ),
     }
     return fallback_map.get(agent_title, "结论：本 Agent 已完成阶段检查；依据：当前只展示公开工作轨迹和可审计证据。")
 
@@ -2869,7 +2873,90 @@ def _sanitize_subagent_brief(text: str, agent_title: str, evidence: dict[str, An
     return cleaned
 
 
-async def _call_subagent_brief(agent_title: str, user_message: str, evidence: dict[str, Any], instruction: str) -> str:
+def _build_subagent_showcase_final_reply(
+    *,
+    user_message: str,
+    evidence: dict[str, Any],
+    results: list[dict[str, str]],
+) -> str:
+    task_type = str(evidence.get("task_type") or "综合风险分析")
+    targets = [str(item) for item in evidence.get("targets", []) if str(item).strip()]
+    target_text = "、".join(targets) or "当前关注站点"
+    junctions = evidence.get("junctions", []) or []
+    stations = evidence.get("stations", []) or []
+    pipeline_count = int(evidence.get("pipeline_count") or 0)
+    system_ids = sorted({
+        str(system_id)
+        for junction in junctions
+        for system_id in (junction.get("system_ids") or [])
+        if str(system_id).strip()
+    })
+    system_text = "、".join(system_ids) if system_ids else "待运行时拓扑补齐"
+    has_target_match = bool(junctions or stations)
+
+    compact = re.sub(r"\s+", "", user_message)
+    is_flow_limit = any(word in compact for word in ("限流", "降量", "降输", "下降", "截断"))
+    scenario_name = "中卫-靖边限流推演" if ("中卫" in compact and "靖边" in compact) else f"{target_text}{task_type}"
+    next_action_line = (
+        "补充限流比例、压力边界和下游需求后，可重新触发仿真并生成曲线。"
+        if is_flow_limit
+        else "补充目标站点、实时边界条件和历史曲线后，可重新生成可计算分析结果。"
+    )
+    evidence_line = (
+        f"已命中 {len(junctions)} 个枢纽、{len(stations)} 个站点、{pipeline_count} 条管线，涉及系统：{system_text}。"
+        if has_target_match
+        else f"未命中与“{target_text}”直接对应的枢纽或站点；当前仅能读取全网管线规模 {pipeline_count} 条，尚不能确认该对象的上下游影响范围。"
+    )
+    business_judgement = (
+        f"{target_text}需要作为重点关注对象。依据是：目标对象已进入运行时拓扑匹配，且关联多系统、多站点关系；若发生限流或边界变化，影响可能沿上下游扩散。当前仍缺少实时压力、流量、限流比例和压缩机边界，所以不能直接给“高/中/低”风险定级。"
+        if has_target_match
+        else f"当前不能对{target_text}给出风险等级。原因很直接：系统没有命中具体枢纽或站点，缺少可定位对象、实时压力、流量、限流比例和上下游边界，不能把全网管线规模当成该站风险依据。"
+    )
+    topology_summary = (
+        f"- 拓扑分析：已命中 {len(junctions)} 个枢纽、{len(stations)} 个站点，目标对象已进入运行时拓扑。"
+        if has_target_match
+        else "- 拓扑分析：未命中具体枢纽或站点，影响范围暂不能确认。"
+    )
+
+    agent_summary = [
+        f"- 主控：已识别“{task_type}”任务，并把目标锁定到 {target_text}。",
+        "- 历史曲线：已触发自动调曲线动作；生产级分析还要接入压力、流量、温度等时序数据。",
+        topology_summary,
+        "- 仿真推演：已进入场景准备；真实压降、流量和供气缺口必须由仿真模型按边界条件计算。",
+        "- 风险复核：当前只给“重点关注”判断，不给真实风险等级，避免把演示推演说成生产事实。",
+        "- 业务表达复核：已按统一格式收口，避免缺依据、过度自信和把仿真推演说成生产事实。",
+    ]
+
+    return "\n".join([
+        "结论：",
+        f"{scenario_name}已完成 SubAgent 分析流程，但当前不能直接判定真实生产风险等级。",
+        "",
+        "依据：",
+        f"平台已将问题拆成主控编排、历史曲线、拓扑分析、仿真推演、风险复核和业务表达复核六步。{evidence_line}",
+        "",
+        "影响：",
+        business_judgement,
+        "",
+        "建议：",
+        "1. 先补齐目标站点或管段的唯一标识，避免站名泛化导致误判。",
+        "2. 接入近 12-24 小时压力、流量、温度和压缩机工况数据。",
+        "3. 明确仿真边界条件，再让仿真 Agent 输出压降、流量和供气缺口曲线。",
+        "",
+        "待复核项：",
+        *agent_summary,
+        "",
+        "边界说明：",
+        f"{next_action_line}在这些数据补齐前，当前结论只能作为分析流程结果和风险关注提示，不能作为真实调度指令。",
+    ])
+
+
+async def _call_subagent_brief(
+    agent_title: str,
+    user_message: str,
+    evidence: dict[str, Any],
+    instruction: str,
+    prior_results: list[dict[str, str]] | None = None,
+) -> str:
     messages = [
         {
             "role": "system",
@@ -2886,6 +2973,7 @@ async def _call_subagent_brief(agent_title: str, user_message: str, evidence: di
             "content": (
                 f"用户问题：{user_message}\n"
                 f"当前证据：{json.dumps(evidence, ensure_ascii=False)}\n"
+                f"前序 Agent 结果：{json.dumps(prior_results or [], ensure_ascii=False)}\n"
                 f"你的任务：{instruction}"
             ),
         },
@@ -2910,7 +2998,7 @@ async def _subagent_showcase_event_generator(request: ChatRequest, session: Sess
 
     intro = (
         f"先撂准话：我按 SubAgent 专家组来跑这次“{task_type}”。"
-        "下面能看到每个 Agent 的任务、动作和阶段结果；仿真由模型/接口算，AI 只负责选择、解释和复核。\n\n"
+        "下面能看到每个 Agent 的任务、动作和阶段结果；仿真由模型/接口算，最后由业务表达复核 Agent 统一口径。\n\n"
     )
     yield f"[REPLY] {json.dumps(intro, ensure_ascii=False)}\n"
 
@@ -2921,7 +3009,7 @@ async def _subagent_showcase_event_generator(request: ChatRequest, session: Sess
             "icon": "account_tree",
             "tool": "任务识别与编排",
             "instruction": "判断这个问题要调哪些专业 Agent，指出目标站点和任务类型。",
-            "steps": ["识别用户意图", "拆分专业任务", "分配历史、拓扑、仿真、复核 Agent"],
+            "steps": ["识别用户意图", "拆分专业任务", "分配历史、拓扑、仿真、复核和表达 Agent"],
         },
         {
             "id": "history",
@@ -2957,6 +3045,15 @@ async def _subagent_showcase_event_generator(request: ChatRequest, session: Sess
             "instruction": "复核前面 Agent 的结论，指出数据缺口、仿真假设和不能下绝对结论的地方。",
             "steps": ["检查数据缺口", "检查曲线与拓扑是否冲突", "标注仿真假设"],
         },
+        {
+            "id": "business_expression",
+            "title": "业务表达复核 Agent",
+            "icon": "record_voice_over",
+            "tool": "Skill 统一业务表达",
+            "instruction": "作为最后一个 SubAgent，基于前序结果统一业务口径：先说结论，再给依据、影响、建议、待复核项和边界说明；不得新增事实，不把仿真推演说成真实未来。",
+            "steps": ["汇总前序 Agent 结果", "压住过度判断", "转换成业务可执行语言"],
+            "action": "统一口径",
+        },
     ]
 
     results: list[dict[str, str]] = []
@@ -2979,6 +3076,7 @@ async def _subagent_showcase_event_generator(request: ChatRequest, session: Sess
             user_message=user_message,
             evidence=evidence,
             instruction=agent["instruction"],
+            prior_results=results,
         )
         results.append({"agent": agent["title"], "summary": summary})
 
@@ -3001,37 +3099,11 @@ async def _subagent_showcase_event_generator(request: ChatRequest, session: Sess
 
         await asyncio.sleep(0.12)
 
-    final_messages = [
-        {
-            "role": "system",
-            "content": (
-                "你是 SmartGas Grid 的汇总 Agent + 于谦说人话 Skill。"
-                "你要把多个 SubAgent 的公开结论汇总成业务人员能听懂的答复。"
-                "必须包含：结论、依据、风险影响、建议动作、不确定性说明。"
-                "这是导师汇报用的评审演示：可以说 SubAgent 已自动调曲线、进入仿真演示流程；"
-                "真实风险定级、真实调度动作必须说明还需要实时压力/流量/边界条件。"
-                "仿真只能说“基于当前参数推演”，不能说成真实未来。"
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"用户问题：{user_message}\n"
-                f"工具证据：{json.dumps(evidence, ensure_ascii=False)}\n"
-                f"SubAgent 结果：{json.dumps(results, ensure_ascii=False)}"
-            ),
-        },
-    ]
-    try:
-        final_reply = await ai_client.chat_completion(messages=final_messages, temperature=0.45, max_tokens=1200)
-        final_reply = _strip_think_tags(final_reply).strip()
-    except Exception as exc:
-        logger.warning("subagent final summary failed: %s", exc)
-        final_reply = (
-            "结论：专家组流程已跑完，但最终 AI 汇总暂时不可用。\n"
-            "依据：历史、拓扑、仿真、复核 Agent 的阶段结果已经展示在上方。\n"
-            "不确定性说明：需要重新请求汇总模型后才能生成完整业务结论。"
-        )
+    final_reply = _build_subagent_showcase_final_reply(
+        user_message=user_message,
+        evidence=evidence,
+        results=results,
+    )
 
     final_reply = _append_completeness_hint(
         final_reply,
@@ -3040,6 +3112,7 @@ async def _subagent_showcase_event_generator(request: ChatRequest, session: Sess
         reason="已完成 SubAgent 分工演示、工具证据整理和最终汇总。",
     )
     yield f"[REPLY] {json.dumps(chr(10) + final_reply, ensure_ascii=False)}\n"
+    yield "[DONE]\n"
 
 
 async def _universal_search_event_generator(message: str, session: Session):

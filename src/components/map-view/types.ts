@@ -50,7 +50,7 @@ export interface MapConfig {
  */
 export interface MapViewProps {
     /** 地图配置 */
-    config?: MapConfig
+    config?: Partial<MapConfig>
     /** 容器类名 */
     className?: string
     /** 容器样式 */

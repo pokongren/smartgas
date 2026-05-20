@@ -107,7 +107,6 @@ const PageLoader: React.FC = () => (
 const ViewSwitcher: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isTech = location.pathname === '/tech';
   const isMapDemo = location.pathname === '/map-demo';
   const isGlobal = location.pathname === '/global';
   const isTopology = location.pathname === '/topology';
@@ -156,18 +155,6 @@ const ViewSwitcher: React.FC = () => {
         <span className="material-symbols-outlined text-2xl">public</span>
       </button>
 
-      <button
-        onClick={() => navigate(isTech ? '/' : '/tech')}
-        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isTech
-          ? 'bg-corp-primary text-[#1d1a15] hover:bg-white'
-          : 'bg-tech-primary text-white hover:bg-blue-400'
-          }`}
-        title="切换 科技/政企 视图"
-      >
-        <span className="material-symbols-outlined text-2xl">
-          {isTech ? 'domain' : 'terminal'}
-        </span>
-      </button>
     </div>
   );
 };
