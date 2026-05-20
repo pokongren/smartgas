@@ -37,10 +37,6 @@ const EXAMPLE_QUESTIONS: PromptExample[] = [
     { group: '管网基础', label: '统计压气站数量', prompt: '管网里有多少个压气站？请按类型给出统计口径。', icon: 'pin_drop' },
     { group: '管网基础', label: '列出干线管线', prompt: '列出所有干线管线，并说明每条管线的起终点和关键站场。', icon: 'route' },
     { group: '管网基础', label: '全网概况', prompt: '请用汇报口径总结管网整体概况，包括站场、管线、管线组和重点节点。', icon: 'public' },
-    { group: '平台展示', label: '导师汇报提纲', prompt: '帮我生成导师汇报提纲：项目痛点、项目结构、平台展示、三库一模、仿真、AI理解仿真、AI对管网理解升华。', icon: 'slideshow' },
-    { group: '平台展示', label: '项目痛点', prompt: '用导师汇报口径说明这个项目解决了哪些管网调度和仿真痛点。', icon: 'report_problem' },
-    { group: '平台展示', label: '三库一模说明', prompt: '解释三库一模在平台里的作用，并说明它和AI助手、仿真模型的关系。', icon: 'database' },
-    { group: '平台展示', label: '多工况AI仿真', prompt: '/多工况AI', icon: 'checklist' },
 ]
 
 const DATA_ANALYSIS_EXAMPLES: PromptExample[] = [
@@ -52,10 +48,10 @@ const DATA_ANALYSIS_EXAMPLES: PromptExample[] = [
 
 const SUBAGENT_EXAMPLES: PromptExample[] = [
     { label: '进入 SubAgent', prompt: '/subagent', icon: 'login' },
-    { label: '甪直风险演示', prompt: '帮我用subagent分析甪直联络站当前风险，并自动开启仿真演示。', icon: 'hub' },
-    { label: '自动仿真流程', prompt: '按照subagent，自动仿真、自动调曲线，演绎一次完整实施过程。', icon: 'science' },
-    { label: '靖边压气站复核', prompt: '用subagent方式分析靖边压气站，先看拓扑关系，再做风险复核。', icon: 'fact_check' },
-    { label: '榆林压气站对比', prompt: '用subagent方式对两个榆林压气站做合并后的拓扑和仿真影响说明。', icon: 'account_tree' },
+    { label: '中卫-靖边限流', prompt: '帮我用subagent分析中卫到靖边限流场景，并自动开启仿真推演演示。要求展示每个Agent过程，最后按结论、依据、影响、建议、待复核项、边界说明输出。', icon: 'science' },
+    { label: '中卫单站风险', prompt: '帮我用subagent分析中卫压气站当前是否存在风险，结合历史曲线、拓扑关系、仿真场景和风险复核输出。', icon: 'fact_check' },
+    { label: '甪直露点趋势', prompt: '用subagent分析甪直分输站最近水露点和压力趋势，判断是否存在异常，并说明数据来源和建议动作。', icon: 'water_drop' },
+    { label: '中卫-白鹤全段', prompt: '用subagent分析中卫压气站到上海白鹤末站主干段的拓扑影响范围，说明关键压气站、分输站和下游关注点。', icon: 'account_tree' },
 ]
 
 const SLASH_SKILLS: SlashSkill[] = [
@@ -716,28 +712,35 @@ const ThinkingPanel: React.FC<{
     content: string
     isStreaming?: boolean
     answer?: string
+    userQuestion?: string
     onAction: (payload: AssistantActionPayload) => void
     onSend?: (text?: string, options?: HandleSendOptions) => void
-}> = ({ content, isStreaming, answer = '', onAction, onSend }) => {
+}> = ({ content, isStreaming, answer = '', userQuestion = '', onAction, onSend }) => {
     const trimmed = stripPrivateThinkBlocks(content).trim()
     if (!trimmed) return null
 
     const stepCount = dedupeSubagentBlocks(trimmed.split(/\n\s*\n/)).filter(Boolean).length
-    const assessmentText = `${trimmed}\n${answer}`
+    const assessmentText = `${userQuestion}\n${trimmed}\n${answer}`
     const hasCompleteHint = /完整性提示[:：]\s*是/.test(assessmentText)
     const hasIncompleteHint = /完整性提示[:：]\s*否/.test(assessmentText)
     const hasExactEntityMatch = /(索引\s*ID\s*是|RAW-ST-\d+|唯一命中|确定为|已定位|登记的一个(?:压气站|分输站|输气站|阀室|门站|末站|首站)|是\s*[^。；\n]*(?:压气站|分输站|输气站|阀室|门站|末站|首站|LNG))/i.test(assessmentText)
     const hasEvidence = /(证据[:：]|数据来源|检索证据|命中|SubAgent|\[SUBAGENT:|仿真|SCADA|raw_excel|知识库|完整性提示)/i.test(assessmentText)
     const hasMissing = /(未命中|缺少|不足|无法|未找到|不确定|非实时)/.test(assessmentText)
     const hasAction = /\[ACTION:|建议|可操作|调度/.test(assessmentText)
-    const shouldShowConfidence = hasEvidence || hasExactEntityMatch || hasCompleteHint || hasIncompleteHint || hasAction
+    const questionText = userQuestion.trim() || assessmentText
+    const hasDeterministicAgent = /(确定性查询 Agent|已按数据库口径直出|确定性查询已直接走数据库口径|数据库口径已闭合)/.test(assessmentText)
+    const isDeterministicLookup = hasDeterministicAgent || (/(有多少|多少个|统计|数量|列出|按类型|分类|全网概况|基础设施|压气站数量|干线管线)/.test(questionText)
+        && !hasIncompleteHint
+        && !hasMissing
+        && !/(风险|仿真|推演|预测|限流|异常|是否存在风险|需不需要关注)/.test(questionText))
+    const shouldShowConfidence = isDeterministicLookup || hasEvidence || hasExactEntityMatch || hasCompleteHint || hasIncompleteHint || hasAction
     const evidenceMissingPenalty = hasMissing ? (hasExactEntityMatch ? 4 : 14) : 0
     const completenessMissingPenalty = hasMissing ? (hasExactEntityMatch ? 4 : 12) : 0
-    const evidenceConfidence = Math.max(
+    const evidenceConfidence = isDeterministicLookup ? 100 : Math.max(
         32,
         Math.min(96, 48 + stepCount * 7 + (hasEvidence ? 18 : 0) + (hasExactEntityMatch ? 16 : 0) + (hasAction ? 5 : 0) - evidenceMissingPenalty),
     )
-    const completenessConfidence = Math.max(
+    const completenessConfidence = isDeterministicLookup ? 100 : Math.max(
         25,
         Math.min(98, 54 + (hasCompleteHint ? 28 : 0) + (hasExactEntityMatch ? 12 : 0) - (hasIncompleteHint ? 30 : 0) - completenessMissingPenalty + Math.min(stepCount * 3, 12)),
     )
@@ -802,7 +805,7 @@ const ThinkingPanel: React.FC<{
                             <div style={{ width: `${overallConfidence}%` }} />
                         </div>
                         <div className="ai-confidence-note">
-                            综合评估 {overallConfidence}% · {hasExactEntityMatch ? '实体已定位，可作为当前站点结论使用' : hasMissing ? '存在数据缺口，结论需保守使用' : '证据链较完整，可用于当前演示'}
+                            综合评估 {overallConfidence}% · {isDeterministicLookup ? '确定性查询，数据库口径已闭合' : hasExactEntityMatch ? '实体已定位，可作为当前站点结论使用' : hasMissing ? '存在数据缺口，结论需保守使用' : '证据链较完整，可用于当前演示'}
                         </div>
                     </div>
                 )}
@@ -978,6 +981,7 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
                                         content={message.thinking}
                                         isStreaming={message.isStreaming}
                                         answer={message.content}
+                                        userQuestion={messages[index - 1]?.role === 'user' ? messages[index - 1].content : ''}
                                         onAction={onAction}
                                         onSend={handleSend}
                                     />
@@ -1102,9 +1106,9 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
                         <div className="ai-skill-actions">
                             {subagentMode ? (
                                 <>
-                                    <button type="button" onClick={() => handleSend('请用subagent方式并行侦察当前问题，先列证据再给结论。')} disabled={loading}>并行侦察</button>
-                                    <button type="button" onClick={() => handleSend('请用subagent方式输出实施方案，按侦察、实施、验证三段给出。')} disabled={loading}>实施方案</button>
-                                    <button type="button" onClick={() => handleSend('请用subagent方式做独立验证，输出风险和回退点。')} disabled={loading}>独立验证</button>
+                                    <button type="button" onClick={() => handleSend('帮我用subagent分析中卫到靖边限流场景，并自动开启仿真推演演示。要求展示每个Agent过程，最后按结论、依据、影响、建议、待复核项、边界说明输出。')} disabled={loading}>中卫-靖边限流</button>
+                                    <button type="button" onClick={() => handleSend('帮我用subagent分析中卫压气站当前是否存在风险，结合历史曲线、拓扑关系、仿真场景和风险复核输出。')} disabled={loading}>中卫单站风险</button>
+                                    <button type="button" onClick={() => handleSend('用subagent分析甪直分输站最近水露点和压力趋势，判断是否存在异常，并说明数据来源和建议动作。')} disabled={loading}>甪直露点趋势</button>
                                     <button type="button" onClick={() => handleSend('/退出subagent')} disabled={loading}>退出</button>
                                 </>
                             ) : (

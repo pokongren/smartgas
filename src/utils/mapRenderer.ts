@@ -258,8 +258,9 @@ function injectMarkerStyles() {
             transition: all 0.3s ease;
         }
         .compressor-marker-container:hover {
-            transform: scale(1.2) !important;
-            filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.9));
+            transform: scale(1.45) !important;
+            filter: drop-shadow(0 0 12px rgba(0, 212, 255, 0.95));
+            z-index: 999;
         }
 
         /* 呼吸灯发光层 */
@@ -329,10 +330,11 @@ function injectMarkerStyles() {
             overflow: visible;
             perspective: 140px;
             filter: drop-shadow(0 5px 4px rgba(0,0,0,0.38)) drop-shadow(0 0 6px ${HUB_MARKER_CONFIG.GLOW_COLOR});
-            transition: transform 0.2s ease, filter 0.2s ease;
+            transform-origin: center center;
+            transition: transform 0.18s ease, filter 0.18s ease;
         }
         .hub-marker-container:hover {
-            transform: scale(1.12) translateY(-1px);
+            transform: scale(1.22) translateY(-1px);
             filter: drop-shadow(0 8px 6px rgba(0,0,0,0.46)) drop-shadow(0 0 10px rgba(0,229,255,0.82));
         }
         .hub-marker-glow {
@@ -1092,11 +1094,15 @@ function createCompressorMarkerContent(rotation: number = 0): HTMLElement {
     return container
 }
 
-export function createHubMarkerContent(isCompact = false): string {
+export function createHubMarkerContent(isCompact = false, label = ''): string {
     const compactClass = isCompact ? ' compact' : ''
+    const labelHtml = label
+        ? `<div style="position:absolute;top:${HUB_MARKER_CONFIG.SIZE + 8}px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:11px;font-weight:700;color:#fff;text-shadow:0 0 2px #000,0 0 4px #000;background:rgba(15,23,42,0.72);border:1px solid rgba(255,255,255,0.14);border-radius:4px;padding:1px 5px;">${label}</div>`
+        : ''
     return `
         <div class="hub-marker-container" title="枢纽">
             <div class="hub-marker-glow${compactClass}"></div>
+            ${labelHtml}
         </div>
     `
 }
@@ -1331,6 +1337,26 @@ function createOffsetNodeMarker(
     nodeMarkerMap.set(node.id, marker)
 
     // 标签（也跟随拖拽移动）
+    const baseLabelStyle = {
+        'font-size': '10px',
+        'font-weight': '500',
+        'color': '#ccc',
+        'background-color': 'rgba(0,0,0,0.5)',
+        'border-radius': '2px',
+        'padding': '1px 3px',
+        'border': 'none',
+        'transition': 'font-size 180ms ease, padding 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease',
+    }
+    const hoverLabelStyle = {
+        ...baseLabelStyle,
+        'font-size': '14px',
+        'font-weight': '800',
+        'color': '#fff',
+        'background-color': 'rgba(0,0,0,0.82)',
+        'border-radius': '5px',
+        'padding': '2px 7px',
+        'box-shadow': '0 0 10px rgba(56,189,248,0.45)',
+    }
     const text = new AMap.Text({
         text: node.name,
         position: [position.longitude, position.latitude],
@@ -1343,17 +1369,22 @@ function createOffsetNodeMarker(
             : isCompressor
             ? new AMap.Pixel(0, COMPRESSOR_ICON_CONFIG.HEIGHT / 2 + 5)
             : new AMap.Pixel(0, -15),
-        style: {
-            'font-size': '10px',
-            'color': '#ccc',
-            'background-color': 'rgba(0,0,0,0.5)',
-            'border-radius': '2px',
-            'padding': '1px 3px',
-            'border': 'none'
-        },
+        style: baseLabelStyle,
         zIndex: 121,
         zooms: [2, 30]
     })
+
+    const enlargeNodeLabel = () => {
+        text.setStyle?.(hoverLabelStyle)
+        text.setzIndex?.(240)
+    }
+    const restoreNodeLabel = () => {
+        text.setStyle?.(baseLabelStyle)
+        text.setzIndex?.(121)
+    }
+
+    marker.on('mouseover', enlargeNodeLabel)
+    marker.on('mouseout', restoreNodeLabel)
 
     // NOTE: dragging 事件实时触发，拖拽过程中管线跟随移动
     marker.on('dragging', (e: any) => {

@@ -1445,6 +1445,27 @@ const GlobalPipelineView: React.FC = () => {
         })
     }, [])
 
+    const toggleStationHistoryPanel = useCallback((stationName: string) => {
+        if (stationHistoryTarget?.stationName === stationName) {
+            setStationHistoryTarget(null)
+            return
+        }
+
+        openStationHistoryPanel(stationName, {
+            displayName: stationName,
+            initialViewMode: 'overview',
+            initialHours: 0,
+        })
+    }, [openStationHistoryPanel, stationHistoryTarget?.stationName])
+
+    const getEmbeddedHistoryStationName = useCallback((stationName?: string): '中卫压气站' | '甪直分输站' | null => {
+        if (!stationName) return null
+        const key = normalizeStationMatchKey(stationName)
+        if (key.includes('中卫')) return '中卫压气站'
+        if (key.includes('甪直')) return '甪直分输站'
+        return null
+    }, [])
+
     useEffect(() => {
         const handleAssistantHistoryOpen = (event: Event) => {
             const detail = (event as CustomEvent).detail as {
@@ -3010,47 +3031,6 @@ const GlobalPipelineView: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                        {/* 甪直站历史数据入口 */}
-                        <button
-                            onClick={() => {
-                                if (stationHistoryTarget?.stationName === '甪直分输站') {
-                                    setStationHistoryTarget(null)
-                                } else {
-                                    openStationHistoryPanel('甪直分输站', { displayName: '甪直分输站', initialViewMode: 'overview', initialHours: 0 })
-                                }
-                            }}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all"
-                            style={{
-                                background: stationHistoryTarget?.stationName === '甪直分输站' ? 'rgba(59,130,246,0.25)' : 'rgba(15,23,42,0.6)',
-                                border: `1px solid ${stationHistoryTarget?.stationName === '甪直分输站' ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.2)'}`,
-                                color: stationHistoryTarget?.stationName === '甪直分输站' ? '#93c5fd' : '#64748b',
-                            }}
-                            title="甪直分输站历史回溯（试点）"
-                        >
-                            <span className="material-symbols-outlined text-base">history</span>
-                            <span>甪直历史</span>
-                            <span style={{ fontSize: '9px', color: '#10b981', background: 'rgba(16,185,129,0.15)', padding: '0 4px', borderRadius: '4px', border: '1px solid rgba(16,185,129,0.3)' }}>试点</span>
-                        </button>
-                        <button
-                            onClick={() => {
-                                if (stationHistoryTarget?.stationName === '中卫压气站') {
-                                    setStationHistoryTarget(null)
-                                } else {
-                                    openStationHistoryPanel('中卫压气站', { displayName: '中卫压气站', initialViewMode: 'overview', initialHours: 0 })
-                                }
-                            }}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all"
-                            style={{
-                                background: stationHistoryTarget?.stationName === '中卫压气站' ? 'rgba(245,158,11,0.22)' : 'rgba(15,23,42,0.6)',
-                                border: `1px solid ${stationHistoryTarget?.stationName === '中卫压气站' ? 'rgba(245,158,11,0.48)' : 'rgba(245,158,11,0.2)'}`,
-                                color: stationHistoryTarget?.stationName === '中卫压气站' ? '#fde68a' : '#94a3b8',
-                            }}
-                            title="打开中卫压气站历史回溯面板"
-                        >
-                            <span className="material-symbols-outlined text-base">monitoring</span>
-                            <span>中卫历史</span>
-                            <span style={{ fontSize: '9px', color: '#facc15', background: 'rgba(250,204,21,0.12)', padding: '0 4px', borderRadius: '4px', border: '1px solid rgba(250,204,21,0.28)' }}>新接入</span>
-                        </button>
                         <button
                             onClick={() => void runGlobalMultiScenarioAi(['zhongwei-cutoff'])}
                             disabled={multiScenarioActive || globalSimulation.isLoading}
@@ -3475,6 +3455,8 @@ const GlobalPipelineView: React.FC = () => {
                         popOut={panel.popOut}
                         accentColor={panel.accentColor}
                         onMetricClick={handleMetricClick}
+                        onStationHistoryClick={toggleStationHistoryPanel}
+                        activeStationHistoryName={stationHistoryTarget?.stationName}
                     />
                 </ScadaFloatingPanel>
             ))}
@@ -3604,7 +3586,7 @@ const GlobalPipelineView: React.FC = () => {
                             </p>
                         </div>
 
-                        <div>
+                        <div className="space-y-2">
                             <button
                                 onClick={() => {
                                     if (mapInstance) {
@@ -3615,6 +3597,15 @@ const GlobalPipelineView: React.FC = () => {
                             >
                                 <span className="material-symbols-outlined text-sm">my_location</span>地图定位
                             </button>
+                            {getEmbeddedHistoryStationName(selectedMapNode.name) && (
+                                <button
+                                    onClick={() => toggleStationHistoryPanel(getEmbeddedHistoryStationName(selectedMapNode.name)!)}
+                                    className="w-full bg-cyan-500/10 hover:bg-cyan-500/18 text-cyan-100 border border-cyan-400/25 py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1"
+                                >
+                                    <span className="material-symbols-outlined text-sm">history</span>
+                                    打开{getEmbeddedHistoryStationName(selectedMapNode.name)}历史
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -3635,7 +3626,9 @@ const ScadaTableContent: React.FC<{
     accentColor?: string
     onStationClick?: (stationName: string) => void
     onMetricClick?: (stationName: string, metricType: 'pressure' | 'temperature', baseValue: number) => void
-}> = ({ data, isPoppedOut, closePopOut, accentColor = '#10b981', onStationClick, onMetricClick }) => {
+    onStationHistoryClick?: (stationName: string) => void
+    activeStationHistoryName?: string
+}> = ({ data, isPoppedOut, closePopOut, accentColor = '#10b981', onStationClick, onMetricClick, onStationHistoryClick, activeStationHistoryName }) => {
     const inPressureColor = accentColor === '#10b981' ? '#34d399'
         : accentColor === '#3b82f6' ? '#60a5fa'
         : accentColor === '#f59e0b' ? '#fcd34d'
@@ -3711,13 +3704,47 @@ const ScadaTableContent: React.FC<{
                         const typeLabel = d.type === 'compressor' ? '压' : d.type === 'distribution' ? '分' : '阀'
                         const typeBg = d.type === 'compressor' ? `rgba(${rgb},0.22)` : 'rgba(100,116,139,0.2)'
                         const typeColor = d.type === 'compressor' ? accentColor : '#94a3b8'
+                        const historyStationName = name.includes('中卫') ? '中卫压气站' : name.includes('甪直') ? '甪直分输站' : ''
+                        const hasEmbeddedHistory = Boolean(historyStationName)
+                        const isHistoryActive = activeStationHistoryName === historyStationName
+                        const historyAccent = historyStationName === '中卫压气站' ? '#facc15' : '#38bdf8'
 
                         return (
                             <tr key={name} style={{ background: rowBg, borderRadius: '6px', transition: 'background 0.15s' }}
                                 onMouseEnter={e => (e.currentTarget.style.background = `rgba(${rgb},0.14)`)}
                                 onMouseLeave={e => (e.currentTarget.style.background = rowBg)}>
-                                <td style={{ padding: '5px 6px', borderRadius: '6px 0 0 6px', fontWeight: nameBold ? 600 : 400, color: '#e2e8f0', maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={name}>
-                                    {name}
+                                <td style={{ padding: '5px 6px', borderRadius: '6px 0 0 6px', fontWeight: nameBold ? 600 : 400, color: '#e2e8f0', maxWidth: '150px' }} title={name}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                                        {onStationHistoryClick && hasEmbeddedHistory && (
+                                            <button
+                                                type="button"
+                                                onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    onStationHistoryClick(historyStationName)
+                                                }}
+                                                title={`打开${historyStationName}历史回溯面板`}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 2,
+                                                    padding: '1px 5px',
+                                                    borderRadius: 999,
+                                                    border: `1px solid ${isHistoryActive ? historyAccent : `${historyAccent}55`}`,
+                                                    background: isHistoryActive ? `${historyAccent}2e` : `${historyAccent}14`,
+                                                    color: isHistoryActive ? '#fff' : historyAccent,
+                                                    fontSize: 10,
+                                                    fontWeight: 800,
+                                                    cursor: 'pointer',
+                                                    whiteSpace: 'nowrap',
+                                                    flexShrink: 0,
+                                                }}
+                                            >
+                                                <span className="material-symbols-outlined" style={{ fontSize: 12 }}>history</span>
+                                                历史
+                                            </button>
+                                        )}
+                                    </span>
                                 </td>
                                 <td style={{ padding: '5px 4px', textAlign: 'center' }}>
                                     <span style={{ fontSize: '10px', background: typeBg, color: typeColor, padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>{typeLabel}</span>

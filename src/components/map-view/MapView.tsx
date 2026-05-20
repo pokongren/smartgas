@@ -4,13 +4,12 @@ import type { MapViewProps, MapConfig } from './types'
 import styles from './MapView.module.css'
 import type { PipelineNode } from '@/types'
 import { renderPipelineLines, renderPipelineNodesWithClustering, renderPipelineDevices, clearMapOverlays, clearClusterCache, clearDragMappings } from '@/utils/mapRenderer'
-import { renderHubNode, clearHubNodeRender } from '@/utils/hubRenderer'
 import { ClusterDetailPanel } from '../ClusterDetailPanel'
 import { HubDetailPanel } from '../HubDetailPanel'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
 import type { HubNode } from '@/types/hub'
-import { DEFAULT_HUB_VISUAL_CONFIG } from '@/types/hub'
 import { getNodeRawType, isHubNode, isSourceNode, isValveNode } from '@/utils/pipelineDomain'
+import { hubNodesSample, zhongweiHubNodeSimple } from '@/data/hubNodes'
 
 /**
  * 默认地图配置
@@ -136,7 +135,6 @@ function MapView({
 
     // 枢纽节点相关状态
     const [selectedHubNode, setSelectedHubNode] = useState<HubNode | null>(null)
-    const hubRenderRef = useRef<{ ports: any[]; connections: any[] }[]>([])
 
     const mapConfig = { ...DEFAULT_CONFIG, ...config }
     const mapStyle = mapConfig.theme === 'light' ? 'amap://styles/light' : 'amap://styles/dark'
@@ -217,6 +215,12 @@ function MapView({
             lines,
         }
     }, [hubNodeTypes, mapConfig.maxRenderLines, mapConfig.maxRenderNodes, nodeDisplayMode, pipelineData, showValveRooms])
+    const visibleHubNodes = useMemo(() => {
+        if (showDemoHubNodes) return hubNodesSample
+        const nodes = Array.isArray(effectivePipelineData?.nodes) ? effectivePipelineData.nodes : []
+        const hasZhongwei = nodes.some(node => node.id === 'WE1-76' || node.name?.includes('中卫'))
+        return hasZhongwei ? [zhongweiHubNodeSimple] : []
+    }, [effectivePipelineData, showDemoHubNodes])
 
     // 使用 ref 存储所有回调函数，避免 useEffect 依赖它们
     const callbacksRef = useRef({
@@ -672,12 +676,6 @@ function MapView({
             clearMapOverlays(mapInstanceRef.current, nodeOverlaysRef.current)
             nodeOverlaysRef.current = []
 
-            // 清除旧的枢纽节点渲染
-            hubRenderRef.current.forEach(renderResult => {
-                clearHubNodeRender(mapInstanceRef.current, renderResult)
-            })
-            hubRenderRef.current = []
-
             clearClusterCache()
 
             try {
@@ -686,12 +684,21 @@ function MapView({
                     const nodeOverlays = await renderPipelineNodesWithClustering(
                         mapInstanceRef.current,
                         effectivePipelineData.nodes,
-                        onNodeClick ? (e) => onNodeClick({
-                            type: 'node',
-                            targetId: e.node.id,
-                            data: e.node,
-                            originalEvent: e
-                        }) : undefined,
+                        (e) => {
+                            const matchedHubNode = visibleHubNodes.find(hubNode =>
+                                e.node.id === hubNode.id
+                                || (hubNode.id === zhongweiHubNodeSimple.id && e.node.name?.includes('中卫'))
+                            )
+                            if (matchedHubNode) {
+                                setSelectedHubNode(matchedHubNode)
+                            }
+                            onNodeClick?.({
+                                type: 'node',
+                                targetId: e.node.id,
+                                data: e.node,
+                                originalEvent: e
+                            })
+                        },
                         handleClusterClick,
                         abortController.signal
                     )
@@ -703,30 +710,6 @@ function MapView({
                     }
                 }
 
-                // 渲染枢纽节点
-                if (hubNodesSample.length > 0 && !abortController.signal.aborted) {
-                    hubNodesSample.forEach(hubNode => {
-                        const renderResult = renderHubNode(
-                            mapInstanceRef.current,
-                            hubNode,
-                            DEFAULT_HUB_VISUAL_CONFIG,
-                            {
-                                onPortClick: (event) => {
-                                    console.log('点击端口:', event.port)
-                                },
-                                onConnectionClick: (event) => {
-                                    console.log('点击连接:', event.connection)
-                                },
-                                onNodeClick: (event) => {
-                                    setSelectedHubNode(event.node)
-                                }
-                            }
-                        )
-                        if (renderResult) {
-                            hubRenderRef.current.push(renderResult)
-                        }
-                    })
-                }
             } catch (error) {
                 // 渲染失败
             }
@@ -737,7 +720,7 @@ function MapView({
         return () => {
             abortController.abort()
         }
-    }, [effectivePipelineData, mapInstance, renderTrigger, handleClusterClick])
+    }, [effectivePipelineData, mapInstance, renderTrigger, handleClusterClick, visibleHubNodes])
 
     return (
         <div className={`${styles.mapContainer} ${className}`} style={style}>

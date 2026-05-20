@@ -52,6 +52,29 @@ export interface NodePort {
 
   /** 端口状态 */
   status: 'active' | 'inactive' | 'maintenance'
+
+  /** 站内阀组名称，用于详情面板展示 */
+  valveGroupName?: string
+
+  /** 与站外管线的关系 */
+  connectionSide?: 'upstream' | 'downstream' | 'interconnect'
+
+  /** 当前通过量 万方/天 */
+  currentThroughput?: number
+
+  /** 当前压力 MPa */
+  currentPressure?: number
+
+  /** 当前温度 ℃ */
+  currentTemperature?: number
+
+  /** 工艺图上的固定位置，用于贴近地图管道走向 */
+  diagramPosition?: {
+    x: number
+    y: number
+    labelX: number
+    labelY: number
+  }
 }
 
 /**
@@ -75,6 +98,15 @@ export interface PortConnection {
 
   /** 备注 */
   remark?: string
+
+  /** 当前通过量 万方/天 */
+  currentThroughput?: number
+
+  /** 当前压力 MPa */
+  currentPressure?: number
+
+  /** 当前温度 ℃ */
+  currentTemperature?: number
 }
 
 /**

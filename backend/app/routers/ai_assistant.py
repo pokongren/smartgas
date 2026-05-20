@@ -214,7 +214,7 @@ async def chat(
         async def subagent_enter_gen():
             reply_text = _apply_yuqian_style(
                 _append_completeness_hint(
-                    "已进入 SubAgent 协作模式。你接下来问甪直、靖边、榆林或中卫-靖边限流，我会在 AI 窗口里把专家组分工过程演给你看。",
+                    "已进入 SubAgent 协作模式。推荐先跑“中卫-靖边限流”“中卫单站风险”或“甪直露点趋势”。统计、列举这类确定性查询会自动直出，不硬走完整专家组。",
                     msg_clean,
                     is_complete=True,
                     reason="已执行 subagent 进入命令。",
@@ -283,6 +283,11 @@ async def chat(
     logger.info("AI assistant received message: %s", msg_clean[:100])
 
     if request.analysis_mode == "subagents":
+        if _is_deterministic_lookup_message(msg_clean):
+            return StreamingResponse(
+                _deterministic_lookup_event_generator(request=request, session=session),
+                media_type="text/event-stream",
+            )
         return StreamingResponse(
             _subagent_showcase_event_generator(request=request, session=session),
             media_type="text/event-stream",
@@ -519,7 +524,7 @@ def _resolve_direct_reply(message: str) -> str | None:
     if SUBAGENT_ENTER_PATTERN.match(msg_clean):
         return _apply_yuqian_style(
             _append_completeness_hint(
-                "已进入 SubAgent 协作模式。你可以直接点“并行侦察 / 实施方案 / 独立验证”。",
+                "已进入 SubAgent 协作模式。推荐先跑“中卫-靖边限流”“中卫单站风险”或“甪直露点趋势”。统计、列举这类确定性查询会自动直出，不硬走完整专家组。",
                 message,
                 is_complete=True,
                 reason="已执行 subagent 进入命令。",
@@ -2769,6 +2774,37 @@ def _detect_subagent_demo_target(message: str) -> tuple[str, list[str]]:
     return task_type, targets
 
 
+def _is_deterministic_lookup_message(message: str) -> bool:
+    compact = re.sub(r"\s+", "", message)
+    lookup_patterns = (
+        r"有多少",
+        r"多少个",
+        r"统计",
+        r"数量",
+        r"列出",
+        r"按类型",
+        r"分类",
+        r"全网概况",
+        r"基础设施",
+        r"压气站数量",
+        r"干线管线",
+    )
+    risk_patterns = (
+        r"风险",
+        r"仿真",
+        r"推演",
+        r"预测",
+        r"限流",
+        r"异常",
+        r"是否存在风险",
+        r"需不需要关注",
+        r"需要关注",
+    )
+    return any(re.search(pattern, compact) for pattern in lookup_patterns) and not any(
+        re.search(pattern, compact) for pattern in risk_patterns
+    )
+
+
 def _collect_subagent_evidence(message: str, session: Session) -> dict[str, Any]:
     task_type, targets = _detect_subagent_demo_target(message)
     evidence: dict[str, Any] = {
@@ -2819,6 +2855,64 @@ def _collect_subagent_evidence(message: str, session: Session) -> dict[str, Any]
         pass
 
     return evidence
+
+
+async def _deterministic_lookup_event_generator(request: ChatRequest, session: Session):
+    direct_count_reply = try_raw_excel_direct_count_reply(request.message.strip())
+    direct_list_reply = try_raw_excel_direct_list_reply(request.message.strip())
+    direct_lookup_reply = try_raw_excel_direct_entity_lookup(request.message.strip())
+    if _is_raw_excel_negative_lookup(direct_lookup_reply):
+        direct_lookup_reply = None
+
+    reply_text = direct_count_reply or direct_list_reply or direct_lookup_reply or ""
+    if not reply_text:
+        reply_text = "当前命中的是确定性查询，但暂时没有取到直出结果。"
+
+    reply_text = _apply_yuqian_style(
+        _append_completeness_hint(
+            reply_text,
+            request.message,
+            is_complete=True,
+            reason="确定性查询已直接走数据库口径，不进入完整 SubAgent 专家组。",
+        )
+    )
+
+    targets: list[str] = []
+    for keyword, label in (
+        ("中卫", "中卫压气站"),
+        ("靖边", "靖边压气站"),
+        ("甪直", "甪直联络站"),
+        ("白鹤", "白鹤末站"),
+        ("压气站", "压气站"),
+    ):
+        if keyword in request.message and label not in targets:
+            targets.append(label)
+    if not targets:
+        targets.append("确定性查询对象")
+
+    async for event in _yield_subagent_event({
+        "agent": "deterministic-lookup",
+        "title": "确定性查询 Agent",
+        "icon": "database",
+        "status": "completed",
+        "tool": "raw_excel_index",
+        "message": "已按数据库口径直出结果，不进入完整专家组。",
+        "steps": [
+            "识别这是确定性查询",
+            "调用原始索引或站点统计",
+            "直接返回数据库口径",
+        ],
+        "evidence": [
+            f"目标：{'、'.join(targets)}",
+            "枢纽命中：0 个",
+            "站点命中：0 个",
+        ],
+        "action": "直出结果",
+    }):
+        yield event
+
+    yield f"[REPLY] {json.dumps(chr(10) + reply_text, ensure_ascii=False)}\n"
+    yield "[DONE]\n"
 
 
 def _fallback_subagent_brief(agent_title: str, evidence: dict[str, Any]) -> str:
@@ -2917,6 +3011,24 @@ def _build_subagent_showcase_final_reply(
         if has_target_match
         else "- 拓扑分析：未命中具体枢纽或站点，影响范围暂不能确认。"
     )
+    if has_target_match and is_flow_limit:
+        suggestion_lines = [
+            "1. 先设定限流场景，例如中卫侧降至 80% 或给出具体日输量目标。",
+            "2. 补齐中卫、盐池、靖边近 12-24 小时压力、流量、温度和压缩机工况数据。",
+            "3. 明确靖边侧下游需求和压力边界，再让仿真 Agent 输出压降、流量和供气缺口曲线。",
+        ]
+    elif has_target_match:
+        suggestion_lines = [
+            "1. 先读取目标站点近 12-24 小时压力、流量、温度和压缩机工况数据。",
+            "2. 对照上下游拓扑和历史基线，确认异常是单站波动还是沿线传导。",
+            "3. 明确仿真边界条件，再让仿真 Agent 输出压降、流量和供气缺口曲线。",
+        ]
+    else:
+        suggestion_lines = [
+            "1. 先补齐目标站点或管段的唯一标识，避免站名泛化导致误判。",
+            "2. 接入近 12-24 小时压力、流量、温度和压缩机工况数据。",
+            "3. 明确仿真边界条件，再让仿真 Agent 输出压降、流量和供气缺口曲线。",
+        ]
 
     agent_summary = [
         f"- 主控：已识别“{task_type}”任务，并把目标锁定到 {target_text}。",
@@ -2938,9 +3050,7 @@ def _build_subagent_showcase_final_reply(
         business_judgement,
         "",
         "建议：",
-        "1. 先补齐目标站点或管段的唯一标识，避免站名泛化导致误判。",
-        "2. 接入近 12-24 小时压力、流量、温度和压缩机工况数据。",
-        "3. 明确仿真边界条件，再让仿真 Agent 输出压降、流量和供气缺口曲线。",
+        *suggestion_lines,
         "",
         "待复核项：",
         *agent_summary,

@@ -5,7 +5,7 @@
  */
 
 import React from 'react'
-import type { HubNode } from '@/types/hub'
+import type { HubNode, NodePort, PortConnection } from '@/types/hub'
 import { PortDirection, DistributionStrategy } from '@/types/hub'
 
 interface HubDetailPanelProps {
@@ -14,38 +14,6 @@ interface HubDetailPanelProps {
     onClose: () => void
     onPortClick?: (portId: string) => void
     onPipelineClick?: (pipelineId: string) => void
-}
-
-/**
- * 端口方向显示文本
- */
-function getDirectionLabel(direction: PortDirection): string {
-    switch (direction) {
-        case PortDirection.IN:
-            return '进气'
-        case PortDirection.OUT:
-            return '出气'
-        case PortDirection.BIDIRECTIONAL:
-            return '双向'
-        default:
-            return '未知'
-    }
-}
-
-/**
- * 端口方向图标
- */
-function getDirectionIcon(direction: PortDirection): string {
-    switch (direction) {
-        case PortDirection.IN:
-            return 'arrow_downward'
-        case PortDirection.OUT:
-            return 'arrow_upward'
-        case PortDirection.BIDIRECTIONAL:
-            return 'swap_vert'
-        default:
-            return 'help'
-    }
 }
 
 /**
@@ -96,6 +64,145 @@ function getStrategyText(strategy: DistributionStrategy): string {
     }
 }
 
+function getNodeTypeLabel(type: HubNode['type']): string {
+    switch (type) {
+        case 'compressor':
+            return '压气站'
+        case 'distribution':
+            return '分输站'
+        case 'source':
+            return '气源'
+        case 'junction':
+            return '流程枢纽'
+        default:
+            return type
+    }
+}
+
+function getPortDisplayName(port: NodePort): string {
+    return port.valveGroupName || port.pipelineName
+}
+
+function getPortStatusText(status: NodePort['status']): string {
+    switch (status) {
+        case 'active':
+            return '已导通'
+        case 'maintenance':
+            return '检修'
+        case 'inactive':
+            return '关闭'
+        default:
+            return '未知'
+    }
+}
+
+function getPortShortName(port: NodePort): string {
+    return getPortDisplayName(port).replace('阀组', '')
+}
+
+function getFlowPathColor(index: number): string {
+    const colors = ['#22d3ee', '#f59e0b', '#38bdf8', '#a78bfa']
+    return colors[index % colors.length]
+}
+
+function formatThroughput(value?: number): string {
+    if (value === undefined || value === null) return '--'
+    return `${value.toLocaleString('zh-CN')} 万方/天`
+}
+
+function formatTemperature(value?: number): string {
+    if (value === undefined || value === null) return '--'
+    return `${value.toFixed(1)} ℃`
+}
+
+function formatPressure(value?: number): string {
+    if (value === undefined || value === null) return '--'
+    return `${value.toFixed(1)} MPa`
+}
+
+function getSeed(text: string): number {
+    return text.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
+}
+
+function getLiveMetric(base: number | undefined, key: string, tick: number, amplitude: number, decimals = 1): number | undefined {
+    if (base === undefined || base === null) return undefined
+    const seed = getSeed(key)
+    const wave = Math.sin(tick / 2600 + seed) + Math.sin(tick / 7100 + seed / 3) * 0.35
+    const value = base + wave * amplitude
+    const factor = 10 ** decimals
+    return Math.round(value * factor) / factor
+}
+
+function getLiveThroughput(base: number | undefined, key: string, tick: number): number | undefined {
+    const amplitude = Math.max(12, (base || 0) * 0.018)
+    return getLiveMetric(base, `${key}-q`, tick, amplitude, 0)
+}
+
+function getLivePressure(base: number | undefined, key: string, tick: number): number | undefined {
+    return getLiveMetric(base, `${key}-p`, tick, 0.08, 1)
+}
+
+function getLiveTemperature(base: number | undefined, key: string, tick: number): number | undefined {
+    return getLiveMetric(base, `${key}-t`, tick, 0.35, 1)
+}
+
+function getLivePortMetrics(port: NodePort, tick: number): { throughput?: number; pressure?: number; temperature?: number } {
+    return {
+        throughput: getLiveThroughput(port.currentThroughput, port.portId, tick),
+        pressure: getLivePressure(port.currentPressure, port.portId, tick),
+        temperature: getLiveTemperature(port.currentTemperature, port.portId, tick),
+    }
+}
+
+function getLiveConnectionMetrics(conn: PortConnection, tick: number): { throughput?: number; pressure?: number; temperature?: number } {
+    return {
+        throughput: getLiveThroughput(conn.currentThroughput, `${conn.fromPort}-${conn.toPort}`, tick),
+        pressure: getLivePressure(conn.currentPressure, `${conn.fromPort}-${conn.toPort}`, tick),
+        temperature: getLiveTemperature(conn.currentTemperature, `${conn.fromPort}-${conn.toPort}`, tick),
+    }
+}
+
+function getPortDiagramPosition(port: NodePort, index: number, total: number): { x: number; y: number; labelX: number; labelY: number } {
+    if (port.diagramPosition) return port.diagramPosition
+
+    const spread = total <= 1 ? 0 : index / (total - 1)
+    if (port.connectionSide === 'upstream' || port.direction === PortDirection.IN) {
+        return { x: 15, y: 28 + spread * 44, labelX: 4, labelY: 20 + spread * 44 }
+    }
+    if (port.connectionSide === 'downstream' || port.direction === PortDirection.OUT) {
+        return { x: 85, y: 28 + spread * 44, labelX: 64, labelY: 20 + spread * 44 }
+    }
+    return { x: 50, y: 50, labelX: 38, labelY: 42 }
+}
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value))
+}
+
+function createOrthogonalPath(conn: PortConnection, from: { x: number; y: number }, to: { x: number; y: number }): string {
+    if (conn.fromPort === 'zhongwei-we2-upstream-in' && conn.toPort === 'zhongwei-zg-downstream-out') {
+        return `M ${from.x} ${from.y} L ${to.x} ${from.y} L ${to.x} ${to.y}`
+    }
+    if (from.x === to.x || from.y === to.y) {
+        return `M ${from.x} ${from.y} L ${to.x} ${to.y}`
+    }
+    const midX = Math.round((from.x + to.x) / 2)
+    return `M ${from.x} ${from.y} L ${midX} ${from.y} L ${midX} ${to.y} L ${to.x} ${to.y}`
+}
+
+function getConnectionValveIds(conn: PortConnection): string[] {
+    if (conn.fromPort === 'zhongwei-we1-upstream-in' && conn.toPort === 'zhongwei-we1-downstream-out') {
+        return ['v101', 'v102']
+    }
+    if (conn.fromPort === 'zhongwei-we2-upstream-in' && conn.toPort === 'zhongwei-we2-downstream-out') {
+        return ['v201', 'v202']
+    }
+    if (conn.fromPort === 'zhongwei-we2-upstream-in' && conn.toPort === 'zhongwei-zg-downstream-out') {
+        return ['v201', 'v301']
+    }
+    return []
+}
+
 export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
     node,
     visible,
@@ -103,25 +210,104 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
     onPortClick,
     onPipelineClick
 }) => {
+    const diagramRef = React.useRef<HTMLDivElement>(null)
+    const dragStateRef = React.useRef<{ id: string; offsetX: number; offsetY: number } | null>(null)
+    const [metricTick, setMetricTick] = React.useState(() => Date.now())
+    const [labelOverrides, setLabelOverrides] = React.useState<Record<string, { x: number; y: number }>>({})
+    const [valveStates, setValveStates] = React.useState<Record<string, boolean>>({})
+
+    React.useEffect(() => {
+        if (!visible) return
+        const timer = window.setInterval(() => setMetricTick(Date.now()), 2000)
+        return () => window.clearInterval(timer)
+    }, [visible])
+
+    React.useEffect(() => {
+        const handlePointerMove = (event: PointerEvent) => {
+            const dragState = dragStateRef.current
+            const rect = diagramRef.current?.getBoundingClientRect()
+            if (!dragState || !rect) return
+
+            const nextX = ((event.clientX - rect.left - dragState.offsetX) / rect.width) * 100
+            const nextY = ((event.clientY - rect.top - dragState.offsetY) / rect.height) * 100
+
+            setLabelOverrides(prev => ({
+                ...prev,
+                [dragState.id]: {
+                    x: clamp(nextX, 1, 72),
+                    y: clamp(nextY, 6, 88),
+                },
+            }))
+        }
+
+        const handlePointerUp = () => {
+            dragStateRef.current = null
+        }
+
+        window.addEventListener('pointermove', handlePointerMove)
+        window.addEventListener('pointerup', handlePointerUp)
+        return () => {
+            window.removeEventListener('pointermove', handlePointerMove)
+            window.removeEventListener('pointerup', handlePointerUp)
+        }
+    }, [])
+
     if (!visible || !node || !node.extension.isHub) return null
 
     const { extension } = node
+    const ports = extension.ports || []
+    const activeConnections = extension.internalConnections?.filter(conn => conn.isActive) || []
+    const valveNodes = [
+        { id: 'v101', label: 'V101', name: '西一线进站阀', x: 31, y: 30, angle: 0 },
+        { id: 'v102', label: 'V102', name: '西一线出站阀', x: 74, y: 30, angle: 0 },
+        { id: 'v201', label: 'V201', name: '西二线进站阀', x: 31, y: 62, angle: 0 },
+        { id: 'v202', label: 'V202', name: '西二线出站阀', x: 74, y: 62, angle: 0 },
+        { id: 'v301', label: 'V301', name: '中贵线外输阀', x: 56, y: 75, angle: 90 },
+    ]
+    const portLayout = new Map<string, { x: number; y: number; labelX: number; labelY: number }>()
 
-    // 分类端口：进气口、出气口
-    const inPorts = extension.ports?.filter(p => p.direction === PortDirection.IN) || []
-    const outPorts = extension.ports?.filter(p => p.direction === PortDirection.OUT) || []
-    const biPorts = extension.ports?.filter(p => p.direction === PortDirection.BIDIRECTIONAL) || []
+    ports.forEach((port, index) => {
+        portLayout.set(port.portId, getPortDiagramPosition(port, index, ports.length))
+    })
+
+    const beginLabelDrag = (id: string, fallback: { labelX: number; labelY: number }, event: React.PointerEvent) => {
+        const rect = diagramRef.current?.getBoundingClientRect()
+        if (!rect) return
+
+        const current = labelOverrides[id] || { x: fallback.labelX, y: fallback.labelY }
+        dragStateRef.current = {
+            id,
+            offsetX: event.clientX - rect.left - (current.x / 100) * rect.width,
+            offsetY: event.clientY - rect.top - (current.y / 100) * rect.height,
+        }
+    }
+
+    const isValveOpen = (valveId: string): boolean => valveStates[valveId] !== false
+    const isConnectionOpen = (conn: PortConnection): boolean => getConnectionValveIds(conn).every(isValveOpen)
+    const toggleValve = (valveId: string) => {
+        setValveStates(prev => ({
+            ...prev,
+            [valveId]: prev[valveId] === false,
+        }))
+    }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-gray-900 rounded-lg shadow-2xl border border-amber-500/30 w-[500px] max-h-[80vh] overflow-hidden flex flex-col">
-                {/* 头部 */}
-                <div className="flex justify-between items-center p-4 border-b border-gray-700 bg-gradient-to-r from-amber-900/30 to-gray-800 shrink-0">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
+        >
+            <div className="bg-slate-950 rounded-lg shadow-2xl border border-cyan-500/30 w-[820px] max-w-[calc(100vw-24px)] max-h-[88vh] overflow-hidden flex flex-col">
+                <div className="flex justify-between items-center px-4 py-3 border-b border-slate-700 bg-slate-900 shrink-0">
                     <div className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-amber-400 text-2xl">hub</span>
+                        <span className="material-symbols-outlined text-cyan-300 text-2xl">valve</span>
                         <div>
-                            <h3 className="text-lg font-bold text-white">{node.name}</h3>
-                            <span className="text-xs text-amber-400">{getHubLevelText(extension.hubLevel)}</span>
+                            <h3 className="text-lg font-bold text-white">{node.name.replace('阀组', '工艺流程')}</h3>
+                            <div className="flex flex-wrap gap-2 mt-1">
+                                <span className="text-[11px] text-cyan-300">{getHubLevelText(extension.hubLevel)}</span>
+                                <span className="text-[11px] text-slate-400">{getNodeTypeLabel(node.type)}</span>
+                                <span className="text-[11px] text-slate-400">{node.operatingPressure || '-'} MPa</span>
+                                <span className="text-[11px] text-emerald-300">{getStrategyText(extension.distributionStrategy)}</span>
+                            </div>
                         </div>
                     </div>
                     <button
@@ -132,175 +318,210 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                     </button>
                 </div>
 
-                {/* 基本信息 */}
-                <div className="p-4 border-b border-gray-700 bg-gray-800/50 shrink-0">
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                            <span className="text-gray-400">节点类型</span>
-                            <p className="text-white font-medium">{node.type === 'compressor' ? '压气站' : node.type}</p>
-                        </div>
-                        <div>
-                            <span className="text-gray-400">设计压力</span>
-                            <p className="text-white font-medium">{node.designPressure} MPa</p>
-                        </div>
-                        <div>
-                            <span className="text-gray-400">运行压力</span>
-                            <p className="text-white font-medium">{node.operatingPressure || '-'} MPa</p>
-                        </div>
-                        <div>
-                            <span className="text-gray-400">处理能力</span>
-                            <p className="text-white font-medium">{node.capacity || '-'} 万方/天</p>
-                        </div>
-                        <div>
-                            <span className="text-gray-400">端口数量</span>
-                            <p className="text-white font-medium">{extension.ports?.length || 0} 个</p>
-                        </div>
-                        <div>
-                            <span className="text-gray-400">分配策略</span>
-                            <p className="text-white font-medium">{getStrategyText(extension.distributionStrategy)}</p>
-                        </div>
+                <div className="overflow-y-auto flex-1 p-4">
+                    <div
+                        ref={diagramRef}
+                        className="relative h-[430px] rounded-md border border-slate-700 bg-[linear-gradient(180deg,rgba(2,6,23,0.96),rgba(5,12,26,0.96))] overflow-hidden"
+                    >
+                        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ fontFamily: 'inherit' }}>
+                            <defs>
+                                <marker id="hub-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                                    <path d="M0,0 L6,3 L0,6 Z" fill="#67e8f9" />
+                                </marker>
+                                <filter id="hub-glow">
+                                    <feGaussianBlur stdDeviation="0.9" result="blur" />
+                                    <feMerge>
+                                        <feMergeNode in="blur" />
+                                        <feMergeNode in="SourceGraphic" />
+                                    </feMerge>
+                                </filter>
+                            </defs>
+                            <line x1="8" y1="30" x2="92" y2="30" stroke="rgba(148,163,184,0.26)" strokeWidth="5" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
+                            <line x1="10" y1="30" x2="90" y2="30" stroke="rgba(34,211,238,0.58)" strokeWidth="3" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
+                            <line x1="8" y1="62" x2="92" y2="62" stroke="rgba(148,163,184,0.22)" strokeWidth="5" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
+                            <line x1="10" y1="62" x2="90" y2="62" stroke="rgba(14,165,233,0.56)" strokeWidth="3" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
+                            <line x1="56" y1="62" x2="56" y2="88" stroke="rgba(148,163,184,0.22)" strokeWidth="5" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
+                            <line x1="56" y1="62" x2="56" y2="88" stroke="rgba(59,130,246,0.52)" strokeWidth="3" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
+                            {activeConnections.map((conn, index) => {
+                                const fromPort = extension.ports?.find(p => p.portId === conn.fromPort)
+                                const toPort = extension.ports?.find(p => p.portId === conn.toPort)
+                                const from = portLayout.get(conn.fromPort) || { x: 15, y: 50, labelX: 4, labelY: 42 }
+                                const to = portLayout.get(conn.toPort) || { x: 85, y: 50, labelX: 68, labelY: 42 }
+                                const open = isConnectionOpen(conn)
+                                const color = open ? getFlowPathColor(index) : '#ef4444'
+
+                                return (
+                                    <g key={`${conn.fromPort}-${conn.toPort}`}>
+                                        <path
+                                            d={createOrthogonalPath(conn, from, to)}
+                                            fill="none"
+                                            stroke={color}
+                                            strokeWidth="4"
+                                            strokeLinecap="square"
+                                            strokeLinejoin="miter"
+                                            strokeDasharray={open ? undefined : '3 2'}
+                                            markerEnd={open ? 'url(#hub-arrow)' : undefined}
+                                            opacity={open ? 1 : 0.72}
+                                            vectorEffect="non-scaling-stroke"
+                                        />
+                                        <title>
+                                            {`${fromPort ? getPortDisplayName(fromPort) : conn.fromPort} -> ${toPort ? getPortDisplayName(toPort) : conn.toPort}`}
+                                        </title>
+                                    </g>
+                                )
+                            })}
+                        </svg>
+
+                        <div className="absolute left-4 top-4 text-[11px] font-semibold text-emerald-300">站内流程：西一线直供下游，西二线直供下游并转供中贵线</div>
+
+                        {ports.map(port => {
+                            const position = portLayout.get(port.portId)
+                            if (!position) return null
+                            const color = port.direction === PortDirection.IN ? '#34d399' : '#38bdf8'
+                            return (
+                                <span
+                                    key={`${port.portId}-anchor`}
+                                    className="absolute z-[9] h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/80 shadow-[0_0_8px_rgba(34,211,238,0.55)]"
+                                    style={{ left: `${position.x}%`, top: `${position.y}%`, backgroundColor: color }}
+                                />
+                            )
+                        })}
+
+                        {valveNodes.map((valve) => {
+                            const open = isValveOpen(valve.id)
+                            const valveColor = open ? '#22c55e' : '#ef4444'
+                            return (
+                                <button
+                                    key={valve.id}
+                                    type="button"
+                                    onClick={() => toggleValve(valve.id)}
+                                    className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded px-1 py-0.5 text-[10px] leading-none text-white transition-transform hover:scale-125"
+                                    style={{ left: `${valve.x}%`, top: `${valve.y}%` }}
+                                    title={`${valve.label} ${valve.name}：${open ? '开' : '关'}，点击切换`}
+                                >
+                                    <svg
+                                        width="20"
+                                        height="12"
+                                        viewBox="0 0 20 12"
+                                        style={{ transform: `rotate(${valve.angle}deg)` }}
+                                        aria-hidden="true"
+                                    >
+                                        <rect x="0.5" y="0.5" width="19" height="11" rx="1.5" fill="rgba(2,6,23,0.94)" stroke="rgba(255,255,255,0.2)" />
+                                        <path
+                                            d="M2 2 L10 6 L2 10 Z M18 2 L10 6 L18 10 Z"
+                                            fill={open ? 'rgba(34,197,94,0.16)' : 'rgba(239,68,68,0.18)'}
+                                            stroke={valveColor}
+                                            strokeWidth="1.25"
+                                            strokeLinejoin="round"
+                                        />
+                                        <circle cx="10" cy="6" r="2.15" fill="#020617" stroke={valveColor} strokeWidth="1.1" />
+                                        <circle cx="10" cy="6" r="1.05" fill={valveColor} />
+                                        {!open && <path d="M3.5 2.4 L16.5 9.6" stroke={valveColor} strokeWidth="1.2" strokeLinecap="round" />}
+                                    </svg>
+                                    <span className="rounded bg-slate-950/80 px-1 font-semibold tracking-normal">{valve.label}</span>
+                                    <span className="font-semibold tracking-normal" style={{ color: valveColor }}>{open ? '开' : '关'}</span>
+                                </button>
+                            )
+                        })}
+
+                        {ports.map(port => {
+                            const position = portLayout.get(port.portId)!
+                            const labelPosition = labelOverrides[port.portId] || { x: position.labelX, y: position.labelY }
+                            const metrics = getLivePortMetrics(port, metricTick)
+                            const isInput = port.direction === PortDirection.IN
+                            return (
+                                <button
+                                    key={port.portId}
+                                    type="button"
+                                    onPointerDown={(event) => beginLabelDrag(port.portId, position, event)}
+                                    onClick={() => {
+                                        onPortClick?.(port.portId)
+                                        onPipelineClick?.(port.pipelineId)
+                                    }}
+                                    className={`absolute w-[218px] rounded-md border px-3 py-2 text-left shadow-[0_0_18px_rgba(14,165,233,0.12)] transition-colors ${
+                                        isInput
+                                            ? 'border-emerald-400/35 bg-slate-950/90 hover:border-emerald-300 hover:bg-emerald-950/70'
+                                            : 'border-sky-400/35 bg-slate-950/90 hover:border-sky-300 hover:bg-sky-950/70'
+                                    }`}
+                                    style={{ left: `${labelPosition.x}%`, top: `${labelPosition.y}%`, cursor: 'move' }}
+                                    title={port.pipelineName}
+                                >
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="truncate text-sm font-semibold text-white">{getPortShortName(port)}</span>
+                                        <span className={`h-2 w-2 rounded-full ${getStatusColor(port.status)}`} />
+                                    </div>
+                                    <div className={`truncate text-[11px] ${isInput ? 'text-emerald-200/80' : 'text-sky-200/80'}`}>{port.pipelineName}</div>
+                                    <div className="mt-1 grid grid-cols-3 gap-1 text-[10px] text-slate-300">
+                                        <span>{formatThroughput(metrics.throughput)}</span>
+                                        <span>{formatPressure(metrics.pressure)}</span>
+                                        <span>{formatTemperature(metrics.temperature)}</span>
+                                    </div>
+                                </button>
+                            )
+                        })}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        {activeConnections.map((conn, index) => {
+                            const fromPort = extension.ports?.find(p => p.portId === conn.fromPort)
+                            const toPort = extension.ports?.find(p => p.portId === conn.toPort)
+                            const open = isConnectionOpen(conn)
+                            const metrics = getLiveConnectionMetrics(conn, metricTick)
+                            return (
+                                <div
+                                    key={`${conn.fromPort}-${conn.toPort}-summary`}
+                                    className={`rounded-md border px-3 py-2 ${open ? 'border-slate-700 bg-slate-900/80' : 'border-red-500/45 bg-red-950/20'}`}
+                                >
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: open ? getFlowPathColor(index) : '#ef4444' }} />
+                                        <span className={`text-xs font-bold ${open ? 'text-cyan-200' : 'text-red-300'}`}>
+                                            {open ? formatThroughput(metrics.throughput) : '停输'}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 truncate text-xs text-slate-200">
+                                        {fromPort ? getPortShortName(fromPort) : conn.fromPort}
+                                        <span className="px-1 text-slate-500">-&gt;</span>
+                                        {toPort ? getPortShortName(toPort) : conn.toPort}
+                                    </div>
+                                    <div className="mt-1 truncate text-[11px] text-slate-500">
+                                        {open
+                                            ? `${formatPressure(metrics.pressure)} / ${formatTemperature(metrics.temperature)} · ${conn.remark || '已导通'}`
+                                            : '对应阀门关闭，通道停止流动'}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+                        {valveNodes.map(valve => {
+                            const open = isValveOpen(valve.id)
+                            return (
+                                <button
+                                    key={`${valve.id}-status`}
+                                    type="button"
+                                    onClick={() => toggleValve(valve.id)}
+                                    className="inline-flex items-center gap-1.5 hover:text-white transition-colors"
+                                >
+                                    <span className={`h-2 w-2 rounded-full ${open ? 'bg-green-500' : 'bg-red-500'}`} />
+                                    {valve.label} {valve.name}：{open ? '开' : '关'}
+                                </button>
+                            )
+                        })}
+                        {extension.ports?.map(port => (
+                            <span key={`${port.portId}-status`} className="inline-flex items-center gap-1.5">
+                                <span className={`h-2 w-2 rounded-full ${getStatusColor(port.status)}`} />
+                                {getPortShortName(port)}：{getPortStatusText(port.status)}
+                            </span>
+                        ))}
                     </div>
                 </div>
 
-                {/* 端口列表 */}
-                <div className="overflow-y-auto flex-1 p-4 space-y-4">
-                    {/* 进气口 */}
-                    {inPorts.length > 0 && (
-                        <div className="border border-green-500/30 bg-green-900/10 rounded-lg p-3">
-                            <h4 className="text-sm font-semibold mb-3 text-green-400 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px]">arrow_downward</span>
-                                进气口 ({inPorts.length})
-                            </h4>
-                            <div className="space-y-2">
-                                {inPorts.map(port => (
-                                    <div
-                                        key={port.portId}
-                                        className="bg-gray-800/50 rounded-lg p-3 hover:bg-gray-700/50 cursor-pointer transition-colors"
-                                        onClick={() => onPortClick?.(port.portId)}
-                                    >
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <p className="text-white font-medium">{port.pipelineName}</p>
-                                                <p className="text-xs text-gray-400 mt-1">
-                                                    压力: {port.pressureRange[0]}-{port.pressureRange[1]} MPa
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className={`inline-block w-2 h-2 rounded-full ${getStatusColor(port.status)}`}></span>
-                                                <p className="text-xs text-gray-400 mt-1">{port.flowCapacity} 万方/天</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 出气口 */}
-                    {outPorts.length > 0 && (
-                        <div className="border border-blue-500/30 bg-blue-900/10 rounded-lg p-3">
-                            <h4 className="text-sm font-semibold mb-3 text-blue-400 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px]">arrow_upward</span>
-                                出气口 ({outPorts.length})
-                            </h4>
-                            <div className="space-y-2">
-                                {outPorts.map(port => (
-                                    <div
-                                        key={port.portId}
-                                        className="bg-gray-800/50 rounded-lg p-3 hover:bg-gray-700/50 cursor-pointer transition-colors"
-                                        onClick={() => onPortClick?.(port.portId)}
-                                    >
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <p className="text-white font-medium">{port.pipelineName}</p>
-                                                <p className="text-xs text-gray-400 mt-1">
-                                                    压力: {port.pressureRange[0]}-{port.pressureRange[1]} MPa
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className={`inline-block w-2 h-2 rounded-full ${getStatusColor(port.status)}`}></span>
-                                                <p className="text-xs text-gray-400 mt-1">{port.flowCapacity} 万方/天</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 双向端口 */}
-                    {biPorts.length > 0 && (
-                        <div className="border border-purple-500/30 bg-purple-900/10 rounded-lg p-3">
-                            <h4 className="text-sm font-semibold mb-3 text-purple-400 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px]">swap_vert</span>
-                                双向端口 ({biPorts.length})
-                            </h4>
-                            <div className="space-y-2">
-                                {biPorts.map(port => (
-                                    <div
-                                        key={port.portId}
-                                        className="bg-gray-800/50 rounded-lg p-3 hover:bg-gray-700/50 cursor-pointer transition-colors"
-                                        onClick={() => onPortClick?.(port.portId)}
-                                    >
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <p className="text-white font-medium">{port.pipelineName}</p>
-                                                <p className="text-xs text-gray-400 mt-1">
-                                                    压力: {port.pressureRange[0]}-{port.pressureRange[1]} MPa
-                                                </p>
-                                            </div>
-                                            <span className={`inline-block w-2 h-2 rounded-full ${getStatusColor(port.status)}`}></span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 内部连接关系 */}
-                    {extension.internalConnections && extension.internalConnections.length > 0 && (
-                        <div className="border border-amber-500/30 bg-amber-900/10 rounded-lg p-3">
-                            <h4 className="text-sm font-semibold mb-3 text-amber-400 flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px]">sync_alt</span>
-                                内部调度关系
-                            </h4>
-                            <div className="space-y-2">
-                                {extension.internalConnections.map((conn, index) => {
-                                    const fromPort = extension.ports?.find(p => p.portId === conn.fromPort)
-                                    const toPort = extension.ports?.find(p => p.portId === conn.toPort)
-
-                                    return (
-                                        <div
-                                            key={index}
-                                            className={`bg-gray-800/50 rounded-lg p-3 ${conn.isActive ? '' : 'opacity-50'}`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-green-400 text-sm">{fromPort?.pipelineName || conn.fromPort}</span>
-                                                    <span className="material-symbols-outlined text-gray-400 text-xs">arrow_forward</span>
-                                                    <span className="text-blue-400 text-sm">{toPort?.pipelineName || conn.toPort}</span>
-                                                </div>
-                                                <span className="text-amber-400 font-bold">
-                                                    {Math.round(conn.flowRatio * 100)}%
-                                                </span>
-                                            </div>
-                                            {conn.remark && (
-                                                <p className="text-xs text-gray-500 mt-1">{conn.remark}</p>
-                                            )}
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* 底部操作 */}
-                <div className="p-4 border-t border-gray-700 bg-gray-800/50 shrink-0">
+                <div className="px-4 py-3 border-t border-slate-700 bg-slate-900 shrink-0">
                     <div className="flex justify-end gap-2">
                         <button
                             onClick={onClose}
-                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
+                            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors text-sm"
                         >
                             关闭
                         </button>

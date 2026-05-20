@@ -180,31 +180,6 @@ export function renderInternalConnection(
     clickable: true
   })
 
-  // 添加流量比例标签
-  if (connection.flowRatio > 0) {
-    const midLng = (fromCoord.longitude + toCoord.longitude) / 2
-    const midLat = (fromCoord.latitude + toCoord.latitude) / 2
-
-    const label = new (window as any).AMap.Text({
-      text: `${Math.round(connection.flowRatio * 100)}%`,
-      position: [midLng, midLat],
-      style: {
-        'background-color': 'rgba(0,0,0,0.7)',
-        'border-radius': '4px',
-        'padding': '2px 6px',
-        'font-size': '10px',
-        'color': '#fff',
-        'border': 'none'
-      },
-      zIndex: 51
-    })
-
-    map.add(label)
-    map.add(line)
-
-    return { line, label }
-  }
-
   map.add(line)
   return line
 }
@@ -267,9 +242,16 @@ function renderHubCenterMarker(
 ): any {
   if (!map) return null
 
+  const markerPosition = node.id === 'WE1-76'
+    ? {
+        longitude: node.coordinate.longitude + 0.055,
+        latitude: node.coordinate.latitude + 0.035
+      }
+    : node.coordinate
+
   const marker = new (window as any).AMap.Marker({
-    position: [node.coordinate.longitude, node.coordinate.latitude],
-    content: createHubMarkerContent(false),
+    position: [markerPosition.longitude, markerPosition.latitude],
+    content: createHubMarkerContent(true),
     offset: new (window as any).AMap.Pixel(-18, -18),
     zIndex: 200,
     clickable: true,
@@ -281,7 +263,7 @@ function renderHubCenterMarker(
     marker.on('click', (e: any) => {
       onClick({
         node,
-        position: node.coordinate
+        position: markerPosition
       })
     })
   }
