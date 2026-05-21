@@ -9,7 +9,7 @@ import { HubDetailPanel } from '../HubDetailPanel'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
 import type { HubNode } from '@/types/hub'
 import { getNodeRawType, isHubNode, isSourceNode, isValveNode } from '@/utils/pipelineDomain'
-import { hubNodesSample, zhongweiHubNodeSimple } from '@/data/hubNodes'
+import { hubNodesSample, processHubNodes } from '@/data/hubNodes'
 
 /**
  * 默认地图配置
@@ -218,8 +218,14 @@ function MapView({
     const visibleHubNodes = useMemo(() => {
         if (showDemoHubNodes) return hubNodesSample
         const nodes = Array.isArray(effectivePipelineData?.nodes) ? effectivePipelineData.nodes : []
-        const hasZhongwei = nodes.some(node => node.id === 'WE1-76' || node.name?.includes('中卫'))
-        return hasZhongwei ? [zhongweiHubNodeSimple] : []
+        return processHubNodes.filter(hubNode =>
+            nodes.some(node =>
+                node.id === hubNode.id
+                || (hubNode.name.includes('中卫') && node.name?.includes('中卫'))
+                || (hubNode.name.includes('甪直') && node.name?.includes('甪直'))
+                || (hubNode.name.includes('靖边') && node.name?.includes('靖边'))
+            )
+        )
     }, [effectivePipelineData, showDemoHubNodes])
 
     // 使用 ref 存储所有回调函数，避免 useEffect 依赖它们
@@ -687,7 +693,9 @@ function MapView({
                         (e) => {
                             const matchedHubNode = visibleHubNodes.find(hubNode =>
                                 e.node.id === hubNode.id
-                                || (hubNode.id === zhongweiHubNodeSimple.id && e.node.name?.includes('中卫'))
+                                || (hubNode.name.includes('中卫') && e.node.name?.includes('中卫'))
+                                || (hubNode.name.includes('甪直') && e.node.name?.includes('甪直'))
+                                || (hubNode.name.includes('靖边') && e.node.name?.includes('靖边'))
                             )
                             if (matchedHubNode) {
                                 setSelectedHubNode(matchedHubNode)

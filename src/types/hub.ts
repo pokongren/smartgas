@@ -110,6 +110,43 @@ export interface PortConnection {
 }
 
 /**
+ * 站内流程阀门 - 用于工艺流程弹窗定位和交互
+ */
+export interface ProcessValve {
+  /** 阀门唯一标识 */
+  id: string
+
+  /** 图上短标签，如 V101 */
+  label: string
+
+  /** 阀门业务名称 */
+  name: string
+
+  /** 工艺图坐标，百分比 */
+  x: number
+
+  /** 工艺图坐标，百分比 */
+  y: number
+
+  /** 图标旋转角度 */
+  angle?: number
+}
+
+/**
+ * 站内工艺流程展示配置
+ */
+export interface HubProcessFlowConfig {
+  /** 图上方一句话流程说明 */
+  summary?: string
+
+  /** 阀门列表 */
+  valves?: ProcessValve[]
+
+  /** 连接到阀门的映射，key 格式为 fromPort->toPort */
+  connectionValveMap?: Record<string, string[]>
+}
+
+/**
  * 枢纽节点扩展属性
  */
 export interface HubNodeProps {
@@ -127,6 +164,9 @@ export interface HubNodeProps {
 
   /** 枢纽等级 */
   hubLevel: 1 | 2 | 3  // 1=国家级枢纽, 2=省级枢纽, 3=区域枢纽
+
+  /** 站内工艺流程展示配置 */
+  processFlow?: HubProcessFlowConfig
 }
 
 /**

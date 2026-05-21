@@ -614,6 +614,46 @@ function renderMessageContentDeprecated(
     })
 }
 
+type SemanticMessageBlock = {
+    tone: 'conclusion' | 'scenario' | 'action' | 'risk' | 'pending' | 'source' | 'completeness' | 'evidence'
+    label: string
+    body: string
+}
+
+function parseSemanticMessageBlock(block: string): SemanticMessageBlock | null {
+    const text = block.trim()
+    if (!text) return null
+
+    const normalized = text.replace(/^#{1,4}\s*/, '')
+    const colonMatch = normalized.match(/^(.{2,14}?)[：:]\s*([\s\S]*)$/)
+    const headingMatch = normalized.match(/^([^\n：:]{2,14})\n([\s\S]+)$/)
+    const match = colonMatch || headingMatch
+    if (!match) return null
+
+    const rawLabel = match[1].trim()
+    const body = match[2].trimStart()
+    const labelKey = rawLabel.replace(/\s+/g, '')
+    const labelMap: Array<[RegExp, SemanticMessageBlock['tone']]> = [
+        [/^(结论|判断|当前判断|最终结论)$/, 'conclusion'],
+        [/^(适用场景|场景|适用范围)$/, 'scenario'],
+        [/^(操作要点|建议动作|建议|调度建议|处置步骤|处理步骤)$/, 'action'],
+        [/^(风险与禁止项|风险影响|风险提示|风险|禁止项|边界说明)$/, 'risk'],
+        [/^(待确认项|待复核项|不确定性说明|待补充项)$/, 'pending'],
+        [/^(来源|证据来源|数据来源|规程依据|依据)$/, 'source'],
+        [/^(完整性提示|完整性|置信度说明)$/, 'completeness'],
+        [/^(证据|已查询|检索证据|命中的库|已检索但未命中的来源)$/, 'evidence'],
+    ]
+
+    const matchTone = labelMap.find(([pattern]) => pattern.test(labelKey))
+    if (!matchTone) return null
+
+    return {
+        tone: matchTone[1],
+        label: rawLabel,
+        body,
+    }
+}
+
 function renderMessageContent(
     content: string,
     onAction: (payload: AssistantActionPayload) => void,
@@ -700,6 +740,21 @@ function renderMessageContent(
             )
         }
 
+        const semanticBlock = parseSemanticMessageBlock(block)
+        if (semanticBlock) {
+            return (
+                <div
+                    key={`block-${index}`}
+                    className={`ai-msg-text-block ai-msg-section ai-msg-section-${semanticBlock.tone}`}
+                >
+                    <span className="ai-msg-section-label">{semanticBlock.label}：</span>
+                    {semanticBlock.body ? (
+                        <span className="ai-msg-section-body">{semanticBlock.body}</span>
+                    ) : null}
+                </div>
+            )
+        }
+
         return (
             <div key={`block-${index}`} className="ai-msg-text-block">
                 {block}
@@ -728,19 +783,24 @@ const ThinkingPanel: React.FC<{
     const hasMissing = /(未命中|缺少|不足|无法|未找到|不确定|非实时)/.test(assessmentText)
     const hasAction = /\[ACTION:|建议|可操作|调度/.test(assessmentText)
     const questionText = userQuestion.trim() || assessmentText
+    const assistantAssessmentText = `${trimmed}\n${answer}`
+    const hasCommonMetricTypoInQuestion = /(水路点|水漏点|水落点|水陆点)/.test(userQuestion)
+    const hasCommonMetricTypoInAssistant = /(水路点|水漏点|水落点|水陆点)/.test(assistantAssessmentText)
+    const hasMetricTypoCorrection = /(水露点|已(?:将|把).*(?:纠正|识别).*水露点|疑似.*水露点)/.test(assistantAssessmentText)
+    const hasUnresolvedMetricTypo = hasCommonMetricTypoInAssistant || (hasCommonMetricTypoInQuestion && !hasMetricTypoCorrection)
     const hasDeterministicAgent = /(确定性查询 Agent|已按数据库口径直出|确定性查询已直接走数据库口径|数据库口径已闭合)/.test(assessmentText)
     const isDeterministicLookup = hasDeterministicAgent || (/(有多少|多少个|统计|数量|列出|按类型|分类|全网概况|基础设施|压气站数量|干线管线)/.test(questionText)
         && !hasIncompleteHint
         && !hasMissing
         && !/(风险|仿真|推演|预测|限流|异常|是否存在风险|需不需要关注)/.test(questionText))
-    const shouldShowConfidence = isDeterministicLookup || hasEvidence || hasExactEntityMatch || hasCompleteHint || hasIncompleteHint || hasAction
+    const shouldShowConfidence = hasUnresolvedMetricTypo || isDeterministicLookup || hasEvidence || hasExactEntityMatch || hasCompleteHint || hasIncompleteHint || hasAction
     const evidenceMissingPenalty = hasMissing ? (hasExactEntityMatch ? 4 : 14) : 0
     const completenessMissingPenalty = hasMissing ? (hasExactEntityMatch ? 4 : 12) : 0
-    const evidenceConfidence = isDeterministicLookup ? 100 : Math.max(
+    const evidenceConfidence = hasUnresolvedMetricTypo ? 0 : isDeterministicLookup ? 100 : Math.max(
         32,
         Math.min(96, 48 + stepCount * 7 + (hasEvidence ? 18 : 0) + (hasExactEntityMatch ? 16 : 0) + (hasAction ? 5 : 0) - evidenceMissingPenalty),
     )
-    const completenessConfidence = isDeterministicLookup ? 100 : Math.max(
+    const completenessConfidence = hasUnresolvedMetricTypo ? 0 : isDeterministicLookup ? 100 : Math.max(
         25,
         Math.min(98, 54 + (hasCompleteHint ? 28 : 0) + (hasExactEntityMatch ? 12 : 0) - (hasIncompleteHint ? 30 : 0) - completenessMissingPenalty + Math.min(stepCount * 3, 12)),
     )
@@ -805,7 +865,7 @@ const ThinkingPanel: React.FC<{
                             <div style={{ width: `${overallConfidence}%` }} />
                         </div>
                         <div className="ai-confidence-note">
-                            综合评估 {overallConfidence}% · {isDeterministicLookup ? '确定性查询，数据库口径已闭合' : hasExactEntityMatch ? '实体已定位，可作为当前站点结论使用' : hasMissing ? '存在数据缺口，结论需保守使用' : '证据链较完整，可用于当前演示'}
+                            综合评估 {overallConfidence}% · {hasUnresolvedMetricTypo ? '存在明显术语错字，未完成纠正前不采信' : isDeterministicLookup ? '确定性查询，数据库口径已闭合' : hasExactEntityMatch ? '实体已定位，可作为当前站点结论使用' : hasMissing ? '存在数据缺口，结论需保守使用' : '证据链较完整，可用于当前演示'}
                         </div>
                     </div>
                 )}
@@ -1126,6 +1186,7 @@ const AiAssistant: React.FC = () => {
     const [isOpen, setIsOpen] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
+    const lastAutoHistoryActionRef = useRef<string>('')
     const chat = useAiAssistantChat()
     const { isPoppedOut, popOut, closePopOut } = useNewWindow('ai-assistant-sync', '/popout/assistant')
 
@@ -1142,6 +1203,36 @@ const AiAssistant: React.FC = () => {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [chat.messages, chat.loading])
+
+    useEffect(() => {
+        let latestAssistantMessage: ChatMessage | undefined
+        for (let index = chat.messages.length - 1; index >= 0; index -= 1) {
+            const message = chat.messages[index]
+            if (message.role === 'assistant') {
+                latestAssistantMessage = message
+                break
+            }
+        }
+        if (!latestAssistantMessage) return
+
+        const action = latestAssistantMessage.content
+            .split(/\n\s*\n/)
+            .map(parseAssistantActionToken)
+            .find((item): item is AssistantActionPayload => Boolean(item))
+
+        if (!action || action.type !== 'OPEN_HISTORY_PANEL') return
+
+        const signature = [
+            action.station || '',
+            action.view || '',
+            action.hours || 0,
+            action.metric || '',
+        ].join('|')
+        if (lastAutoHistoryActionRef.current === signature) return
+
+        lastAutoHistoryActionRef.current = signature
+        window.setTimeout(() => emitAssistantAction(action), 300)
+    }, [chat.loading, chat.messages])
 
     useEffect(() => {
         if (!isOpen) return

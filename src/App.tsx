@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import AiAssistant from './components/ai-assistant/AiAssistant';
+import EmergencyPanel from './components/EmergencyPanel';
 import { DEFAULT_WE1_PILOT_ID } from './types/simulation';
 
 // ✅ 路由级代码分割 - 动态导入视图组件
@@ -107,6 +108,8 @@ const PageLoader: React.FC = () => (
 const ViewSwitcher: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [expanded, setExpanded] = React.useState(false);
+  const [showEmergencyPanel, setShowEmergencyPanel] = React.useState(false);
   const isMapDemo = location.pathname === '/map-demo';
   const isGlobal = location.pathname === '/global';
   const isTopology = location.pathname === '/topology';
@@ -116,46 +119,92 @@ const ViewSwitcher: React.FC = () => {
   if (isMapDemo) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 group">
-      <div className="absolute bottom-full right-0 mb-2 px-3 py-1 bg-black/80 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-        切换第一张图主仿真页 / 第三张图展示页
+    <>
+      <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-3 group">
+        {expanded && (
+          <div className="flex flex-col items-end gap-3 animate-fade-in-up">
+            <div className="px-3 py-1 bg-black/80 text-white text-xs rounded whitespace-nowrap">
+              页面入口
+            </div>
+
+            <button
+              onClick={() => {
+                setShowEmergencyPanel(true);
+                setExpanded(false);
+              }}
+              className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${showEmergencyPanel
+                ? 'bg-amber-600 text-white shadow-amber-500/50'
+                : 'bg-gray-700 text-white hover:bg-amber-500'
+                }`}
+              title="事件/应急指挥"
+            >
+              <span className="material-symbols-outlined text-2xl">emergency_home</span>
+            </button>
+
+            <button
+              onClick={() => {
+                navigate(`/map-topology?pilotId=${DEFAULT_WE1_PILOT_ID}`);
+                setExpanded(false);
+              }}
+              className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isMapTopology
+                ? 'bg-teal-600 text-white shadow-teal-500/50'
+                : 'bg-gray-700 text-white hover:bg-teal-500'
+                }`}
+              title="第一张图主仿真入口"
+            >
+              <span className="material-symbols-outlined text-2xl">conversion_path</span>
+            </button>
+
+            <button
+              onClick={() => {
+                navigate(`/topology?pilotId=${DEFAULT_WE1_PILOT_ID}`);
+                setExpanded(false);
+              }}
+              className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isTopology
+                ? 'bg-cyan-600 text-white shadow-cyan-500/50'
+                : 'bg-gray-700 text-white hover:bg-cyan-500'
+                }`}
+              title="WE1 第三张图展示页"
+            >
+              <span className="material-symbols-outlined text-2xl">hub</span>
+            </button>
+
+            <button
+              onClick={() => {
+                navigate('/global');
+                setExpanded(false);
+              }}
+              className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isGlobal
+                ? 'bg-blue-600 text-white shadow-blue-500/50'
+                : 'bg-gray-700 text-white hover:bg-blue-500'
+                }`}
+              title="全国管网统一视图"
+            >
+              <span className="material-symbols-outlined text-2xl">public</span>
+            </button>
+          </div>
+        )}
+
+        <button
+          onClick={() => setExpanded((value) => !value)}
+          className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${expanded
+            ? 'bg-slate-700 text-white shadow-slate-500/40'
+            : 'bg-cyan-600 text-white shadow-cyan-500/50 hover:bg-cyan-500'
+            }`}
+          title={expanded ? '收起页面入口' : '呼出页面入口'}
+          aria-expanded={expanded}
+          aria-label={expanded ? '收起页面入口' : '呼出页面入口'}
+        >
+          <span className="material-symbols-outlined text-2xl">
+            {expanded ? 'close' : 'apps'}
+          </span>
+        </button>
       </div>
 
-      <button
-        onClick={() => navigate(`/map-topology?pilotId=${DEFAULT_WE1_PILOT_ID}`)}
-        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isMapTopology
-          ? 'bg-teal-600 text-white shadow-teal-500/50'
-          : 'bg-gray-700 text-white hover:bg-teal-500'
-          }`}
-        title="第一张图主仿真入口"
-      >
-        <span className="material-symbols-outlined text-2xl">conversion_path</span>
-      </button>
-
-      <button
-        onClick={() => navigate(`/topology?pilotId=${DEFAULT_WE1_PILOT_ID}`)}
-        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isTopology
-          ? 'bg-cyan-600 text-white shadow-cyan-500/50'
-          : 'bg-gray-700 text-white hover:bg-cyan-500'
-          }`}
-        title="WE1 第三张图展示页"
-      >
-        <span className="material-symbols-outlined text-2xl">hub</span>
-      </button>
-
-
-      <button
-        onClick={() => navigate('/global')}
-        className={`size-12 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 ${isGlobal
-          ? 'bg-blue-600 text-white shadow-blue-500/50'
-          : 'bg-gray-700 text-white hover:bg-blue-500'
-          }`}
-        title="全国管网统一视图"
-      >
-        <span className="material-symbols-outlined text-2xl">public</span>
-      </button>
-
-    </div>
+      {showEmergencyPanel && (
+        <EmergencyPanel onClose={() => setShowEmergencyPanel(false)} />
+      )}
+    </>
   );
 };
 

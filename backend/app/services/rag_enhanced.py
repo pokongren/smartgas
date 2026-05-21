@@ -14,7 +14,7 @@ try:
     CHROMADB_AVAILABLE = True
 except ImportError:
     CHROMADB_AVAILABLE = False
-    print("⚠️  ChromaDB 未安装,向量搜索功能不可用")
+    print("[WARN] ChromaDB 未安装,向量搜索功能不可用")
 
 from sqlmodel import Session, select
 from app.database import engine
@@ -50,9 +50,9 @@ class EnhancedRAGService:
                         settings=Settings(anonymized_telemetry=False)
                     )
                     self.vector_db = client.get_or_create_collection("smartgas_knowledge_docs")
-                    print(f"✅ 向量数据库已加载，当前记录数: {self.vector_db.count()}")
+                    print(f"[OK] 向量数据库已加载，当前记录数: {self.vector_db.count()}")
             except Exception as e:
-                print(f"⚠️  向量数据库加载失败: {e}")
+                print(f"[WARN] 向量数据库加载失败: {e}")
 
         # model 设为 None（Text-to-SQL 功能依赖 Gemini，暂时禁用）
         self.model = None
@@ -107,7 +107,7 @@ class EnhancedRAGService:
         与入库时 type=db 配合使用，保证向量空间一致。
         """
         if not self.minimax_api_key or self.minimax_api_key == "your_api_key_here":
-            print("⚠️ 未配置有效的 AI_API_KEY，跳过 MiniMax Embedding")
+            print("[WARN] 未配置有效的 AI_API_KEY，跳过 MiniMax Embedding")
             return None
             
         try:
@@ -124,14 +124,19 @@ class EnhancedRAGService:
             resp.raise_for_status()
             data = resp.json()
             if data.get("base_resp", {}).get("status_code", 0) != 0:
-                print(f"⚠️ MiniMax API 返回错误: {data.get('base_resp')}")
+                print(f"[WARN] MiniMax API 返回错误: {data.get('base_resp')}")
                 return None
             return data["vectors"][0]
         except Exception as e:
-            print(f"⚠️ MiniMax Embedding 请求失败，将降级使用内置查询: {str(e)}")
+            print(f"[WARN] MiniMax Embedding 请求失败，将降级使用内置查询: {str(e)}")
             return None
 
-    def query_vector_db(self, question: str, n_results: int = 3) -> Optional[Dict]:
+    def query_vector_db(
+        self,
+        question: str,
+        n_results: int = 3,
+        metadata_filter: Optional[Dict] = None,
+    ) -> Optional[Dict]:
         """
         使用向量数据库进行语义搜索。
 
@@ -145,17 +150,23 @@ class EnhancedRAGService:
             # 优先：MiniMax 查询向量（与入库向量同维度，精度最高）
             query_embedding = self._embed_with_minimax(question)
             if query_embedding:
-                results = self.vector_db.query(
-                    query_embeddings=[query_embedding],
-                    n_results=n_results
-                )
+                query_kwargs = {
+                    "query_embeddings": [query_embedding],
+                    "n_results": n_results,
+                }
+                if metadata_filter:
+                    query_kwargs["where"] = metadata_filter
+                results = self.vector_db.query(**query_kwargs)
             else:
                 # 降级：ChromaDB 内置 Embedding（句向量模型，维度可能不匹配）
-                print("⚠️ 降级到 ChromaDB 内置查询")
-                results = self.vector_db.query(
-                    query_texts=[question],
-                    n_results=n_results
-                )
+                print("[WARN] 降级到 ChromaDB 内置查询")
+                query_kwargs = {
+                    "query_texts": [question],
+                    "n_results": n_results,
+                }
+                if metadata_filter:
+                    query_kwargs["where"] = metadata_filter
+                results = self.vector_db.query(**query_kwargs)
 
             if not results or not results.get('documents') or not results['documents'][0]:
                 return None
@@ -166,7 +177,7 @@ class EnhancedRAGService:
                 'distances': results['distances'][0] if results.get('distances') else []
             }
         except Exception as e:
-            print(f"⚠️  向量搜索失败: {e}")
+            print(f"[WARN] 向量搜索失败: {e}")
             return None
     
     def query_with_sql(self, question: str) -> Optional[Dict]:
@@ -237,7 +248,7 @@ class EnhancedRAGService:
                     'count': len(rows)
                 }
         except Exception as e:
-            print(f"⚠️  SQL 查询失败: {e}")
+            print(f"[WARN] SQL 查询失败: {e}")
             return None
     
     def query_emergency_knowledge(self, question: str) -> Optional[Dict]:
@@ -302,7 +313,7 @@ class EnhancedRAGService:
                         'data': sql_result['results']
                     }
                 except Exception as e:
-                    print(f"⚠️  生成答案失败: {e}")
+                    print(f"[WARN] 生成答案失败: {e}")
         
         # 3. 尝试向量搜索(语义查询)
         vector_result = self.query_vector_db(question)
@@ -329,7 +340,7 @@ class EnhancedRAGService:
                         'references': vector_result['documents'][:3]
                     }
                 except Exception as e:
-                    print(f"⚠️  生成答案失败: {e}")
+                    print(f"[WARN] 生成答案失败: {e}")
         
         # 4. 无法回答
         return {

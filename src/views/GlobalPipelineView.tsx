@@ -1415,12 +1415,26 @@ const GlobalPipelineView: React.FC = () => {
         setHubNodeTypes(prev => prev.includes(type) ? prev.filter(item => item !== type) : [...prev, type])
     }, [])
 
+    const isPresentationNodeMode = nodeDisplayMode === 'hub'
+        && hubNodeTypes.length === 2
+        && hubNodeTypes.includes('source')
+        && hubNodeTypes.includes('junction')
+        && !showValveRooms
+
     const activatePresentationNodeMode = useCallback(() => {
+        if (isPresentationNodeMode) {
+            setNodeDisplayMode('full')
+            setHubNodeTypes(['source', 'compressor', 'junction', 'distribution'])
+            setShowValveRooms(false)
+            setIsHubMenuOpen(false)
+            return
+        }
+
         setNodeDisplayMode('hub')
         setHubNodeTypes(['source', 'junction'])
         setShowValveRooms(false)
         setIsHubMenuOpen(false)
-    }, [])
+    }, [isPresentationNodeMode])
 
     // 统一的指标点击处理函数
     const handleMetricClick = useCallback((stationName: string, metricType: 'pressure' | 'temperature' | 'dewpoint', baseValue: number) => {
@@ -2894,15 +2908,15 @@ const GlobalPipelineView: React.FC = () => {
                     <div className="flex items-center gap-3">
                         <button
                             onClick={activatePresentationNodeMode}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border bg-amber-500/15 border-amber-300/35 text-amber-100 hover:bg-amber-500/22 hover:border-amber-300/55"
-                            title="展示模式：只保留气源站和枢纽站，并隐藏阀室"
+                            className={`flex min-w-[68px] items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border ${isPresentationNodeMode ? 'bg-amber-500/22 border-amber-300/55 text-amber-50' : 'bg-amber-500/15 border-amber-300/35 text-amber-100 hover:bg-amber-500/22 hover:border-amber-300/55'}`}
+                            title={isPresentationNodeMode ? '恢复全量站场和压气站显示' : '展示模式：只保留气源站和枢纽站，并隐藏阀室'}
                         >
                             <span className="material-symbols-outlined text-base">filter_alt</span>
                             <span>展示</span>
                         </button>
                         <button
                             onClick={() => setMapTheme(prev => prev === 'dark' ? 'light' : 'dark')}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border ${mapTheme === 'dark' ? 'bg-slate-800/75 border-cyan-300/35 text-cyan-100 hover:bg-slate-700/80' : 'bg-white/80 border-amber-300/60 text-amber-800 hover:bg-amber-50'}`}
+                            className={`flex min-w-[68px] items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border ${mapTheme === 'dark' ? 'bg-slate-800/75 border-cyan-300/35 text-cyan-100 hover:bg-slate-700/80' : 'bg-white/80 border-amber-300/60 text-amber-800 hover:bg-amber-50'}`}
                             title={mapTheme === 'dark' ? '当前深色底图，点击切换浅色' : '当前浅色底图，点击切换深色'}
                         >
                             <span className="material-symbols-outlined text-base">
@@ -2919,7 +2933,7 @@ const GlobalPipelineView: React.FC = () => {
                                         setNodeDisplayMode('hub')
                                     }
                                 }}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border ${nodeDisplayMode === 'hub' ? 'bg-cyan-500/15 border-cyan-400/40 text-cyan-200' : 'bg-emerald-500/10 border-emerald-400/30 text-emerald-200'}`}
+                                className={`flex min-w-[132px] items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border ${nodeDisplayMode === 'hub' ? 'bg-cyan-500/15 border-cyan-400/40 text-cyan-200' : 'bg-emerald-500/10 border-emerald-400/30 text-emerald-200'}`}
                                 title={nodeDisplayMode === 'hub' ? '点击展开枢纽筛选菜单' : '当前显示全量节点，点击切回枢纽精简'}
                             >
                                 <span className="material-symbols-outlined text-base">hub</span>
@@ -3031,21 +3045,6 @@ const GlobalPipelineView: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                        <button
-                            onClick={() => void runGlobalMultiScenarioAi(['zhongwei-cutoff'])}
-                            disabled={multiScenarioActive || globalSimulation.isLoading}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            style={{
-                                background: 'rgba(127,29,29,0.72)',
-                                border: '1px solid rgba(248,113,113,0.48)',
-                                color: '#fee2e2',
-                            }}
-                            title="在全国一张网运行中卫截断仿真，并联动管线粒子流"
-                        >
-                            <span className="material-symbols-outlined text-base">content_cut</span>
-                            <span>截断流动</span>
-                            <span style={{ fontSize: '9px', color: '#fecaca', background: 'rgba(248,113,113,0.14)', padding: '0 4px', borderRadius: '4px', border: '1px solid rgba(248,113,113,0.28)' }}>演示</span>
-                        </button>
                     </div>
                 </div>
             </div>

@@ -61,7 +61,13 @@ LUZHI_PILOT_ENV_KEY = "SMARTGAS_LUZHI_PILOT_ENABLED"
 LUZHI_TRACE_PATH = Path(__file__).resolve().parents[2] / "data" / "ai_traces" / "luzhi_pilot_trace.jsonl"
 DATA_ANALYSIS_ENTER_COMMAND = "/数据分析"
 DATA_ANALYSIS_EXIT_COMMAND = "/退出数据分析"
-DEWPOINT_QUERY_KEYWORDS = ("水露点", "露点", "dewpoint")
+COMMON_METRIC_TERM_CORRECTIONS = {
+    "水路点": "水露点",
+    "水漏点": "水露点",
+    "水落点": "水露点",
+    "水陆点": "水露点",
+}
+DEWPOINT_QUERY_KEYWORDS = ("水露点", "露点", "dewpoint", *COMMON_METRIC_TERM_CORRECTIONS.keys())
 DEWPOINT_COMPARE_KEYWORDS = ("对比", "比较", "差异", "对照")
 DATA_ANALYSIS_ENTER_PATTERN = re.compile(r"^\s*/数据分析(?:\s+(?P<payload>.+))?\s*$", re.IGNORECASE)
 DATA_ANALYSIS_EXIT_PATTERN = re.compile(r"^\s*/退出数据分析\s*$", re.IGNORECASE)
@@ -79,6 +85,231 @@ MULTI_STATION_COMPARE_KEYWORDS = ("对比", "比较", "差异", "对照", "横�
 PRESSURE_KEYWORDS = ("压力", "pressure", "MPa", "mpa")
 TEMPERATURE_KEYWORDS = ("温度", "温层", "temperature")
 HISTORY_CURVE_KEYWORDS = ("历史", "曲线", "趋势", "查询", "query", "trend", "history", "chart")
+OPERATION_PROCEDURE_KEYWORDS = (
+    "操作规程",
+    "规程",
+    "运行规程",
+    "工艺规程",
+    "作业",
+    "操作",
+    "步骤",
+    "流程",
+    "怎么做",
+    "如何",
+    "投产",
+    "启输",
+    "停输",
+    "放空",
+    "排污",
+    "置换",
+    "清管",
+    "内检测",
+    "阀门",
+    "开阀",
+    "关阀",
+    "倒流程",
+    "切换",
+    "联锁",
+    "ESD",
+    "esd",
+)
+
+
+def _mentions_subagent(message: str) -> bool:
+    compact = re.sub(r"\s+", "", str(message or "")).lower()
+    return "subagent" in compact or "专家组" in compact or "多agent" in compact or "多智能体" in compact
+
+
+def _looks_like_operation_procedure_query(message: str) -> bool:
+    text = str(message or "").strip()
+    if not text:
+        return False
+    compact = re.sub(r"\s+", "", text)
+    if "应急" in compact or "预案" in compact or "处置" in compact:
+        return True
+    if "规程" in compact:
+        return True
+    action_hit = any(keyword in compact for keyword in OPERATION_PROCEDURE_KEYWORDS)
+    ask_hit = any(keyword in compact for keyword in ("怎么", "如何", "步骤", "流程", "注意", "要求", "风险", "禁止"))
+    asset_hit = any(keyword in compact for keyword in ("站", "管线", "管道", "阀", "机组", "压缩机", "分输", "清管", "天然气"))
+    return action_hit and (ask_hit or asset_hit)
+
+
+def _detect_knowledge_doc_type(message: str) -> str:
+    compact = re.sub(r"\s+", "", str(message or ""))
+    if "应急" in compact or "预案" in compact or "处置" in compact:
+        return "应急预案"
+    return "操作规程"
+
+
+def _detect_operation_action(message: str) -> str:
+    compact = re.sub(r"\s+", "", str(message or ""))
+    for action in ("失效", "放空", "排污", "置换", "清管", "投产", "启输", "停输", "切换", "阀门", "联锁", "ESD", "esd"):
+        if action in compact:
+            return "ESD" if action.lower() == "esd" else action
+    return "操作"
+
+
+def _extract_knowledge_sources(tool_result: str, limit: int = 4) -> list[str]:
+    sources: list[str] = []
+    for match in re.finditer(r"\d+\.\s*来源：(.+?)/(.*?)/\s*chunk\s*#([^\s，]+)", tool_result or ""):
+        doc_type = match.group(1).strip()
+        filename = match.group(2).strip()
+        item = f"{doc_type} / {filename}"
+        if item not in sources:
+            sources.append(item)
+        if len(sources) >= limit:
+            break
+    return sources
+
+
+def _extract_knowledge_excerpts(tool_result: str) -> list[str]:
+    excerpts: list[str] = []
+    for match in re.finditer(r"摘要：(.+?)(?=\n\d+\.\s*来源：|\n\n【回答要求】|$)", tool_result or "", flags=re.S):
+        excerpt = re.sub(r"\s+", " ", match.group(1)).strip()
+        if excerpt:
+            excerpts.append(excerpt)
+    return excerpts
+
+
+def _extract_action_steps_from_excerpts(action: str, excerpts: list[str]) -> list[str]:
+    joined = " ".join(excerpts)
+    if not joined:
+        return []
+
+    if action == "失效" and ("管网关键站场失效" in joined or "站场失效" in joined or "功能失效" in joined):
+        return [
+            "信息接报后做好事件记录，确认管道或站场受影响程度。",
+            "通过 SCADA 发现站场进气、增压、转供等功能失效或全站失效时，立即联系现场确认情况。",
+            "向值班调度长汇报事件相关情况。",
+            "如果关键站场 ESD 触发，要求站场排查触发原因；无异常事件时尽快恢复工艺流程。",
+            "如果发生泄漏、火灾、爆炸，转入管道或站场泄漏、火灾、爆炸应急处置卡。",
+            "如果接气、转供站场短时间无法恢复，调整上下游运行并匹配管道输量；压气站短时间无法恢复时，通知站场导通越站流程，并根据工况启动上下游可替代压气站。",
+        ]
+
+    section = ""
+    if action and action != "操作":
+        pattern = rf"(?:\d+(?:\.\d+)?\s*)?{re.escape(action)}\s*(.*?)(?=\s\d+(?:\.\d+)?\s*[\u4e00-\u9fa5]{{2,}}|\s[ABC]\.\d|\s附\s*录|$)"
+        match = re.search(pattern, joined)
+        if match:
+            section = match.group(1)
+    source_text = section or joined
+    raw_items = re.findall(r"（\d+）\s*(.*?)(?=（\d+）|$)", source_text)
+    steps: list[str] = []
+    for item in raw_items:
+        cleaned = re.sub(r"\s+", " ", item).strip(" 。；;")
+        if not cleaned:
+            continue
+        if action != "操作" and action not in cleaned and not steps and action not in source_text[:80]:
+            continue
+        steps.append(cleaned + "。")
+        if len(steps) >= 6:
+            break
+
+    if steps:
+        return steps
+
+    sentences = re.split(r"[。；;]", source_text)
+    for sentence in sentences:
+        cleaned = re.sub(r"\s+", " ", sentence).strip()
+        if not cleaned:
+            continue
+        if action == "操作" or action in cleaned:
+            steps.append(cleaned + "。")
+        if len(steps) >= 5:
+            break
+    return steps
+
+
+def _format_operation_procedure_result(message: str, tool_result: str, doc_type: str) -> str:
+    action = _detect_operation_action(message)
+    sources = _extract_knowledge_sources(tool_result)
+    excerpts = _extract_knowledge_excerpts(tool_result)
+    steps = _extract_action_steps_from_excerpts(action, excerpts)
+
+    if not steps and "放空" in message:
+        steps = [
+            "放空操作应经中心调度同意。",
+            "放空时先全开球阀，再用节流截止放空阀或旋塞阀控制放空流量。",
+            "放空结束后，先关闭节流截止放空阀或旋塞阀，再关闭球阀。",
+            "具备热放空条件的站场宜采用热放空。",
+            "除自动放空逻辑测试等特殊情况外，自动放空阀上游及安全阀上下游的手动球阀应保持常开。",
+        ]
+
+    if not steps:
+        steps = ["已命中规程证据，但片段里没有形成可直接照搬的完整操作步骤；需要结合具体站场、作业票和调度指令复核。"]
+
+    risk_items = [
+        "没有中心调度同意、现场作业票或明确站场边界时，不能把这里的规程摘要当成直接操作指令。",
+    ]
+    if action == "失效":
+        risk_items.extend([
+            "“永清站”没有在命中片段中作为专站预案出现，本次依据是“管网关键站场失效应急处置卡”，属于通用处置口径。",
+            "如果现场伴随泄漏、火灾、爆炸，不能只按“站场失效”处理，应切换到泄漏、火灾、爆炸应急处置卡。",
+            "压气站失效和接气/转供站失效的调度动作不同，必须先确认永清站在当前工况里的功能角色。",
+        ])
+    if action == "放空":
+        risk_items.extend([
+            "放空流量需要通过节流截止放空阀或旋塞阀控制，不能简单理解成阀门全开后不管。",
+            "自动放空阀、安全阀相关手动球阀的常开要求不能随意改动，除非属于规程允许的特殊测试场景。",
+        ])
+    if any("ESD" in excerpt or "SHUT DOWN" in excerpt for excerpt in excerpts):
+        risk_items.append("命中片段包含 ESD/SHUT DOWN 保护定值，联锁和停车相关动作必须按站控/调度权限执行。")
+
+    pending_items = [
+        "确认具体站场、管段和作业类型是否就是本次问题对象。",
+        "确认现场阀门状态、压力边界、放空/排污设施可用状态。",
+        "确认是否已有调度指令、操作票、监护和警戒安排。",
+    ]
+    if action == "失效":
+        pending_items = [
+            "确认永清站当前是压气、接气、转供还是联络节点，按实际功能选择处置分支。",
+            "确认是否为 ESD 触发、进气/增压/转供功能失效，还是全站失效。",
+            "确认上下游压力、流量、可替代压气站和可调配路径。",
+            "确认是否伴随泄漏、火灾、爆炸等升级事件。",
+        ]
+
+    source_lines = sources or ["已命中规程库，但来源字段解析不完整，需回看知识库证据。"]
+    reply = [
+        "结论：",
+        f"已命中{doc_type}证据，可以按规程做“{action}”类回答；但这只能作为规程摘要，不能替代现场操作票和调度指令。",
+        "",
+        "适用场景：",
+        f"适用于用户提到的“{message}”这类规程查询。若实际对象不是命中文件覆盖的管线/站场，只能作为相近规程参考。",
+        "",
+        "操作要点：",
+        *[f"{idx}. {step}" for idx, step in enumerate(steps[:6], 1)],
+        "",
+        "风险与禁止项：",
+        *[f"- {item}" for item in risk_items],
+        "",
+        "待确认项：",
+        *[f"- {item}" for item in pending_items],
+        "",
+        "来源：",
+        *[f"- {item}" for item in source_lines],
+    ]
+    return "\n".join(reply)
+
+
+def _normalize_common_metric_terms(text: str) -> str:
+    normalized = str(text or "")
+    for wrong, right in COMMON_METRIC_TERM_CORRECTIONS.items():
+        normalized = normalized.replace(wrong, right)
+    return normalized
+
+
+def _build_metric_term_correction_note(raw_text: str, normalized_text: str) -> str:
+    if raw_text == normalized_text:
+        return ""
+    corrected_terms = [
+        f"“{wrong}”应为“{right}”"
+        for wrong, right in COMMON_METRIC_TERM_CORRECTIONS.items()
+        if wrong in str(raw_text or "")
+    ]
+    if not corrected_terms:
+        return ""
+    return f"术语纠错：已识别常见错字，{'、'.join(corrected_terms)}，本次按“水露点”处理。"
 
 
 CANONICAL_STATION_SUFFIXES = (
@@ -282,7 +513,7 @@ async def chat(
 
     logger.info("AI assistant received message: %s", msg_clean[:100])
 
-    if request.analysis_mode == "subagents":
+    if request.analysis_mode == "subagents" or _mentions_subagent(msg_clean):
         if _is_deterministic_lookup_message(msg_clean):
             return StreamingResponse(
                 _deterministic_lookup_event_generator(request=request, session=session),
@@ -334,6 +565,12 @@ async def chat(
                 logger.warning('AI interp for data analysis failed: %s', _ai_exc)
 
         return StreamingResponse(data_analysis_gen(), media_type="text/event-stream")
+
+    if _looks_like_operation_procedure_query(msg_clean):
+        return StreamingResponse(
+            _operation_procedure_event_generator(message=msg_clean, session=session),
+            media_type="text/event-stream",
+        )
 
     direct_count_reply = try_raw_excel_direct_count_reply(msg_clean)
     if direct_count_reply:
@@ -900,6 +1137,7 @@ def _extract_station_name_from_fragment(fragment: str, *, prefer_tail: bool) -> 
 
 def _clean_station_fragment(fragment: str) -> str:
     text = re.sub(r"\s+", "", str(fragment or ""))
+    text = _normalize_common_metric_terms(text)
     text = re.sub(r"(水?露点|dewpoint|对比|比较|差异|对照|分析|趋势|并行)+$", "", text, flags=re.IGNORECASE)
     text = text.strip("，。；;：:,")
     return text
@@ -909,7 +1147,7 @@ def _extract_station_name_for_dewpoint(
     message: str,
     context: AssistantContext | None,
 ) -> str:
-    compact = re.sub(r"\s+", "", (message or ""))
+    compact = re.sub(r"\s+", "", _normalize_common_metric_terms(message or ""))
     tokens = re.findall(
         r"[\u4e00-\u9fa5A-Za-z0-9]{1,24}(?:分输联络站|分输压气站|分输清管站|分输站|压气站|清管站|站)",
         compact,
@@ -1246,7 +1484,7 @@ def _build_history_curve_action_reply(station_name: str, metric_type: str) -> st
         "|hours=12"
         "|time_start="
         "|time_end="
-        f"|metric={metric_token}]"
+        f"|metric={metric_token}]\n\n"
     )
 
 
@@ -1270,11 +1508,19 @@ def try_data_analysis_skill_reply_v2(request: ChatRequest) -> str | None:
             reason="已执行进入命令。",
         )
 
-    if not (mode_active_before or command == "enter"):
+    target_message_raw = payload if command == "enter" else request.message.strip()
+    target_message = _normalize_common_metric_terms(target_message_raw)
+    term_correction_note = _build_metric_term_correction_note(target_message_raw, target_message)
+
+    def with_term_correction(reply: str | None) -> str | None:
+        if not reply or not term_correction_note:
+            return reply
+        return f"{term_correction_note}\n\n{reply}"
+
+    normalized_message = re.sub(r"\s+", "", target_message).lower()
+    if not (mode_active_before or command == "enter" or _looks_like_dewpoint_query(normalized_message)):
         return None
 
-    target_message = payload if command == "enter" else request.message.strip()
-    normalized_message = re.sub(r"\s+", "", target_message).lower()
     if not _looks_like_dewpoint_query(normalized_message):
         return None
 
@@ -1301,7 +1547,7 @@ def try_data_analysis_skill_reply_v2(request: ChatRequest) -> str | None:
                     is_complete=True,
                     reason=f'已完成{len(station_list)}站{compare_metric}横向对比分析。',
                 )
-                return '__NEEDS_AI_INTERP__' + _compare_hint
+                return '__NEEDS_AI_INTERP__' + (with_term_correction(_compare_hint) or _compare_hint)
             except Exception as _exc:
                 logger.warning('多站对比工具调用失败: %s', _exc)
                 # 失败时降级继续
@@ -1309,12 +1555,12 @@ def try_data_analysis_skill_reply_v2(request: ChatRequest) -> str | None:
     if _looks_like_dewpoint_compare_query(normalized_message):
         station_pair = _extract_station_pair_for_compare(target_message)
         if not station_pair:
-            return _append_completeness_hint(
+            return with_term_correction(_append_completeness_hint(
                 "你这句里我没识别出两个站名。请按“甲站和乙站水露点对比”再发一次。",
                 request.message,
                 is_complete=False,
                 reason="双站对比缺少可解析的站名。",
-            )
+            ))
 
         left_station_input, right_station_input = station_pair
         left_station_name, left_snapshot = _resolve_station_snapshot(left_station_input, snapshot_index, alias_index)
@@ -1340,23 +1586,23 @@ def try_data_analysis_skill_reply_v2(request: ChatRequest) -> str | None:
             missing_stations.append(right_station_input)
         if missing_stations:
             available = sorted(snapshot_index.keys())
-            return _append_completeness_hint(
+            return with_term_correction(_append_completeness_hint(
                 _build_missing_station_snapshot_reply(missing_stations, available),
                 request.message,
                 is_complete=False,
                 reason="目标站缺少露点快照。",
-            )
+            ))
 
         left_analysis = _analyze_station_dewpoint(left_snapshot)
         right_analysis = _analyze_station_dewpoint(right_snapshot)
         if left_analysis is None or right_analysis is None:
             available = sorted(snapshot_index.keys())
-            return _append_completeness_hint(
+            return with_term_correction(_append_completeness_hint(
                 f"站点已命中，但露点指标为空。当前可分析站：{'、'.join(available) if available else '无'}。",
                 request.message,
                 is_complete=False,
                 reason="快照存在但无 dewpoint 指标。",
-            )
+            ))
 
         compare_reply = _build_dewpoint_compare_reply(
             left_station_name,
@@ -1366,12 +1612,12 @@ def try_data_analysis_skill_reply_v2(request: ChatRequest) -> str | None:
             left_analysis,
             right_analysis,
         )
-        return _append_completeness_hint(
+        return with_term_correction(_append_completeness_hint(
             compare_reply,
             request.message,
             is_complete=True,
             reason="已完成双站露点并行分析和对比。",
-        )
+        ))
 
     station_name_input = _extract_station_name_for_dewpoint(target_message, request.context)
     resolved_station_name, resolved_snapshot = _resolve_station_snapshot(station_name_input, snapshot_index, alias_index)
@@ -1385,33 +1631,33 @@ def try_data_analysis_skill_reply_v2(request: ChatRequest) -> str | None:
     if resolved_snapshot is None:
         available = sorted(snapshot_index.keys())
         query_station_text = station_name_input or "目标站"
-        return _append_completeness_hint(
+        return with_term_correction(_append_completeness_hint(
             f"{query_station_text}没有露点快照。当前可分析站：{'、'.join(available) if available else '无'}。",
             request.message,
             is_complete=False,
             reason="单站请求缺少对应站点快照，且数据库无可用露点历史。",
-        )
+        ))
 
     station_analysis = _analyze_station_dewpoint(resolved_snapshot)
     if station_analysis is None:
-        return _append_completeness_hint(
+        return with_term_correction(_append_completeness_hint(
             f"{resolved_station_name}当前快照没有露点指标，暂时无法分析。",
             request.message,
             is_complete=False,
             reason="站点快照缺少 dewpoint 指标。",
-        )
+        ))
 
     single_station_reply = _build_single_station_dewpoint_reply(
         resolved_station_name,
         resolved_snapshot,
         station_analysis,
     )
-    return _append_completeness_hint(
+    return with_term_correction(_append_completeness_hint(
         single_station_reply,
         request.message,
         is_complete=True,
         reason="已完成单站露点分析。",
-    )
+    ))
 
 
 def _ensure_station_snapshot_from_db(
@@ -3001,11 +3247,28 @@ def _build_subagent_showcase_final_reply(
         if has_target_match
         else f"未命中与“{target_text}”直接对应的枢纽或站点；当前仅能读取全网管线规模 {pipeline_count} 条，尚不能确认该对象的上下游影响范围。"
     )
-    business_judgement = (
-        f"{target_text}需要作为重点关注对象。依据是：目标对象已进入运行时拓扑匹配，且关联多系统、多站点关系；若发生限流或边界变化，影响可能沿上下游扩散。当前仍缺少实时压力、流量、限流比例和压缩机边界，所以不能直接给“高/中/低”风险定级。"
-        if has_target_match
-        else f"当前不能对{target_text}给出风险等级。原因很直接：系统没有命中具体枢纽或站点，缺少可定位对象、实时压力、流量、限流比例和上下游边界，不能把全网管线规模当成该站风险依据。"
-    )
+    if has_target_match and is_flow_limit:
+        conclusion_text = (
+            f"{scenario_name}已完成演示分析。按默认演示边界“中卫侧供气能力下调至 80%”理解，"
+            "当前应判为“重点关注、需复核后再定级”：中卫侧是上游压气与输送能力约束点，靖边侧关联多系统分输，"
+            "限流影响更可能表现为靖边入口压力余量收紧、下游分输可用量下降和跨系统调配压力上升。"
+        )
+        business_judgement = (
+            "影响链条可以这么看：中卫侧先出现输送能力收缩，随后沿中卫至靖边方向传导；"
+            "靖边作为多系统节点，会把压力和流量缺口继续分摊到相关下游路径。"
+            "当前没有实时压力、限流比例、压缩机边界和下游需求，所以这里给的是演示场景判断，不是生产风险等级。"
+        )
+        simulation_summary = (
+            "- 仿真推演：已按演示边界进入场景推演；默认关注中卫出口压力、靖边入口压力、下游可供流量和供气缺口曲线。"
+        )
+    else:
+        conclusion_text = (
+            f"{target_text}需要作为重点关注对象。依据是：目标对象已进入运行时拓扑匹配，且关联多系统、多站点关系；若发生限流或边界变化，影响可能沿上下游扩散。当前仍缺少实时压力、流量、限流比例和压缩机边界，所以不能直接给真实“高/中/低”风险定级。"
+            if has_target_match
+            else f"当前不能对{target_text}给出风险等级。原因很直接：系统没有命中具体枢纽或站点，缺少可定位对象、实时压力、流量、限流比例和上下游边界，不能把全网管线规模当成该站风险依据。"
+        )
+        business_judgement = conclusion_text
+        simulation_summary = "- 仿真推演：已进入场景准备；真实压降、流量和供气缺口必须由仿真模型按边界条件计算。"
     topology_summary = (
         f"- 拓扑分析：已命中 {len(junctions)} 个枢纽、{len(stations)} 个站点，目标对象已进入运行时拓扑。"
         if has_target_match
@@ -3013,9 +3276,9 @@ def _build_subagent_showcase_final_reply(
     )
     if has_target_match and is_flow_limit:
         suggestion_lines = [
-            "1. 先设定限流场景，例如中卫侧降至 80% 或给出具体日输量目标。",
-            "2. 补齐中卫、盐池、靖边近 12-24 小时压力、流量、温度和压缩机工况数据。",
-            "3. 明确靖边侧下游需求和压力边界，再让仿真 Agent 输出压降、流量和供气缺口曲线。",
+            "1. 演示时先采用默认场景：中卫侧供气能力下调至 80%，观察靖边入口压力和下游可供量变化。",
+            "2. 重点看三条曲线：中卫出口压力、靖边入口压力、靖边下游分输流量；若三者同步走弱，说明限流影响正在传导。",
+            "3. 调度动作建议按“先保压力、再调流量、最后切路径”排序：先稳靖边入口压力，再压减非关键分输需求，必要时启用替代供气路径。",
         ]
     elif has_target_match:
         suggestion_lines = [
@@ -3034,14 +3297,13 @@ def _build_subagent_showcase_final_reply(
         f"- 主控：已识别“{task_type}”任务，并把目标锁定到 {target_text}。",
         "- 历史曲线：已触发自动调曲线动作；生产级分析还要接入压力、流量、温度等时序数据。",
         topology_summary,
-        "- 仿真推演：已进入场景准备；真实压降、流量和供气缺口必须由仿真模型按边界条件计算。",
+        simulation_summary,
         "- 风险复核：当前只给“重点关注”判断，不给真实风险等级，避免把演示推演说成生产事实。",
         "- 业务表达复核：已按统一格式收口，避免缺依据、过度自信和把仿真推演说成生产事实。",
     ]
-
-    return "\n".join([
+    reply_sections = [
         "结论：",
-        f"{scenario_name}已完成 SubAgent 分析流程，但当前不能直接判定真实生产风险等级。",
+        conclusion_text,
         "",
         "依据：",
         f"平台已将问题拆成主控编排、历史曲线、拓扑分析、仿真推演、风险复核和业务表达复核六步。{evidence_line}",
@@ -3055,9 +3317,19 @@ def _build_subagent_showcase_final_reply(
         "待复核项：",
         *agent_summary,
         "",
+    ]
+    if targets:
+        reply_sections.extend([
+            "可视化动作：",
+            "历史曲线入口已在历史曲线 Agent 后生成，评审时可直接点击按钮打开；这里不重复输出动作标记。",
+            "",
+        ])
+
+    reply_sections.extend([
         "边界说明：",
         f"{next_action_line}在这些数据补齐前，当前结论只能作为分析流程结果和风险关注提示，不能作为真实调度指令。",
     ])
+    return "\n".join(reply_sections)
 
 
 async def _call_subagent_brief(
@@ -3207,6 +3479,10 @@ async def _subagent_showcase_event_generator(request: ChatRequest, session: Sess
         }):
             yield event
 
+        if agent["id"] == "history" and targets:
+            history_action_reply = _build_history_curve_action_reply(str(targets[0]), "pressure")
+            yield f"[REPLY] {json.dumps(chr(10) + chr(10) + history_action_reply, ensure_ascii=False)}\n"
+
         await asyncio.sleep(0.12)
 
     final_reply = _build_subagent_showcase_final_reply(
@@ -3246,6 +3522,47 @@ async def _universal_search_event_generator(message: str, session: Session):
     except Exception as exc:
         logger.warning("Universal search AI summary failed: %s", exc)
         yield f"[REPLY] {json.dumps(tool_result, ensure_ascii=False)}\n"
+
+
+async def _operation_procedure_event_generator(message: str, session: Session):
+    doc_type = _detect_knowledge_doc_type(message)
+    yield "[TOOL] search_knowledge_base\n"
+    tool_result = execute_tool(
+        "search_knowledge_base",
+        {"query": message, "limit": 8, "doc_type": doc_type},
+        session,
+    )
+
+    no_hit = "未检索到足够相关" in tool_result or "执行出错" in tool_result
+    if no_hit:
+        reply_text = "\n".join([
+            "结论：当前规程库没有命中足够可靠的依据，不能硬编操作步骤。",
+            "",
+            "已查询：",
+            f"- 文档类型：{doc_type}",
+            f"- 查询问题：{message}",
+            "",
+            "建议补充：管线名称、站场名称、作业类型，比如“西三线 中卫站 放空操作规程”。",
+        ])
+        reply_text = _append_completeness_hint(
+            reply_text,
+            message,
+            is_complete=False,
+            reason="规程库未命中足够证据，已给出补充检索条件。",
+        )
+        yield f"[REPLY] {json.dumps(_apply_yuqian_style(reply_text), ensure_ascii=False)}\n"
+        yield "[DONE]\n"
+        return
+
+    structured_reply = _format_operation_procedure_result(message, tool_result, doc_type)
+    structured_reply = _append_completeness_hint(
+        structured_reply,
+        message,
+        is_complete=True,
+        reason="已完成规程库命中、关键词重排和结构化收口。",
+    )
+    yield f"[REPLY] {json.dumps(_apply_yuqian_style(structured_reply), ensure_ascii=False)}\n"
+    yield "[DONE]\n"
 
 
 async def _orchestrated_event_generator(request: ChatRequest, session: Session):

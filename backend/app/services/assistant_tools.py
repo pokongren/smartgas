@@ -151,6 +151,8 @@ TOOL_DEFINITIONS = [
         "description": "专门用于检索天然气管网操作规程、现场处置应急预案等官方文档，以回答如何处理故障、参数对标、操作步骤等特定业务知识问题。",
         "parameters": {
             "query": {"description": "用户检索问题的关键字或完整句子", "required": True},
+            "limit": {"description": "最多返回多少条规程/预案片段，默认 8", "required": False},
+            "doc_type": {"description": "文档类型过滤，可选：操作规程、应急预案", "required": False},
         },
     },
     {
@@ -395,8 +397,168 @@ def _looks_like_knowledge_query(query: str) -> bool:
     text = str(query or "").strip()
     if not text:
         return False
-    keywords = ("预案", "规程", "应急", "处置", "步骤", "流程", "规范", "标准", "制度", "法规")
+    keywords = (
+        "预案", "规程", "应急", "处置", "步骤", "流程", "规范", "标准", "制度", "法规",
+        "作业", "操作", "投产", "停输", "启输", "放空", "排污", "置换", "清管",
+        "内检测", "阀门", "开阀", "关阀", "倒流程", "切换", "联锁", "esd", "ESD",
+    )
     return any(k in text for k in keywords)
+
+
+def _expand_knowledge_query(query: str, doc_type: str = "") -> list[str]:
+    text = str(query or "").strip()
+    if not text:
+        return []
+
+    compact = _search_key(text)
+    expanded = [text]
+    operation_terms = (
+        "操作规程",
+        "工艺运行规程",
+        "运行规程",
+        "作业步骤",
+        "风险控制",
+        "注意事项",
+    )
+    emergency_terms = (
+        "应急预案",
+        "现场处置",
+        "响应程序",
+        "风险控制",
+    )
+    if doc_type == "应急预案" or "应急" in compact or "预案" in compact or "处置" in compact:
+        expanded.append(f"{text} {' '.join(emergency_terms)}")
+    else:
+        expanded.append(f"{text} {' '.join(operation_terms)}")
+
+    for term in ("西气东输三线", "西三线", "西气东输一线", "西一线", "陕京", "中卫", "靖边", "甪直"):
+        if term in text:
+            expanded.append(f"{term} {text}")
+
+    return list(dict.fromkeys(item for item in expanded if item.strip()))
+
+
+def _doc_type_filter(doc_type: str) -> dict[str, str] | None:
+    normalized = str(doc_type or "").strip()
+    if normalized in {"操作规程", "应急预案"}:
+        return {"type": normalized}
+    return None
+
+
+def _compact_doc_excerpt(doc: str, max_chars: int = 650) -> str:
+    text = re.sub(r"\s+", " ", str(doc or "")).strip()
+    text = re.sub(r"^来源：【[^】]+】\s*", "", text).strip()
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars].rstrip() + "..."
+
+
+def _knowledge_lexical_terms(query: str) -> list[str]:
+    text = str(query or "")
+    aliases = {
+        "西气东输三线": ("西三线",),
+        "西三线": ("西气东输三线",),
+        "西气东输一线": ("西一线",),
+        "西一线": ("西气东输一线",),
+        "西气东输二线": ("西二线",),
+        "西二线": ("西气东输二线",),
+    }
+    terms: set[str] = set()
+    for term, alias_items in aliases.items():
+        if term in text:
+            terms.add(term)
+            terms.update(alias_items)
+    compound_terms = {
+        "失效": ("关键站场失效", "站场失效", "功能失效", "全站失效"),
+        "泄漏": ("站场泄漏", "管道泄漏", "泄漏火灾爆炸"),
+        "火灾": ("站场火灾", "火灾爆炸", "泄漏火灾爆炸"),
+        "爆炸": ("站场爆炸", "火灾爆炸", "泄漏火灾爆炸"),
+        "异常截断": ("管道异常截断", "异常截断"),
+    }
+    for key, items in compound_terms.items():
+        if key in text:
+            terms.add(key)
+            terms.update(items)
+
+    for token in re.findall(r"[\u4e00-\u9fa5A-Za-z0-9]{2,}", text):
+        if token in {"操作规程", "运行规程", "工艺运行规程", "怎么", "如何", "一下", "查询"}:
+            continue
+        terms.add(token)
+        stripped = re.sub(r"(压气站|分输站|清管站|联络站|站|应急预案|处置卡|预案)$", "", token)
+        if stripped and stripped != token and len(stripped) >= 2:
+            terms.add(stripped)
+    for action in ("放空", "排污", "置换", "清管", "投产", "启输", "停输", "切换", "阀门", "联锁", "ESD", "esd", "失效", "异常截断"):
+        if action in text:
+            terms.add(action)
+    return sorted(terms, key=len, reverse=True)
+
+
+def _score_knowledge_doc(query: str, doc: str, meta: dict[str, Any]) -> int:
+    terms = _knowledge_lexical_terms(query)
+    if not terms:
+        return 0
+    source = str(meta.get("source") or "")
+    doc_type = str(meta.get("type") or "")
+    source_key = _search_key(source)
+    doc_key = _search_key(doc)
+    score = 0
+    for term in terms:
+        term_key = _search_key(term)
+        if not term_key:
+            continue
+        if term_key in source_key:
+            score += 8
+        if term_key in doc_key:
+            score += 3
+        if term_key in _search_key(doc_type):
+            score += 2
+    if "规程" in query and "操作规程" in doc_type:
+        score += 4
+    if ("应急" in query or "预案" in query or "处置" in query) and "应急预案" in doc_type:
+        score += 4
+    if "失效" in query:
+        if "关键站场失效" in doc or "站场失效" in doc or "功能失效" in doc or "全站失效" in doc:
+            score += 40
+        if "沉降" in doc or "位移" in doc or "漂管" in doc or "变形" in doc:
+            score -= 10
+    if ("泄漏" in query or "火灾" in query or "爆炸" in query) and "泄漏、火灾、爆炸" in doc:
+        score += 35
+    return score
+
+
+def _lexical_knowledge_hits(rag_service: Any, query: str, metadata_filter: dict[str, str] | None, limit: int) -> list[dict[str, Any]]:
+    collection = getattr(rag_service, "vector_db", None)
+    if collection is None:
+        return []
+    try:
+        get_kwargs: dict[str, Any] = {"include": ["documents", "metadatas"]}
+        if metadata_filter:
+            get_kwargs["where"] = metadata_filter
+        result = collection.get(**get_kwargs)
+    except Exception as exc:
+        logger.warning("知识库关键词检索失败: %s", exc)
+        return []
+
+    docs = result.get("documents") or []
+    metas = result.get("metadatas") or []
+    scored: list[tuple[int, dict[str, Any]]] = []
+    for i, doc in enumerate(docs):
+        meta = metas[i] if i < len(metas) and isinstance(metas[i], dict) else {}
+        score = _score_knowledge_doc(query, str(doc or ""), meta)
+        if score <= 0:
+            continue
+        scored.append((
+            score,
+            {
+                "source": str(meta.get("source") or "未知文件"),
+                "type": str(meta.get("type") or "未知类型"),
+                "chunk": str(meta.get("chunk") if meta.get("chunk") is not None else "?"),
+                "distance": None,
+                "excerpt": _compact_doc_excerpt(str(doc or "")),
+            },
+        ))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [item for _, item in scored[:limit]]
 
 
 def _limit_int(value: Any, default: int = 8, minimum: int = 1, maximum: int = 20) -> int:
@@ -847,32 +1009,90 @@ def _handle_simulate_failure(args: dict, session: Session) -> str:
 
 def _handle_search_knowledge_base(args: dict, session: Session) -> str:
     """查询结构化 PDF 操作规程与应急预案库"""
-    query = args.get("query", "")
+    query = str(args.get("query", "") or "").strip()
     if not query:
         return "请提供要查询的具体问题或关键字。"
+    limit = _limit_int(args.get("limit"), default=8, minimum=3, maximum=12)
+    doc_type = str(args.get("doc_type") or "").strip()
+    metadata_filter = _doc_type_filter(doc_type)
 
     try:
         from app.services.rag_enhanced import EnhancedRAGService
         rag_service = EnhancedRAGService()
-        
-        # 强制只走 ChromaDB 向量搜索，这里跳过 Text2SQL 以免干扰
-        vector_result = rag_service.query_vector_db(query, n_results=4)
-        
-        if vector_result and vector_result.get('documents'):
-            docs = vector_result['documents']
-            metas = vector_result['metadatas']
-            
-            lines = ["下面是从《操作规程》与《应急预案》库中为您检索到的相关原文片段：\n"]
+
+        hits: list[dict[str, Any]] = []
+        seen: set[tuple[str, str, str]] = set()
+
+        for hit in _lexical_knowledge_hits(rag_service, query, metadata_filter, limit):
+            key = (hit["source"], hit["type"], hit["chunk"])
+            if key in seen:
+                continue
+            seen.add(key)
+            hits.append(hit)
+            if len(hits) >= limit:
+                break
+
+        for candidate_query in _expand_knowledge_query(query, doc_type):
+            if len(hits) >= limit:
+                break
+            vector_result = rag_service.query_vector_db(
+                candidate_query,
+                n_results=limit,
+                metadata_filter=metadata_filter,
+            )
+            if (not vector_result or not vector_result.get("documents")) and metadata_filter:
+                vector_result = rag_service.query_vector_db(candidate_query, n_results=limit)
+            if not vector_result or not vector_result.get("documents"):
+                continue
+            docs = vector_result.get("documents", [])
+            metas = vector_result.get("metadatas", [])
+            distances = vector_result.get("distances", [])
             for i, doc in enumerate(docs):
                 meta = metas[i] if i < len(metas) else {}
-                source = meta.get("source", "未知文件")
-                chunk_idx = meta.get("chunk", "?")
-                lines.append(f"【参考来源 {i+1} : {source} (切片位置: #{chunk_idx})】\n{doc}\n")
-                
-            lines.append("\n【系统提示：请综合上述官方文本，为用户提炼出重点步骤与专业数值进行回答。注意呈现 Markdown 表格以保持清晰。】")
-            return "\n".join(lines)
-        else:
-            return "抱歉，知识库中未检索到相关的规程与预案记载。"
+                source = str(meta.get("source") or "未知文件")
+                hit_type = str(meta.get("type") or "未知类型")
+                chunk_idx = str(meta.get("chunk") if meta.get("chunk") is not None else "?")
+                key = (source, hit_type, chunk_idx)
+                if key in seen:
+                    continue
+                seen.add(key)
+                hits.append({
+                    "source": source,
+                    "type": hit_type,
+                    "chunk": chunk_idx,
+                    "distance": distances[i] if i < len(distances) else None,
+                    "excerpt": _compact_doc_excerpt(doc),
+                })
+                if len(hits) >= limit:
+                    break
+            if len(hits) >= limit:
+                break
+
+        if not hits:
+            type_hint = f"（已限定 {doc_type}）" if doc_type else ""
+            return f"知识库{type_hint}未检索到足够相关的规程/预案片段。建议补充管线名称、站场名称和作业类型。"
+
+        lines = [
+            "知识库命中结果（供 AI 归纳，必须基于以下证据回答）：",
+            f"- 用户问题：{query}",
+            f"- 文档类型限定：{doc_type or '未限定'}",
+            f"- 命中片段数：{len(hits)}",
+            "",
+            "【规程证据】",
+        ]
+        for idx, hit in enumerate(hits, 1):
+            distance = hit.get("distance")
+            distance_text = f"，距离 {distance:.4f}" if isinstance(distance, (int, float)) else ""
+            lines.append(
+                f"{idx}. 来源：{hit['type']} / {hit['source']} / chunk #{hit['chunk']}{distance_text}\n"
+                f"   摘要：{hit['excerpt']}"
+            )
+
+        lines.append(
+            "\n【回答要求】先给业务结论，再按“适用场景、规程依据、操作要点、风险与禁止项、待确认项、来源”输出；"
+            "没有在证据里出现的阈值、步骤和责任主体不得编造。"
+        )
+        return "\n".join(lines)
             
     except Exception as e:
         logger.error(f"知识库检索失败: {e}", exc_info=True)

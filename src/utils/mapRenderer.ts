@@ -61,11 +61,11 @@ export const PRESSURE_COLORS = {
 } as const
 
 /**
- * 压气站图标配置 - 右小左宽梯形
+ * 压气站图标配置 - 左长右短、竖边平行梯形
  */
 const COMPRESSOR_ICON_CONFIG = {
-    WIDTH: 20,
-    HEIGHT: 14,
+    WIDTH: 16,
+    HEIGHT: 20,
     COLOR: '#00d4ff',
     DPR: Math.min(window.devicePixelRatio || 1, 2),
 } as const
@@ -255,7 +255,8 @@ function injectMarkerStyles() {
             align-items: center;
             cursor: pointer;
             filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.6));
-            transition: all 0.3s ease;
+            transform-origin: center center;
+            transition: transform 0.22s ease, filter 0.22s ease;
         }
         .compressor-marker-container:hover {
             transform: scale(1.45) !important;
@@ -751,7 +752,7 @@ export function clearDragMappings(): void {
 }
 
 /**
- * 使用 Canvas 绘制压气站梯形图标 - 右小左宽
+ * 使用 Canvas 绘制压气站梯形图标 - 左长右短、竖边平行
  * @returns DataURL 格式的图片
  */
 export function createCompressorIcon(): string {
@@ -771,27 +772,22 @@ export function createCompressorIcon(): string {
     const w = WIDTH
     const h = HEIGHT
 
-    // 等腰梯形：上底短，下底长，两腰等长对称
-    const topWidth = w * 0.5      // 上底宽度 50%
-    const bottomWidth = w         // 下底宽度 100%
-    const topLeft = (w - topWidth) / 2   // 上底居中
-    const topRight = topLeft + topWidth
-    const bottomLeft = 0
-    const bottomRight = w
+    // 左侧长边、右侧短边，两条竖边平行；贴近地图上的压气站梯形标识
+    const rightTop = h * 0.22
+    const rightBottom = h * 0.78
 
-    // 绘制等腰梯形
     ctx.beginPath()
-    ctx.moveTo(topLeft, 0)           // 左上
-    ctx.lineTo(topRight, 0)          // 右上
-    ctx.lineTo(bottomRight, h)       // 右下
-    ctx.lineTo(bottomLeft, h)        // 左下
+    ctx.moveTo(0, 0)                 // 左上
+    ctx.lineTo(0, h)                 // 左下
+    ctx.lineTo(w, rightBottom)       // 右下（短边下端）
+    ctx.lineTo(w, rightTop)          // 右上（短边上端）
     ctx.closePath()
 
-    // 渐变填充（从上到下）
-    const gradient = ctx.createLinearGradient(0, 0, 0, h)
-    gradient.addColorStop(0, '#00e5ff')   // 顶部亮色
+    // 渐变填充（从左到右）
+    const gradient = ctx.createLinearGradient(0, 0, w, 0)
+    gradient.addColorStop(0, '#35f2ff')   // 左侧亮色
     gradient.addColorStop(0.5, COLOR)      // 中间
-    gradient.addColorStop(1, '#0099cc')   // 底部深色
+    gradient.addColorStop(1, '#008fc2')   // 右侧深色
     ctx.fillStyle = gradient
     ctx.fill()
 
@@ -809,8 +805,8 @@ export function createCompressorIcon(): string {
  */
 export function createCompressorIconSVG(): string {
     const { WIDTH, HEIGHT, COLOR } = COMPRESSOR_ICON_CONFIG
-    const rightTop = HEIGHT * 0.3
-    const rightBottom = HEIGHT * 0.7
+    const rightTop = HEIGHT * 0.22
+    const rightBottom = HEIGHT * 0.78
 
     const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
@@ -1073,11 +1069,10 @@ function buildVisualLinePath(line: PipelineLine): number[][] {
 /**
  * 创建压气站标记内容（Canvas/SVG 高清晰度版）
  */
-function createCompressorMarkerContent(rotation: number = 0): HTMLElement {
+function createCompressorMarkerContent(): HTMLElement {
     // 创建容器
     const container = document.createElement('div')
     container.className = 'compressor-marker-container'
-    container.style.transform = `rotate(${rotation}deg)`
 
     // 呼吸灯发光层
     const glow = document.createElement('div')
@@ -1257,41 +1252,7 @@ function createOffsetNodeMarker(
         zooms: [2, 30]
     })
     } else if (isCompressor) {
-        let rotation = 0;
-
-        // 自动根据相连的管线计算朝向角度，修正固定90度导致的重叠和错误横置问题
-        const connections = nodePolylinesMap.get(node.id);
-        if (connections && connections.length > 0) {
-            const conn = connections[0];
-            const path = conn.polyline.getPath?.();
-            if (path && path.length > 1) {
-                let dx = 0, dy = 0;
-                if (conn.role === 'start') {
-                    const p1 = path[1];
-                    const nextLng = p1.lng ?? p1.getLng?.();
-                    const nextLat = p1.lat ?? p1.getLat?.();
-                    if (nextLng !== undefined && nextLat !== undefined) {
-                        dx = nextLng - position.longitude;
-                        dy = nextLat - position.latitude;
-                    }
-                } else {
-                    const pPrev = path[path.length - 2];
-                    const prevLng = pPrev.lng ?? pPrev.getLng?.();
-                    const prevLat = pPrev.lat ?? pPrev.getLat?.();
-                    if (prevLng !== undefined && prevLat !== undefined) {
-                        dx = position.longitude - prevLng;
-                        dy = position.latitude - prevLat;
-                    }
-                }
-                if (dx !== 0 || dy !== 0) {
-                    rotation = Math.atan2(dx, dy) * 180 / Math.PI;
-                }
-            }
-        } else if (node.properties?.rotation !== undefined) {
-            rotation = node.properties.rotation;
-        }
-
-        const content = createCompressorMarkerContent(rotation)
+        const content = createCompressorMarkerContent()
         markerSize = COMPRESSOR_ICON_CONFIG.WIDTH
 
         marker = new AMap.Marker({

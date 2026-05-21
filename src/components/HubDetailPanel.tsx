@@ -5,7 +5,7 @@
  */
 
 import React from 'react'
-import type { HubNode, NodePort, PortConnection } from '@/types/hub'
+import type { HubNode, NodePort, PortConnection, HubProcessFlowConfig, ProcessValve } from '@/types/hub'
 import { PortDirection, DistributionStrategy } from '@/types/hub'
 
 interface HubDetailPanelProps {
@@ -105,6 +105,30 @@ function getFlowPathColor(index: number): string {
     return colors[index % colors.length]
 }
 
+const DEFAULT_PROCESS_SUMMARY = '站内流程：西一线直供下游，西二线直供下游并转供中贵线'
+
+const DEFAULT_VALVE_NODES: ProcessValve[] = [
+    { id: 'v101', label: 'V101', name: '西一线进站阀', x: 31, y: 30, angle: 0 },
+    { id: 'v102', label: 'V102', name: '西一线出站阀', x: 74, y: 30, angle: 0 },
+    { id: 'v201', label: 'V201', name: '西二线进站阀', x: 31, y: 62, angle: 0 },
+    { id: 'v202', label: 'V202', name: '西二线出站阀', x: 74, y: 62, angle: 0 },
+    { id: 'v301', label: 'V301', name: '中贵线外输阀', x: 56, y: 75, angle: 90 },
+]
+
+function getConnectionKey(conn: PortConnection): string {
+    return `${conn.fromPort}->${conn.toPort}`
+}
+
+function getSvgSafeId(value: string): string {
+    return value.replace(/[^a-zA-Z0-9_-]/g, '-')
+}
+
+function getProcessTitle(node: HubNode): string {
+    if (node.name.includes('工艺流程')) return node.name
+    if (node.name.includes('阀组')) return node.name.replace('阀组', '工艺流程')
+    return `${node.name}工艺流程`
+}
+
 function formatThroughput(value?: number): string {
     if (value === undefined || value === null) return '--'
     return `${value.toLocaleString('zh-CN')} 万方/天`
@@ -183,6 +207,9 @@ function createOrthogonalPath(conn: PortConnection, from: { x: number; y: number
     if (conn.fromPort === 'zhongwei-we2-upstream-in' && conn.toPort === 'zhongwei-zg-downstream-out') {
         return `M ${from.x} ${from.y} L ${to.x} ${from.y} L ${to.x} ${to.y}`
     }
+    if (to.y >= 80 && from.y < to.y) {
+        return `M ${from.x} ${from.y} L ${to.x} ${from.y} L ${to.x} ${to.y}`
+    }
     if (from.x === to.x || from.y === to.y) {
         return `M ${from.x} ${from.y} L ${to.x} ${to.y}`
     }
@@ -190,7 +217,10 @@ function createOrthogonalPath(conn: PortConnection, from: { x: number; y: number
     return `M ${from.x} ${from.y} L ${midX} ${from.y} L ${midX} ${to.y} L ${to.x} ${to.y}`
 }
 
-function getConnectionValveIds(conn: PortConnection): string[] {
+function getConnectionValveIds(conn: PortConnection, processFlow?: HubProcessFlowConfig): string[] {
+    const mappedValveIds = processFlow?.connectionValveMap?.[getConnectionKey(conn)]
+    if (mappedValveIds) return mappedValveIds
+
     if (conn.fromPort === 'zhongwei-we1-upstream-in' && conn.toPort === 'zhongwei-we1-downstream-out') {
         return ['v101', 'v102']
     }
@@ -257,13 +287,8 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
     const { extension } = node
     const ports = extension.ports || []
     const activeConnections = extension.internalConnections?.filter(conn => conn.isActive) || []
-    const valveNodes = [
-        { id: 'v101', label: 'V101', name: '西一线进站阀', x: 31, y: 30, angle: 0 },
-        { id: 'v102', label: 'V102', name: '西一线出站阀', x: 74, y: 30, angle: 0 },
-        { id: 'v201', label: 'V201', name: '西二线进站阀', x: 31, y: 62, angle: 0 },
-        { id: 'v202', label: 'V202', name: '西二线出站阀', x: 74, y: 62, angle: 0 },
-        { id: 'v301', label: 'V301', name: '中贵线外输阀', x: 56, y: 75, angle: 90 },
-    ]
+    const valveNodes = extension.processFlow?.valves?.length ? extension.processFlow.valves : DEFAULT_VALVE_NODES
+    const processSummary = extension.processFlow?.summary || DEFAULT_PROCESS_SUMMARY
     const portLayout = new Map<string, { x: number; y: number; labelX: number; labelY: number }>()
 
     ports.forEach((port, index) => {
@@ -283,7 +308,7 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
     }
 
     const isValveOpen = (valveId: string): boolean => valveStates[valveId] !== false
-    const isConnectionOpen = (conn: PortConnection): boolean => getConnectionValveIds(conn).every(isValveOpen)
+    const isConnectionOpen = (conn: PortConnection): boolean => getConnectionValveIds(conn, extension.processFlow).every(isValveOpen)
     const toggleValve = (valveId: string) => {
         setValveStates(prev => ({
             ...prev,
@@ -301,7 +326,7 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                     <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-cyan-300 text-2xl">valve</span>
                         <div>
-                            <h3 className="text-lg font-bold text-white">{node.name.replace('阀组', '工艺流程')}</h3>
+                            <h3 className="text-lg font-bold text-white">{getProcessTitle(node)}</h3>
                             <div className="flex flex-wrap gap-2 mt-1">
                                 <span className="text-[11px] text-cyan-300">{getHubLevelText(extension.hubLevel)}</span>
                                 <span className="text-[11px] text-slate-400">{getNodeTypeLabel(node.type)}</span>
@@ -335,6 +360,17 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                                         <feMergeNode in="SourceGraphic" />
                                     </feMerge>
                                 </filter>
+                                <style>
+                                    {`
+                                        @keyframes hubFlowDash {
+                                            from { stroke-dashoffset: 28; }
+                                            to { stroke-dashoffset: 0; }
+                                        }
+                                        .hub-flow-runner {
+                                            animation: hubFlowDash 1.35s linear infinite;
+                                        }
+                                    `}
+                                </style>
                             </defs>
                             <line x1="8" y1="30" x2="92" y2="30" stroke="rgba(148,163,184,0.26)" strokeWidth="5" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
                             <line x1="10" y1="30" x2="90" y2="30" stroke="rgba(34,211,238,0.58)" strokeWidth="3" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
@@ -349,11 +385,14 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                                 const to = portLayout.get(conn.toPort) || { x: 85, y: 50, labelX: 68, labelY: 42 }
                                 const open = isConnectionOpen(conn)
                                 const color = open ? getFlowPathColor(index) : '#ef4444'
+                                const routePath = createOrthogonalPath(conn, from, to)
+                                const pathId = `hub-flow-${getSvgSafeId(conn.fromPort)}-${getSvgSafeId(conn.toPort)}`
 
                                 return (
                                     <g key={`${conn.fromPort}-${conn.toPort}`}>
                                         <path
-                                            d={createOrthogonalPath(conn, from, to)}
+                                            id={pathId}
+                                            d={routePath}
                                             fill="none"
                                             stroke={color}
                                             strokeWidth="4"
@@ -364,6 +403,29 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                                             opacity={open ? 1 : 0.72}
                                             vectorEffect="non-scaling-stroke"
                                         />
+                                        {open && (
+                                            <>
+                                                <path
+                                                    d={routePath}
+                                                    fill="none"
+                                                    stroke="#ecfeff"
+                                                    strokeWidth="1.6"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeDasharray="7 21"
+                                                    className="hub-flow-runner"
+                                                    opacity="0.9"
+                                                    filter="url(#hub-glow)"
+                                                    vectorEffect="non-scaling-stroke"
+                                                    style={{ animationDelay: `${index * -0.18}s` }}
+                                                />
+                                                <circle r="0.85" fill="#e0f2fe" opacity="0.95" filter="url(#hub-glow)">
+                                                    <animateMotion dur="1.8s" repeatCount="indefinite" begin={`${index * 0.22}s`} rotate="auto">
+                                                        <mpath href={`#${pathId}`} />
+                                                    </animateMotion>
+                                                </circle>
+                                            </>
+                                        )}
                                         <title>
                                             {`${fromPort ? getPortDisplayName(fromPort) : conn.fromPort} -> ${toPort ? getPortDisplayName(toPort) : conn.toPort}`}
                                         </title>
@@ -372,7 +434,7 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                             })}
                         </svg>
 
-                        <div className="absolute left-4 top-4 text-[11px] font-semibold text-emerald-300">站内流程：西一线直供下游，西二线直供下游并转供中贵线</div>
+                        <div className="absolute left-4 top-4 text-[11px] font-semibold text-emerald-300">{processSummary}</div>
 
                         {ports.map(port => {
                             const position = portLayout.get(port.portId)
@@ -403,7 +465,7 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                                         width="20"
                                         height="12"
                                         viewBox="0 0 20 12"
-                                        style={{ transform: `rotate(${valve.angle}deg)` }}
+                                        style={{ transform: `rotate(${valve.angle ?? 0}deg)` }}
                                         aria-hidden="true"
                                     >
                                         <rect x="0.5" y="0.5" width="19" height="11" rx="1.5" fill="rgba(2,6,23,0.94)" stroke="rgba(255,255,255,0.2)" />
