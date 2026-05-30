@@ -6,6 +6,20 @@ import type { SimulationOverlay, SimEdgeResult } from '@/types/simulation'
 import { getJunctionKind, getLinePipelineKind, getNodeRawType, isCompressorNode, isDistributionNode, isHubNode, isLngSourceNode, isMajorJunctionNode, isSourceNode, isValveNode } from '@/utils/pipelineDomain'
 import { getNodeImportance, getNodeLODStrategy, NODE_LOD_THRESHOLDS, NodeImportance, shouldShowNodeAtZoom } from '@/utils/hierarchyRenderer'
 
+// ============ 流向动画全局开关 ============
+/** 是否启用流动动画，默认开启；通过 setFlowAnimationEnabled() 控制 */
+let _flowAnimationEnabled = true
+
+/** 启用/禁用流动动画 */
+export function setFlowAnimationEnabled(enabled: boolean): void {
+    _flowAnimationEnabled = enabled
+}
+
+/** 获取当前流动动画状态 */
+export function isFlowAnimationEnabled(): boolean {
+    return _flowAnimationEnabled
+}
+
 /**
  * 地图渲染工具函数 - 性能优化版
  * 用于在高德地图上渲染管网数据
@@ -1523,8 +1537,13 @@ export function renderPipelineLines(
                         zIndex: isCutoff || isNetworkxReroute || isNetworkxAffected || isNetworkxBeforePath ? 66 : 46,
                         lineJoin: 'round',
                         lineCap: 'round',
+<<<<<<< HEAD
                         zooms: [2, 30],
                         extData: { line, isHalo: true, simEdge, isCutoff },
+=======
+                        showDir: true,    // 开启方向箭头显示流向
+                        dirColor: '#ffffff',  // 箭头白色
+>>>>>>> 拓扑分支
                     })
 
                     const polyline = new AMap.Polyline({
@@ -1556,9 +1575,19 @@ export function renderPipelineLines(
                     map.add(polyline)
                     polylines.push(polyline)
 
+<<<<<<< HEAD
                     if (isCutoff) {
                         const cutoffMarker = createCutoffMarker(map, path, line)
                         if (cutoffMarker) polylines.push(cutoffMarker)
+=======
+                    // 所有干线触发流动动画；支线长度 > 5000m 也触发；全局开关关闭时跳过
+                    const shouldAnimate = _flowAnimationEnabled && (!isBranch || (line.length ?? 0) > 5000)
+                    if (shouldAnimate) {
+                        const flowMarker = createFlowAnimation(map, line, color)
+                        if (flowMarker) {
+                            polylines.push(flowMarker)
+                        }
+>>>>>>> 拓扑分支
                     }
 
                     // 不再在这里为单根极短管段创建光效，改在全部渲染完后基于合并长路径创建
@@ -1623,6 +1652,7 @@ export function renderPipelineLines(
 // 连续长路径光流动画系统
 // ==========================================
 
+<<<<<<< HEAD
 /**
  * 核心算法：将原本被阀室/站点打断的零散管段，根据连通性（拓扑）无缝缝合成一条条完整的干线路径
  */
@@ -1648,6 +1678,33 @@ function mergeLinesIntoContinuousPaths(
             if (rawType === 'compressor' || rawType === 'distribution' || isSourceNode(node) || rawType === 'junction' || isMajorJunctionNode(node)) {
                 hubNodeIds.add(node.id)
             }
+=======
+    // 流动点图标大小根据管线类别适配
+    const isBranch = (line.properties?.category as string || '').includes('支线')
+    const dotSize = isBranch ? 6 : 8
+
+    const flowMarker = new AMap.Marker({
+        position: [line.path[0].longitude, line.path[0].latitude],
+        icon: new AMap.Icon({
+            size: new AMap.Size(dotSize, dotSize),
+            image: createFlowDot(color),
+            imageSize: new AMap.Size(dotSize, dotSize),
+        }),
+        offset: new AMap.Pixel(-dotSize / 2, -dotSize / 2),
+        zIndex: 100,
+    })
+
+    map.add(flowMarker)
+
+    const path = line.path.map(p => [p.longitude, p.latitude])
+    // 干线流动周期 30s，支线 45s，让小管段看起来运动更慢
+    const duration = isBranch ? 45000 : 30000
+
+    const startAnimation = () => {
+        flowMarker.moveAlong(path, {
+            duration: duration,
+            autoRotation: false,
+>>>>>>> 拓扑分支
         })
     }
 
@@ -1760,6 +1817,7 @@ function mergeLinesIntoContinuousPaths(
     return paths
 }
 
+<<<<<<< HEAD
 function createLongFlowAnimation(
     map: any,
     points: number[][],
@@ -1769,11 +1827,19 @@ function createLongFlowAnimation(
 ): any[] {
     const AMap = (window as any).AMap
     if (!AMap || points.length < 2) return []
+=======
+function createFlowDot(color: string): string {
+    const canvas = document.createElement('canvas')
+    canvas.width = 10
+    canvas.height = 10
+    const ctx = canvas.getContext('2d')
+>>>>>>> 拓扑分支
 
     const flowPoints = options.reverse ? [...points].reverse() : points
     const flowIntensity = clampNumber(options.flowIntensity ?? 1, 0, 1.25)
     if (flowIntensity <= 0.01) return []
 
+<<<<<<< HEAD
     // 1. 计算长距离
     const distances = [0]
     let totalLength = 0
@@ -1790,6 +1856,17 @@ function createLongFlowAnimation(
         totalLength += d
         distances.push(totalLength)
     }
+=======
+    // 圆形火焰效果：中心白色亮灯，外圈渐变为管线颜色
+    const gradient = ctx.createRadialGradient(5, 5, 0, 5, 5, 5)
+    gradient.addColorStop(0, '#ffffff')       // 中心白光
+    gradient.addColorStop(0.4, color)          // 管线颜色
+    gradient.addColorStop(0.7, color + 'aa')  // 加透明
+    gradient.addColorStop(1, color + '00')    // 完全透明
+
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, 10, 10)
+>>>>>>> 拓扑分支
 
     if (totalLength <= 0) totalLength = fallbackLength
     if (totalLength <= 0) return []
