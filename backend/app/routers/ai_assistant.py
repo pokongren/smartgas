@@ -38,6 +38,11 @@ from app.services.assistant_intent_config import (
     PRESSURE_KEYWORDS,
     TEMPERATURE_KEYWORDS,
 )
+from app.services.assistant_actions import (
+    _build_subagent_step_action_reply,
+    _build_zhongwei_multi_scenario_action_reply,
+    _sanitize_action_token_text,
+)
 from app.services.assistant_tools import build_tools_description, execute_tool
 from app.services.junction_groups import load_runtime_junction_groups
 from app.services.raw_excel_ai_direct import (
@@ -49,7 +54,10 @@ from app.services.raw_excel_ai_index import raw_excel_ai_index
 from app.services.topology import TopologyService
 from app.services.we1_result_snapshot_service import get_snapshot
 from app.services.multi_source.orchestrator import multi_source_orchestrator
-from app.services.simulation_scenarios import DEFAULT_ZHONGWEI_MULTI_SCENARIO_IDS
+from app.services.subagent_simulation_service import (
+    _collect_subagent_simulation_summary,
+    _looks_like_zhongwei_simulation_request,
+)
 from app.mcp.tools import run_steady_sim
 
 logger = logging.getLogger(__name__)
@@ -2610,33 +2618,6 @@ def _build_locate_station_action_reply(station_name: str) -> str:
     )
 
 
-def _build_zhongwei_multi_scenario_action_reply() -> str:
-    return (
-        "仿真 Agent 已准备好三工况演示：3000 万方/天、2000 万方/天、截断。请点击下面按钮开始，完成后主 Agent 再统一输出结论。\n\n"
-        f"[ACTION:START_MULTI_SCENARIO_AI|scenario_ids={','.join(DEFAULT_ZHONGWEI_MULTI_SCENARIO_IDS)}|auto=0]\n\n"
-    )
-
-
-def _build_subagent_step_action_reply(
-    *,
-    step: str,
-    status: str,
-    title: str,
-    message: str,
-) -> str:
-    step_token = _sanitize_action_token_text(step)
-    status_token = _sanitize_action_token_text(status)
-    title_token = _sanitize_action_token_text(title)
-    message_token = _sanitize_action_token_text(re.sub(r"\s+", " ", message).strip()[:96])
-    return (
-        "[ACTION:SUBAGENT_STEP"
-        f"|step={step_token}"
-        f"|status={status_token}"
-        f"|title={title_token}"
-        f"|message={message_token}]"
-    )
-
-
 def _build_multi_station_compare_reply(compare_result: str, station_list: list[str], metric_type: str, hours: int) -> str:
     metric_label_map = {
         "pressure": "压力",
@@ -4107,10 +4088,6 @@ def _parse_trace_datetime(raw_time: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def _sanitize_action_token_text(raw: str) -> str:
-    return raw.replace("|", "/").replace("]", "")
-
-
 def _format_time_window(snapshot: dict[str, Any]) -> str:
     start = _format_time_text(snapshot.get("time_start"))
     end = _format_time_text(snapshot.get("time_end"))
@@ -4468,28 +4445,6 @@ def _detect_subagent_demo_target(message: str) -> tuple[str, list[str]]:
     return task_type, targets
 
 
-def _looks_like_zhongwei_simulation_request(message: str) -> bool:
-    compact = re.sub(r"\s+", "", str(message or ""))
-    if "中卫" not in compact:
-        return False
-    return any(
-        word in compact
-        for word in (
-            "仿真",
-            "模拟",
-            "推演",
-            "演示",
-            "接入",
-            "风险",
-            "影响",
-            "分析",
-            "限流",
-            "下降",
-            "截断",
-        )
-    )
-
-
 def _count_knowledge_hits(tool_result: str) -> int:
     match = re.search(r"命中片段数：\s*(\d+)", tool_result or "")
     if match:
@@ -4583,46 +4538,6 @@ def _collect_subagent_knowledge_summary(message: str, targets: list[str], sessio
     except Exception as exc:
         logger.warning("collect subagent knowledge evidence failed: %s", exc)
         summary.update({"connected": False, "error": str(exc)})
-    return summary
-
-
-def _collect_subagent_simulation_summary(message: str, session: Session) -> dict[str, Any]:
-    compact = re.sub(r"\s+", "", message or "")
-    is_zhongwei_auto_demo = _looks_like_zhongwei_simulation_request(message)
-    should_run_model = is_zhongwei_auto_demo or any(word in compact for word in ("仿真", "模拟", "推演", "限流", "下降", "截断", "三库一模", "一模"))
-    summary: dict[str, Any] = {
-        "connected": should_run_model,
-        "tool": "run_steady_sim",
-        "pilot_id": "zhongwei_shanghai_baihe",
-        "scenario_id": "steady_base",
-        "status": "not_required",
-        "auto_demo": is_zhongwei_auto_demo,
-        "demo_action": "START_MULTI_SCENARIO_AI" if is_zhongwei_auto_demo else "",
-        "selected_scenario_ids": DEFAULT_ZHONGWEI_MULTI_SCENARIO_IDS if is_zhongwei_auto_demo else [],
-    }
-    if not should_run_model:
-        return summary
-    try:
-        tool_result = execute_tool(
-            "run_steady_sim",
-            {"pilot_id": "zhongwei_shanghai_baihe", "scenario_id": "steady_base"},
-            session,
-        )
-        status_match = re.search(r"状态：([^，\n]+)", tool_result)
-        supply_match = re.search(r"总供气：([0-9.]+)\s*万方/天", tool_result)
-        unserved_match = re.search(r"未满足需求：([0-9.]+)\s*万方/天", tool_result)
-        risk_match = re.search(r"风险等级：([A-Za-z0-9_\u4e00-\u9fa5-]+)", tool_result)
-        run_id_match = re.search(r"稳态仿真已完成：([^\s，\n]+)", tool_result)
-        summary.update({
-            "run_id": run_id_match.group(1).strip() if run_id_match else "",
-            "status": status_match.group(1).strip() if status_match else "returned",
-            "total_supply": float(supply_match.group(1)) if supply_match else None,
-            "unserved_demand": float(unserved_match.group(1)) if unserved_match else None,
-            "risk_level": risk_match.group(1).strip() if risk_match else "",
-        })
-    except Exception as exc:
-        logger.warning("collect subagent simulation evidence failed: %s", exc)
-        summary.update({"status": "error", "error": str(exc)})
     return summary
 
 

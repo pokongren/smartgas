@@ -15,7 +15,7 @@ const TopologyDemoView = lazy(() => import('./views/TopologyDemoView'));
 
 // 独立弹窗组件
 import { AiAssistantStandalone } from './components/ai-assistant/AiAssistant';
-import { ScadaStandalone } from './views/GlobalPipelineView';
+import { ScadaStandalone } from './views/global-pipeline/ScadaStandalone';
 
 const PENDING_ASSISTANT_HISTORY_ACTION_KEY = 'smartgas.pendingAssistantHistoryAction';
 
