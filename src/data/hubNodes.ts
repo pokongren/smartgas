@@ -119,6 +119,81 @@ export const zhongweiHubNodeSimple: HubNode = {
     isHub: true,
     hubLevel: 1,
     distributionStrategy: DistributionStrategy.PRIORITY,
+    processFlow: {
+      summary: '站内流程：西一线干线贯通，西二线跨站联络，中贵线从中卫枢纽外输',
+      valves: [
+        {
+          id: 'zw101',
+          label: 'ZW101',
+          name: '西一线上游进站阀',
+          x: 31,
+          y: 30,
+          angle: 0,
+          cutoffAction: {
+            stage: 'we1',
+            label: '中卫西一线截断',
+            description: '关闭中卫站西一线上游进站阀，外部地图同步展示西一线中卫节点前后拓扑断开。'
+          }
+        },
+        {
+          id: 'zw102',
+          label: 'ZW102',
+          name: '西一线下游出站阀',
+          x: 74,
+          y: 30,
+          angle: 0,
+          cutoffAction: {
+            stage: 'we1',
+            label: '中卫西一线出站截断',
+            description: '关闭中卫站西一线下游出站阀，外部地图同步高亮中卫至下游方向停流段。'
+          }
+        },
+        {
+          id: 'zw201',
+          label: 'ZW201',
+          name: '西二线上游联络阀',
+          x: 31,
+          y: 62,
+          angle: 0,
+          cutoffAction: {
+            stage: 'we2',
+            label: '中卫西二线截断',
+            description: '关闭中卫站西二线联络阀，外部地图同步展示西二线接入中卫的截断段。'
+          }
+        },
+        {
+          id: 'zw202',
+          label: 'ZW202',
+          name: '西二线下游联络阀',
+          x: 74,
+          y: 62,
+          angle: 0,
+          cutoffAction: {
+            stage: 'we2',
+            label: '中卫西二线外输截断',
+            description: '关闭中卫站西二线下游联络阀，外部地图同步展示西二线中卫外输方向停流。'
+          }
+        },
+        {
+          id: 'zw301',
+          label: 'ZW301',
+          name: '中贵线外输阀',
+          x: 56,
+          y: 75,
+          angle: 90,
+          cutoffAction: {
+            stage: 'zg',
+            label: '中卫中贵线截断',
+            description: '关闭中卫站中贵线外输阀，外部地图同步展示中贵线从中卫枢纽脱开的拓扑影响。'
+          }
+        },
+      ],
+      connectionValveMap: {
+        'zhongwei-we1-upstream-in->zhongwei-we1-downstream-out': ['zw101', 'zw102'],
+        'zhongwei-we2-upstream-in->zhongwei-we2-downstream-out': ['zw201', 'zw202'],
+        'zhongwei-we2-upstream-in->zhongwei-zg-downstream-out': ['zw201', 'zw301'],
+      },
+    },
     ports: [
       // 西一线上游来气
       {
@@ -271,11 +346,71 @@ export const luzhiProcessHubNode: HubNode = {
     processFlow: {
       summary: '站内流程：嘉甪联络线进站，西一线干线贯通，并向甪宝支线外输',
       valves: [
-        { id: 'lz101', label: 'LZ101', name: '嘉甪联络线进站阀', x: 31, y: 30, angle: 0 },
-        { id: 'lz102', label: 'LZ102', name: '西一线下游阀', x: 74, y: 30, angle: 0 },
-        { id: 'lz201', label: 'LZ201', name: '西一线干线进站阀', x: 31, y: 62, angle: 0 },
-        { id: 'lz202', label: 'LZ202', name: '西一线干线出站阀', x: 74, y: 62, angle: 0 },
-        { id: 'lz301', label: 'LZ301', name: '甪宝支线外输阀', x: 56, y: 75, angle: 90 },
+        {
+          id: 'lz101',
+          label: 'LZ101',
+          name: '嘉甪联络线进站阀',
+          x: 31,
+          y: 30,
+          angle: 0,
+          cutoffAction: {
+            stage: 'jxlz',
+            label: '甪直嘉甪联络线截断',
+            description: '关闭甪直站嘉甪联络线进站阀，外部地图同步展示嘉兴-甪直联络线接入点截断。'
+          }
+        },
+        {
+          id: 'lz102',
+          label: 'LZ102',
+          name: '西一线下游阀',
+          x: 74,
+          y: 30,
+          angle: 0,
+          cutoffAction: {
+            stage: 'we1',
+            label: '甪直西一线下游截断',
+            description: '关闭甪直站西一线下游阀，外部地图同步展示昆山/白鹤方向拓扑断开。'
+          }
+        },
+        {
+          id: 'lz201',
+          label: 'LZ201',
+          name: '西一线干线进站阀',
+          x: 31,
+          y: 62,
+          angle: 0,
+          cutoffAction: {
+            stage: 'we1',
+            label: '甪直西一线进站截断',
+            description: '关闭甪直站西一线干线进站阀，外部地图同步展示甪直上游侧断开。'
+          }
+        },
+        {
+          id: 'lz202',
+          label: 'LZ202',
+          name: '西一线干线出站阀',
+          x: 74,
+          y: 62,
+          angle: 0,
+          cutoffAction: {
+            stage: 'we1',
+            label: '甪直西一线出站截断',
+            description: '关闭甪直站西一线干线出站阀，外部地图同步展示甪直下游侧停流。'
+          }
+        },
+        {
+          id: 'lz301',
+          label: 'LZ301',
+          name: '甪宝支线外输阀',
+          x: 56,
+          y: 75,
+          angle: 90,
+          cutoffAction: {
+            stage: 'lubao',
+            label: '甪直甪宝支线截断',
+            description: '关闭甪直站甪宝支线外输阀，外部地图同步展示甪宝支线脱开和支线停流范围。'
+          }
+        },
       ],
       connectionValveMap: {
         'luzhi-jxlz-in->luzhi-we1-downstream-out': ['lz101', 'lz102'],
@@ -411,11 +546,71 @@ export const jingbianProcessHubNode: HubNode = {
     processFlow: {
       summary: '站内流程：中靖支干线进站提压，西三中靖联络补充，并向西一线与陕京方向外输',
       valves: [
-        { id: 'jb101', label: 'JB101', name: '中靖支干线进站阀', x: 31, y: 30, angle: 0 },
-        { id: 'jb102', label: 'JB102', name: '西一线下游出站阀', x: 74, y: 30, angle: 0 },
-        { id: 'jb201', label: 'JB201', name: '西三中靖联络进站阀', x: 31, y: 62, angle: 0 },
-        { id: 'jb202', label: 'JB202', name: '陕京二线外输阀', x: 74, y: 62, angle: 0 },
-        { id: 'jb301', label: 'JB301', name: '靖边联络线外输阀', x: 56, y: 75, angle: 90 },
+        {
+          id: 'jb101',
+          label: 'JB101',
+          name: '中靖支干线进站阀',
+          x: 31,
+          y: 30,
+          angle: 0,
+          cutoffAction: {
+            stage: 'we1',
+            label: '中靖进站截断',
+            description: '关闭中靖支干线进站方向，外部地图同步展示靖边西一线关联截断'
+          }
+        },
+        {
+          id: 'jb102',
+          label: 'JB102',
+          name: '西一线下游出站阀',
+          x: 74,
+          y: 30,
+          angle: 0,
+          cutoffAction: {
+            stage: 'we1',
+            label: '西一线截断',
+            description: '关闭西一线转供/出站方向，外部地图同步展示西一线截断前后路径'
+          }
+        },
+        {
+          id: 'jb201',
+          label: 'JB201',
+          name: '西三中靖联络进站阀',
+          x: 31,
+          y: 62,
+          angle: 0,
+          cutoffAction: {
+            stage: 'sj2',
+            label: '西三联络进站截断',
+            description: '关闭西三中靖联络进站方向，外部地图同步展示陕京方向停流影响'
+          }
+        },
+        {
+          id: 'jb202',
+          label: 'JB202',
+          name: '陕京二线外输阀',
+          x: 74,
+          y: 62,
+          angle: 0,
+          cutoffAction: {
+            stage: 'sj2',
+            label: '陕京二线截断',
+            description: '关闭陕京二线外输方向，外部地图同步停流陕京二线'
+          }
+        },
+        {
+          id: 'jb301',
+          label: 'JB301',
+          name: '靖边联络线外输阀',
+          x: 56,
+          y: 75,
+          angle: 90,
+          cutoffAction: {
+            stage: 'sj4',
+            label: '联络线截断',
+            description: '关闭靖边联络线外输方向，外部地图同步停流陕京靖边首站方向'
+          }
+        },
       ],
       connectionValveMap: {
         'jingbian-zhongjing-in->jingbian-we1-out': ['jb101', 'jb102'],
@@ -544,6 +739,162 @@ export const jingbianProcessHubNode: HubNode = {
 }
 
 /**
+ * 广州压气站（点进去工艺流程页）
+ *
+ * 表达西气东输二线吉安方向来气在广州站增压后，向广南支干线、广深支干线及广东省网外输。
+ * 压力/温度参考当前前端 SCADA 展示口径；流量为演示展示值，不代表实时调度量。
+ */
+export const guangzhouProcessHubNode: HubNode = {
+  id: 'GZ-PROCESS-HUB',
+  name: '广州压气站',
+  type: 'compressor',
+  coordinate: {
+    longitude: 113.26,
+    latitude: 23.13
+  },
+  designPressure: 10.0,
+  operatingPressure: 9.2,
+  capacity: 2600,
+  extension: {
+    isHub: true,
+    hubLevel: 1,
+    distributionStrategy: DistributionStrategy.PRIORITY,
+    processFlow: {
+      summary: '站内流程：西二线吉安方向来气进站，经压缩机组增压后分输广南、广深及广东省网',
+      valves: [
+        { id: 'gz101', label: 'GZ101', name: '西二线进站阀', x: 31, y: 30, angle: 0 },
+        { id: 'gz102', label: 'GZ102', name: '压缩机出口母管阀', x: 52, y: 30, angle: 0 },
+        { id: 'gz201', label: 'GZ201', name: '广南支干线外输阀', x: 74, y: 30, angle: 0 },
+        { id: 'gz301', label: 'GZ301', name: '广深支干线外输阀', x: 74, y: 62, angle: 0 },
+        { id: 'gz401', label: 'GZ401', name: '广东省网外输阀', x: 56, y: 75, angle: 90 },
+      ],
+      connectionValveMap: {
+        'guangzhou-we2-in->guangzhou-gn-out': ['gz101', 'gz102', 'gz201'],
+        'guangzhou-we2-in->guangzhou-gs-out': ['gz101', 'gz102', 'gz301'],
+        'guangzhou-we2-in->guangzhou-city-out': ['gz101', 'gz102', 'gz401'],
+      },
+    },
+    ports: [
+      {
+        portId: 'guangzhou-we2-in',
+        pipelineId: 'WE2-GZ-IN',
+        pipelineName: '西气东输二线 吉安-广州段',
+        direction: PortDirection.IN,
+        pressureRange: [6.0, 10.0],
+        flowCapacity: 2600,
+        displayAngle: 180,
+        status: 'active',
+        valveGroupName: '西二线进站阀组',
+        connectionSide: 'upstream',
+        currentThroughput: 2120,
+        currentPressure: 6.66,
+        currentTemperature: 22.6,
+        diagramPosition: { x: 10, y: 30, labelX: 4, labelY: 19 }
+      },
+      {
+        portId: 'guangzhou-backup-in',
+        pipelineId: 'GD-NET-BACKUP',
+        pipelineName: '广东省网回供/备用接口',
+        direction: PortDirection.IN,
+        pressureRange: [4.0, 8.0],
+        flowCapacity: 900,
+        displayAngle: 180,
+        status: 'inactive',
+        valveGroupName: '省网备用接口',
+        connectionSide: 'upstream',
+        currentThroughput: 0,
+        currentPressure: 6.1,
+        currentTemperature: 24.0,
+        diagramPosition: { x: 10, y: 62, labelX: 4, labelY: 67 }
+      },
+      {
+        portId: 'guangzhou-gn-out',
+        pipelineId: 'GN-T-1',
+        pipelineName: '广南支干线 南宁方向',
+        direction: PortDirection.OUT,
+        pressureRange: [7.0, 10.0],
+        flowCapacity: 1600,
+        displayAngle: 0,
+        status: 'active',
+        valveGroupName: '广南外输阀组',
+        connectionSide: 'downstream',
+        currentThroughput: 1180,
+        currentPressure: 9.17,
+        currentTemperature: 47.7,
+        diagramPosition: { x: 90, y: 30, labelX: 69, labelY: 19 }
+      },
+      {
+        portId: 'guangzhou-gs-out',
+        pipelineId: 'GS-T-1',
+        pipelineName: '广深支干线 深圳方向',
+        direction: PortDirection.OUT,
+        pressureRange: [7.0, 10.0],
+        flowCapacity: 1100,
+        displayAngle: 0,
+        status: 'active',
+        valveGroupName: '广深外输阀组',
+        connectionSide: 'downstream',
+        currentThroughput: 720,
+        currentPressure: 9.05,
+        currentTemperature: 46.8,
+        diagramPosition: { x: 90, y: 62, labelX: 69, labelY: 51 }
+      },
+      {
+        portId: 'guangzhou-city-out',
+        pipelineId: 'GD-CITY-GATE',
+        pipelineName: '广东省网/城市门站',
+        direction: PortDirection.OUT,
+        pressureRange: [4.0, 8.0],
+        flowCapacity: 900,
+        displayAngle: -90,
+        status: 'active',
+        valveGroupName: '省网外输阀组',
+        connectionSide: 'downstream',
+        currentThroughput: 220,
+        currentPressure: 7.2,
+        currentTemperature: 36.5,
+        diagramPosition: { x: 56, y: 88, labelX: 58, labelY: 78 }
+      }
+    ],
+    internalConnections: [
+      {
+        fromPort: 'guangzhou-we2-in',
+        toPort: 'guangzhou-gn-out',
+        flowRatio: 0.56,
+        isActive: true,
+        priority: 3,
+        remark: '西二线来气增压后主供广南支干线',
+        currentThroughput: 1180,
+        currentPressure: 9.17,
+        currentTemperature: 47.7
+      },
+      {
+        fromPort: 'guangzhou-we2-in',
+        toPort: 'guangzhou-gs-out',
+        flowRatio: 0.34,
+        isActive: true,
+        priority: 2,
+        remark: '分输广深支干线，支撑珠三角南部用气',
+        currentThroughput: 720,
+        currentPressure: 9.05,
+        currentTemperature: 46.8
+      },
+      {
+        fromPort: 'guangzhou-we2-in',
+        toPort: 'guangzhou-city-out',
+        flowRatio: 0.10,
+        isActive: true,
+        priority: 1,
+        remark: '小流量外输广东省网/城市门站',
+        currentThroughput: 220,
+        currentPressure: 7.2,
+        currentTemperature: 36.5
+      }
+    ]
+  }
+}
+
+/**
  * 西一线古浪站
  */
 export const we1GulangHubNode: HubNode = {
@@ -654,6 +1005,7 @@ export const hubNodesSample: HubNode[] = [
   zhongweiHubNodeSimple,
   luzhiProcessHubNode,
   jingbianProcessHubNode,
+  guangzhouProcessHubNode,
   we1GulangHubNode,
   we2GulangHubNode
 ]
@@ -661,7 +1013,8 @@ export const hubNodesSample: HubNode[] = [
 export const processHubNodes: HubNode[] = [
   zhongweiHubNodeSimple,
   luzhiProcessHubNode,
-  jingbianProcessHubNode
+  jingbianProcessHubNode,
+  guangzhouProcessHubNode
 ]
 
 /**

@@ -6,6 +6,28 @@ import type { CSSProperties } from 'react'
 import type { PipelineData, PipelineLayerConfig, PipelineEvent } from '@/types'
 import type { SimulationOverlay } from '@/types/simulation'
 
+export interface NetworkxCutoffMapOverlay {
+    beforePathEdgeIds?: string[]
+    cutoffEdgeIds?: string[]
+    affectedEdgeIds?: string[]
+    rerouteEdgeIds?: string[]
+    blockedFlowEdgeIds?: string[]
+    cutoffNodeIds?: string[]
+}
+
+export interface StationProcessCutoffStageDetail {
+    stationId?: string
+    stationName?: string
+    valveId?: string
+    valveLabel?: string
+    valveName?: string
+    action?: 'cutoff' | 'restore'
+    valveOpen?: boolean
+    stage?: 'all' | 'we1' | 'sj2' | 'sj4' | string
+    label?: string
+    description?: string
+}
+
 /**
  * 坐标点类型
  */
@@ -73,6 +95,10 @@ export interface MapViewProps {
     simulationOverlay?: SimulationOverlay | null
     /** 仿真中被主动截断的管段 ID，用于和下游零流量区分 */
     simulationCutoffEdgeIds?: string[]
+    /** NetworkX 原生截断演示覆盖层 */
+    networkxCutoffOverlay?: NetworkxCutoffMapOverlay | null
+    /** 站内流程阀门触发的外部截断演示 */
+    onStationProcessCutoff?: (detail: StationProcessCutoffStageDetail) => void
     /** 节点显示模式：full 保持全量，hub 只保留少数枢纽 */
     nodeDisplayMode?: 'full' | 'hub'
     /** 枢纽精简模式下保留的节点类型 */

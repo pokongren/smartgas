@@ -3,6 +3,9 @@ import './ai-assistant.css'
 import { useNewWindow, usePopoutSync } from '../../hooks/useNewWindow'
 import { stripPrivateThinkBlocks, useAiAssistantChat } from './useAiAssistantChat'
 import type { ChatMessage, HandleSendOptions } from './useAiAssistantChat'
+import { DEFAULT_ZHONGWEI_MULTI_SCENARIO_IDS } from '@/config/simulationScenarios'
+
+const AI_ASSISTANT_SYNC_CHANNEL = 'ai-assistant-sync'
 
 const TOOL_LABELS: Record<string, string> = {
     query_stations: '获取站场详情',
@@ -14,7 +17,10 @@ const TOOL_LABELS: Record<string, string> = {
     simulate_failure: '推演沿线断流影响',
     compare_stations: '并发抓取历史记录并执行指标横向对比分析',
     'multi-scenario-ai': '调用 multi-scenario-ai skill',
+    'networkx-cutoff-showcase': '调用 NetworkX 截断演示',
     'mcp.run_steady_sim': '调用 MCP 稳态仿真工具',
+    'multi-source-query': '调用三库并行查询',
+    search_knowledge_base: '检索操作规程/应急预案',
 }
 
 interface PromptExample {
@@ -37,11 +43,22 @@ const EXAMPLE_QUESTIONS: PromptExample[] = [
     { group: '管网基础', label: '统计压气站数量', prompt: '管网里有多少个压气站？请按类型给出统计口径。', icon: 'pin_drop' },
     { group: '管网基础', label: '列出干线管线', prompt: '列出所有干线管线，并说明每条管线的起终点和关键站场。', icon: 'route' },
     { group: '管网基础', label: '全网概况', prompt: '请用汇报口径总结管网整体概况，包括站场、管线、管线组和重点节点。', icon: 'public' },
+    { group: 'AI分析', label: '三库查中卫', prompt: '/三库查询 中卫压气站最近压力为什么偏低？结合时序、拓扑资料和规程依据给结论。', icon: 'database_search' },
+    { group: 'RAG检索', label: '搜RAG原文', prompt: '/RAG检索 西气东输一线压气站出站超压保护定值', icon: 'manage_search' },
+    { group: '规程查询', label: '中卫放空规程', prompt: '/规程查询 中卫压气站放空操作步骤和风险点', icon: 'plumbing' },
+    { group: '规程查询', label: '超压保护定值', prompt: '/规程查询 西气东输一线压气站出站超压保护定值依据是什么？', icon: 'shield' },
+    { group: '拓扑演示', label: '中卫截断推演', prompt: '演示中卫压气站截断推演，显示一连串操作，最后给分析。', icon: 'content_cut' },
+    { group: '拓扑演示', label: '靖边NetworkX截断', prompt: '在全国一张网里演示靖边 NetworkX 原生截断推演，显示截断点、受影响路径、绕行范围和分析结论。', icon: 'account_tree' },
 ]
 
 const DATA_ANALYSIS_EXAMPLES: PromptExample[] = [
     { label: '进入数据分析', prompt: '/数据分析', icon: 'login' },
     { label: '甪直单站露点', prompt: '甪直水露点，按结论、关键异常点、调度建议输出。', icon: 'water_drop' },
+    { label: '中卫单站露点', prompt: '中卫水露点，按结论、关键异常点、调度建议输出。', icon: 'water_drop' },
+    { label: '甪直风险分析', prompt: '甪直站风险分析', icon: 'health_and_safety' },
+    { label: '甪直压力温度', prompt: '甪直站压力和温度情况，给出计算过程、风险等级和调度建议。', icon: 'device_thermostat' },
+    { label: '中卫风险分析', prompt: '中卫站风险分析', icon: 'health_and_safety' },
+    { label: '中卫压力分析', prompt: '中卫压气站12小时压力情况，给出计算过程、风险等级和历史曲线入口。', icon: 'speed' },
     { label: '双站露点对比', prompt: '甪直站和中卫站水露点对比，指出哪个站更需要关注。', icon: 'compare_arrows' },
     { label: '按汇报口径总结', prompt: '把刚才的数据分析结果整理成导师汇报能用的一段话。', icon: 'summarize' },
 ]
@@ -56,6 +73,30 @@ const SUBAGENT_EXAMPLES: PromptExample[] = [
 
 const SLASH_SKILLS: SlashSkill[] = [
     {
+        id: 'rag-search',
+        label: 'RAG原文检索',
+        description: '直接搜索 RAG 库，返回命中文档、chunk 和摘要。',
+        prompt: '/RAG检索 ',
+        icon: 'manage_search',
+        keywords: ['rag', 'RAG', '向量', '知识库', '原文', 'chunk'],
+    },
+    {
+        id: 'procedure-search',
+        label: '规程查询',
+        description: '强制检索操作规程、运行规程和应急预案。',
+        prompt: '/规程查询 ',
+        icon: 'menu_book',
+        keywords: ['规程', '操作', '预案', '定值', '超压', '放空'],
+    },
+    {
+        id: 'multi-source',
+        label: '三库并行查询',
+        description: 'AI 自动并行查业务库、时序库和规程/资料库，合并证据链。',
+        prompt: '/三库查询 ',
+        icon: 'database_search',
+        keywords: ['三库', '多库', '跨库', '证据', '验证', '查询'],
+    },
+    {
         id: 'multi-scenario-ai',
         label: '多工况AI Skill',
         description: '先选择工况，再在全国一张网执行比对。',
@@ -66,10 +107,10 @@ const SLASH_SKILLS: SlashSkill[] = [
     {
         id: 'data-analysis',
         label: '数据分析 Skill',
-        description: '进入站场水露点分析与双站对比模式。',
+        description: '进入站场水露点、压力、温度分析与双站对比模式。',
         prompt: '/数据分析',
         icon: 'analytics',
-        keywords: ['数据', '分析', '露点', 'luzhi'],
+        keywords: ['数据', '分析', '露点', '压力', '温度', 'luzhi'],
     },
     {
         id: 'subagent',
@@ -190,6 +231,20 @@ interface TableBlock {
 
 type SubagentStatus = 'queued' | 'running' | 'completed' | 'warning' | 'error'
 
+interface SubagentReview {
+    from_agent?: string
+    to_agent?: string
+    result?: string
+    message?: string
+}
+
+interface SubagentCorrection {
+    target?: string
+    before?: string
+    after?: string
+    status?: string
+}
+
 interface SubagentBlock {
     agent?: string
     title?: string
@@ -199,6 +254,10 @@ interface SubagentBlock {
     message?: string
     steps?: string[]
     evidence?: string[]
+    claims?: string[]
+    reviews?: SubagentReview[]
+    corrections?: SubagentCorrection[]
+    shared_board?: string[]
     action?: string
 }
 
@@ -215,7 +274,7 @@ interface MultiScenarioSelectorBlock {
     cases: MultiScenarioSelectorCase[]
 }
 
-type AssistantActionType = 'OPEN_LUZHI_HISTORY' | 'OPEN_HISTORY_PANEL' | 'LOCATE_STATION'
+type AssistantActionType = 'OPEN_LUZHI_HISTORY' | 'OPEN_HISTORY_PANEL' | 'LOCATE_STATION' | 'START_MULTI_SCENARIO_AI' | 'SUBAGENT_STEP'
 
 interface AssistantActionPayload {
     type: AssistantActionType
@@ -225,6 +284,12 @@ interface AssistantActionPayload {
     timeStart?: string
     timeEnd?: string
     metric?: string
+    selectedScenarioIds?: string[]
+    auto?: boolean
+    step?: string
+    status?: string
+    title?: string
+    message?: string
 }
 
 interface AssistantSendMessagePayload {
@@ -234,11 +299,17 @@ interface AssistantSendMessagePayload {
 
 function parseAssistantActionToken(block: string): AssistantActionPayload | null {
     const normalized = block.trim()
-    const match = normalized.match(/^\[ACTION:([A-Z_]+)\|(.+)\]$/)
+    const match = normalized.match(/\[ACTION:([A-Z_]+)\|([^\]]+)\]/)
     if (!match) return null
 
     const actionType = match[1] as AssistantActionType
-    if (actionType !== 'OPEN_LUZHI_HISTORY' && actionType !== 'OPEN_HISTORY_PANEL' && actionType !== 'LOCATE_STATION') return null
+    if (
+        actionType !== 'OPEN_LUZHI_HISTORY'
+        && actionType !== 'OPEN_HISTORY_PANEL'
+        && actionType !== 'LOCATE_STATION'
+        && actionType !== 'START_MULTI_SCENARIO_AI'
+        && actionType !== 'SUBAGENT_STEP'
+    ) return null
 
     const rawPairs = match[2].split('|')
     const map = new Map<string, string>()
@@ -253,6 +324,10 @@ function parseAssistantActionToken(block: string): AssistantActionPayload | null
     const hoursRaw = Number(map.get('hours') || '0')
     const viewRaw = (map.get('view') || 'pressure') as AssistantActionPayload['view']
     const allowedView = viewRaw === 'temperature' || viewRaw === 'dewpoint' || viewRaw === 'overview' ? viewRaw : 'pressure'
+    const selectedScenarioIds = (map.get('scenario_ids') || '')
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean)
 
     return {
         type: actionType,
@@ -262,10 +337,64 @@ function parseAssistantActionToken(block: string): AssistantActionPayload | null
         timeStart: map.get('time_start') || undefined,
         timeEnd: map.get('time_end') || undefined,
         metric: map.get('metric') || undefined,
+        selectedScenarioIds: selectedScenarioIds.length > 0 ? selectedScenarioIds : undefined,
+        auto: map.get('auto') === '1' || map.get('auto') === 'true',
+        step: map.get('step') || undefined,
+        status: map.get('status') || undefined,
+        title: map.get('title') || undefined,
+        message: map.get('message') || undefined,
     }
 }
 
+function extractAssistantActions(content: string): AssistantActionPayload[] {
+    const tokens = content.match(/\[ACTION:[A-Z_]+\|[^\]]+\]/g) || []
+    return tokens
+        .map(parseAssistantActionToken)
+        .filter((item): item is AssistantActionPayload => Boolean(item))
+}
+
 function emitAssistantAction(action: AssistantActionPayload): void {
+    if (action.type === 'SUBAGENT_STEP') {
+        const detail = {
+            step: action.step,
+            status: action.status,
+            title: action.title,
+            message: action.message,
+        }
+        window.dispatchEvent(new CustomEvent('assistant-subagent-demo-step', { detail }))
+        if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type: 'assistant-subagent-demo-step', detail }, '*')
+        }
+        try {
+            const channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+            channel.postMessage({ type: 'assistant-subagent-demo-step', detail })
+            channel.close()
+        } catch {
+            // BroadcastChannel is a convenience path for popped-out assistant windows.
+        }
+        return
+    }
+
+    if (action.type === 'START_MULTI_SCENARIO_AI') {
+        const detail = {
+            skillName: 'multi-scenario-ai',
+            selectedScenarioIds: action.selectedScenarioIds || DEFAULT_ZHONGWEI_MULTI_SCENARIO_IDS,
+            message: 'SubAgent 已触发中卫三工况仿真自动演示。',
+        }
+        window.dispatchEvent(new CustomEvent('assistant-start-multi-scenario-ai', { detail }))
+        if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type: 'assistant-start-multi-scenario-ai', detail }, '*')
+        }
+        try {
+            const channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+            channel.postMessage({ type: 'assistant-start-multi-scenario-ai', detail })
+            channel.close()
+        } catch {
+            // BroadcastChannel is a convenience path for popped-out assistant windows.
+        }
+        return
+    }
+
     if (action.type === 'LOCATE_STATION') {
         window.dispatchEvent(new CustomEvent('assistant-locate-station', { detail: action }))
         if (window.opener && !window.opener.closed) {
@@ -306,41 +435,85 @@ function emitAssistantAction(action: AssistantActionPayload): void {
     }
 }
 
-function parseSubagentBlock(block: string): SubagentBlock | null {
+function normalizeStructuredAssistantBlock(block: string): string {
     const normalized = block.trim()
-    const match = normalized.match(/^\[SUBAGENT:(.+)\]$/s)
-    if (!match) return null
+    if (!normalized) return normalized
 
-    try {
-        const parsed = JSON.parse(match[1]) as SubagentBlock
-        if (!parsed || typeof parsed !== 'object') return null
-        return parsed
-    } catch {
-        return null
+    if (
+        (normalized.startsWith('"') && normalized.endsWith('"'))
+        || (normalized.startsWith("'") && normalized.endsWith("'"))
+    ) {
+        try {
+            const parsed = JSON.parse(normalized)
+            if (typeof parsed === 'string') {
+                return parsed.trim()
+            }
+        } catch {
+            return normalized
+        }
     }
+
+    return normalized
+}
+
+function parseStructuredJsonPayload<T>(payload: string): T | null {
+    const attempts: string[] = [payload]
+    let unescaped = payload
+    for (let index = 0; index < 3; index += 1) {
+        unescaped = unescaped.replace(/\\\\/g, '\\').replace(/\\"/g, '"')
+        if (!attempts.includes(unescaped)) {
+            attempts.push(unescaped)
+        }
+    }
+
+    for (const attempt of attempts) {
+        try {
+            const parsed = JSON.parse(attempt)
+            if (typeof parsed === 'string') {
+                return JSON.parse(parsed) as T
+            }
+            return parsed as T
+        } catch {
+            // Try the next normalization form.
+        }
+    }
+    return null
+}
+
+function parseSubagentBlock(block: string): SubagentBlock | null {
+    const normalized = normalizeStructuredAssistantBlock(block)
+    const start = normalized.indexOf('[SUBAGENT:')
+    if (start < 0) return null
+    const candidate = normalized.slice(start)
+    const end = candidate.lastIndexOf(']')
+    if (end < 0) return null
+    const payloadText = candidate.slice('[SUBAGENT:'.length, end)
+    const parsed = parseStructuredJsonPayload<SubagentBlock>(payloadText)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
 }
 
 function parseMultiScenarioSelectorBlock(block: string): MultiScenarioSelectorBlock | null {
-    const normalized = block.trim()
-    const match = normalized.match(/^\[MULTI_SCENARIO_SELECTOR:(.+)\]$/s)
-    if (!match) return null
+    const normalized = normalizeStructuredAssistantBlock(block)
+    const start = normalized.indexOf('[MULTI_SCENARIO_SELECTOR:')
+    if (start < 0) return null
+    const candidate = normalized.slice(start)
+    const end = candidate.lastIndexOf(']')
+    if (end < 0) return null
+    const payloadText = candidate.slice('[MULTI_SCENARIO_SELECTOR:'.length, end)
 
-    try {
-        const parsed = JSON.parse(match[1]) as MultiScenarioSelectorBlock
-        if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.cases)) return null
-        const validCases = parsed.cases.filter((item) =>
-            item
-            && typeof item.id === 'string'
-            && typeof item.label === 'string'
-            && typeof item.description === 'string',
-        )
-        if (validCases.length === 0) return null
-        return {
-            ...parsed,
-            cases: validCases,
-        }
-    } catch {
-        return null
+    const parsed = parseStructuredJsonPayload<MultiScenarioSelectorBlock>(payloadText)
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.cases)) return null
+    const validCases = parsed.cases.filter((item) =>
+        item
+        && typeof item.id === 'string'
+        && typeof item.label === 'string'
+        && typeof item.description === 'string',
+    )
+    if (validCases.length === 0) return null
+    return {
+        ...parsed,
+        cases: validCases,
     }
 }
 
@@ -515,6 +688,61 @@ const SubagentProcessCard: React.FC<{ block: SubagentBlock }> = ({ block }) => {
 
             {block.message && <div className="ai-subagent-message">{block.message}</div>}
 
+            {((block.claims && block.claims.length > 0) || (block.reviews && block.reviews.length > 0) || (block.corrections && block.corrections.length > 0) || (block.shared_board && block.shared_board.length > 0)) && (
+                <div className="ai-subagent-collab">
+                    <div className="ai-subagent-collab-head">
+                        <span className="material-symbols-outlined">forum</span>
+                        协作纠错
+                    </div>
+
+                    {block.shared_board && block.shared_board.length > 0 && (
+                        <div className="ai-subagent-board">
+                            {block.shared_board.map((item, index) => (
+                                <span key={`board-${index}`}>{item}</span>
+                            ))}
+                        </div>
+                    )}
+
+                    {block.claims && block.claims.length > 0 && (
+                        <div className="ai-subagent-collab-section">
+                            <em>本轮判断</em>
+                            {block.claims.map((claim, index) => (
+                                <div key={`claim-${index}`} className="ai-subagent-claim">
+                                    {claim}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {block.reviews && block.reviews.length > 0 && (
+                        <div className="ai-subagent-collab-section">
+                            <em>互审记录</em>
+                            {block.reviews.map((review, index) => (
+                                <div key={`review-${index}`} className="ai-subagent-review">
+                                    <span>{review.from_agent || '当前 Agent'} → {review.to_agent || '前序 Agent'}</span>
+                                    <strong>{review.result || '复核'}</strong>
+                                    <p>{review.message || '已完成交叉复核。'}</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {block.corrections && block.corrections.length > 0 && (
+                        <div className="ai-subagent-collab-section">
+                            <em>纠正结果</em>
+                            {block.corrections.map((correction, index) => (
+                                <div key={`correction-${index}`} className="ai-subagent-correction">
+                                    <span>{correction.status || '已采纳'}</span>
+                                    <strong>{correction.target || '口径'}</strong>
+                                    {correction.before && <p>原判断：{correction.before}</p>}
+                                    {correction.after && <p>修正后：{correction.after}</p>}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
             {block.evidence && block.evidence.length > 0 && (
                 <div className="ai-subagent-evidence">
                     {block.evidence.map((item, index) => (
@@ -563,8 +791,16 @@ function renderMessageContentDeprecated(
             return <SubagentProcessCard key={`subagent-${index}`} block={subagentBlock} />
         }
 
+        if (block.includes('[SUBAGENT:')) {
+            return null
+        }
+
         const actionPayload = parseAssistantActionToken(block)
         if (actionPayload) {
+            if (actionPayload.type === 'SUBAGENT_STEP') {
+                return null
+            }
+
             const labelHours = actionPayload.hours ? `${actionPayload.hours}h` : '全量'
             const labelMetric = actionPayload.metric ? ` · ${actionPayload.metric}` : ''
             return (
@@ -615,7 +851,7 @@ function renderMessageContentDeprecated(
 }
 
 type SemanticMessageBlock = {
-    tone: 'conclusion' | 'scenario' | 'action' | 'risk' | 'pending' | 'source' | 'completeness' | 'evidence'
+    tone: 'conclusion' | 'scenario' | 'station' | 'scale' | 'topology' | 'data' | 'process' | 'detail' | 'action' | 'risk' | 'pending' | 'source' | 'completeness' | 'evidence' | 'path' | 'direction'
     label: string
     body: string
 }
@@ -624,24 +860,35 @@ function parseSemanticMessageBlock(block: string): SemanticMessageBlock | null {
     const text = block.trim()
     if (!text) return null
 
-    const normalized = text.replace(/^#{1,4}\s*/, '')
-    const colonMatch = normalized.match(/^(.{2,14}?)[：:]\s*([\s\S]*)$/)
-    const headingMatch = normalized.match(/^([^\n：:]{2,14})\n([\s\S]+)$/)
+    const normalized = text
+        .replace(/^[-*]\s*/, '')
+        .replace(/^#{1,4}\s*/, '')
+        .replace(/^\*\*(.+?)\*\*/, '$1')
+    const colonMatch = normalized.match(/^(.{2,34}?)[：:]\s*([\s\S]*)$/)
+    const headingMatch = normalized.match(/^([^\n：:]{2,34})\n([\s\S]+)$/)
     const match = colonMatch || headingMatch
     if (!match) return null
 
-    const rawLabel = match[1].trim()
+    const rawLabel = match[1].trim().replace(/^\*+|\*+$/g, '')
     const body = match[2].trimStart()
     const labelKey = rawLabel.replace(/\s+/g, '')
     const labelMap: Array<[RegExp, SemanticMessageBlock['tone']]> = [
-        [/^(结论|判断|当前判断|最终结论)$/, 'conclusion'],
+        [/^(结论|判断|当前判断|关键判断|最终结论|.+结论)$/, 'conclusion'],
         [/^(适用场景|场景|适用范围)$/, 'scenario'],
-        [/^(操作要点|建议动作|建议|调度建议|处置步骤|处理步骤)$/, 'action'],
-        [/^(风险与禁止项|风险影响|风险提示|风险|禁止项|边界说明)$/, 'risk'],
+        [/^(站场类型|站点类型|场站类型|站场信息|站点信息)$/, 'station'],
+        [/^(规模与对象|规模|对象|设备规模|业务规模)$/, 'scale'],
+        [/^(拓扑关系|拓扑|上下游拓扑|连接关系|管网关系)$/, 'topology'],
+        [/^(数据连接|数据库连接|数据源连接|数据来源连接|重点监测|指标研判|边界余量)$/, 'data'],
+        [/^(计算过程|分析过程|处理过程|AI处理过程|推理过程|过程说明|Agent证据互证链（编排校验）|Agent证据互证链|Agent互证\/辩论链|Agent互证|证据互证链|互证\/辩论链|辩论链|协作纠错|证据互证)$/, 'process'],
+        [/^(指标明细|.+指标明细|明细|证据表|证据表（快照）|数据明细|计算明细)$/, 'detail'],
+        [/^(路径分析|关键路径|路径|上下游|上下游关系)$/, 'path'],
+        [/^(气流方向|流向|方向)$/, 'direction'],
+        [/^(操作要点|建议动作|动作建议|动作建议（模板）|建议|调度建议|处置建议|处置步骤|处理步骤)$/, 'action'],
+        [/^(风险与禁止项|风险影响|风险提示|风险边界|风险|禁止项|边界说明)$/, 'risk'],
         [/^(待确认项|待复核项|不确定性说明|待补充项)$/, 'pending'],
         [/^(来源|证据来源|数据来源|规程依据|依据)$/, 'source'],
         [/^(完整性提示|完整性|置信度说明)$/, 'completeness'],
-        [/^(证据|已查询|检索证据|命中的库|已检索但未命中的来源)$/, 'evidence'],
+        [/^(证据|已查询|检索证据|命中的库|命中的数据源|未命中的数据源|已检索但未命中的来源|数据覆盖)$/, 'evidence'],
     ]
 
     const matchTone = labelMap.find(([pattern]) => pattern.test(labelKey))
@@ -654,12 +901,218 @@ function parseSemanticMessageBlock(block: string): SemanticMessageBlock | null {
     }
 }
 
+function isSemanticHeadingOnly(block: string): boolean {
+    const text = block.trim()
+    if (!text) return false
+    const normalized = text
+        .replace(/^[-*]\s*/, '')
+        .replace(/^#{1,4}\s*/, '')
+        .replace(/^\*\*(.+?)\*\*$/, '$1')
+        .replace(/[：:]$/, '')
+        .replace(/\s+/g, '')
+    return /^(结论|判断|当前判断|关键判断|最终结论|适用场景|场景|适用范围|站场类型|站点类型|场站类型|站场信息|站点信息|规模与对象|规模|对象|设备规模|业务规模|拓扑关系|拓扑|上下游拓扑|连接关系|管网关系|数据连接|数据库连接|数据源连接|数据来源连接|重点监测|指标研判|边界余量|计算过程|分析过程|处理过程|AI处理过程|推理过程|过程说明|Agent证据互证链（编排校验）|Agent证据互证链|Agent互证\/辩论链|Agent互证|证据互证链|互证\/辩论链|辩论链|协作纠错|证据互证|指标明细|明细|证据表|证据表（快照）|数据明细|计算明细|路径分析|关键路径|路径|上下游|上下游关系|气流方向|流向|方向|操作要点|建议动作|动作建议|动作建议（模板）|建议|调度建议|处置建议|处置步骤|处理步骤|风险与禁止项|风险影响|风险提示|风险边界|风险|禁止项|边界说明|待确认项|待复核项|不确定性说明|待补充项|来源|证据来源|数据来源|规程依据|依据|完整性提示|完整性|置信度说明|证据|已查询|检索证据|命中的库|命中的数据源|未命中的数据源|已检索但未命中的来源|数据覆盖)$/.test(normalized)
+}
+
+function normalizeAssistantSemanticBreaks(content: string): string {
+    const headingPattern = /(关键判断|重点监测|处置建议|数据覆盖|风险边界|计算过程|完整性提示|(?:压力、温度、水露点|压力、温度|压力|温度|水露点|露点|[\u4e00-\u9fa5、]{2,18})指标明细)[：:]/g
+    return content.replace(headingPattern, (match, _label, offset, fullText) => {
+        if (offset === 0) return match
+        const before = fullText.slice(Math.max(0, offset - 2), offset)
+        if (before === '\n\n') return match
+        return `\n\n${match}`
+    })
+}
+
+function splitSubagentSegments(block: string): string[] {
+    const parts: string[] = []
+    let cursor = 0
+
+    while (cursor < block.length) {
+        const start = block.indexOf('[SUBAGENT:', cursor)
+        if (start < 0) {
+            parts.push(block.slice(cursor))
+            break
+        }
+
+        if (start > cursor) {
+            parts.push(block.slice(cursor, start))
+        }
+
+        const jsonStart = start + '[SUBAGENT:'.length
+        if (block[jsonStart] !== '{') {
+            cursor = start + '[SUBAGENT:'.length
+            continue
+        }
+
+        let depth = 0
+        let inString = false
+        let escaped = false
+        let end = -1
+        for (let index = jsonStart; index < block.length; index += 1) {
+            const char = block[index]
+            if (inString) {
+                if (escaped) {
+                    escaped = false
+                } else if (char === '\\') {
+                    escaped = true
+                } else if (char === '"') {
+                    inString = false
+                }
+                continue
+            }
+
+            if (char === '"') {
+                inString = true
+            } else if (char === '{') {
+                depth += 1
+            } else if (char === '}') {
+                depth -= 1
+                if (depth === 0 && block[index + 1] === ']') {
+                    end = index + 2
+                    break
+                }
+            }
+        }
+
+        if (end < 0) {
+            parts.push(block.slice(start))
+            break
+        }
+
+        parts.push(block.slice(start, end))
+        cursor = end
+    }
+
+    return parts.map(part => part.trim()).filter(Boolean)
+}
+
+function stripSubagentBlockLines(content: string): string {
+    return content
+        .split('\n')
+        .filter(line => !line.includes('[SUBAGENT:'))
+        .join('\n')
+        .trim()
+}
+
+function splitAssistantDisplayBlocks(content: string): string[] {
+    const normalizedContent = normalizeAssistantSemanticBreaks(stripPrivateThinkBlocks(content))
+    const rawBlocks = dedupeSubagentBlocks(normalizedContent.split(/\n\s*\n/))
+        .map(block => block.trim())
+        .filter(Boolean)
+    const merged: string[] = []
+
+    for (let index = 0; index < rawBlocks.length; index += 1) {
+        const block = rawBlocks[index]
+        const next = rawBlocks[index + 1]
+        const subagentSegments = splitSubagentSegments(block)
+        if (subagentSegments.length > 1 || parseSubagentBlock(subagentSegments[0] || '')) {
+            merged.push(...subagentSegments)
+            continue
+        }
+
+        const parts = block
+            .split(/(\[ACTION:[A-Z_]+\|[^\]]+\])/g)
+            .map(part => part.trim())
+            .filter(Boolean)
+
+        if (parts.length > 1) {
+            merged.push(...parts)
+            continue
+        }
+
+        if (next && isSemanticHeadingOnly(block)) {
+            merged.push(`${block.replace(/[：:]$/, '')}\n${next}`)
+            index += 1
+        } else {
+            merged.push(block)
+        }
+    }
+
+    return merged
+}
+
+function parseLeadConclusionBlock(block: string, index: number): SemanticMessageBlock | null {
+    if (index !== 0) return null
+    const text = block.trim()
+    if (!text || text.length > 260) return null
+    if (/^\s*(?:[-*]|\|)/.test(text)) return null
+    const looksLikeConclusion =
+        /^(要我说，先给准话|咱先把结论放这儿|先给准话|结论|找到了|可以|当前|这次|已完成|没有找到|未找到|不能|建议先)/.test(text)
+        || /(共|总计|合计|累计|命中|找到|未找到|存在|不存在|可作为|不能作为).*\d+(?:\.\d+)?\s*(?:座|个|条|段|项|%|km|公里|MPa)?/.test(text)
+    if (looksLikeConclusion) {
+        const cleaned = text
+            .replace(/^(要我说，先给准话|咱先把结论放这儿|先给准话)[：:]/, '')
+            .replace(/^结论[：:]/, '')
+            .trim()
+        return { tone: 'conclusion', label: '结论', body: cleaned }
+    }
+    return null
+}
+
+function renderHighlightedBody(text: string): React.ReactNode {
+    const parts = text.split(/(\d+(?:\.\d+)?\s*(?:km|公里|段|个|座|条|项|MPa|°C|摄氏度|万方\/天|万方|小时|分钟|次|%)|风险(?:等级)?[：: ]?[高中低]|高风险|中风险|低风险|正常|10MPa|0°C)/g)
+    return parts.map((part, index) => {
+        const metricLike = /^\d+(?:\.\d+)?\s*(?:km|公里|MPa|°C|摄氏度|万方\/天|万方|小时|分钟|次|%)$/.test(part)
+        const riskLike = /^(风险(?:等级)?[：: ]?[高中低]|高风险|中风险|低风险|正常|10MPa|0°C)$/.test(part)
+        const nearbyText = `${parts[index - 1] || ''}${parts[index + 1] || ''}`
+        const countWorthHighlighting =
+            /^\d+(?:\.\d+)?\s*(?:段|个|座|条|项)$/.test(part)
+            && /(命中|合计|累计|总计|关联|相邻|用户|压缩机|管段|管线|数据|记录|边|节点)/.test(nearbyText)
+            && !/(由\s*$|分站|站点|合并展示)/.test(nearbyText)
+        if (metricLike || riskLike || countWorthHighlighting) {
+            return <strong key={index} className={`ai-msg-key-number ${riskLike ? 'risk' : ''}`}>{part}</strong>
+        }
+        return <React.Fragment key={index}>{part}</React.Fragment>
+    })
+}
+
+function renderSemanticBlock(semanticBlock: SemanticMessageBlock, key: string): React.ReactNode {
+    if (semanticBlock.tone === 'conclusion') {
+        return (
+            <div key={key} className="ai-msg-conclusion-card">
+                <div className="ai-msg-conclusion-icon">
+                    <span className="material-symbols-outlined">verified</span>
+                </div>
+                <div className="ai-msg-conclusion-copy">
+                    <span>{semanticBlock.label}</span>
+                    <strong>{renderHighlightedBody(semanticBlock.body)}</strong>
+                </div>
+            </div>
+        )
+    }
+
+    if (semanticBlock.tone === 'source' || semanticBlock.tone === 'evidence' || semanticBlock.tone === 'completeness' || semanticBlock.tone === 'process' || semanticBlock.tone === 'detail') {
+        const defaultOpen = semanticBlock.tone === 'detail'
+        return (
+            <details key={key} open={defaultOpen} className={`ai-msg-folded-section ai-msg-folded-section-${semanticBlock.tone}`}>
+                <summary>
+                    <span className="material-symbols-outlined">unfold_more</span>
+                    {semanticBlock.label}
+                </summary>
+                {semanticBlock.body ? (
+                    <div className="ai-msg-folded-body">{renderHighlightedBody(semanticBlock.body)}</div>
+                ) : null}
+            </details>
+        )
+    }
+
+    return (
+        <div key={key} className={`ai-msg-text-block ai-msg-section ai-msg-section-${semanticBlock.tone}`}>
+            <span className="ai-msg-section-label">{semanticBlock.label}：</span>
+            {semanticBlock.body ? (
+                <span className="ai-msg-section-body">{renderHighlightedBody(semanticBlock.body)}</span>
+            ) : null}
+        </div>
+    )
+}
+
 function renderMessageContent(
     content: string,
     onAction: (payload: AssistantActionPayload) => void,
     onSend?: (text?: string, options?: HandleSendOptions) => void,
 ): React.ReactNode {
-    const blocks = dedupeSubagentBlocks(stripPrivateThinkBlocks(content).split(/\n\s*\n/))
+    const blocks = splitAssistantDisplayBlocks(content)
+    const hasLeadConclusion = !!parseLeadConclusionBlock(blocks[0] ?? '', 0)
     return blocks.map((block, index) => {
         const selectorBlock = parseMultiScenarioSelectorBlock(block)
         if (selectorBlock) {
@@ -682,6 +1135,25 @@ function renderMessageContent(
 
         const actionPayload = parseAssistantActionToken(block)
         if (actionPayload) {
+            if (actionPayload.type === 'SUBAGENT_STEP') {
+                return null
+            }
+
+            if (actionPayload.type === 'START_MULTI_SCENARIO_AI') {
+                return (
+                    <React.Fragment key={`action-${index}`}>
+                        <button
+                            className="ai-msg-action-btn"
+                            onClick={() => onAction(actionPayload)}
+                            title="启动全国一张网中卫三工况仿真演示"
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>science</span>
+                            启动中卫仿真演示
+                        </button>
+                    </React.Fragment>
+                )
+            }
+
             if (actionPayload.type === 'LOCATE_STATION') {
                 const labelStation = actionPayload.station ? `${actionPayload.station}` : '该站'
                 return (
@@ -716,8 +1188,8 @@ function renderMessageContent(
 
         const table = parseMarkdownTable(block)
         if (table) {
-            return (
-                <div key={`block-${index}`} className="ai-msg-table-wrap">
+            const tableNode = (
+                <div className="ai-msg-table-wrap">
                     <table className="ai-msg-table">
                         <thead>
                             <tr>
@@ -738,21 +1210,19 @@ function renderMessageContent(
                     </table>
                 </div>
             )
+            return (
+                <React.Fragment key={`table-${index}`}>{tableNode}</React.Fragment>
+            )
         }
 
         const semanticBlock = parseSemanticMessageBlock(block)
         if (semanticBlock) {
-            return (
-                <div
-                    key={`block-${index}`}
-                    className={`ai-msg-text-block ai-msg-section ai-msg-section-${semanticBlock.tone}`}
-                >
-                    <span className="ai-msg-section-label">{semanticBlock.label}：</span>
-                    {semanticBlock.body ? (
-                        <span className="ai-msg-section-body">{semanticBlock.body}</span>
-                    ) : null}
-                </div>
-            )
+            return renderSemanticBlock(semanticBlock, `block-${index}`)
+        }
+
+        const leadConclusion = parseLeadConclusionBlock(block, index)
+        if (leadConclusion) {
+            return renderSemanticBlock(leadConclusion, `lead-${index}`)
         }
 
         return (
@@ -773,9 +1243,13 @@ const ThinkingPanel: React.FC<{
 }> = ({ content, isStreaming, answer = '', userQuestion = '', onAction, onSend }) => {
     const trimmed = stripPrivateThinkBlocks(content).trim()
     if (!trimmed) return null
+    const visibleThinkingContent = !isStreaming && trimmed.includes('[SUBAGENT:')
+        ? stripSubagentBlockLines(trimmed)
+        : trimmed
 
     const stepCount = dedupeSubagentBlocks(trimmed.split(/\n\s*\n/)).filter(Boolean).length
     const assessmentText = `${userQuestion}\n${trimmed}\n${answer}`
+    const hasZhongweiSimulationAgent = /中卫稳态仿真 Agent|START_MULTI_SCENARIO_AI|run_steady_sim/.test(assessmentText)
     const hasCompleteHint = /完整性提示[:：]\s*是/.test(assessmentText)
     const hasIncompleteHint = /完整性提示[:：]\s*否/.test(assessmentText)
     const hasExactEntityMatch = /(索引\s*ID\s*是|RAW-ST-\d+|唯一命中|确定为|已定位|登记的一个(?:压气站|分输站|输气站|阀室|门站|末站|首站)|是\s*[^。；\n]*(?:压气站|分输站|输气站|阀室|门站|末站|首站|LNG))/i.test(assessmentText)
@@ -869,7 +1343,64 @@ const ThinkingPanel: React.FC<{
                         </div>
                     </div>
                 )}
-                {renderMessageContent(trimmed, onAction, onSend)}
+                {!isStreaming && trimmed.includes('[SUBAGENT:') && (
+                    <div className="ai-subagent-collab ai-subagent-collab-summary">
+                        <div className="ai-subagent-collab-head">
+                            <span className="material-symbols-outlined">forum</span>
+                            证据互证
+                        </div>
+                        <div className="ai-subagent-board">
+                            {hasZhongweiSimulationAgent ? (
+                                <>
+                                    <span>中卫稳态仿真 Agent 已接入</span>
+                                    <span>工具：run_steady_sim</span>
+                                    <span>演示：3000/2000/截断三工况</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span>共享证据板已闭合</span>
+                                    <span>风险边界：压力=管线设计压力；水露点=0°C</span>
+                                    <span>最终结论已由风险复核与业务表达复核收口</span>
+                                </>
+                            )}
+                        </div>
+                        <div className="ai-subagent-collab-section">
+                            <em>证据互证链</em>
+                            {hasZhongweiSimulationAgent ? (
+                                <>
+                                    <div className="ai-subagent-review">
+                                        <span>主控 Agent → 中卫稳态仿真 Agent</span>
+                                        <p>识别中卫对象和演示意图；仿真 Agent 调用 run_steady_sim 回证模型状态和 run_id。</p>
+                                    </div>
+                                    <div className="ai-subagent-review">
+                                        <span>仿真 Agent → 全国一张网演示</span>
+                                        <p>下发中卫 3000、2000、截断三组工况，触发前端自动播放和压力/流量曲线生成。</p>
+                                    </div>
+                                    <div className="ai-subagent-review">
+                                        <span>风险复核 Agent → 业务表达复核 Agent</span>
+                                        <p>把结果限定为仿真场景，要求生产研判继续补 SCADA、规程和设计边界。</p>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="ai-subagent-review">
+                                        <span>主控 Agent → 历史曲线 Agent</span>
+                                        <p>校验是否有真实数据；历史曲线用 SCADA 命中记录和当前值、6h变化、波动幅度回证。</p>
+                                    </div>
+                                    <div className="ai-subagent-review">
+                                        <span>历史曲线 Agent → 风险复核 Agent</span>
+                                        <p>提出风险信号；风险复核按本轮实际数值判断是越界风险还是波动风险，并修正最终口径。</p>
+                                    </div>
+                                    <div className="ai-subagent-review">
+                                        <span>拓扑/规程 Agent → 业务表达复核 Agent</span>
+                                        <p>追问是否上下游传导，并拦截调度指令；最终只输出趋势复核单、证据清单和边界说明。</p>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+                {renderMessageContent(visibleThinkingContent, onAction, onSend)}
             </div>
         </details>
     )
@@ -1148,7 +1679,10 @@ const AssistantPanel: React.FC<AssistantPanelProps> = ({
                         <div className="ai-skill-actions">
                             {dataAnalysisMode ? (
                                 <>
-                                    <button type="button" onClick={() => handleSend('甪直水露点')} disabled={loading}>单站露点</button>
+                                    <button type="button" onClick={() => handleSend('甪直水露点')} disabled={loading}>甪直露点</button>
+                                    <button type="button" onClick={() => handleSend('中卫水露点')} disabled={loading}>中卫露点</button>
+                                    <button type="button" onClick={() => handleSend('甪直站风险分析')} disabled={loading}>甪直风险</button>
+                                    <button type="button" onClick={() => handleSend('中卫站风险分析')} disabled={loading}>中卫风险</button>
                                     <button type="button" onClick={() => handleSend('甪直站和中卫站水露点对比')} disabled={loading}>双站对比</button>
                                     <button type="button" onClick={() => handleSend('/退出数据分析')} disabled={loading}>退出</button>
                                 </>
@@ -1187,6 +1721,8 @@ const AiAssistant: React.FC = () => {
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
     const lastAutoHistoryActionRef = useRef<string>('')
+    const lastAutoSimulationActionRef = useRef<string>('')
+    const emittedSubagentStepSignaturesRef = useRef<Set<string>>(new Set())
     const chat = useAiAssistantChat()
     const { isPoppedOut, popOut, closePopOut } = useNewWindow('ai-assistant-sync', '/popout/assistant')
 
@@ -1206,32 +1742,63 @@ const AiAssistant: React.FC = () => {
 
     useEffect(() => {
         let latestAssistantMessage: ChatMessage | undefined
+        let latestAssistantIndex = -1
         for (let index = chat.messages.length - 1; index >= 0; index -= 1) {
             const message = chat.messages[index]
             if (message.role === 'assistant') {
                 latestAssistantMessage = message
+                latestAssistantIndex = index
                 break
             }
         }
         if (!latestAssistantMessage) return
 
-        const action = latestAssistantMessage.content
-            .split(/\n\s*\n/)
-            .map(parseAssistantActionToken)
-            .find((item): item is AssistantActionPayload => Boolean(item))
+        const actions = extractAssistantActions(latestAssistantMessage.content)
+        const subagentStepActions = actions.filter((item) => item.type === 'SUBAGENT_STEP')
+        subagentStepActions.forEach((action, actionIndex) => {
+            const signature = [
+                latestAssistantIndex,
+                actionIndex,
+                action.step || '',
+                action.status || '',
+                action.title || '',
+                action.message || '',
+            ].join('|')
+            if (!emittedSubagentStepSignaturesRef.current.has(signature)) {
+                emittedSubagentStepSignaturesRef.current.add(signature)
+                const delay = action.status === 'completed' ? 1200 : 520
+                window.setTimeout(() => emitAssistantAction(action), delay)
+            }
+        })
 
-        if (!action || action.type !== 'OPEN_HISTORY_PANEL') return
+        const historyAction = actions.find((item) => item.type === 'OPEN_HISTORY_PANEL')
+        if (historyAction) {
+            const signature = [
+                latestAssistantIndex,
+                historyAction.station || '',
+                historyAction.view || '',
+                historyAction.hours || 0,
+                historyAction.timeStart || '',
+                historyAction.timeEnd || '',
+                historyAction.metric || '',
+            ].join('|')
+            if (lastAutoHistoryActionRef.current !== signature) {
+                lastAutoHistoryActionRef.current = signature
+                window.setTimeout(() => emitAssistantAction(historyAction), 300)
+            }
+        }
 
-        const signature = [
-            action.station || '',
-            action.view || '',
-            action.hours || 0,
-            action.metric || '',
-        ].join('|')
-        if (lastAutoHistoryActionRef.current === signature) return
-
-        lastAutoHistoryActionRef.current = signature
-        window.setTimeout(() => emitAssistantAction(action), 300)
+        const simulationAction = actions.find((item) => item.type === 'START_MULTI_SCENARIO_AI' && item.auto)
+        if (simulationAction) {
+            const signature = [
+                latestAssistantIndex,
+                simulationAction.selectedScenarioIds?.join(',') || '',
+            ].join('|')
+            if (lastAutoSimulationActionRef.current !== signature) {
+                lastAutoSimulationActionRef.current = signature
+                window.setTimeout(() => emitAssistantAction(simulationAction), 500)
+            }
+        }
     }, [chat.loading, chat.messages])
 
     useEffect(() => {
@@ -1331,11 +1898,75 @@ export const AiAssistantStandalone: React.FC = () => {
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const inputRef = useRef<HTMLInputElement>(null)
+    const lastAutoHistoryActionRef = useRef<string>('')
+    const lastAutoSimulationActionRef = useRef<string>('')
+    const emittedSubagentStepSignaturesRef = useRef<Set<string>>(new Set())
     const chat = useAiAssistantChat()
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [chat.messages, chat.loading])
+
+    useEffect(() => {
+        let latestAssistantMessage: ChatMessage | undefined
+        let latestAssistantIndex = -1
+        for (let index = chat.messages.length - 1; index >= 0; index -= 1) {
+            const message = chat.messages[index]
+            if (message.role === 'assistant') {
+                latestAssistantMessage = message
+                latestAssistantIndex = index
+                break
+            }
+        }
+        if (!latestAssistantMessage) return
+
+        const actions = extractAssistantActions(latestAssistantMessage.content)
+        const subagentStepActions = actions.filter((item) => item.type === 'SUBAGENT_STEP')
+        subagentStepActions.forEach((action, actionIndex) => {
+            const signature = [
+                latestAssistantIndex,
+                actionIndex,
+                action.step || '',
+                action.status || '',
+                action.title || '',
+                action.message || '',
+            ].join('|')
+            if (!emittedSubagentStepSignaturesRef.current.has(signature)) {
+                emittedSubagentStepSignaturesRef.current.add(signature)
+                const delay = action.status === 'completed' ? 1200 : 520
+                window.setTimeout(() => emitAssistantAction(action), delay)
+            }
+        })
+
+        const historyAction = actions.find((item) => item.type === 'OPEN_HISTORY_PANEL')
+        if (historyAction) {
+            const signature = [
+                latestAssistantIndex,
+                historyAction.station || '',
+                historyAction.view || '',
+                historyAction.hours || 0,
+                historyAction.timeStart || '',
+                historyAction.timeEnd || '',
+                historyAction.metric || '',
+            ].join('|')
+            if (lastAutoHistoryActionRef.current !== signature) {
+                lastAutoHistoryActionRef.current = signature
+                window.setTimeout(() => emitAssistantAction(historyAction), 300)
+            }
+        }
+
+        const simulationAction = actions.find((item) => item.type === 'START_MULTI_SCENARIO_AI' && item.auto)
+        if (simulationAction) {
+            const signature = [
+                latestAssistantIndex,
+                simulationAction.selectedScenarioIds?.join(',') || '',
+            ].join('|')
+            if (lastAutoSimulationActionRef.current !== signature) {
+                lastAutoSimulationActionRef.current = signature
+                window.setTimeout(() => emitAssistantAction(simulationAction), 500)
+            }
+        }
+    }, [chat.loading, chat.messages])
 
     useEffect(() => {
         inputRef.current?.focus()

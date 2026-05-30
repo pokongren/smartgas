@@ -91,6 +91,119 @@ interface BaseTopoEdge {
 
 const WE1_PRIMARY_PILOT_ID = DEFAULT_WE1_PILOT_ID
 const TOPOLOGY_DRAFT_STORAGE_KEY = 'smartgas-map-topology-draft-v1'
+const AI_ASSISTANT_SYNC_CHANNEL = 'ai-assistant-sync'
+const ZHONGWEI_SOURCE_NODE_ID = 'WE1-76'
+const ZHONGWEI_PRESSURE_CHANGE_SCENARIO_ID = 'zhongwei_supply_pressure_drop'
+const ZHONGWEI_DEFAULT_TARGET_PRESSURE_MPA = 9.8
+const DEFAULT_SIMULATION_TEMPERATURE_C = 15
+const DEFAULT_SIMULATION_FLOW_RATE = 3000
+
+type CutoffShowcaseStationKey = 'zhongwei' | 'jingbian' | 'yongqing'
+
+function parseOptionalNumber(raw: string): number | undefined {
+    const text = raw.trim()
+    if (!text) return undefined
+    const value = Number(text)
+    return Number.isFinite(value) ? value : undefined
+}
+
+function formatSignedDelta(value: number, digits = 2): string {
+    if (!Number.isFinite(value) || Math.abs(value) < 0.0005) return '0'
+    return `${value > 0 ? '+' : ''}${value.toFixed(digits)}`
+}
+
+function getSimulationDeltaTone(delta: number | null | undefined): {
+    color: string
+    bg: string
+    border: string
+    arrow: string
+} {
+    if (delta == null || !Number.isFinite(delta) || Math.abs(delta) < 0.0005) {
+        return {
+            color: '#cbd5e1',
+            bg: 'rgba(51,65,85,0.48)',
+            border: 'rgba(148,163,184,0.32)',
+            arrow: '→',
+        }
+    }
+    if (delta > 0) {
+        return {
+            color: '#fbbf24',
+            bg: 'rgba(120,53,15,0.52)',
+            border: 'rgba(251,191,36,0.48)',
+            arrow: '↑',
+        }
+    }
+    return {
+        color: '#38bdf8',
+        bg: 'rgba(8,47,73,0.58)',
+        border: 'rgba(56,189,248,0.5)',
+        arrow: '↓',
+    }
+}
+
+function getIdNumericSuffix(id: string): number | null {
+    const match = id.match(/-(\d+)$/)
+    if (!match) return null
+    const value = Number.parseInt(match[1], 10)
+    return Number.isFinite(value) ? value : null
+}
+
+function getSimulationEdgeStartIndex(edgeId: string): number | null {
+    const match = edgeId.match(/-T-(\d+)$/)
+    if (!match) return getIdNumericSuffix(edgeId)
+    const value = Number.parseInt(match[1], 10)
+    return Number.isFinite(value) ? value : null
+}
+
+function getFiniteFlowRate(edge: SimulationOverlay['edges'][number] | undefined): number | undefined {
+    const flow = edge?.flow_rate
+    return typeof flow === 'number' && Number.isFinite(flow) ? flow : undefined
+}
+
+function getSimulationNodeFlowRate(nodeId: string, overlay: SimulationOverlay): number | undefined {
+    const nodeIndex = getIdNumericSuffix(nodeId)
+    if (nodeIndex == null) return undefined
+
+    const samples = overlay.edges
+        .map(edge => ({
+            edge,
+            startIndex: getSimulationEdgeStartIndex(edge.id),
+            flowRate: getFiniteFlowRate(edge),
+        }))
+        .filter((item): item is {
+            edge: SimulationOverlay['edges'][number]
+            startIndex: number
+            flowRate: number
+        } => item.startIndex != null && item.flowRate != null)
+        .sort((left, right) => left.startIndex - right.startIndex)
+
+    const outgoing = samples.find(item => item.startIndex === nodeIndex)
+    if (outgoing) return outgoing.flowRate
+
+    const incoming = samples
+        .filter(item => item.startIndex < nodeIndex)
+        .sort((left, right) => right.startIndex - left.startIndex)[0]
+    return incoming?.flowRate
+}
+
+function emitCutoffShowcaseAssistantEvent(type: 'progress' | 'result', detail: Record<string, unknown>): void {
+    const eventType = type === 'progress'
+        ? 'assistant-cutoff-showcase-progress'
+        : 'assistant-cutoff-showcase-result'
+    const payload = { type: eventType, detail }
+    window.dispatchEvent(new CustomEvent(eventType, { detail }))
+    if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(payload, '*')
+    }
+    try {
+        const channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+        channel.postMessage(payload)
+        channel.close()
+    } catch {
+        // BroadcastChannel is optional for same-window runs.
+    }
+}
 
 function formatDateTimeLabel(value?: string): string {
     if (!value) return '-'
@@ -235,10 +348,10 @@ const MAINLINE_SCENARIO_PLAYBOOK: Record<string, {
         talk: '这一幕讲限流，不是断辟，而是主干还能跑但运行边界开始变紧。',
     },
     zhongwei_supply_pressure_drop: {
-        focus: '重点看中卫出站压力下调后，全段压力梯度和下游告警有没有抬升。',
+        focus: '重点看中卫站压力/流量变化后，全段压力梯度和下游告警有没有抬升。',
         success: '中卫侧扰动能沿主干传到华东，节点压力和告警数有清晰变化。',
-        risk: '如果边界压力变化不明显，优先核对 seed 里的中卫 source 覆盖参数。',
-        talk: '这一幕讲上游边界变弱后，长距离主干是怎么把影响传到华东末端的。',
+        risk: '如果压力/流量变化影响不明显，优先核对 seed 里的中卫 source 覆盖参数。',
+        talk: '这一幕讲上游边界变化后，长距离主干是怎么把影响传到华东末端的。',
     },
     zhengzhou_compressor_offline: {
         focus: '重点看郑州压气站停运后，河南到华东段压力恢复能力。',
@@ -364,6 +477,7 @@ const MapTopologyView: React.FC = () => {
     const handleMapLoad = useCallback((map: any) => setMapInstance(map), [])
     const importedOnceRef = useRef(false)
     const appliedFocusNodeRef = useRef<string | null>(null)
+    const appliedCutoffDemoRef = useRef<string | null>(null)
 
     // 管线数据异步加载
     const [pipelines, setPipelines] = useState<PipelinePackage[]>([])
@@ -485,9 +599,28 @@ const MapTopologyView: React.FC = () => {
     }, [pressurePopupOverlay, topoNodes])
 
     // SimParamEditor 状态
-    const [nodeOverrides, setNodeOverrides] = useState<Record<string, { target_pressure_mpa?: number; min_pressure_mpa?: number }>>({})
+    const [nodeOverrides, setNodeOverrides] = useState<Record<string, {
+        target_pressure_mpa?: number
+        min_pressure_mpa?: number
+        nominal_flow?: number
+        supply_nominal?: number
+        supply_max?: number
+    }>>({})
+    const [zhongweiPressureChangeValue, setZhongweiPressureChangeValue] = useState('9.30')
+    const [zhongweiFlowChangeValue, setZhongweiFlowChangeValue] = useState('1800')
     const [edgeLengthOverrides, setEdgeLengthOverrides] = useState<Record<string, number>>({})
-    const [globalDefaults, setGlobalDefaults] = useState<{ default_pressure_mpa?: number; default_flow_rate?: number; apply_to_sources?: boolean }>({})
+    const [edgeFlowOverrides, setEdgeFlowOverrides] = useState<Record<string, number>>({})
+    const [globalDefaults, setGlobalDefaults] = useState<{
+        default_pressure_mpa?: number
+        default_temperature_c?: number
+        default_flow_rate?: number
+        apply_to_sources?: boolean
+    }>({
+        default_pressure_mpa: ZHONGWEI_DEFAULT_TARGET_PRESSURE_MPA,
+        default_temperature_c: DEFAULT_SIMULATION_TEMPERATURE_C,
+        default_flow_rate: DEFAULT_SIMULATION_FLOW_RATE,
+        apply_to_sources: true,
+    })
     const [paramValidationError, setParamValidationError] = useState<string | null>(null)
 
     // 流动动画与渲染安全
@@ -510,6 +643,7 @@ const MapTopologyView: React.FC = () => {
     const [cutoffEdgeId, setCutoffEdgeId] = useState<string | null>(null)
     const [cutoffClosedEdgeIds, setCutoffClosedEdgeIds] = useState<string[]>([])
     const [cutoffStoppedEdgeIds, setCutoffStoppedEdgeIds] = useState<string[]>([])
+    const [cutoffRerouteEdgeIds, setCutoffRerouteEdgeIds] = useState<string[]>([])
     const [cutoffResult, setCutoffResult] = useState<CutoffResult | null>(null)
     const [cutoffSearch, setCutoffSearch] = useState('')
 
@@ -624,6 +758,7 @@ const MapTopologyView: React.FC = () => {
         setCutoffEdgeId(null)
         setCutoffClosedEdgeIds([])
         setCutoffStoppedEdgeIds([])
+        setCutoffRerouteEdgeIds([])
         setCutoffResult(null)
         setStatusMsg(`截断点已选：${nodeName || nodeId}`)
     }, [])
@@ -637,6 +772,7 @@ const MapTopologyView: React.FC = () => {
         setCutoffEdgeId(edge.id)
         setCutoffClosedEdgeIds([])
         setCutoffStoppedEdgeIds([])
+        setCutoffRerouteEdgeIds([])
         setCutoffResult(null)
         setStatusMsg(`截断管段已选：${edge.name || edge.id}`)
     }, [])
@@ -1238,17 +1374,43 @@ const MapTopologyView: React.FC = () => {
         setStatusMsg(`已从地图联动定位到拓扑节点：${targetNode.name}`)
     }, [flyTo, location.search, topoNodes])
 
+    const collectPathEdgeIds = useCallback((paths: string[][]) => {
+        const edgeIds = new Set<string>()
+        for (const path of paths) {
+            for (let i = 0; i < path.length - 1; i++) {
+                const left = path[i]
+                const right = path[i + 1]
+                const edge = topoEdges.find(item => (
+                    (item.startNodeId === left && item.endNodeId === right) ||
+                    (item.startNodeId === right && item.endNodeId === left)
+                ))
+                if (edge) edgeIds.add(edge.id)
+            }
+        }
+        return [...edgeIds]
+    }, [topoEdges])
+
     // ================== 截断仿真 ==================
-    const runCutoffSimulation = useCallback(() => {
-        if ((!cutoffNodeId && !cutoffEdgeId) || topoNodes.length === 0) return
+    const runCutoffSimulationForTarget = useCallback((target: { nodeId?: string | null; edgeId?: string | null }) => {
+        const targetNodeId = target.nodeId ?? null
+        const targetEdgeId = target.edgeId ?? null
+        if ((!targetNodeId && !targetEdgeId) || topoNodes.length === 0) return null
         const gn = topoNodes.map(n => ({ id: n.id, name: n.name, type: n.type }))
         const ge = topoEdges.map(e => ({ id: e.id, startNodeId: e.startNodeId, endNodeId: e.endNodeId }))
-        const result = cutoffEdgeId
-            ? simulateEdgeCutoff(gn, ge, cutoffEdgeId)
-            : simulateCutoff(gn, ge, cutoffNodeId!)
+        const result = targetEdgeId
+            ? simulateEdgeCutoff(gn, ge, targetEdgeId)
+            : simulateCutoff(gn, ge, targetNodeId!)
+
+        setCutoffNodeId(targetEdgeId ? null : targetNodeId)
+        setCutoffEdgeId(targetEdgeId)
         setCutoffResult(result)
         setCutoffClosedEdgeIds(result.cutoffEdgeIds)
         setCutoffStoppedEdgeIds(result.stoppedEdgeIds)
+        setCutoffRerouteEdgeIds(collectPathEdgeIds(
+            result.affectedNodes
+                .filter(node => node.status === 'rerouted' && node.pathAfter.length > 1)
+                .map(node => node.pathAfter)
+        ))
 
         // ---- 地图高亮渲染 ----
         // 先恢复所有已高亮节点
@@ -1259,10 +1421,10 @@ const MapTopologyView: React.FC = () => {
         highlightedMarkersRef.current.clear()
 
         // 截断节点：大红圆
-        const cutNode = cutoffNodeId ? nodesRef.current.find(n => n.id === cutoffNodeId) : null
-        if (cutoffNodeId && cutNode?.marker) {
+        const cutNode = targetNodeId ? nodesRef.current.find(n => n.id === targetNodeId) : null
+        if (targetNodeId && cutNode?.marker) {
             const orig = cutNode.marker.getContent()
-            highlightedMarkersRef.current.set(cutoffNodeId, orig)
+            highlightedMarkersRef.current.set(targetNodeId, orig)
             cutNode.marker.setContent(
                 `<div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
                     <div style="width:18px;height:18px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 10px #ef4444; pointer-events: auto;"></div>
@@ -1298,7 +1460,97 @@ const MapTopologyView: React.FC = () => {
             })
         }
         setStatusMsg(`仿真完成：${lostCount} 个断供，${result.summary.rerouted} 个绕行，${result.stoppedEdgeIds.length} 条管段停流`)
-    }, [buildClosedEdgeOverrides, cutoffEdgeId, cutoffNodeId, sim, topoNodes, topoEdges])
+        return result
+    }, [buildClosedEdgeOverrides, collectPathEdgeIds, sim, topoNodes, topoEdges])
+
+    const runCutoffSimulation = useCallback(() => {
+        runCutoffSimulationForTarget({ nodeId: cutoffNodeId, edgeId: cutoffEdgeId })
+    }, [cutoffEdgeId, cutoffNodeId, runCutoffSimulationForTarget])
+
+    const runCutoffNodeDemo = useCallback((node: TopoNode, options?: { emitAssistantResult?: boolean; stationKey?: CutoffShowcaseStationKey }) => {
+        setCutoffSearch('')
+        flyTo(node)
+        setSelectedNode(null)
+        if (options?.emitAssistantResult) {
+            emitCutoffShowcaseAssistantEvent('progress', {
+                skillName: 'map-topology-cutoff-showcase',
+                station: options.stationKey,
+                stationLabel: node.name,
+                step: 'run-cutoff',
+                message: `已切换到截断面板，正在以${node.name}作为截断点运行推演。`,
+            })
+        }
+        const result = runCutoffSimulationForTarget({ nodeId: node.id })
+        if (options?.emitAssistantResult && result) {
+            emitCutoffShowcaseAssistantEvent('result', {
+                skillName: 'map-topology-cutoff-showcase',
+                station: options.stationKey,
+                stationLabel: node.name,
+                message: `${node.name}截断推演已完成。`,
+                summary: {
+                    supplyLost: result.summary.supplyLost,
+                    rerouted: result.summary.rerouted,
+                    same: result.summary.same,
+                    stoppedEdges: result.stoppedEdgeIds.length,
+                    rerouteEdges: collectPathEdgeIds(
+                        result.affectedNodes
+                            .filter(item => item.status === 'rerouted' && item.pathAfter.length > 1)
+                            .map(item => item.pathAfter)
+                    ).length,
+                    sourceCount: result.sourceNodes.length,
+                    totalDistributionNodes: result.totalDistributionNodes,
+                },
+                affectedNodes: result.affectedNodes.slice(0, 12).map(item => ({
+                    name: item.name,
+                    status: item.status,
+                })),
+            })
+        }
+    }, [collectPathEdgeIds, flyTo, runCutoffSimulationForTarget])
+
+    const cutoffDemoTargets = useMemo(() => {
+        const presets = [
+            { label: '中卫截断', name: '中卫压气站', icon: 'content_cut' },
+            { label: '靖边截断', name: '靖边压气站', icon: 'alt_route' },
+            { label: '永清截断', name: '永清压气站', icon: 'emergency_home' },
+        ]
+        return presets.map(preset => ({
+            ...preset,
+            node: topoNodes.find(node => node.name === preset.name)
+                ?? topoNodes.find(node => node.name.includes(preset.name.replace('压气站', ''))),
+        }))
+    }, [topoNodes])
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search)
+        const rawKey = params.get('cutoffDemo') || ''
+        const stationKey = (['zhongwei', 'jingbian', 'yongqing'].includes(rawKey) ? rawKey : '') as CutoffShowcaseStationKey | ''
+        if (!stationKey || topoNodes.length === 0) return
+        if (appliedCutoffDemoRef.current === `${stationKey}:${topoNodes.length}`) return
+
+        const labelByKey: Record<CutoffShowcaseStationKey, string> = {
+            zhongwei: '中卫截断',
+            jingbian: '靖边截断',
+            yongqing: '永清截断',
+        }
+        const target = cutoffDemoTargets.find(item => item.label === labelByKey[stationKey])
+        if (!target?.node) return
+
+        appliedCutoffDemoRef.current = `${stationKey}:${topoNodes.length}`
+        setActiveTab('cutoff')
+        setEditMode('view')
+        emitCutoffShowcaseAssistantEvent('progress', {
+            skillName: 'map-topology-cutoff-showcase',
+            station: stationKey,
+            stationLabel: target.node.name,
+            step: 'open-map-topology',
+            message: `已打开地图拓扑管理页面，正在切换到“截断”面板并定位${target.node.name}。`,
+        })
+        const timer = window.setTimeout(() => {
+            runCutoffNodeDemo(target.node!, { emitAssistantResult: true, stationKey })
+        }, 250)
+        return () => window.clearTimeout(timer)
+    }, [cutoffDemoTargets, location.search, runCutoffNodeDemo, topoNodes.length])
 
     /** 清除截断仿真高亮，恢复原始样式 */
     const clearCutoffHighlight = useCallback(() => {
@@ -1311,6 +1563,7 @@ const MapTopologyView: React.FC = () => {
         setCutoffEdgeId(null)
         setCutoffClosedEdgeIds([])
         setCutoffStoppedEdgeIds([])
+        setCutoffRerouteEdgeIds([])
         setCutoffResult(null)
         setStatusMsg('截断仿真已清除')
     }, [])
@@ -1611,6 +1864,21 @@ const MapTopologyView: React.FC = () => {
         return buildSimulationOverlayMapping(displayNodes, displayEdges, sim.overlay)
     }, [sim.overlay, topoNodes, topoEdges])
 
+    const baselineOverlayMapping = useMemo(() => {
+        if (!sim.baselineOverlay || topoNodes.length === 0) return null
+        const displayNodes = topoNodes.map(n => ({
+            id: n.id,
+            name: n.name,
+            sourceNodeIds: n.sourceNodeIds,
+        }))
+        const displayEdges = topoEdges.map(e => ({
+            id: e.id,
+            name: e.name,
+            sourceEdgeIds: e.sourceEdgeIds,
+        }))
+        return buildSimulationOverlayMapping(displayNodes, displayEdges, sim.baselineOverlay)
+    }, [sim.baselineOverlay, topoNodes, topoEdges])
+
     useEffect(() => {
         if (!sim.overlay) {
             setLineFlowPhase(0)
@@ -1652,6 +1920,10 @@ const MapTopologyView: React.FC = () => {
                 const pressureIn = match.averagePressureInMpa
                 const alert = match.highestAlertLevel
                 if (pressureOut == null) continue
+                const baselineMatch = baselineOverlayMapping?.nodeMatchesByDisplayId.get(node.id)
+                const baselinePressureOut = baselineMatch?.averagePressureMpa ?? null
+                const baselineDelta = typeof baselinePressureOut === 'number' ? pressureOut - baselinePressureOut : null
+                const baselineDeltaTone = getSimulationDeltaTone(baselineDelta)
 
                 // Animation logic
                 let displayPressure = pressureOut
@@ -1668,7 +1940,7 @@ const MapTopologyView: React.FC = () => {
                         const diffTime = pressureOut - pPrev
                         if (Math.abs(diffTime) > 0.05) {
                             const sign = diffTime > 0 ? '+' : ''
-                            const colorClass = diffTime > 0 ? '#4ade80' : '#f87171'
+                            const colorClass = diffTime > 0 ? '#fbbf24' : '#38bdf8'
                             const translateY = -20 * ratio
                             const opacity = ratio < 0.8 ? 1 : (1 - ratio) * 5
                             displayDeltaHtml = `<div style="position:absolute;bottom:calc(100% + 5px);font-weight:bold;color:${colorClass};font-size:13px;text-shadow:0 0 4px rgba(0,0,0,0.8); transform: translateY(${translateY}px); opacity: ${opacity}; white-space:nowrap; z-index:20;">${sign}${diffTime.toFixed(2)}</div>`
@@ -1685,6 +1957,9 @@ const MapTopologyView: React.FC = () => {
                 const labelHtml = showInOut
                     ? `${node.name} <span style="color:#94a3b8;margin-right:2px;">进${pressureIn.toFixed(2)}</span><span style="color:#475569;margin-right:2px;">|</span><span style="color:#38bdf8;font-weight:600;">出${displayPressure.toFixed(2)}</span> <span style="color:#cbd5e1;font-size:9px;">MPa</span>`
                     : `<span style="font-weight:500;">${node.name}</span> <span style="color:#38bdf8;font-weight:600;">${displayPressure.toFixed(2)}</span> <span style="color:#cbd5e1;font-size:9px;">MPa</span>`
+                const baselineDeltaHtml = baselineDelta == null
+                    ? ''
+                    : `<div style="margin-top:3px;display:inline-block;padding:1px 6px;border-radius:999px;color:${baselineDeltaTone.color};background:${baselineDeltaTone.bg};border:1px solid ${baselineDeltaTone.border};font-size:10px;font-weight:800;animation:smartgas-sim-delta-pulse 1.35s ease-in-out infinite;">前${baselinePressureOut?.toFixed(2)} 后${pressureOut.toFixed(2)} ${baselineDeltaTone.arrow} ΔP ${formatSignedDelta(baselineDelta, 2)}</div>`
 
                 const baseShapeCss = `width:${size}px;height:${size}px;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9) 0%, ${color} 40%, rgba(0,0,0,0.6) 100%);border:1px solid rgba(255,255,255,0.6);box-shadow:${flashGlow ? `0 0 18px rgba(248,113,113,0.85), 0 0 36px rgba(248,113,113,0.35),` : ''}0 4px 8px rgba(0,0,0,0.5), inset 0 -2px 4px rgba(0,0,0,0.4), 0 0 10px ${color};pointer-events:auto;transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1);`
 
@@ -1698,17 +1973,18 @@ const MapTopologyView: React.FC = () => {
                     <div style="position:relative;display:flex;flex-direction:column;align-items:center;pointer-events:none;">
                         ${displayDeltaHtml}
                         <div style="${shapeStyle}"></div>
-                        <div style="${labelContainerStyle}">${flashGlow ? '<span style="color:#fca5a5;font-size:9px;margin-right:4px;">故障演示</span>' : ''}${labelHtml}</div>
+                        <div style="${labelContainerStyle}">${flashGlow ? '<span style="color:#fca5a5;font-size:9px;margin-right:4px;">故障演示</span>' : ''}${labelHtml}${baselineDeltaHtml}</div>
                     </div>
                 `)
             } catch (error) {
                 console.warn('[MapTopologyView] update node label failed', node.id, error)
             }
         }
-    }, [overlayMapping, topoNodes, sim.animatingState, lineFlowPhase, damageFlashVisible, sim.currentScenario])
+    }, [baselineOverlayMapping, overlayMapping, topoNodes, sim.animatingState, lineFlowPhase, damageFlashVisible, sim.currentScenario])
 
     const cutoffClosedEdgeSet = useMemo(() => new Set(cutoffClosedEdgeIds), [cutoffClosedEdgeIds])
     const cutoffStoppedEdgeSet = useMemo(() => new Set(cutoffStoppedEdgeIds), [cutoffStoppedEdgeIds])
+    const cutoffRerouteEdgeSet = useMemo(() => new Set(cutoffRerouteEdgeIds), [cutoffRerouteEdgeIds])
 
     // 仿真管段利用率着色 + 前端截断停流
     useEffect(() => {
@@ -1717,6 +1993,7 @@ const MapTopologyView: React.FC = () => {
             try {
                 const isCutoffClosed = cutoffClosedEdgeSet.has(edge.id)
                 const isStoppedByCutoff = cutoffStoppedEdgeSet.has(edge.id)
+                const isReroutePath = cutoffRerouteEdgeSet.has(edge.id)
                 if (isCutoffClosed || isStoppedByCutoff) {
                     forEachEdgePolyline(edge, polyline => {
                         polyline?.setOptions({
@@ -1726,6 +2003,19 @@ const MapTopologyView: React.FC = () => {
                             strokeStyle: 'dashed',
                             strokeDasharray: isCutoffClosed ? [10, 8] : [4, 8],
                             zIndex: isCutoffClosed ? 170 : 104,
+                        })
+                    })
+                    continue
+                }
+                if (isReroutePath) {
+                    forEachEdgePolyline(edge, polyline => {
+                        polyline?.setOptions({
+                            strokeColor: '#f59e0b',
+                            strokeWeight: LINE_WEIGHT + 2,
+                            strokeOpacity: 0.92,
+                            strokeStyle: 'solid',
+                            strokeDasharray: lineFlowPhase % 2 === 0 ? [16, 8] : [8, 16],
+                            zIndex: 150,
                         })
                     })
                     continue
@@ -1761,7 +2051,7 @@ const MapTopologyView: React.FC = () => {
                 console.warn('[MapTopologyView] update edge style failed', edge.id, error)
             }
         }
-    }, [cutoffClosedEdgeSet, cutoffStoppedEdgeSet, overlayMapping, topoEdges, lineFlowPhase, damageFlashVisible])
+    }, [cutoffClosedEdgeSet, cutoffRerouteEdgeSet, cutoffStoppedEdgeSet, overlayMapping, topoEdges, lineFlowPhase, damageFlashVisible])
 
     // 仿真状态同步到展示页 & AI 助手上下文
     useEffect(() => {
@@ -1806,16 +2096,44 @@ const MapTopologyView: React.FC = () => {
     // 带参数运行仿真
     const handleRunSimulation = useCallback(() => {
         const initialInput: SimulationInitialInput = {}
-        const nodeOvr = Object.entries(nodeOverrides)
-            .filter(([, v]) => (v as { target_pressure_mpa?: number }).target_pressure_mpa != null)
-            .map(([nodeId, v]) => ({ node_id: nodeId, target_pressure_mpa: (v as { target_pressure_mpa?: number }).target_pressure_mpa }))
+        const nodeOvr: NonNullable<SimulationInitialInput['node_overrides']> = []
+        Object.entries(nodeOverrides).forEach(([nodeId, value]) => {
+            const override: NonNullable<SimulationInitialInput['node_overrides']>[number] = { node_id: nodeId }
+            if (value.target_pressure_mpa != null) override.target_pressure_mpa = value.target_pressure_mpa
+            if (value.min_pressure_mpa != null) override.min_pressure_mpa = value.min_pressure_mpa
+            if (value.nominal_flow != null) override.nominal_flow = value.nominal_flow
+            if (value.supply_nominal != null) override.supply_nominal = value.supply_nominal
+            if (value.supply_max != null) override.supply_max = value.supply_max
+            if (
+                override.target_pressure_mpa != null ||
+                override.min_pressure_mpa != null ||
+                override.nominal_flow != null ||
+                override.supply_nominal != null ||
+                override.supply_max != null
+            ) {
+                nodeOvr.push(override)
+            }
+        })
         if (nodeOvr.length > 0) initialInput.node_overrides = nodeOvr
+
+        const edgeOverrideMap = new Map<string, NonNullable<SimulationInitialInput['edge_overrides']>[number]>()
+        Object.entries(edgeLengthOverrides).forEach(([edgeId, length]) => {
+            edgeOverrideMap.set(edgeId, { edge_id: edgeId, length_km: length })
+        })
+        Object.entries(edgeFlowOverrides).forEach(([edgeId, flow]) => {
+            const existing = edgeOverrideMap.get(edgeId) ?? { edge_id: edgeId }
+            existing.flow_rate = flow
+            edgeOverrideMap.set(edgeId, existing)
+        })
+        if (edgeOverrideMap.size > 0) initialInput.edge_overrides = Array.from(edgeOverrideMap.values())
+
         if (globalDefaults.default_pressure_mpa != null) initialInput.default_pressure_mpa = globalDefaults.default_pressure_mpa
+        if (globalDefaults.default_temperature_c != null) initialInput.default_temperature_c = globalDefaults.default_temperature_c
         if (globalDefaults.default_flow_rate != null) initialInput.default_flow_rate = globalDefaults.default_flow_rate
         if (globalDefaults.apply_to_sources) initialInput.apply_to_sources = true
         pressurePopupPendingRef.current = true
         void sim.runSimulation({ initialInput: Object.keys(initialInput).length > 0 ? initialInput : undefined })
-    }, [globalDefaults, nodeOverrides, sim])
+    }, [edgeFlowOverrides, edgeLengthOverrides, globalDefaults, nodeOverrides, sim])
 
     // 种子节点数据（供 SimParamEditor 使用）
     const seedNodesForEditor = useMemo(() => {
@@ -1824,16 +2142,113 @@ const MapTopologyView: React.FC = () => {
             id: n.id,
             name: topoNodes.find(tn => tn.sourceNodeIds?.includes(n.id))?.name ?? n.id,
             operating_pressure_in: n.pressure_in_mpa ?? n.pressure_mpa,
+            operating_pressure_out: n.pressure_mpa,
             target_pressure_mpa: n.pressure_mpa,
             min_pressure_mpa: undefined as number | undefined,
+            default_flow_rate: getSimulationNodeFlowRate(n.id, sim.overlay),
         }))
     }, [sim.overlay, topoNodes])
+
+    const zhongweiPressureBaseMpa = useMemo(() => {
+        const zhongweiNode = seedNodesForEditor.find(node => node.id === ZHONGWEI_SOURCE_NODE_ID)
+        const candidates = [
+            zhongweiNode?.target_pressure_mpa,
+            zhongweiNode?.operating_pressure_out,
+            ZHONGWEI_DEFAULT_TARGET_PRESSURE_MPA,
+        ]
+        return candidates.find((value): value is number => typeof value === 'number' && Number.isFinite(value)) ?? ZHONGWEI_DEFAULT_TARGET_PRESSURE_MPA
+    }, [seedNodesForEditor])
+
+    const zhongweiFlowBase = useMemo(() => {
+        const zhongweiNode = seedNodesForEditor.find(node => node.id === ZHONGWEI_SOURCE_NODE_ID)
+        const candidates = [
+            zhongweiNode?.default_flow_rate,
+            globalDefaults.default_flow_rate,
+            DEFAULT_SIMULATION_FLOW_RATE,
+        ]
+        return candidates.find((value): value is number => typeof value === 'number' && Number.isFinite(value)) ?? DEFAULT_SIMULATION_FLOW_RATE
+    }, [globalDefaults.default_flow_rate, seedNodesForEditor])
+
+    const applyZhongweiPressureChange = useCallback((rawValue: string) => {
+        setZhongweiPressureChangeValue(rawValue)
+        const targetPressure = parseOptionalNumber(rawValue)
+        setNodeOverrides(prev => {
+            const next = { ...prev }
+            const current = { ...(next[ZHONGWEI_SOURCE_NODE_ID] ?? {}) }
+            if (targetPressure == null) {
+                delete current.target_pressure_mpa
+            } else {
+                current.target_pressure_mpa = Number(targetPressure.toFixed(2))
+            }
+            if (
+                current.target_pressure_mpa == null &&
+                current.min_pressure_mpa == null &&
+                current.nominal_flow == null &&
+                current.supply_nominal == null &&
+                current.supply_max == null
+            ) {
+                delete next[ZHONGWEI_SOURCE_NODE_ID]
+            } else {
+                next[ZHONGWEI_SOURCE_NODE_ID] = current
+            }
+            return next
+        })
+    }, [])
+
+    const applyZhongweiFlowChange = useCallback((rawValue: string) => {
+        setZhongweiFlowChangeValue(rawValue)
+        const targetFlow = parseOptionalNumber(rawValue)
+        setNodeOverrides(prev => {
+            const next = { ...prev }
+            const current = { ...(next[ZHONGWEI_SOURCE_NODE_ID] ?? {}) }
+            if (targetFlow == null) {
+                delete current.nominal_flow
+                delete current.supply_nominal
+                delete current.supply_max
+            } else {
+                const flow = Math.max(0, Number(targetFlow.toFixed(1)))
+                current.nominal_flow = flow
+                current.supply_nominal = flow
+                current.supply_max = flow
+            }
+            if (
+                current.target_pressure_mpa == null &&
+                current.min_pressure_mpa == null &&
+                current.nominal_flow == null &&
+                current.supply_nominal == null &&
+                current.supply_max == null
+            ) {
+                delete next[ZHONGWEI_SOURCE_NODE_ID]
+            } else {
+                next[ZHONGWEI_SOURCE_NODE_ID] = current
+            }
+            return next
+        })
+    }, [])
+
+    const handleScenarioChange = useCallback((scenarioId: string) => {
+        sim.setScenario(scenarioId)
+        if (scenarioId === ZHONGWEI_PRESSURE_CHANGE_SCENARIO_ID) {
+            applyZhongweiPressureChange(zhongweiPressureChangeValue)
+            applyZhongweiFlowChange(zhongweiFlowChangeValue)
+        }
+    }, [applyZhongweiFlowChange, applyZhongweiPressureChange, sim, zhongweiFlowChangeValue, zhongweiPressureChangeValue])
+
+    const zhongweiPressureTarget = parseOptionalNumber(zhongweiPressureChangeValue)
+    const zhongweiPressureTargetMpa = zhongweiPressureTarget == null
+        ? undefined
+        : Number(zhongweiPressureTarget.toFixed(2))
+    const zhongweiFlowValue = parseOptionalNumber(zhongweiFlowChangeValue)
+    const zhongweiFlowTarget = zhongweiFlowValue == null
+        ? undefined
+        : Math.max(0, Number(zhongweiFlowValue.toFixed(1)))
 
     const edgesForEditor = useMemo(() => {
         if (!sim.overlay) return []
         return sim.overlay.edges.map(e => ({
             id: e.id,
             name: topoEdges.find(te => te.sourceEdgeIds?.includes(e.id))?.name ?? e.id,
+            defaultFlowRate: e.flow_rate,
         }))
     }, [sim.overlay, topoEdges])
 
@@ -2313,7 +2728,7 @@ const MapTopologyView: React.FC = () => {
                                         </div>
                                         <select
                                             value={sim.currentScenario}
-                                            onChange={e => sim.setScenario(e.target.value)}
+                                            onChange={e => handleScenarioChange(e.target.value)}
                                             className="flex-1 bg-slate-800/80 border border-indigo-500/25 rounded-lg text-[11px] text-slate-200 px-2.5 py-1.5 outline-none hover:border-cyan-500/50 transition-colors"
                                         >
                                             {scenarioOptions.map(s => (
@@ -2321,6 +2736,48 @@ const MapTopologyView: React.FC = () => {
                                             ))}
                                         </select>
                                     </div>
+                                    {sim.currentScenario === ZHONGWEI_PRESSURE_CHANGE_SCENARIO_ID && (
+                                        <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/20 p-2">
+                                            <div className="mb-1 flex items-center justify-between gap-2">
+                                                <span className="text-[11px] font-semibold text-cyan-100">中卫站压力/流量变化</span>
+                                                <span className="text-[10px] text-slate-400">
+                                                    基准 {zhongweiPressureBaseMpa.toFixed(2)} MPa / {zhongweiFlowBase.toFixed(0)} 万方/天
+                                                </span>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <div className="grid grid-cols-[62px_minmax(0,1fr)_82px] items-center gap-2">
+                                                    <div className="text-[10px] text-slate-300">目标压力</div>
+                                                    <div className="min-w-0 truncate text-[10px] text-slate-400">
+                                                        设定 {zhongweiPressureTargetMpa == null ? '--' : `${zhongweiPressureTargetMpa.toFixed(2)} MPa`}
+                                                    </div>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={zhongweiPressureChangeValue}
+                                                        placeholder="9.30"
+                                                        onChange={(event) => applyZhongweiPressureChange(event.target.value)}
+                                                        className="w-full rounded border border-cyan-500/30 bg-black/35 px-2 py-1 text-center text-[11px] text-cyan-100 tabular-nums outline-none placeholder:text-slate-500"
+                                                        title="中卫站目标出站压力 MPa"
+                                                    />
+                                                </div>
+                                                <div className="grid grid-cols-[62px_minmax(0,1fr)_82px] items-center gap-2">
+                                                    <div className="text-[10px] text-slate-300">目标流量</div>
+                                                    <div className="min-w-0 truncate text-[10px] text-slate-400">
+                                                        设定 {zhongweiFlowTarget == null ? '--' : `${zhongweiFlowTarget.toFixed(0)} 万方/天`}
+                                                    </div>
+                                                    <input
+                                                        type="number"
+                                                        step="1"
+                                                        value={zhongweiFlowChangeValue}
+                                                        placeholder="1800"
+                                                        onChange={(event) => applyZhongweiFlowChange(event.target.value)}
+                                                        className="w-full rounded border border-cyan-500/30 bg-black/35 px-2 py-1 text-center text-[11px] text-cyan-100 tabular-nums outline-none placeholder:text-slate-500"
+                                                        title="中卫站目标供气流量 万方/天"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                     {/* 历史快照 */}
                                     <div className="flex items-center gap-2.5">
                                         <div className="w-7 h-7 rounded-md bg-cyan-900/40 border border-cyan-500/30 flex items-center justify-center shrink-0 shadow-[0_0_8px_rgba(6,182,212,0.15)]">
@@ -2622,6 +3079,28 @@ const MapTopologyView: React.FC = () => {
                                     )}
                                 </div>
 
+                                {/* 一键演示按钮 */}
+                                <div className="rounded-lg border border-cyan-500/20 bg-cyan-950/10 p-2">
+                                    <div className="mb-1.5 flex items-center justify-between">
+                                        <p className="text-[10px] font-semibold tracking-wider text-cyan-300">截断推演演示</p>
+                                        <span className="text-[9px] text-gray-500">自动选点并运行</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        {cutoffDemoTargets.map(target => (
+                                            <button
+                                                key={target.label}
+                                                onClick={() => target.node && runCutoffNodeDemo(target.node)}
+                                                disabled={!target.node || topoNodes.length === 0}
+                                                title={target.node ? `以${target.node.name}作为截断点运行推演` : `未找到${target.name}`}
+                                                className="flex items-center justify-center gap-1 rounded-md border border-cyan-500/25 bg-slate-900/70 px-2 py-1.5 text-[10px] font-semibold text-cyan-100 transition-colors hover:border-cyan-300/60 hover:bg-cyan-900/30 disabled:cursor-not-allowed disabled:opacity-35"
+                                            >
+                                                <span className="material-symbols-outlined text-[13px]">{target.icon}</span>
+                                                {target.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 {/* 当前截断点 */}
                                 {(cutoffNodeId || cutoffEdgeId) && (
                                     <div className="bg-red-900/20 border border-red-700/40 rounded-lg p-2">
@@ -2685,6 +3164,10 @@ const MapTopologyView: React.FC = () => {
                                             <div className="mt-2 flex items-center justify-between rounded bg-red-950/25 px-2 py-1 text-[10px] text-red-200">
                                                 <span>停流管段</span>
                                                 <b>{cutoffResult.stoppedEdgeIds.length}</b>
+                                            </div>
+                                            <div className="mt-1 flex items-center justify-between rounded bg-orange-950/25 px-2 py-1 text-[10px] text-orange-200">
+                                                <span>绕行路径管段</span>
+                                                <b>{cutoffRerouteEdgeIds.length}</b>
                                             </div>
                                         </div>
 

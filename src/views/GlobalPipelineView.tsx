@@ -24,12 +24,26 @@ import {
 import { EmptyScadaState, ScadaFloatingPanel } from '@/views/global-pipeline/ScadaFloatingPanel'
 import type { ScadaRecord } from '@/views/global-pipeline/scadaConfig'
 import { setAssistantRuntimeContext } from '@/components/ai-assistant/runtimeAssistantContext'
+import { SimPanel } from '@/components/topology/SimPanel'
+import SimParamEditor from '@/components/topology/SimParamEditor'
 import { useSimulation } from '@/hooks/useSimulation'
 import {
     DEFAULT_WE1_PILOT_ID,
     resolveSimulationPilotConfig,
 } from '@/types/simulation'
 import type { SimulationInitialInput, SimulationOverlay } from '@/types/simulation'
+import type { SeedNodePressure } from '@/services/api'
+import { resolveApiPath } from '@/services/apiBase'
+import type { NetworkxCutoffMapOverlay, StationProcessCutoffStageDetail } from '@/components/map-view/types'
+import {
+    DEFAULT_ZHONGWEI_MULTI_SCENARIO_IDS,
+    isZhongweiCutoffScenario,
+    type SimulationShowcaseCase,
+    ZHONGWEI_FIRST_TRUNK_EDGE_ID,
+    ZHONGWEI_MULTI_SCENARIO_CASES,
+    ZHONGWEI_SOURCE_NODE_ID,
+} from '@/config/simulationScenarios'
+import { CORE_SOURCE_STATION_NAMES } from '@/config/pipelineKeywords'
 
 import { getNodeMarkerMap } from '@/utils/mapRenderer'
 import { useNewWindow, usePopoutSync } from '@/hooks/useNewWindow'
@@ -37,15 +51,9 @@ import { getNodeRawType } from '@/utils/pipelineDomain'
 import { getJunctionKind } from '@/utils/pipelineDomain'
 
 const noop = () => {}
+const PENDING_ASSISTANT_HISTORY_ACTION_KEY = 'smartgas.pendingAssistantHistoryAction'
 
 type HubNodeType = 'source' | 'compressor' | 'junction' | 'distribution'
-
-const CORE_SOURCE_STATION_NAMES = [
-    '霍尔果斯',
-    '轮南',
-    '瑞丽',
-    '黑河',
-]
 
 const CORE_HUB_STATION_NAMES = [
     '中卫',
@@ -63,10 +71,355 @@ const CORE_HUB_STATION_NAMES = [
     '嘉兴',
 ]
 
+type SubAgentDemoStatus = 'pending' | 'running' | 'completed' | 'warning' | 'error'
+
+type SubAgentDemoStep = {
+    id: string
+    title: string
+    icon: string
+    status: SubAgentDemoStatus
+    message: string
+    updatedAt?: number
+}
+
+type SubAgentDemoStepEventDetail = {
+    step?: string
+    status?: string
+    title?: string
+    message?: string
+}
+
+const SUBAGENT_DEMO_STEP_DEFS: Array<Pick<SubAgentDemoStep, 'id' | 'title' | 'icon' | 'message'>> = [
+    { id: 'controller', title: '主控 Agent', icon: 'account_tree', message: '等待任务识别与编排' },
+    { id: 'history', title: '历史曲线 Agent', icon: 'show_chart', message: '等待调取压力和水露点曲线' },
+    { id: 'topology', title: '拓扑分析 Agent', icon: 'hub', message: '等待读取上下游关系' },
+    { id: 'procedure', title: '规程处置 Agent', icon: 'rule', message: '等待检索规程和边界' },
+    { id: 'simulation', title: '稳态仿真 Agent', icon: 'science', message: '等待启动三工况仿真' },
+    { id: 'review', title: '风险复核 Agent', icon: 'fact_check', message: '等待复核数据缺口和边界' },
+    { id: 'business_expression', title: '表达复核 Agent', icon: 'record_voice_over', message: '等待统一汇报口径' },
+    { id: 'main_summary', title: '主 Agent 汇总', icon: 'summarize', message: '等待汇总输出' },
+]
+
+function createDefaultSubAgentDemoSteps(): SubAgentDemoStep[] {
+    return SUBAGENT_DEMO_STEP_DEFS.map(item => ({
+        ...item,
+        status: 'pending',
+    }))
+}
+
+function normalizeSubAgentDemoStatus(raw?: string): SubAgentDemoStatus {
+    if (raw === 'running' || raw === 'completed' || raw === 'warning' || raw === 'error') return raw
+    return 'pending'
+}
+
+function emitSubAgentDemoFinalReady(): void {
+    const detail = { ready: true }
+    ;(window as typeof window & { __smartgasSubagentFinalReady?: boolean }).__smartgasSubagentFinalReady = true
+    window.dispatchEvent(new CustomEvent('assistant-subagent-demo-final-ready', { detail }))
+    if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'assistant-subagent-demo-final-ready', detail }, '*')
+    }
+    try {
+        const channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+        channel.postMessage({ type: 'assistant-subagent-demo-final-ready', detail })
+        channel.close()
+    } catch {
+        // BroadcastChannel is only used when the AI assistant is popped out.
+    }
+}
+
+const SUBAGENT_DEMO_ACCENT: Record<string, {
+    title: string
+    icon: string
+    message: string
+    badge: string
+    ring: string
+    line: string
+}> = {
+    controller: {
+        title: 'text-cyan-100',
+        icon: 'text-cyan-200',
+        message: 'text-cyan-50/78',
+        badge: 'border-cyan-300/35 bg-cyan-400/10 text-cyan-100',
+        ring: 'border-cyan-200/55 bg-cyan-300/16',
+        line: 'bg-cyan-300/35',
+    },
+    history: {
+        title: 'text-sky-100',
+        icon: 'text-sky-200',
+        message: 'text-sky-50/78',
+        badge: 'border-sky-300/35 bg-sky-400/10 text-sky-100',
+        ring: 'border-sky-200/55 bg-sky-300/16',
+        line: 'bg-sky-300/35',
+    },
+    topology: {
+        title: 'text-violet-100',
+        icon: 'text-violet-200',
+        message: 'text-violet-50/78',
+        badge: 'border-violet-300/35 bg-violet-400/10 text-violet-100',
+        ring: 'border-violet-200/55 bg-violet-300/16',
+        line: 'bg-violet-300/35',
+    },
+    procedure: {
+        title: 'text-amber-100',
+        icon: 'text-amber-200',
+        message: 'text-amber-50/78',
+        badge: 'border-amber-300/35 bg-amber-400/10 text-amber-100',
+        ring: 'border-amber-200/55 bg-amber-300/16',
+        line: 'bg-amber-300/35',
+    },
+    simulation: {
+        title: 'text-emerald-100',
+        icon: 'text-emerald-200',
+        message: 'text-emerald-50/78',
+        badge: 'border-emerald-300/35 bg-emerald-400/10 text-emerald-100',
+        ring: 'border-emerald-200/55 bg-emerald-300/16',
+        line: 'bg-emerald-300/35',
+    },
+    review: {
+        title: 'text-rose-100',
+        icon: 'text-rose-200',
+        message: 'text-rose-50/78',
+        badge: 'border-rose-300/35 bg-rose-400/10 text-rose-100',
+        ring: 'border-rose-200/55 bg-rose-300/16',
+        line: 'bg-rose-300/35',
+    },
+    business_expression: {
+        title: 'text-fuchsia-100',
+        icon: 'text-fuchsia-200',
+        message: 'text-fuchsia-50/78',
+        badge: 'border-fuchsia-300/35 bg-fuchsia-400/10 text-fuchsia-100',
+        ring: 'border-fuchsia-200/55 bg-fuchsia-300/16',
+        line: 'bg-fuchsia-300/35',
+    },
+    main_summary: {
+        title: 'text-orange-100',
+        icon: 'text-orange-200',
+        message: 'text-orange-50/78',
+        badge: 'border-orange-300/35 bg-orange-400/10 text-orange-100',
+        ring: 'border-orange-200/55 bg-orange-300/16',
+        line: 'bg-orange-300/35',
+    },
+}
+
+const SUBAGENT_DEMO_DEFAULT_ACCENT = {
+    title: 'text-slate-100',
+    icon: 'text-slate-200',
+    message: 'text-slate-300',
+    badge: 'border-slate-300/25 bg-slate-400/10 text-slate-100',
+    ring: 'border-white/10 bg-white/5',
+    line: 'bg-white/12',
+}
+
+function SubAgentDemoPanel({
+    steps,
+    lastMessage,
+    onClose,
+    onStartSimulation,
+}: {
+    steps: SubAgentDemoStep[]
+    lastMessage: string
+    onClose: () => void
+    onStartSimulation: () => void
+}) {
+    const [position, setPosition] = useState(() => ({
+        x: typeof window !== 'undefined' ? Math.min(450, Math.max(20, window.innerWidth - 420)) : 450,
+        y: 104,
+    }))
+    const [size, setSize] = useState({ width: 400, height: 620 })
+    const dragStateRef = useRef<{
+        mode: 'move' | 'resize'
+        startX: number
+        startY: number
+        startLeft: number
+        startTop: number
+        startWidth: number
+        startHeight: number
+    } | null>(null)
+    const completedCount = steps.filter(item => item.status === 'completed').length
+    const runningStep = steps.find(item => item.status === 'running')
+    const progress = Math.round((completedCount / Math.max(1, steps.length)) * 100)
+
+    const statusText: Record<SubAgentDemoStatus, string> = {
+        pending: '等待',
+        running: '运行中',
+        completed: '完成',
+        warning: '需复核',
+        error: '失败',
+    }
+
+    const statusClass: Record<SubAgentDemoStatus, string> = {
+        pending: 'border-slate-600/45 bg-slate-950/48 text-slate-300',
+        running: 'border-cyan-300/75 bg-cyan-500/16 text-cyan-50 shadow-[0_0_24px_rgba(34,211,238,0.24)]',
+        completed: 'border-emerald-300/55 bg-emerald-500/14 text-emerald-50',
+        warning: 'border-amber-300/60 bg-amber-500/14 text-amber-50',
+        error: 'border-red-300/60 bg-red-500/14 text-red-50',
+    }
+
+    useEffect(() => {
+        const handleMouseMove = (event: MouseEvent) => {
+            const state = dragStateRef.current
+            if (!state) return
+            event.preventDefault()
+            const deltaX = event.clientX - state.startX
+            const deltaY = event.clientY - state.startY
+            if (state.mode === 'move') {
+                setPosition({
+                    x: Math.max(0, Math.min(window.innerWidth - size.width, state.startLeft + deltaX)),
+                    y: Math.max(64, Math.min(window.innerHeight - 120, state.startTop + deltaY)),
+                })
+                return
+            }
+            setSize({
+                width: Math.max(340, Math.min(720, state.startWidth + deltaX)),
+                height: Math.max(420, Math.min(window.innerHeight - 90, state.startHeight + deltaY)),
+            })
+        }
+        const handleMouseUp = () => {
+            dragStateRef.current = null
+        }
+        window.addEventListener('mousemove', handleMouseMove)
+        window.addEventListener('mouseup', handleMouseUp)
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove)
+            window.removeEventListener('mouseup', handleMouseUp)
+        }
+    }, [size.width])
+
+    const handleMoveMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+        if ((event.target as HTMLElement).closest('button')) return
+        dragStateRef.current = {
+            mode: 'move',
+            startX: event.clientX,
+            startY: event.clientY,
+            startLeft: position.x,
+            startTop: position.y,
+            startWidth: size.width,
+            startHeight: size.height,
+        }
+    }
+
+    const handleResizeMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+        event.preventDefault()
+        event.stopPropagation()
+        dragStateRef.current = {
+            mode: 'resize',
+            startX: event.clientX,
+            startY: event.clientY,
+            startLeft: position.x,
+            startTop: position.y,
+            startWidth: size.width,
+            startHeight: size.height,
+        }
+    }
+
+    return (
+        <div
+            className="absolute z-50 flex flex-col overflow-hidden rounded-2xl border border-cyan-300/35 bg-slate-950/92 text-slate-100 shadow-2xl shadow-cyan-950/45 backdrop-blur-xl"
+            style={{ left: position.x, top: position.y, width: size.width, height: size.height }}
+        >
+            <div
+                className="cursor-move border-b border-white/10 bg-gradient-to-r from-cyan-950/80 via-slate-950/90 to-blue-950/70 px-4 py-3"
+                onMouseDown={handleMoveMouseDown}
+            >
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <div className="flex items-center gap-2 text-sm font-bold">
+                            <span className={`material-symbols-outlined text-cyan-200 ${runningStep ? 'animate-spin' : ''}`}>hub</span>
+                            SubAgent 协同分析
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-300">
+                            中卫工况调整 · 曲线 / 拓扑 / 规程 / 仿真
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white"
+                        onClick={onClose}
+                        title="关闭 SubAgent 演示面板"
+                    >
+                        <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                </div>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800">
+                    <div
+                        className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-emerald-300 to-blue-300 transition-all duration-500"
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
+                <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400">
+                    <span>{completedCount}/{steps.length} 已完成</span>
+                    <span>{runningStep ? `${runningStep.title} 正在处理` : '等待下一步'}</span>
+                </div>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+                {steps.map((step, index) => {
+                    const accent = SUBAGENT_DEMO_ACCENT[step.id] || SUBAGENT_DEMO_DEFAULT_ACCENT
+                    const canStartSimulation = step.id === 'simulation' && step.status === 'running'
+                    return (
+                        <div
+                            key={step.id}
+                            className={`relative rounded-xl border px-3 py-2.5 transition-all duration-300 ${statusClass[step.status]} ${step.status === 'running' ? 'scale-[1.015] animate-pulse' : ''}`}
+                        >
+                            {index < steps.length - 1 && (
+                                <div className={`absolute left-[22px] top-[45px] h-4 w-px ${accent.line}`} />
+                            )}
+                            <div className="flex items-start gap-2.5">
+                                <div className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg border ${accent.ring}`}>
+                                    <span className={`material-symbols-outlined text-[17px] ${accent.icon}`}>
+                                        {step.status === 'completed' ? 'check' : step.icon}
+                                    </span>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <div className={`truncate text-[12px] font-semibold ${accent.title}`}>{step.title}</div>
+                                        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] ${accent.badge}`}>
+                                            {statusText[step.status]}
+                                        </span>
+                                    </div>
+                                    <div className={`mt-1 line-clamp-2 text-[11px] leading-relaxed ${accent.message}`}>
+                                        {step.message}
+                                    </div>
+                                    {canStartSimulation && (
+                                        <button
+                                            type="button"
+                                            className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-emerald-300/45 bg-emerald-400/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-100 hover:border-emerald-200 hover:bg-emerald-400/25"
+                                            onClick={onStartSimulation}
+                                        >
+                                            <span className="material-symbols-outlined text-[15px]">play_arrow</span>
+                                            点击开始三工况仿真
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )
+                })}
+            </div>
+
+            {lastMessage && (
+                <div className="border-t border-white/10 bg-black/18 px-4 py-2.5 text-[11px] leading-relaxed text-cyan-100">
+                    {lastMessage}
+                </div>
+            )}
+            <div
+                className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-tl-lg border-l border-t border-cyan-300/30 bg-cyan-300/10 hover:bg-cyan-300/25"
+                onMouseDown={handleResizeMouseDown}
+                title="拖动调整大小"
+            />
+        </div>
+    )
+}
+
 type TrendChartStation = {
     name: string
     inP: number
     outP: number
+    baselineInP?: number
+    baselineOutP?: number
+    flowRate?: number
+    baselineFlowRate?: number
     type: string
     mileage: number
 }
@@ -98,15 +451,6 @@ type DirectoryLayoutState = {
     trendWidth?: number
 }
 
-type MultiScenarioAiCase = {
-    id: string
-    label: string
-    flowText: string
-    description: string
-    scenarioId: string
-    initialInput?: SimulationInitialInput
-}
-
 type MultiScenarioAiResult = {
     caseId: string
     label: string
@@ -121,6 +465,84 @@ type MultiScenarioAiResult = {
     minPressureNodeName: string
     iterations: number
     runId: string
+}
+
+type NetworkxCutoffEdge = {
+    id: string
+    name: string
+    source: string
+    target: string
+    source_name: string
+    target_name: string
+    length_km: number
+    type?: string
+}
+
+type NetworkxCutoffStage = 'all' | 'we1' | 'we2' | 'zg' | 'jxlz' | 'lubao' | 'sj2' | 'sj4'
+
+function normalizeNetworkxCutoffStage(stage?: string): NetworkxCutoffStage {
+    const normalized = (stage || '').toLowerCase()
+    return normalized === 'we1'
+        || normalized === 'we2'
+        || normalized === 'zg'
+        || normalized === 'jxlz'
+        || normalized === 'lubao'
+        || normalized === 'sj2'
+        || normalized === 'sj4'
+        || normalized === 'all'
+        ? normalized
+        : 'all'
+}
+
+type NetworkxCutoffDemoResult = {
+    demo_id: string
+    title: string
+    description: string
+    method: string
+    algorithm: string
+    source: { id: string; name: string }
+    target: { id: string; name: string }
+    cutoff_nodes: Array<{ id: string; name: string; longitude: number; latitude: number }>
+    cutoff_edges: NetworkxCutoffEdge[]
+    before_path: {
+        node_ids: string[]
+        node_names: string[]
+        edges: NetworkxCutoffEdge[]
+        length_km: number
+    }
+    after_path: {
+        available: boolean
+        node_ids: string[]
+        node_names: string[]
+        edges: NetworkxCutoffEdge[]
+        length_km: number
+        error?: string
+    }
+    affected_edges: NetworkxCutoffEdge[]
+    summary: {
+        reroute_available: boolean
+        cutoff_nodes: number
+        cutoff_edges: number
+        before_path_nodes: number
+        before_path_edges: number
+        after_path_nodes: number
+        after_path_edges: number
+        affected_edges: number
+        extra_length_km?: number | null
+    }
+    stats: Record<string, number>
+    boundary_note: string
+}
+
+type NetworkxCutoffItem = {
+    key: string
+    stage: NetworkxCutoffStage
+    label: string
+    description?: string
+    valveLabel?: string
+    valveName?: string
+    result: NetworkxCutoffDemoResult
+    overlay: NetworkxCutoffMapOverlay
 }
 
 type MultiScenarioAiStartEventDetail = {
@@ -140,14 +562,64 @@ type SimulationPressureChartEntry = {
     id: string
     label: string
     overlay: SimulationOverlay
+    baselineOverlay?: SimulationOverlay | null
     color: string
+}
+
+type SimulationNodeOverrideInput = {
+    target_pressure_mpa?: number
+    min_pressure_mpa?: number
+    nominal_flow?: number
+    supply_nominal?: number
+    supply_max?: number
+}
+
+type SimulationGlobalDefaultsInput = {
+    default_pressure_mpa?: number
+    default_temperature_c?: number
+    default_flow_rate?: number
+    apply_to_sources?: boolean
+}
+
+type SimulationScenarioParamState = {
+    nodeOverrides: Record<string, SimulationNodeOverrideInput>
+    edgeLengthOverrides: Record<string, number>
+    edgeFlowOverrides: Record<string, number>
+    globalDefaults: SimulationGlobalDefaultsInput
+    zhongweiPressureChangeValue: string
+    zhongweiFlowChangeValue: string
 }
 
 const DIRECTORY_LAYOUT_STORAGE_KEY = 'smartgas.globalPipeline.directoryLayout.v1'
 const AI_ASSISTANT_SYNC_CHANNEL = 'ai-assistant-sync'
 const MULTI_SCENARIO_AI_SKILL_NAME = 'multi-scenario-ai'
-const ZHONGWEI_SOURCE_NODE_ID = 'WE1-76'
-const ZHONGWEI_FIRST_TRUNK_EDGE_ID = 'WE1-T-76'
+const NETWORKX_CUTOFF_PANEL_MIN_WIDTH = 340
+const NETWORKX_CUTOFF_PANEL_MIN_HEIGHT = 300
+const NETWORKX_CUTOFF_PANEL_DEFAULT_WIDTH = 450
+const NETWORKX_CUTOFF_PANEL_DEFAULT_HEIGHT = 540
+const SIMULATION_PRESSURE_AXIS_MIN_MPA = 0
+const SIMULATION_PRESSURE_AXIS_MAX_MPA = 10
+const SIMULATION_FLOW_AXIS_MAX_10K_NM3D = 4000
+const ZHONGWEI_PRESSURE_CHANGE_SCENARIO_ID = 'zhongwei_supply_pressure_drop'
+const ZHONGWEI_DEFAULT_TARGET_PRESSURE_MPA = 9.8
+const DEFAULT_SIMULATION_TEMPERATURE_C = 15
+const DEFAULT_SIMULATION_FLOW_RATE = 3000
+
+function createDefaultSimulationParamState(): SimulationScenarioParamState {
+    return {
+        nodeOverrides: {},
+        edgeLengthOverrides: {},
+        edgeFlowOverrides: {},
+        globalDefaults: {
+            default_pressure_mpa: ZHONGWEI_DEFAULT_TARGET_PRESSURE_MPA,
+            default_temperature_c: DEFAULT_SIMULATION_TEMPERATURE_C,
+            default_flow_rate: DEFAULT_SIMULATION_FLOW_RATE,
+            apply_to_sources: true,
+        },
+        zhongweiPressureChangeValue: '9.30',
+        zhongweiFlowChangeValue: '1800',
+    }
+}
 
 const WE1_PILOT_NODE_NAMES: Record<string, string> = {
     'WE1-76': '中卫压气站',
@@ -218,62 +690,6 @@ const WE1_PILOT_MILEAGE_ANCHORS: Array<[number, number]> = [
     [181, 3846.1981],
 ]
 
-const MULTI_SCENARIO_AI_CASES: MultiScenarioAiCase[] = [
-    {
-        id: 'zhongwei-3000',
-        label: '中卫 3000 万标方/天',
-        flowText: '3000',
-        description: '基准供气工况，验证常规稳态能跑通。',
-        scenarioId: 'steady_base',
-        initialInput: {
-            node_overrides: [{
-                node_id: ZHONGWEI_SOURCE_NODE_ID,
-                supply_max: 3000,
-                nominal_flow: 3000,
-                supply_nominal: 3000,
-                target_pressure_mpa: 9.8,
-            }],
-        },
-    },
-    {
-        id: 'zhongwei-2000',
-        label: '中卫 2000 万标方/天',
-        flowText: '2000',
-        description: '上游供气下降工况，观察压力、流量和缺口变化。',
-        scenarioId: 'steady_base',
-        initialInput: {
-            node_overrides: [{
-                node_id: ZHONGWEI_SOURCE_NODE_ID,
-                supply_max: 2000,
-                nominal_flow: 2000,
-                supply_nominal: 2000,
-                target_pressure_mpa: 9.8,
-            }],
-        },
-    },
-    {
-        id: 'zhongwei-cutoff',
-        label: '中卫截断',
-        flowText: '0',
-        description: '上游首段关闭工况，演示故障传播和供气缺口。',
-        scenarioId: 'steady_base',
-        initialInput: {
-            node_overrides: [{
-                node_id: ZHONGWEI_SOURCE_NODE_ID,
-                supply_max: 0,
-                nominal_flow: 0,
-                supply_nominal: 0,
-                target_pressure_mpa: 0,
-            }],
-            edge_overrides: [{
-                edge_id: ZHONGWEI_FIRST_TRUNK_EDGE_ID,
-                flow_rate: 0,
-                status: 'closed',
-            }],
-        },
-    },
-]
-
 function readDirectoryLayoutState(): DirectoryLayoutState {
     if (typeof window === 'undefined') return {}
 
@@ -297,6 +713,144 @@ function normalizeStationMatchKey(name: string): string {
         .replace(/[（(][^()（）]*[)）]/g, '')
         .replace(/\s+/g, '')
         .replace(/分输压气站|分输联络站|分输清管站|压气站|分输站|清管站|末站/g, '')
+}
+
+function buildLineIdsForNetworkxEdges(edges: NetworkxCutoffEdge[], pipelineData: PipelineData): string[] {
+    if (edges.length === 0) return []
+
+    const edgeIds = new Set(edges.map(edge => edge.id))
+    const pairKeys = new Set<string>()
+    const namePairKeys = new Set<string>()
+    edges.forEach(edge => {
+        pairKeys.add([edge.source, edge.target].sort().join('::'))
+        const sourceName = normalizeStationMatchKey(edge.source_name || '')
+        const targetName = normalizeStationMatchKey(edge.target_name || '')
+        if (sourceName && targetName) {
+            namePairKeys.add([sourceName, targetName].sort().join('::'))
+        }
+    })
+
+    const nodeNameById = new Map(pipelineData.nodes.map(node => [node.id, node.name]))
+    const matched = new Set<string>()
+    pipelineData.lines.forEach(line => {
+        const lineIds = [
+            line.id,
+            line.properties?.simulationEdgeId,
+            line.properties?.solverEdgeId,
+            line.properties?.sourceEdgeId,
+            line.properties?.edgeId,
+        ].filter((id): id is string => typeof id === 'string' && id.length > 0)
+
+        if (lineIds.some(id => edgeIds.has(id))) {
+            matched.add(line.id)
+            return
+        }
+
+        const idPair = [line.startNodeId, line.endNodeId].sort().join('::')
+        if (pairKeys.has(idPair)) {
+            matched.add(line.id)
+            return
+        }
+
+        const sourceName = normalizeStationMatchKey(nodeNameById.get(line.startNodeId) || '')
+        const targetName = normalizeStationMatchKey(nodeNameById.get(line.endNodeId) || '')
+        if (sourceName && targetName && namePairKeys.has([sourceName, targetName].sort().join('::'))) {
+            matched.add(line.id)
+        }
+    })
+
+    return [...matched]
+}
+
+function buildNetworkxCutoffMapOverlay(
+    result: NetworkxCutoffDemoResult,
+    pipelineData: PipelineData,
+    stage: NetworkxCutoffStage = 'all',
+): NetworkxCutoffMapOverlay {
+    const isJingbianWe1Cutoff = result.demo_id === 'jingbian' && stage === 'we1'
+    const restrictJingbianWe1Edges = (edges: NetworkxCutoffEdge[]) => (
+        isJingbianWe1Cutoff ? edges.filter(edge => edge.id.startsWith('WE1-')) : edges
+    )
+    const stageCutoffEdges = result.cutoff_edges.filter(edge => {
+        if (stage === 'we1') return edge.id.startsWith('WE1-')
+        if (stage === 'we2') return edge.id.startsWith('WE2-')
+        if (stage === 'zg') return edge.id.startsWith('ZG-')
+        if (stage === 'jxlz') return edge.id.startsWith('JXLZ-')
+        if (stage === 'lubao') return edge.id.startsWith('WE1-B10-') || edge.name.includes('甪宝')
+        if (stage === 'sj2') return edge.id.startsWith('SJ2-')
+        if (stage === 'sj4') return edge.id.startsWith('SJ4-') || edge.id.startsWith('SJ3-')
+        return true
+    })
+    const beforePathEdgeIds = buildLineIdsForNetworkxEdges(restrictJingbianWe1Edges(result.before_path.edges), pipelineData)
+    const cutoffEdgeIds = buildLineIdsForNetworkxEdges(stageCutoffEdges, pipelineData)
+    const affectedEdgeIds = buildLineIdsForNetworkxEdges(restrictJingbianWe1Edges(result.affected_edges), pipelineData)
+    const rerouteEdgeIds = buildLineIdsForNetworkxEdges(restrictJingbianWe1Edges(result.after_path.edges), pipelineData)
+    const associatedShutdownEdgeIds = result.demo_id === 'jingbian'
+        ? pipelineData.lines
+            .filter(line => {
+                const text = [
+                    line.id,
+                    line.name,
+                    line.systemId,
+                    line.layerName,
+                    line.properties?.category,
+                    line.properties?.systemName,
+                ].filter(Boolean).join(' ')
+                if (stage === 'we1') return false
+                const matchesSj2 = /(^|[^A-Z0-9])SJ2-/i.test(line.id) || text.includes('陕京二线')
+                const matchesSj3 = /(^|[^A-Z0-9])SJ3-/i.test(line.id) || text.includes('陕京三线')
+                const matchesSj4 = /(^|[^A-Z0-9])SJ4-/i.test(line.id) || text.includes('陕京四线')
+                if (stage === 'sj2') return matchesSj2
+                if (stage === 'sj4') return matchesSj3 || matchesSj4
+                return matchesSj2 || matchesSj3 || matchesSj4
+            })
+            .map(line => line.id)
+        : []
+
+    return {
+        beforePathEdgeIds,
+        cutoffEdgeIds,
+        affectedEdgeIds,
+        rerouteEdgeIds,
+        blockedFlowEdgeIds: [...new Set([
+            ...beforePathEdgeIds,
+            ...cutoffEdgeIds,
+            ...affectedEdgeIds,
+            ...associatedShutdownEdgeIds,
+        ].filter(id => !rerouteEdgeIds.includes(id)))],
+        cutoffNodeIds: result.cutoff_nodes
+            .filter(node => !isJingbianWe1Cutoff || node.id.startsWith('WE1-'))
+            .map(node => node.id),
+    }
+}
+
+function mergeNetworkxCutoffMapOverlays(items: NetworkxCutoffItem[]): NetworkxCutoffMapOverlay | null {
+    if (items.length === 0) return null
+    const collect = (selector: (overlay: NetworkxCutoffMapOverlay) => string[] | undefined) => [
+        ...new Set(items.flatMap(item => selector(item.overlay) || [])),
+    ]
+
+    return {
+        beforePathEdgeIds: collect(overlay => overlay.beforePathEdgeIds),
+        cutoffEdgeIds: collect(overlay => overlay.cutoffEdgeIds),
+        affectedEdgeIds: collect(overlay => overlay.affectedEdgeIds),
+        rerouteEdgeIds: collect(overlay => overlay.rerouteEdgeIds),
+        blockedFlowEdgeIds: collect(overlay => overlay.blockedFlowEdgeIds),
+        cutoffNodeIds: collect(overlay => overlay.cutoffNodeIds),
+    }
+}
+
+function formatPathPreview(names: string[], limit = 6): string {
+    if (names.length === 0) return '未形成路径'
+    const preview = names.slice(0, limit).join(' → ')
+    return names.length > limit ? `${preview} → ...` : preview
+}
+
+function parseOptionalNumber(raw: string): number | undefined {
+    const text = raw.trim()
+    if (!text) return undefined
+    const value = Number(text)
+    return Number.isFinite(value) ? value : undefined
 }
 
 function resolvePilotNodeName(nodeId: string): string {
@@ -343,6 +897,29 @@ function inferSimulationStationType(nodeId: string, name: string): string {
     return 'distribution'
 }
 
+function shouldShowStationSimulationPressureLabel(nodeId: string, name: string): boolean {
+    return inferSimulationStationType(nodeId, name) !== 'valve'
+}
+
+function buildPilotAnchorEdgeOptions(edges?: SimulationOverlay['edges']) {
+    const flowByEdgeId = new Map((edges || []).map(edge => [edge.id, edge.flow_rate]))
+
+    return WE1_PILOT_MILEAGE_ANCHORS.slice(0, -1).map(([nodeIndex, mileage], index) => {
+        const nextAnchor = WE1_PILOT_MILEAGE_ANCHORS[index + 1]
+        const nodeId = `WE1-${nodeIndex}`
+        const nextNodeId = `WE1-${nextAnchor[0]}`
+        const edgeId = `WE1-T-${nodeIndex}`
+        const flow = flowByEdgeId.get(edgeId)
+
+        return {
+            id: edgeId,
+            name: `${resolvePilotNodeName(nodeId)} → ${resolvePilotNodeName(nextNodeId)}`,
+            defaultLength: Number((nextAnchor[1] - mileage).toFixed(1)),
+            defaultFlowRate: typeof flow === 'number' && Number.isFinite(flow) ? flow : undefined,
+        }
+    })
+}
+
 function getSimulationPressureChartColor(caseId: string): string {
     if (caseId.includes('2000')) return '#38bdf8'
     if (caseId.includes('cutoff')) return '#f97316'
@@ -350,19 +927,17 @@ function getSimulationPressureChartColor(caseId: string): string {
 }
 
 function buildDefaultSimulationPressureChartLayout(index: number, viewportWidth: number, viewportHeight: number): SimulationPressureChartLayout {
-    const availableWidth = Math.max(760, viewportWidth - 420)
-    const baseWidth = clampNumber(Math.floor(availableWidth / 2), 560, 760)
-    const baseHeight = clampNumber(Math.floor((viewportHeight - 130) / 2), 270, 340)
-    const columnGap = 18
-    const rowGap = 18
-    const startX = 24
+    const leftPanelWidth = 360
+    const rightReserve = 380
+    const baseWidth = clampNumber(viewportWidth - leftPanelWidth - rightReserve, 520, 640)
+    const baseHeight = clampNumber(Math.floor((viewportHeight - 132) / 5), 188, 220)
+    const rowGap = 10
+    const startX = leftPanelWidth + 12
     const startY = 86
-    const col = index % 2
-    const row = Math.floor(index / 2)
 
     return {
-        x: clampNumber(startX + col * (baseWidth + columnGap), 0, Math.max(0, viewportWidth - baseWidth - 12)),
-        y: clampNumber(startY + row * (baseHeight + rowGap), 64, Math.max(64, viewportHeight - baseHeight - 12)),
+        x: clampNumber(startX, 0, Math.max(0, viewportWidth - baseWidth - 12)),
+        y: clampNumber(startY + index * (baseHeight + rowGap), 64, Math.max(64, viewportHeight - baseHeight - 12)),
         width: baseWidth,
         height: baseHeight,
     }
@@ -372,10 +947,13 @@ function buildSimulationPressureTrendConfig(
     overlay: SimulationOverlay | null,
     label?: string,
     color = '#10b981',
+    baselineOverlay?: SimulationOverlay | null,
 ): TrendChartConfig | null {
     if (!overlay) return null
+    const baselineNodeMap = new Map((baselineOverlay?.nodes || []).map(node => [node.id, node]))
 
     const stations = overlay.nodes
+        .filter(node => Boolean(WE1_PILOT_NODE_NAMES[node.id]))
         .map((node): TrendChartStation | null => {
             const mileage = resolvePilotMileageKm(node.id)
             if (mileage == null) return null
@@ -385,10 +963,21 @@ function buildSimulationPressureTrendConfig(
             if (!Number.isFinite(pressureIn) || !Number.isFinite(pressureOut)) return null
 
             const name = resolvePilotNodeName(node.id)
+            const flowRate = getSimulationNodeFlowRate(node.id, overlay)
+            const baselineNode = baselineNodeMap.get(node.id)
+            const baselineInP = baselineNode
+                ? (typeof baselineNode.pressure_in_mpa === 'number' ? baselineNode.pressure_in_mpa : baselineNode.pressure_mpa)
+                : undefined
+            const baselineOutP = baselineNode?.pressure_mpa
+            const baselineFlowRate = baselineOverlay ? getSimulationNodeFlowRate(node.id, baselineOverlay) : undefined
             return {
-                name: WE1_PILOT_NODE_NAMES[node.id] ? name : `${node.id}阀室`,
+                name,
                 inP: pressureIn,
                 outP: pressureOut,
+                baselineInP,
+                baselineOutP,
+                flowRate,
+                baselineFlowRate,
                 type: inferSimulationStationType(node.id, name),
                 mileage,
             }
@@ -418,6 +1007,94 @@ function findPipelineNodeByPilotNodeId(nodeId: string, pipelineData: PipelineDat
     }) || null
 }
 
+function getSimulationEdgeStartIndex(edgeId: string): number | null {
+    const match = /^WE1-T-(\d+)$/.exec(edgeId)
+    if (!match) return null
+    const value = Number(match[1])
+    return Number.isFinite(value) ? value : null
+}
+
+function getFiniteEdgeFlowRate(edge: SimulationOverlay['edges'][number] | undefined): number | undefined {
+    const flow = edge?.flow_rate
+    return typeof flow === 'number' && Number.isFinite(flow) ? flow : undefined
+}
+
+function getSimulationNodeFlowRate(nodeId: string, overlay: SimulationOverlay): number | undefined {
+    const nodeIndex = resolvePilotNodeIndex(nodeId)
+    if (nodeIndex == null) return undefined
+    const scenarioTotalSupply = Number(overlay.summary?.total_supply ?? 0)
+    const isActiveSupplyScenario = Number.isFinite(scenarioTotalSupply) && scenarioTotalSupply > 0
+
+    const edgeSamples = overlay.edges
+        .map(edge => ({
+            edge,
+            startIndex: getSimulationEdgeStartIndex(edge.id),
+            flowRate: getFiniteEdgeFlowRate(edge),
+        }))
+        .filter((item): item is {
+            edge: SimulationOverlay['edges'][number]
+            startIndex: number
+            flowRate: number
+        } => item.startIndex != null && item.flowRate != null)
+        .sort((left, right) => left.startIndex - right.startIndex)
+
+    const outgoingSample = edgeSamples.find(item => item.startIndex === nodeIndex)
+    const outgoingFlow = outgoingSample?.flowRate
+    if (outgoingFlow != null && outgoingFlow > 0) return outgoingFlow
+
+    if (isActiveSupplyScenario && outgoingFlow === 0) {
+        const previousPositive = edgeSamples
+            .filter(item => item.startIndex < nodeIndex && item.flowRate > 0)
+            .sort((left, right) => right.startIndex - left.startIndex)[0]
+        const nextPositive = edgeSamples
+            .filter(item => item.startIndex > nodeIndex && item.flowRate > 0)
+            .sort((left, right) => left.startIndex - right.startIndex)[0]
+
+        if (previousPositive && nextPositive) {
+            const previousDistance = nodeIndex - previousPositive.startIndex
+            const nextDistance = nextPositive.startIndex - nodeIndex
+            if (previousDistance <= 80 && nextDistance <= 80) return (previousPositive.flowRate + nextPositive.flowRate) / 2
+        }
+
+        if (previousPositive && nodeIndex - previousPositive.startIndex <= 80) return previousPositive.flowRate
+        if (nextPositive && nextPositive.startIndex - nodeIndex <= 80) return nextPositive.flowRate
+    }
+
+    const isValveNode = !WE1_PILOT_NODE_NAMES[nodeId]
+    if (isValveNode && outgoingFlow === 0) {
+        const previousPositive = edgeSamples
+            .filter(item => item.startIndex < nodeIndex && item.flowRate > 0)
+            .sort((left, right) => right.startIndex - left.startIndex)[0]
+        const nextPositive = edgeSamples
+            .filter(item => item.startIndex > nodeIndex && item.flowRate > 0)
+            .sort((left, right) => left.startIndex - right.startIndex)[0]
+
+        if (previousPositive && nextPositive) {
+            const previousDistance = nodeIndex - previousPositive.startIndex
+            const nextDistance = nextPositive.startIndex - nodeIndex
+            if (previousDistance <= 12 && nextDistance <= 12) return (previousPositive.flowRate + nextPositive.flowRate) / 2
+        }
+
+        if (previousPositive && !nextPositive) {
+            const downstreamZeroCount = edgeSamples
+                .filter(item => item.startIndex > nodeIndex)
+                .slice(0, 8)
+                .filter(item => item.flowRate === 0).length
+            if (downstreamZeroCount < 4 && nodeIndex - previousPositive.startIndex <= 12) return previousPositive.flowRate
+        }
+
+        return 0
+    }
+
+    if (outgoingFlow != null) return outgoingFlow
+
+    const incomingSample = edgeSamples
+        .filter(item => item.startIndex < nodeIndex)
+        .sort((left, right) => right.startIndex - left.startIndex)[0]
+
+    return incomingSample?.flowRate
+}
+
 function buildMultiScenarioRiskScore(result: MultiScenarioAiResult): number {
     return result.unservedDemand * 1000
         + result.alertCount * 10
@@ -428,6 +1105,54 @@ function formatScenarioDelta(current: number, reference: number, unit = '', digi
     const delta = current - reference
     if (Math.abs(delta) < 0.0001) return `持平${unit ? `（${current.toFixed(digits)}${unit}）` : ''}`
     return `${delta > 0 ? '增加' : '减少'} ${Math.abs(delta).toFixed(digits)}${unit}`
+}
+
+function formatSignedDelta(value: number, digits = 2, unit = ''): string {
+    if (!Number.isFinite(value) || Math.abs(value) < 0.0005) return `0${unit}`
+    return `${value > 0 ? '+' : ''}${value.toFixed(digits)}${unit}`
+}
+
+function getDeltaTone(delta?: number): {
+    color: string
+    bg: string
+    border: string
+    label: string
+    arrow: string
+} {
+    if (delta == null || !Number.isFinite(delta) || Math.abs(delta) < 0.0005) {
+        return {
+            color: '#cbd5e1',
+            bg: 'rgba(51,65,85,0.45)',
+            border: 'rgba(148,163,184,0.28)',
+            label: '持平',
+            arrow: '→',
+        }
+    }
+    if (delta > 0) {
+        return {
+            color: '#fbbf24',
+            bg: 'rgba(120,53,15,0.46)',
+            border: 'rgba(251,191,36,0.42)',
+            label: '增加',
+            arrow: '↑',
+        }
+    }
+    return {
+        color: '#38bdf8',
+        bg: 'rgba(8,47,73,0.52)',
+        border: 'rgba(56,189,248,0.42)',
+        label: '减少',
+        arrow: '↓',
+    }
+}
+
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
 }
 
 function classifyScenarioIntent(result: MultiScenarioAiResult, reference: MultiScenarioAiResult): string {
@@ -483,7 +1208,7 @@ function buildDetailedMultiScenarioAnalysis(results: MultiScenarioAiResult[]): s
         `详细参数对比：本次 AI 先把所选工况转成结构化边界条件，再依次调用简化稳态模型运行 ${results.length} 个工况，统一比较入口供气量、未满足需求、最低进站压力、告警数、平均管段利用率和求解迭代次数。`,
         `1. ${reference.label} 作为对照工况：入口供气 ${reference.sourceFlow.toFixed(0)} 万标方/天，未满足需求 ${reference.unservedDemand.toFixed(0)} 万标方/天，最低进站压力 ${reference.minPressure.toFixed(2)} MPa，位置在 ${reference.minPressureNodeName}，平均利用率 ${formatUtil(reference.avgUtilization)}，告警 ${reference.alertCount.toFixed(0)} 个，迭代 ${reference.iterations} 次。`,
         ...detailLines,
-        `读数解释：${worst.label} 的风险最高，主要是供气缺口、低压水平和告警数量叠加更强。${lowerFlowNote}这正好说明仿真读数要结合工况类型一起看，而不是只盯一个数。中卫-上海白鹤压力曲线已同步生成，可横向对比压力坡降、局部抬升和末端压力变化。以上结果仍是概念级稳态推演，重点验证 AI 是否能自动编排工况、调用现有参数并生成可读结论，不替代专业水力精算。`,
+        `读数解释：${worst.label} 的风险最高，主要是供气缺口、低压水平和告警数量叠加更强。${lowerFlowNote}这正好说明仿真读数要结合工况类型一起看，而不是只盯一个数。中卫-上海白鹤压力/流量曲线已同步生成，可横向对比压力坡降、局部抬升、末端压力和沿线输量变化。以上结果仍是概念级稳态推演，重点验证 AI 是否能自动编排工况、调用现有参数并生成可读结论，不替代专业水力精算。`,
     ].filter(Boolean).join('\n\n')
 }
 
@@ -528,6 +1253,94 @@ function emitMultiScenarioAiAssistantEvent(type: 'progress' | 'result', detail: 
     } catch {
         // 同窗口事件已经足够，BroadcastChannel 只是给弹出 AI 窗口同步。
     }
+}
+
+function emitNetworkxCutoffAssistantEvent(type: 'progress' | 'result', detail: Record<string, unknown>): void {
+    const eventType = type === 'progress'
+        ? 'assistant-networkx-cutoff-showcase-progress'
+        : 'assistant-networkx-cutoff-showcase-result'
+    const payload = {
+        type: eventType,
+        detail: {
+            skillName: 'networkx-cutoff-showcase',
+            ...detail,
+        },
+    }
+
+    window.dispatchEvent(new CustomEvent(eventType, { detail: payload.detail }))
+    try {
+        const channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+        channel.postMessage(payload)
+        channel.close()
+    } catch {
+        // 同窗口事件已经足够。
+    }
+}
+
+function formatNetworkxCutoffAssistantMessage(result: NetworkxCutoffDemoResult): string {
+    const extraLength = result.summary.extra_length_km ?? 0
+    return [
+        `结论：${result.title}演示已在全国一张网跑通。${result.after_path.available ? `NetworkX 找到了替代通路，绕行约增加 ${extraLength.toFixed(1)} km。` : 'NetworkX 未找到替代通路，拓扑上存在断供风险。'}`,
+        '',
+        `依据：后端使用 ${result.algorithm}，先计算截断前路径，再复制全国图并移除 ${result.summary.cutoff_nodes} 个站点相关节点，随后重新计算截断后路径。`,
+        '',
+        `地图表现：红色为截断关联段，橙色为原路径受影响段，绿色为 NetworkX 计算出的绕行段。`,
+        '',
+        `路径：${formatPathPreview(result.before_path.node_names, 5)} → 截断后：${formatPathPreview(result.after_path.node_names, 5)}`,
+        '',
+        `边界说明：${result.boundary_note}`,
+    ].join('\n')
+}
+
+function getNetworkxCutoffStageLabel(stage: NetworkxCutoffStage): string {
+    switch (stage) {
+        case 'we1':
+            return '西一线截断'
+        case 'we2':
+            return '西二线截断'
+        case 'zg':
+            return '中贵线截断'
+        case 'jxlz':
+            return '嘉甪联络线截断'
+        case 'lubao':
+            return '甪宝支线截断'
+        case 'sj2':
+            return '陕京二线截断'
+        case 'sj4':
+            return '靖边联络线截断'
+        default:
+            return '站内阀门拓扑截断'
+    }
+}
+
+function getNetworkxCutoffLayerGroups(station: string, stage: NetworkxCutoffStage): string[] {
+    const normalized = station.toLowerCase()
+    const isZhongwei = normalized.includes('zhongwei') || station.includes('中卫')
+    if (isZhongwei) {
+        if (stage === 'we1') return ['we1', 'we2']
+        if (stage === 'we2') return ['we2', 'we1']
+        if (stage === 'zg') return ['zg', 'we1', 'we2']
+    }
+
+    if (stage !== 'all') {
+        if (stage === 'lubao') return ['we1']
+        if (stage === 'sj4') return ['sj3', 'sj4']
+        return [stage]
+    }
+
+    if (normalized.includes('luzhi') || station.includes('甪直')) return ['we1', 'jxlz']
+    if (isZhongwei) return ['we1', 'we2', 'zg']
+    if (normalized.includes('jingbian') || station.includes('靖边')) return ['we1', 'sj2', 'sj3', 'sj4']
+    return ['we1']
+}
+
+function resolveStationProcessCutoffDemoStation(detail?: StationProcessCutoffStageDetail | null): 'jingbian' | 'zhongwei' | 'luzhi' | null {
+    const stationText = `${detail?.stationId || ''} ${detail?.stationName || ''}`.toLowerCase()
+    const valveId = (detail?.valveId || '').toLowerCase()
+    if (stationText.includes('we1-92') || stationText.includes('靖边') || valveId.startsWith('jb')) return 'jingbian'
+    if (stationText.includes('we1-76') || stationText.includes('中卫') || valveId.startsWith('zw')) return 'zhongwei'
+    if (stationText.includes('we1-179') || stationText.includes('甪直') || valveId.startsWith('lz')) return 'luzhi'
+    return null
 }
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -1069,18 +1882,27 @@ const PressureTrendChart: React.FC<{
     const W = 860
     const H = 340
     const padL = 50
-    const padR = 25
+    const padR = 62
     const padT = 25
     const padB = 92
     const chartW = W - padL - padR
     const chartH = H - padT - padB
 
-    const allP = hasData
-        ? stations.flatMap((s) => [s.inP, s.outP])
-        : [0, 1]
-    const minP = Math.floor(Math.min(...allP) * 2) / 2
-    const maxP = Math.ceil(Math.max(...allP) * 2) / 2 + 0.5
+    const minP = SIMULATION_PRESSURE_AXIS_MIN_MPA
+    const maxP = SIMULATION_PRESSURE_AXIS_MAX_MPA
     const rangeP = Math.max(maxP - minP, 1)
+    const flowValues = stations
+        .map((station) => station.flowRate)
+        .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+    const hasFlowData = flowValues.length > 0
+    const hasBaselinePressure = stations.some(station =>
+        typeof station.baselineInP === 'number'
+        || typeof station.baselineOutP === 'number'
+    )
+    const hasBaselineFlow = stations.some(station => typeof station.baselineFlowRate === 'number')
+    const flowAxisMax = SIMULATION_FLOW_AXIS_MAX_10K_NM3D
+    const flowColor = '#a78bfa'
+    const baselineColor = 'rgba(148,163,184,0.72)'
     const maxMileage = hasData ? Math.max(stations[stations.length - 1]?.mileage ?? 0, 1) : 1
     const safeRevealProgress = clampNumber(revealProgress, 0, 1)
     const revealWidth = chartW * safeRevealProgress
@@ -1088,6 +1910,7 @@ const PressureTrendChart: React.FC<{
 
     const xScale = (mileage: number) => padL + (mileage / maxMileage) * chartW
     const yScale = (p: number) => padT + chartH - ((p - minP) / rangeP) * chartH
+    const flowYScale = (flow: number) => padT + chartH - (flow / flowAxisMax) * chartH
 
     const buildHydraulicPath = () => {
         let path = ''
@@ -1110,9 +1933,88 @@ const PressureTrendChart: React.FC<{
     }
 
     const hydraulicPath = hasData ? buildHydraulicPath() : ''
+    const buildBaselinePressurePath = () => {
+        let path = ''
+        stations.forEach((s, i) => {
+            const baselineIn = typeof s.baselineInP === 'number' ? s.baselineInP : s.baselineOutP
+            const baselineOut = typeof s.baselineOutP === 'number' ? s.baselineOutP : baselineIn
+            if (baselineIn == null || baselineOut == null) return
+
+            const x = xScale(s.mileage)
+            const yIn = yScale(baselineIn)
+            const yOut = yScale(baselineOut)
+            const hasJump = Math.abs(baselineOut - baselineIn) > jumpThreshold
+
+            if (i === 0 || !path) {
+                path += `M ${x} ${yIn}`
+                if (hasJump) path += ` L ${x} ${yOut}`
+                return
+            }
+
+            path += ` L ${x} ${yIn}`
+            if (hasJump) path += ` L ${x} ${yOut}`
+        })
+        return path
+    }
+    const baselinePressurePath = hasBaselinePressure ? buildBaselinePressurePath() : ''
+    const buildFlowPath = () => {
+        let path = ''
+        stations.forEach((station) => {
+            if (typeof station.flowRate !== 'number' || !Number.isFinite(station.flowRate)) return
+            const x = xScale(station.mileage)
+            const y = flowYScale(station.flowRate)
+            path += path ? ` L ${x} ${y}` : `M ${x} ${y}`
+        })
+        return path
+    }
+    const flowPath = hasFlowData ? buildFlowPath() : ''
+    const buildBaselineFlowPath = () => {
+        let path = ''
+        stations.forEach((station) => {
+            if (typeof station.baselineFlowRate !== 'number' || !Number.isFinite(station.baselineFlowRate)) return
+            const x = xScale(station.mileage)
+            const y = flowYScale(station.baselineFlowRate)
+            path += path ? ` L ${x} ${y}` : `M ${x} ${y}`
+        })
+        return path
+    }
+    const baselineFlowPath = hasBaselineFlow ? buildBaselineFlowPath() : ''
     const areaPath = hasData
         ? `${hydraulicPath} L ${xScale(maxMileage)} ${padT + chartH} L ${padL} ${padT + chartH} Z`
         : ''
+    const pressureDeltaSamples = stations
+        .map(station => {
+            const before = typeof station.baselineOutP === 'number' ? station.baselineOutP : station.baselineInP
+            return typeof before === 'number' ? station.outP - before : null
+        })
+        .filter((value): value is number => value != null && Number.isFinite(value))
+    const avgPressureDelta = pressureDeltaSamples.length
+        ? pressureDeltaSamples.reduce((sum, value) => sum + value, 0) / pressureDeltaSamples.length
+        : undefined
+    const maxPressureDelta = pressureDeltaSamples.length
+        ? pressureDeltaSamples.reduce((best, value) => Math.abs(value) > Math.abs(best) ? value : best, pressureDeltaSamples[0])
+        : undefined
+    const pressureDeltaTone = getDeltaTone(avgPressureDelta)
+    const highlightedDeltaIndices = new Set(
+        stations
+            .map((station, index) => {
+                const beforePressureOut = typeof station.baselineOutP === 'number' ? station.baselineOutP : station.baselineInP
+                const pressureDelta = typeof beforePressureOut === 'number' ? station.outP - beforePressureOut : undefined
+                const flowDelta = typeof station.baselineFlowRate === 'number' && typeof station.flowRate === 'number'
+                    ? station.flowRate - station.baselineFlowRate
+                    : undefined
+                const pressureScore = pressureDelta == null ? 0 : Math.abs(pressureDelta) / 0.05
+                const flowScore = flowDelta == null ? 0 : Math.abs(flowDelta) / 200
+                return {
+                    index,
+                    score: Math.max(pressureScore, flowScore),
+                }
+            })
+            .filter(item => item.score >= 1)
+            .sort((left, right) => right.score - left.score)
+            .slice(0, 7)
+            .map(item => item.index),
+    )
 
     const gridLines: number[] = []
     for (let p = Math.ceil(minP); p <= Math.floor(maxP); p++) {
@@ -1120,6 +2022,9 @@ const PressureTrendChart: React.FC<{
     }
 
     const mileageTicks = Array.from({ length: 6 }, (_, idx) => Number(((maxMileage / 5) * idx).toFixed(1)))
+    const flowTicks = hasFlowData
+        ? Array.from({ length: 5 }, (_, idx) => Math.round((flowAxisMax / 4) * idx))
+        : []
 
     return (
         <div
@@ -1142,8 +2047,8 @@ const PressureTrendChart: React.FC<{
             >
                 <h3 className="m-0 text-sm font-bold flex items-center gap-2" style={{ color: '#e2e8f0' }}>
                     <span className="material-symbols-outlined text-lg" style={{ color: accentColor }}>show_chart</span>
-                    <span>{config.title} · 里程进出站压力图</span>
-                    <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 'normal' }}>单位: MPa / km</span>
+                    <span>{config.title} · 里程进出站压力/流量图</span>
+                    <span style={{ color: '#64748b', fontSize: '10px', fontWeight: 'normal' }}>单位: MPa / 万方/天 / km</span>
                     {config.mileageMode === 'estimated' && (
                         <span style={{ color: '#94a3b8', fontSize: '10px', fontWeight: 'normal' }}>主干线累计长度推算</span>
                     )}
@@ -1153,9 +2058,29 @@ const PressureTrendChart: React.FC<{
                         </span>
                     )}
                 </h3>
-                <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10" title="关闭">
-                    <span className="material-symbols-outlined text-sm">close</span>
-                </button>
+                <div className="flex items-center gap-3" onMouseDown={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                        <span className="flex items-center gap-1">
+                            <span style={{ width: 16, height: 2, background: accentColor, display: 'inline-block' }} />
+                            仿真后压力
+                        </span>
+                        {hasBaselinePressure && (
+                            <span className="flex items-center gap-1">
+                                <span style={{ width: 16, height: 0, borderTop: `2px dashed ${baselineColor}`, display: 'inline-block' }} />
+                                仿真前
+                            </span>
+                        )}
+                        {hasFlowData && (
+                            <span className="flex items-center gap-1">
+                                <span style={{ width: 16, height: 0, borderTop: `2px dashed ${flowColor}`, display: 'inline-block' }} />
+                                仿真后流量
+                            </span>
+                        )}
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10" title="关闭">
+                        <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
             </div>
 
             {!hasData ? (
@@ -1172,6 +2097,48 @@ const PressureTrendChart: React.FC<{
                 </div>
             ) : (
                 <div className="flex-1 px-4 py-2 overflow-hidden">
+                    {avgPressureDelta != null && (
+                        <div
+                            className="mb-1 inline-flex items-center gap-2 rounded-lg border px-2 py-1 text-[10px] font-semibold"
+                            style={{
+                                color: pressureDeltaTone.color,
+                                background: pressureDeltaTone.bg,
+                                borderColor: pressureDeltaTone.border,
+                            }}
+                        >
+                            <span>{pressureDeltaTone.arrow} 平均出站压力{pressureDeltaTone.label}</span>
+                            <span className="font-mono">{formatSignedDelta(avgPressureDelta, 3, ' MPa')}</span>
+                            {maxPressureDelta != null && (
+                                <span className="text-slate-300">最大变化 {formatSignedDelta(maxPressureDelta, 3, ' MPa')}</span>
+                            )}
+                        </div>
+                    )}
+                    {safeRevealProgress < 1 && (
+                        <div className="mb-1.5 rounded-lg border border-cyan-400/20 bg-slate-950/75 px-2 py-1.5 shadow-inner shadow-cyan-950/30">
+                            <div className="mb-1 flex items-center justify-between text-[10px]">
+                                <span className="font-semibold text-cyan-100">曲线生成进度</span>
+                                <span className="font-mono text-cyan-300">{Math.round(safeRevealProgress * 100)}%</span>
+                            </div>
+                            <div className="relative h-1.5 overflow-hidden rounded-full bg-slate-800/90">
+                                <div
+                                    className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-400 via-cyan-300 to-sky-400"
+                                    style={{
+                                        width: `${Math.max(4, safeRevealProgress * 100)}%`,
+                                        backgroundSize: '220% 100%',
+                                        animation: 'simProgressFlow 1.1s linear infinite',
+                                        boxShadow: '0 0 12px rgba(34,211,238,0.55)',
+                                    }}
+                                />
+                                <div
+                                    className="absolute inset-0"
+                                    style={{
+                                        backgroundImage: 'linear-gradient(110deg, transparent 0%, rgba(255,255,255,0.28) 38%, transparent 72%)',
+                                        animation: 'simProgressSweep 1.35s ease-in-out infinite',
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
                     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%' }}>
                         <defs>
                             <linearGradient id={`hydraulicGrad-${config.pipelineId}`} x1="0" y1="0" x2="0" y2="1">
@@ -1190,10 +2157,34 @@ const PressureTrendChart: React.FC<{
                                 <text x={padL - 8} y={yScale(p) + 4} textAnchor="end" fill="#475569" fontSize="10" fontFamily="monospace">{p}</text>
                             </g>
                         ))}
+                        {flowTicks.map(flow => (
+                            <g key={`${config.pipelineId}-flow-grid-${flow}`}>
+                                <text x={padL + chartW + 8} y={flowYScale(flow) + 4} textAnchor="start" fill={hexToRgba(flowColor, 0.7)} fontSize="9" fontFamily="monospace">
+                                    {flow}
+                                </text>
+                            </g>
+                        ))}
 
                         <g clipPath={`url(#${chartClipId})`}>
                             <path d={areaPath} fill={`url(#hydraulicGrad-${config.pipelineId})`} />
+                            {baselinePressurePath && (
+                                <path d={baselinePressurePath} fill="none" stroke={baselineColor} strokeWidth={1.8} strokeDasharray="7 5" strokeLinejoin="round" />
+                            )}
                             <path d={hydraulicPath} fill="none" stroke={accentColor} strokeWidth={2} strokeLinejoin="round" />
+                            {baselineFlowPath && (
+                                <path d={baselineFlowPath} fill="none" stroke={hexToRgba(flowColor, 0.48)} strokeWidth={1.4} strokeDasharray="2 6" strokeLinejoin="round" />
+                            )}
+                            {hasFlowData && (
+                                <path
+                                    d={flowPath}
+                                    fill="none"
+                                    stroke={flowColor}
+                                    strokeWidth={1.8}
+                                    strokeDasharray="5 4"
+                                    strokeLinejoin="round"
+                                    opacity={0.95}
+                                />
+                            )}
                         </g>
 
                         <g clipPath={`url(#${chartClipId})`}>
@@ -1201,10 +2192,28 @@ const PressureTrendChart: React.FC<{
                             const x = xScale(s.mileage)
                             const yIn = yScale(s.inP)
                             const yOut = yScale(s.outP)
+                            const baselineOut = typeof s.baselineOutP === 'number' ? s.baselineOutP : s.baselineInP
+                            const pressureDelta = typeof baselineOut === 'number' ? s.outP - baselineOut : undefined
+                            const flowDelta = typeof s.baselineFlowRate === 'number' && typeof s.flowRate === 'number' ? s.flowRate - s.baselineFlowRate : undefined
+                            const deltaTone = getDeltaTone(pressureDelta)
+                            const flowDeltaTone = getDeltaTone(flowDelta)
+                            const pressureChanged = pressureDelta != null && Math.abs(pressureDelta) > 0.005
+                            const flowChanged = flowDelta != null && Math.abs(flowDelta) >= 1
+                            const hasDeltaAnimation = pressureChanged || flowChanged
+                            const deltaAnimationTone = pressureChanged ? deltaTone : flowDeltaTone
                             const hasJump = Math.abs(s.outP - s.inP) > jumpThreshold
                             const isHovered = hoveredIdx === i
                             const isStationLabel = s.type !== 'valve' && !/^WE1-\d+阀室$/.test(s.name)
                             const showLabel = isHovered || i === 0 || i === stations.length - 1 || isStationLabel
+                            const showDeltaBadge = highlightedDeltaIndices.has(i) && !isHovered
+                            const deltaBadgeText = pressureChanged
+                                ? `ΔP ${formatSignedDelta(pressureDelta ?? 0, 2)}`
+                                : flowChanged
+                                    ? `ΔQ ${formatSignedDelta(flowDelta ?? 0, 0)}`
+                                    : ''
+                            const deltaBadgeWidth = Math.max(54, Math.min(84, deltaBadgeText.length * 6 + 10))
+                            const deltaBadgeX = Math.max(padL + 2, Math.min(x - deltaBadgeWidth / 2, W - padR - deltaBadgeWidth - 2))
+                            const deltaBadgeY = Math.max(padT + 4, yOut - 32 - (i % 2) * 14)
 
                                 return (
                                     <g
@@ -1215,6 +2224,59 @@ const PressureTrendChart: React.FC<{
                                     >
                                         <rect x={x - 10} y={padT} width={20} height={chartH} fill="transparent" />
                                         {isHovered && <line x1={x} y1={padT} x2={x} y2={padT + chartH} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />}
+
+                                        {hasDeltaAnimation && (
+                                            <g pointerEvents="none">
+                                                <circle
+                                                    cx={x}
+                                                    cy={yOut}
+                                                    r={5}
+                                                    fill="none"
+                                                    stroke={deltaAnimationTone.color}
+                                                    strokeWidth={1.5}
+                                                    opacity={0.82}
+                                                >
+                                                    <animate attributeName="r" values="4;11;4" dur="1.45s" repeatCount="indefinite" />
+                                                    <animate attributeName="opacity" values="0.82;0.16;0.82" dur="1.45s" repeatCount="indefinite" />
+                                                </circle>
+                                                <text
+                                                    x={Math.min(x + 10, W - padR - 22)}
+                                                    y={Math.max(padT + 12, yOut - 9)}
+                                                    fill={deltaAnimationTone.color}
+                                                    fontSize="10"
+                                                    fontWeight={800}
+                                                    fontFamily="monospace"
+                                                >
+                                                    {pressureChanged ? deltaTone.arrow : flowDeltaTone.arrow}
+                                                </text>
+                                            </g>
+                                        )}
+
+                                        {showDeltaBadge && deltaBadgeText && (
+                                            <g pointerEvents="none">
+                                                <rect
+                                                    x={deltaBadgeX}
+                                                    y={deltaBadgeY}
+                                                    width={deltaBadgeWidth}
+                                                    height={16}
+                                                    rx={5}
+                                                    fill="rgba(2,6,23,0.86)"
+                                                    stroke={deltaAnimationTone.border}
+                                                    strokeWidth={1}
+                                                />
+                                                <text
+                                                    x={deltaBadgeX + deltaBadgeWidth / 2}
+                                                    y={deltaBadgeY + 11.5}
+                                                    textAnchor="middle"
+                                                    fill={deltaAnimationTone.color}
+                                                    fontSize="9"
+                                                    fontWeight={800}
+                                                    fontFamily="monospace"
+                                                >
+                                                    {deltaAnimationTone.arrow} {deltaBadgeText}
+                                                </text>
+                                            </g>
+                                        )}
 
                                         {isHovered && (
                                             <>
@@ -1246,7 +2308,7 @@ const PressureTrendChart: React.FC<{
                                                     x={Math.min(x - 84, W - padR - 168)}
                                                     y={Math.max(padT, Math.min(yIn, yOut) - 68)}
                                                     width={168}
-                                                    height={60}
+                                                    height={pressureDelta != null ? 102 : 76}
                                                     rx={6}
                                                     fill="rgba(15,23,42,0.95)"
                                                     stroke={hexToRgba(accentColor, 0.35)}
@@ -1264,6 +2326,21 @@ const PressureTrendChart: React.FC<{
                                                 <text x={Math.min(x + 42, W - padR - 42)} y={Math.max(padT + 44, Math.min(yIn, yOut) - 20)} textAnchor="middle" fill={accentColor} fontSize="10" fontFamily="monospace">
                                                     出 {s.outP.toFixed(3)}
                                                 </text>
+                                                {pressureDelta != null && (
+                                                    <>
+                                                        <text x={Math.min(x, W - padR - 84)} y={Math.max(padT + 58, Math.min(yIn, yOut) - 6)} textAnchor="middle" fill="#94a3b8" fontSize="9" fontFamily="monospace">
+                                                            仿真前 {baselineOut?.toFixed(3)} → 后 {s.outP.toFixed(3)}
+                                                        </text>
+                                                        <text x={Math.min(x, W - padR - 84)} y={Math.max(padT + 72, Math.min(yIn, yOut) + 8)} textAnchor="middle" fill={deltaTone.color} fontSize="10" fontWeight={700} fontFamily="monospace">
+                                                            ΔP {formatSignedDelta(pressureDelta, 3, ' MPa')}（{deltaTone.label}）
+                                                        </text>
+                                                    </>
+                                                )}
+                                                {typeof s.flowRate === 'number' && Number.isFinite(s.flowRate) && (
+                                                    <text x={Math.min(x, W - padR - 84)} y={Math.max(padT + (pressureDelta != null ? 88 : 60), Math.min(yIn, yOut) + (pressureDelta != null ? 24 : -4))} textAnchor="middle" fill={flowColor} fontSize="10" fontFamily="monospace">
+                                                        Q {s.flowRate.toFixed(0)}{flowDelta != null ? ` (${formatSignedDelta(flowDelta, 0)})` : ''} 万方/天
+                                                    </text>
+                                                )}
                                             </g>
                                         )}
                                     </g>
@@ -1286,6 +2363,11 @@ const PressureTrendChart: React.FC<{
                         <text x={padL + chartW} y={padT + chartH + 32} textAnchor="end" fill="#475569" fontSize="10">
                             里程 / km
                         </text>
+                        {hasFlowData && (
+                            <text x={padL + chartW + 42} y={padT + 10} textAnchor="middle" fill={hexToRgba(flowColor, 0.78)} fontSize="10" transform={`rotate(90, ${padL + chartW + 42}, ${padT + 10})`}>
+                                流量 万方/天
+                            </text>
+                        )}
                     </svg>
                 </div>
             )}
@@ -1352,19 +2434,78 @@ const GlobalPipelineView: React.FC = () => {
         pilotId: activeSimulationPilot.id,
         scenarios: activeSimulationPilot.scenarios,
     })
+    const [simulationPanelVisible, setSimulationPanelVisible] = useState(false)
+    const [selectedSimulationScenarioIds, setSelectedSimulationScenarioIds] = useState<string[]>(
+        () => activeSimulationPilot.scenarios.map(item => item.id),
+    )
+    const [showSimParamEditor, setShowSimParamEditor] = useState(false)
+    const [simulationParamsByScenario, setSimulationParamsByScenario] = useState<Record<string, SimulationScenarioParamState>>(
+        () => Object.fromEntries(activeSimulationPilot.scenarios.map(item => [item.id, createDefaultSimulationParamState()])),
+    )
     const [multiScenarioActive, setMultiScenarioActive] = useState(false)
     const [multiScenarioStepId, setMultiScenarioStepId] = useState('')
     const [multiScenarioResults, setMultiScenarioResults] = useState<MultiScenarioAiResult[]>([])
     const [multiScenarioPanelOpen, setMultiScenarioPanelOpen] = useState(false)
     const [multiScenarioError, setMultiScenarioError] = useState<string | null>(null)
-    const [multiScenarioSelectedCaseIds, setMultiScenarioSelectedCaseIds] = useState<string[]>(() => MULTI_SCENARIO_AI_CASES.map(item => item.id))
+    const [multiScenarioSelectedCaseIds, setMultiScenarioSelectedCaseIds] = useState<string[]>(() => DEFAULT_ZHONGWEI_MULTI_SCENARIO_IDS)
+    const [subAgentDemoOpen, setSubAgentDemoOpen] = useState(false)
+    const [subAgentDemoSteps, setSubAgentDemoSteps] = useState<SubAgentDemoStep[]>(() => createDefaultSubAgentDemoSteps())
+    const [subAgentDemoLastMessage, setSubAgentDemoLastMessage] = useState('')
     const [simulationCutoffEdgeIds, setSimulationCutoffEdgeIds] = useState<string[]>([])
+    const [networkxCutoffActive, setNetworkxCutoffActive] = useState(false)
+    const [networkxCutoffResult, setNetworkxCutoffResult] = useState<NetworkxCutoffDemoResult | null>(null)
+    const [networkxCutoffItems, setNetworkxCutoffItems] = useState<NetworkxCutoffItem[]>([])
+    const [networkxCutoffOverlay, setNetworkxCutoffOverlay] = useState<NetworkxCutoffMapOverlay | null>(null)
+    const [networkxCutoffError, setNetworkxCutoffError] = useState<string | null>(null)
+    const [networkxCutoffStage, setNetworkxCutoffStage] = useState<NetworkxCutoffStage>('all')
+    const [networkxCutoffStageLabel, setNetworkxCutoffStageLabel] = useState('靖边枢纽截断')
+    const [networkxCutoffPathOpen, setNetworkxCutoffPathOpen] = useState(true)
+    const [networkxCutoffPathExpanded, setNetworkxCutoffPathExpanded] = useState(false)
     const multiScenarioActiveRef = useRef(false)
+    const networkxCutoffUrlAppliedRef = useRef('')
+    const stationProcessCutoffLastRef = useRef<{ key: string; at: number } | null>(null)
     const [simulationPressureChartOpen, setSimulationPressureChartOpen] = useState(false)
     const [simulationPressureChartOverlay, setSimulationPressureChartOverlay] = useState<SimulationOverlay | null>(null)
     const [hiddenSimulationPressureChartIds, setHiddenSimulationPressureChartIds] = useState<Record<string, boolean>>({})
     const [simulationPressureChartRevealProgress, setSimulationPressureChartRevealProgress] = useState<Record<string, number>>({})
     const lastSimulationPressureChartRunIdRef = useRef('')
+    const simulationPressureTextOverlaysRef = useRef<any[]>([])
+
+    const updateSubAgentDemoStep = useCallback((
+        stepId: string,
+        status: SubAgentDemoStatus,
+        message: string,
+        title?: string,
+    ) => {
+        setSubAgentDemoOpen(true)
+        setSubAgentDemoLastMessage(message || title || '')
+        setSubAgentDemoSteps(prev => prev.map(item => item.id === stepId
+            ? {
+                ...item,
+                title: title || item.title,
+                status,
+                message: message || item.message,
+                updatedAt: Date.now(),
+            }
+            : item))
+    }, [])
+
+    const completeSubAgentDemoStepIfStillRunning = useCallback((
+        stepId: string,
+        message: string,
+        title?: string,
+    ) => {
+        setSubAgentDemoSteps(prev => prev.map(item => {
+            if (item.id !== stepId || item.status !== 'running') return item
+            return {
+                ...item,
+                title: title || item.title,
+                status: 'completed',
+                message,
+                updatedAt: Date.now(),
+            }
+        }))
+    }, [])
 
     const [showScada, setShowScada] = useState(false)
     const [showWe2Scada, setShowWe2Scada] = useState(false)
@@ -1420,6 +2561,7 @@ const GlobalPipelineView: React.FC = () => {
         && hubNodeTypes.includes('source')
         && hubNodeTypes.includes('junction')
         && !showValveRooms
+    const shouldShowSimulationPressureLabels = Boolean(globalSimulation.overlay)
 
     const activatePresentationNodeMode = useCallback(() => {
         if (isPresentationNodeMode) {
@@ -1435,6 +2577,546 @@ const GlobalPipelineView: React.FC = () => {
         setShowValveRooms(false)
         setIsHubMenuOpen(false)
     }, [isPresentationNodeMode])
+
+    const currentSimulationParamState = simulationParamsByScenario[globalSimulation.currentScenario]
+        ?? createDefaultSimulationParamState()
+    const nodeOverrides = currentSimulationParamState.nodeOverrides
+    const edgeLengthOverrides = currentSimulationParamState.edgeLengthOverrides
+    const edgeFlowOverrides = currentSimulationParamState.edgeFlowOverrides
+    const globalDefaults = currentSimulationParamState.globalDefaults
+    const zhongweiPressureChangeValue = currentSimulationParamState.zhongweiPressureChangeValue
+    const zhongweiFlowChangeValue = currentSimulationParamState.zhongweiFlowChangeValue
+
+    const updateSimulationParamState = useCallback((
+        scenarioId: string,
+        updater: (prev: SimulationScenarioParamState) => SimulationScenarioParamState,
+    ) => {
+        setSimulationParamsByScenario(prev => {
+            const current = prev[scenarioId] ?? createDefaultSimulationParamState()
+            return { ...prev, [scenarioId]: updater(current) }
+        })
+    }, [])
+
+    const updateCurrentSimulationParamState = useCallback((
+        updater: (prev: SimulationScenarioParamState) => SimulationScenarioParamState,
+    ) => {
+        updateSimulationParamState(globalSimulation.currentScenario, updater)
+    }, [globalSimulation.currentScenario, updateSimulationParamState])
+
+    const setNodeOverrides = useCallback((
+        value: Record<string, SimulationNodeOverrideInput> | ((prev: Record<string, SimulationNodeOverrideInput>) => Record<string, SimulationNodeOverrideInput>),
+    ) => {
+        updateCurrentSimulationParamState(prev => ({
+            ...prev,
+            nodeOverrides: typeof value === 'function' ? value(prev.nodeOverrides) : value,
+        }))
+    }, [updateCurrentSimulationParamState])
+
+    const setEdgeLengthOverrides = useCallback((value: Record<string, number>) => {
+        updateCurrentSimulationParamState(prev => ({ ...prev, edgeLengthOverrides: value }))
+    }, [updateCurrentSimulationParamState])
+
+    const setEdgeFlowOverrides = useCallback((value: Record<string, number>) => {
+        updateCurrentSimulationParamState(prev => ({ ...prev, edgeFlowOverrides: value }))
+    }, [updateCurrentSimulationParamState])
+
+    const setGlobalDefaults = useCallback((value: SimulationGlobalDefaultsInput) => {
+        updateCurrentSimulationParamState(prev => ({ ...prev, globalDefaults: value }))
+    }, [updateCurrentSimulationParamState])
+
+    const setZhongweiPressureChangeValue = useCallback((value: string) => {
+        updateCurrentSimulationParamState(prev => ({ ...prev, zhongweiPressureChangeValue: value }))
+    }, [updateCurrentSimulationParamState])
+
+    const setZhongweiFlowChangeValue = useCallback((value: string) => {
+        updateCurrentSimulationParamState(prev => ({ ...prev, zhongweiFlowChangeValue: value }))
+    }, [updateCurrentSimulationParamState])
+
+    const seedNodesForEditor = useMemo<SeedNodePressure[]>(() => {
+        if (globalSimulation.overlay) {
+            return globalSimulation.overlay.nodes.map(node => ({
+                id: node.id,
+                name: resolvePilotNodeName(node.id),
+                operating_pressure_in: node.pressure_in_mpa ?? node.pressure_mpa,
+                operating_pressure_out: node.pressure_mpa,
+                target_pressure_mpa: node.pressure_mpa,
+                temperature_c: node.temperature_c,
+                default_flow_rate: getSimulationNodeFlowRate(node.id, globalSimulation.overlay),
+            }))
+        }
+
+        return Object.entries(WE1_PILOT_NODE_NAMES).map(([id, name]) => ({
+            id,
+            name,
+            default_flow_rate: id === ZHONGWEI_SOURCE_NODE_ID ? DEFAULT_SIMULATION_FLOW_RATE : undefined,
+        }))
+    }, [globalSimulation.overlay])
+
+    const zhongweiPressureBaseMpa = useMemo(() => {
+        const zhongweiNode = seedNodesForEditor.find(node => node.id === ZHONGWEI_SOURCE_NODE_ID)
+        const candidates = [
+            zhongweiNode?.target_pressure_mpa,
+            zhongweiNode?.operating_pressure_out,
+            ZHONGWEI_DEFAULT_TARGET_PRESSURE_MPA,
+        ]
+        return candidates.find((value): value is number => typeof value === 'number' && Number.isFinite(value)) ?? ZHONGWEI_DEFAULT_TARGET_PRESSURE_MPA
+    }, [seedNodesForEditor])
+
+    const zhongweiFlowBase = useMemo(() => {
+        const zhongweiNode = seedNodesForEditor.find(node => node.id === ZHONGWEI_SOURCE_NODE_ID)
+        const candidates = [
+            zhongweiNode?.default_flow_rate,
+            globalDefaults.default_flow_rate,
+            DEFAULT_SIMULATION_FLOW_RATE,
+        ]
+        return candidates.find((value): value is number => typeof value === 'number' && Number.isFinite(value)) ?? DEFAULT_SIMULATION_FLOW_RATE
+    }, [globalDefaults.default_flow_rate, seedNodesForEditor])
+
+    const applyZhongweiPressureChange = useCallback((rawValue: string) => {
+        setZhongweiPressureChangeValue(rawValue)
+        const targetPressure = parseOptionalNumber(rawValue)
+        setNodeOverrides(prev => {
+            const next = { ...prev }
+            const current = { ...(next[ZHONGWEI_SOURCE_NODE_ID] ?? {}) }
+            if (targetPressure == null) {
+                delete current.target_pressure_mpa
+            } else {
+                current.target_pressure_mpa = Number(targetPressure.toFixed(2))
+            }
+            if (
+                current.target_pressure_mpa == null &&
+                current.min_pressure_mpa == null &&
+                current.nominal_flow == null &&
+                current.supply_nominal == null &&
+                current.supply_max == null
+            ) {
+                delete next[ZHONGWEI_SOURCE_NODE_ID]
+            } else {
+                next[ZHONGWEI_SOURCE_NODE_ID] = current
+            }
+            return next
+        })
+    }, [setNodeOverrides, setZhongweiPressureChangeValue])
+
+    const applyZhongweiFlowChange = useCallback((rawValue: string) => {
+        setZhongweiFlowChangeValue(rawValue)
+        const targetFlow = parseOptionalNumber(rawValue)
+        setNodeOverrides(prev => {
+            const next = { ...prev }
+            const current = { ...(next[ZHONGWEI_SOURCE_NODE_ID] ?? {}) }
+            if (targetFlow == null) {
+                delete current.nominal_flow
+                delete current.supply_nominal
+                delete current.supply_max
+            } else {
+                const flow = Math.max(0, Number(targetFlow.toFixed(1)))
+                current.nominal_flow = flow
+                current.supply_nominal = flow
+                current.supply_max = flow
+            }
+            if (
+                current.target_pressure_mpa == null &&
+                current.min_pressure_mpa == null &&
+                current.nominal_flow == null &&
+                current.supply_nominal == null &&
+                current.supply_max == null
+            ) {
+                delete next[ZHONGWEI_SOURCE_NODE_ID]
+            } else {
+                next[ZHONGWEI_SOURCE_NODE_ID] = current
+            }
+            return next
+        })
+    }, [setNodeOverrides, setZhongweiFlowChangeValue])
+
+    const handleGlobalScenarioChange = useCallback((scenarioId: string) => {
+        globalSimulation.setScenario(scenarioId)
+    }, [globalSimulation])
+
+    const toggleSimulationPanel = useCallback(() => {
+        setSimulationPanelVisible(prev => {
+            const nextVisible = !prev
+            if (nextVisible && globalSimulation.currentScenario === 'steady_base') {
+                handleGlobalScenarioChange(ZHONGWEI_PRESSURE_CHANGE_SCENARIO_ID)
+            }
+            return nextVisible
+        })
+    }, [globalSimulation.currentScenario, handleGlobalScenarioChange])
+
+    const zhongweiPressureTarget = parseOptionalNumber(zhongweiPressureChangeValue)
+    const zhongweiPressureTargetMpa = zhongweiPressureTarget == null
+        ? undefined
+        : Number(zhongweiPressureTarget.toFixed(2))
+    const zhongweiFlowValue = parseOptionalNumber(zhongweiFlowChangeValue)
+    const zhongweiFlowTarget = zhongweiFlowValue == null
+        ? undefined
+        : Math.max(0, Number(zhongweiFlowValue.toFixed(1)))
+
+    const edgesForEditor = useMemo(() => {
+        return buildPilotAnchorEdgeOptions(globalSimulation.overlay?.edges)
+    }, [globalSimulation.overlay])
+
+    const getSimulationParamValidationError = useCallback((paramState: SimulationScenarioParamState) => {
+        const checkRange = (value: number | undefined, label: string, min: number, max: number) => {
+            if (value == null) return null
+            if (!Number.isFinite(value)) return `${label}必须是有效数字`
+            if (value < min || value > max) return `${label}应在 ${min}-${max} 范围内`
+            return null
+        }
+
+        const globalChecks = [
+            checkRange(paramState.globalDefaults.default_pressure_mpa, '默认压力', 0, 15),
+            checkRange(paramState.globalDefaults.default_temperature_c, '默认温度', -30, 80),
+            checkRange(paramState.globalDefaults.default_flow_rate, '默认流量', 0, 10000),
+        ].filter(Boolean)
+        if (globalChecks.length > 0) return globalChecks[0]
+
+        for (const [nodeId, value] of Object.entries(paramState.nodeOverrides)) {
+            const targetError = checkRange(value.target_pressure_mpa, `${resolvePilotNodeName(nodeId)}出站压力`, 0, 15)
+            if (targetError) return targetError
+            const minError = checkRange(value.min_pressure_mpa, `${resolvePilotNodeName(nodeId)}最小压力`, 0, 15)
+            if (minError) return minError
+            const flowError = checkRange(value.nominal_flow, `${resolvePilotNodeName(nodeId)}流量`, 0, 10000)
+            if (flowError) return flowError
+        }
+
+        for (const [edgeId, value] of Object.entries(paramState.edgeLengthOverrides)) {
+            const error = checkRange(value, `${edgeId}长度`, 0.1, 5000)
+            if (error) return error
+        }
+
+        for (const [edgeId, value] of Object.entries(paramState.edgeFlowOverrides)) {
+            const error = checkRange(value, `${edgeId}流量`, 0, 10000)
+            if (error) return error
+        }
+
+        return null
+    }, [])
+
+    const paramValidationError = useMemo(
+        () => getSimulationParamValidationError(currentSimulationParamState),
+        [currentSimulationParamState, getSimulationParamValidationError],
+    )
+
+    const buildGlobalSimulationInitialInput = useCallback((scenarioId = globalSimulation.currentScenario): SimulationInitialInput | undefined => {
+        const paramState = simulationParamsByScenario[scenarioId] ?? createDefaultSimulationParamState()
+        const {
+            nodeOverrides: scenarioNodeOverrides,
+            edgeLengthOverrides: scenarioEdgeLengthOverrides,
+            edgeFlowOverrides: scenarioEdgeFlowOverrides,
+            globalDefaults: scenarioGlobalDefaults,
+            zhongweiPressureChangeValue: scenarioZhongweiPressureValue,
+            zhongweiFlowChangeValue: scenarioZhongweiFlowValue,
+        } = paramState
+        const initialInput: SimulationInitialInput = {}
+        const nodeOverrideMap = new Map<string, NonNullable<SimulationInitialInput['node_overrides']>[number]>()
+
+        Object.entries(scenarioNodeOverrides).forEach(([nodeId, value]) => {
+            const override: NonNullable<SimulationInitialInput['node_overrides']>[number] = { node_id: nodeId }
+            if (value.target_pressure_mpa != null) override.target_pressure_mpa = value.target_pressure_mpa
+            if (value.min_pressure_mpa != null) override.min_pressure_mpa = value.min_pressure_mpa
+            if (value.nominal_flow != null) override.nominal_flow = value.nominal_flow
+            if (value.supply_nominal != null) override.supply_nominal = value.supply_nominal
+            if (value.supply_max != null) override.supply_max = value.supply_max
+            if (
+                override.target_pressure_mpa != null ||
+                override.min_pressure_mpa != null ||
+                override.nominal_flow != null ||
+                override.supply_nominal != null ||
+                override.supply_max != null
+            ) {
+                nodeOverrideMap.set(nodeId, override)
+            }
+        })
+
+        if (scenarioId === ZHONGWEI_PRESSURE_CHANGE_SCENARIO_ID) {
+            const targetPressure = parseOptionalNumber(scenarioZhongweiPressureValue)
+            const targetFlow = parseOptionalNumber(scenarioZhongweiFlowValue)
+            const override = nodeOverrideMap.get(ZHONGWEI_SOURCE_NODE_ID) ?? { node_id: ZHONGWEI_SOURCE_NODE_ID }
+            if (targetPressure != null) {
+                override.target_pressure_mpa = Number(targetPressure.toFixed(2))
+            }
+            if (targetFlow != null) {
+                const flow = Math.max(0, Number(targetFlow.toFixed(1)))
+                override.nominal_flow = flow
+                override.supply_nominal = flow
+                override.supply_max = flow
+            }
+            if (
+                override.target_pressure_mpa != null ||
+                override.min_pressure_mpa != null ||
+                override.nominal_flow != null ||
+                override.supply_nominal != null ||
+                override.supply_max != null
+            ) {
+                nodeOverrideMap.set(ZHONGWEI_SOURCE_NODE_ID, override)
+            }
+        }
+
+        const nodeOverrideList = Array.from(nodeOverrideMap.values())
+        if (nodeOverrideList.length > 0) {
+            initialInput.node_overrides = nodeOverrideList
+        }
+
+        const edgeOverrideMap = new Map<string, NonNullable<SimulationInitialInput['edge_overrides']>[number]>()
+        Object.entries(scenarioEdgeLengthOverrides).forEach(([edgeId, length]) => {
+            edgeOverrideMap.set(edgeId, { edge_id: edgeId, length_km: length })
+        })
+        Object.entries(scenarioEdgeFlowOverrides).forEach(([edgeId, flow]) => {
+            const existing = edgeOverrideMap.get(edgeId) ?? { edge_id: edgeId }
+            existing.flow_rate = flow
+            edgeOverrideMap.set(edgeId, existing)
+        })
+
+        if (edgeOverrideMap.size > 0) {
+            initialInput.edge_overrides = Array.from(edgeOverrideMap.values())
+        }
+
+        if (scenarioGlobalDefaults.default_pressure_mpa != null) initialInput.default_pressure_mpa = scenarioGlobalDefaults.default_pressure_mpa
+        if (scenarioGlobalDefaults.default_temperature_c != null) initialInput.default_temperature_c = scenarioGlobalDefaults.default_temperature_c
+        if (scenarioGlobalDefaults.default_flow_rate != null) initialInput.default_flow_rate = scenarioGlobalDefaults.default_flow_rate
+        if (scenarioGlobalDefaults.apply_to_sources) initialInput.apply_to_sources = true
+
+        return Object.keys(initialInput).length > 0 ? initialInput : undefined
+    }, [globalSimulation.currentScenario, simulationParamsByScenario])
+
+    const handleRunGlobalSimulation = useCallback(() => {
+        if (paramValidationError) {
+            setShowSimParamEditor(true)
+            return
+        }
+
+        void globalSimulation.runSimulation({
+            initialInput: buildGlobalSimulationInitialInput(globalSimulation.currentScenario),
+        })
+    }, [buildGlobalSimulationInitialInput, globalSimulation, paramValidationError])
+
+    const toggleSelectedSimulationScenario = useCallback((scenarioId: string) => {
+        setSelectedSimulationScenarioIds(prev => (
+            prev.includes(scenarioId)
+                ? prev.filter(item => item !== scenarioId)
+                : [...prev, scenarioId]
+        ))
+    }, [])
+
+    const changeSelectedSimulationScenarioSlot = useCallback((index: number, scenarioId: string) => {
+        setSelectedSimulationScenarioIds(prev => {
+            const fallback = activeSimulationPilot.scenarios.map(item => item.id).slice(0, 5)
+            const next = (prev.length ? [...prev] : fallback).slice(0, 5)
+            while (next.length < Math.min(5, activeSimulationPilot.scenarios.length)) {
+                next.push(fallback[next.length] ?? scenarioId)
+            }
+            next[index] = scenarioId
+            return next
+        })
+    }, [activeSimulationPilot.scenarios])
+
+    const handleRunGlobalTrialScenario = useCallback((scenarioId: string) => {
+        handleGlobalScenarioChange(scenarioId)
+        const scenarioValidationError = getSimulationParamValidationError(
+            simulationParamsByScenario[scenarioId] ?? createDefaultSimulationParamState(),
+        )
+        if (scenarioValidationError) {
+            setShowSimParamEditor(true)
+            return
+        }
+
+        void globalSimulation.runTrialScenario(scenarioId, {
+            initialInput: buildGlobalSimulationInitialInput(scenarioId),
+        })
+    }, [
+        buildGlobalSimulationInitialInput,
+        getSimulationParamValidationError,
+        globalSimulation,
+        handleGlobalScenarioChange,
+        simulationParamsByScenario,
+    ])
+
+    const handleRunSelectedGlobalTrialScenarios = useCallback(() => {
+        const scenarioMap = new Map(activeSimulationPilot.scenarios.map(item => [item.id, item]))
+        const selectedIds = selectedSimulationScenarioIds
+            .slice(0, 5)
+            .filter(id => scenarioMap.has(id))
+        if (selectedIds.length === 0) return
+        const scenarioValidationError = selectedIds
+            .map(id => getSimulationParamValidationError(simulationParamsByScenario[id] ?? createDefaultSimulationParamState()))
+            .find(Boolean)
+        if (scenarioValidationError) {
+            setShowSimParamEditor(true)
+            return
+        }
+
+        void (async () => {
+            const collected: MultiScenarioAiResult[] = []
+            multiScenarioActiveRef.current = true
+            setMultiScenarioActive(true)
+            setMultiScenarioSelectedCaseIds([])
+            setMultiScenarioError(null)
+            setMultiScenarioResults([])
+            setMultiScenarioPanelOpen(false)
+            setHiddenSimulationPressureChartIds({})
+            setSimulationPressureChartLayouts({})
+            setSimulationPressureChartOverlay(null)
+            setSimulationPressureChartRevealProgress({})
+            setSimulationPressureChartOpen(true)
+
+            try {
+                for (const [index, scenarioId] of selectedIds.entries()) {
+                    const scenario = scenarioMap.get(scenarioId)
+                    setMultiScenarioStepId(`trial-${index + 1}:${scenarioId}`)
+                    handleGlobalScenarioChange(scenarioId)
+                    const overlay = await globalSimulation.runTrialScenario(scenarioId, {
+                        initialInput: buildGlobalSimulationInitialInput(scenarioId),
+                    })
+                    if (!overlay) {
+                        throw new Error(`${scenario?.label ?? scenarioId} 仿真没有返回结果`)
+                    }
+
+                    const stationPressureNodes = overlay.nodes.filter(node => {
+                        const pipelineNode = findPipelineNodeByPilotNodeId(node.id, pipelineData)
+                        const name = pipelineNode?.name || resolvePilotNodeName(node.id)
+                        return shouldShowStationSimulationPressureLabel(node.id, name)
+                    })
+                    const pressureNodes = stationPressureNodes.length > 0 ? stationPressureNodes : overlay.nodes
+                    const minPressureNode = pressureNodes.reduce((currentMin, node) => {
+                        const currentPressure = currentMin.pressure_in_mpa ?? currentMin.pressure_mpa
+                        const nextPressure = node.pressure_in_mpa ?? node.pressure_mpa
+                        return nextPressure < currentPressure ? node : currentMin
+                    }, pressureNodes[0])
+                    const sourceNode = overlay.nodes.find(node => node.id === ZHONGWEI_SOURCE_NODE_ID)
+                    const minPressurePipelineNode = minPressureNode ? findPipelineNodeByPilotNodeId(minPressureNode.id, pipelineData) : null
+                    const result: MultiScenarioAiResult = {
+                        caseId: `trial-${index + 1}-${scenarioId}-${overlay.run_id}`,
+                        label: `${index + 1}. ${scenario?.label ?? scenarioId}`,
+                        flowText: `${Math.round(overlay.summary.total_supply)}`,
+                        description: `第 ${index + 1} 段仿真结果`,
+                        overlay,
+                        sourceFlow: sourceNode?.supply_actual ?? overlay.summary.total_supply,
+                        unservedDemand: overlay.summary.unserved_demand,
+                        alertCount: overlay.summary.alert_count,
+                        avgUtilization: overlay.summary.avg_utilization,
+                        minPressure: minPressureNode ? (minPressureNode.pressure_in_mpa ?? minPressureNode.pressure_mpa) : 0,
+                        minPressureNodeName: minPressurePipelineNode?.name || (minPressureNode ? resolvePilotNodeName(minPressureNode.id) : '-'),
+                        iterations: overlay.iterations,
+                        runId: overlay.run_id,
+                    }
+
+                    collected.push(result)
+                    setMultiScenarioResults([...collected])
+                    setHiddenSimulationPressureChartIds(prev => ({ ...prev, [result.caseId]: false }))
+                    setSimulationPressureChartRevealProgress(prev => ({ ...prev, [result.caseId]: 0 }))
+                    await new Promise(resolve => setTimeout(resolve, 80))
+                    await animateSimulationPressureChartReveal(result.caseId)
+                }
+                setMultiScenarioPanelOpen(true)
+            } catch (error) {
+                setMultiScenarioError(error instanceof Error ? error.message : '多段仿真失败')
+            } finally {
+                setMultiScenarioStepId('')
+                multiScenarioActiveRef.current = false
+                setMultiScenarioActive(false)
+            }
+        })()
+    }, [
+        activeSimulationPilot.scenarios,
+        buildGlobalSimulationInitialInput,
+        getSimulationParamValidationError,
+        globalSimulation,
+        handleGlobalScenarioChange,
+        simulationParamsByScenario,
+        selectedSimulationScenarioIds,
+    ])
+
+    const simulationParamEditor = useMemo(() => (
+        <div className="rounded-lg border border-cyan-400/20 bg-slate-950/40 p-2">
+            <button
+                onClick={() => setShowSimParamEditor(prev => !prev)}
+                className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-[11px] font-semibold text-emerald-200 transition-colors hover:bg-white/5"
+                title="展开压力、流量、管段长度等精细化仿真参数"
+            >
+                <span className="material-symbols-outlined text-[16px] text-emerald-300">tune</span>
+                <span>编辑精细化参数 (压力/流量)</span>
+                <span className="ml-auto text-cyan-300">{showSimParamEditor ? '▴' : '▾'}</span>
+            </button>
+            {globalSimulation.currentScenario === ZHONGWEI_PRESSURE_CHANGE_SCENARIO_ID && (
+                <div className="mt-2 rounded-lg border border-cyan-400/20 bg-cyan-950/20 p-2">
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-semibold text-cyan-100">中卫站压力/流量变化</span>
+                        <span className="text-[10px] text-slate-400">
+                            基准 {zhongweiPressureBaseMpa.toFixed(2)} MPa / {zhongweiFlowBase.toFixed(0)} 万方/天
+                        </span>
+                    </div>
+                    <div className="space-y-1.5">
+                        <div className="grid grid-cols-[62px_minmax(0,1fr)_82px] items-center gap-2">
+                            <div className="text-[10px] text-slate-300">目标压力</div>
+                            <div className="min-w-0 truncate text-[10px] text-slate-400">
+                                设定 {zhongweiPressureTargetMpa == null ? '--' : `${zhongweiPressureTargetMpa.toFixed(2)} MPa`}
+                            </div>
+                            <input
+                                type="number"
+                                step="0.01"
+                                value={zhongweiPressureChangeValue}
+                                placeholder="9.30"
+                                onChange={(event) => applyZhongweiPressureChange(event.target.value)}
+                                className="w-full rounded border border-cyan-500/30 bg-black/35 px-2 py-1 text-center text-[11px] text-cyan-100 tabular-nums outline-none placeholder:text-slate-500"
+                                title="中卫站目标出站压力 MPa"
+                            />
+                        </div>
+                        <div className="grid grid-cols-[62px_minmax(0,1fr)_82px] items-center gap-2">
+                            <div className="text-[10px] text-slate-300">目标流量</div>
+                            <div className="min-w-0 truncate text-[10px] text-slate-400">
+                                设定 {zhongweiFlowTarget == null ? '--' : `${zhongweiFlowTarget.toFixed(0)} 万方/天`}
+                            </div>
+                            <input
+                                type="number"
+                                step="1"
+                                value={zhongweiFlowChangeValue}
+                                placeholder="1800"
+                                onChange={(event) => applyZhongweiFlowChange(event.target.value)}
+                                className="w-full rounded border border-cyan-500/30 bg-black/35 px-2 py-1 text-center text-[11px] text-cyan-100 tabular-nums outline-none placeholder:text-slate-500"
+                                title="中卫站目标供气流量 万方/天"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showSimParamEditor && (
+                <div className="mt-2">
+                    <SimParamEditor
+                        seedNodes={seedNodesForEditor}
+                        edges={edgesForEditor}
+                        nodeOverrides={nodeOverrides}
+                        edgeLengthOverrides={edgeLengthOverrides}
+                        edgeFlowOverrides={edgeFlowOverrides}
+                        globalDefaults={globalDefaults}
+                        validationError={paramValidationError}
+                        onNodeOverridesChange={setNodeOverrides}
+                        onEdgeLengthOverridesChange={setEdgeLengthOverrides}
+                        onEdgeFlowOverridesChange={setEdgeFlowOverrides}
+                        onGlobalDefaultsChange={setGlobalDefaults}
+                    />
+                </div>
+            )}
+        </div>
+    ), [
+        applyZhongweiFlowChange,
+        applyZhongweiPressureChange,
+        edgeFlowOverrides,
+        edgeLengthOverrides,
+        edgesForEditor,
+        globalDefaults,
+        globalSimulation.currentScenario,
+        nodeOverrides,
+        paramValidationError,
+        seedNodesForEditor,
+        showSimParamEditor,
+        zhongweiFlowBase,
+        zhongweiFlowChangeValue,
+        zhongweiFlowTarget,
+        zhongweiPressureBaseMpa,
+        zhongweiPressureChangeValue,
+        zhongweiPressureTargetMpa,
+    ])
 
     // 统一的指标点击处理函数
     const handleMetricClick = useCallback((stationName: string, metricType: 'pressure' | 'temperature' | 'dewpoint', baseValue: number) => {
@@ -1505,7 +3187,39 @@ const GlobalPipelineView: React.FC = () => {
                 focusHint: detail?.metric?.trim() || undefined,
             })
             setHistoryTarget(null)
+            updateSubAgentDemoStep(
+                'history',
+                'completed',
+                `${stationName}压力/水露点历史曲线已打开，历史曲线 Agent 完成。`,
+                '历史曲线 Agent',
+            )
         }
+
+        const consumePendingAssistantHistoryOpen = () => {
+            let rawPayload = ''
+            try {
+                rawPayload = window.sessionStorage.getItem(PENDING_ASSISTANT_HISTORY_ACTION_KEY) || ''
+                if (rawPayload) {
+                    window.sessionStorage.removeItem(PENDING_ASSISTANT_HISTORY_ACTION_KEY)
+                }
+            } catch {
+                rawPayload = ''
+            }
+            if (!rawPayload) return
+
+            try {
+                const detail = JSON.parse(rawPayload) as {
+                    station?: string
+                    view?: string
+                    hours?: number
+                    metric?: string
+                }
+                handleAssistantHistoryOpen({ detail } as CustomEvent)
+            } catch (error) {
+                console.warn('[GlobalPipelineView] 读取 AI 历史曲线待执行动作失败:', error)
+            }
+        }
+
         const handleAssistantHistoryMessage = (event: MessageEvent) => {
             const payload = event.data as {
                 type?: string
@@ -1526,12 +3240,128 @@ const GlobalPipelineView: React.FC = () => {
         window.addEventListener('assistant-open-history', handleAssistantHistoryOpen as EventListener)
         window.addEventListener('assistant-open-luzhi-history', handleAssistantHistoryOpen as EventListener)
         window.addEventListener('message', handleAssistantHistoryMessage)
+        window.setTimeout(consumePendingAssistantHistoryOpen, 0)
         return () => {
             window.removeEventListener('assistant-open-history', handleAssistantHistoryOpen as EventListener)
             window.removeEventListener('assistant-open-luzhi-history', handleAssistantHistoryOpen as EventListener)
             window.removeEventListener('message', handleAssistantHistoryMessage)
         }
-    }, [openStationHistoryPanel])
+    }, [openStationHistoryPanel, updateSubAgentDemoStep])
+
+    useEffect(() => {
+        const applySubAgentStep = (detail?: SubAgentDemoStepEventDetail) => {
+            const stepId = detail?.step?.trim()
+            if (!stepId) return
+            const status = normalizeSubAgentDemoStatus(detail?.status)
+            const message = detail?.message?.trim() || ''
+            const title = detail?.title?.trim() || ''
+
+            setSubAgentDemoOpen(true)
+            setSubAgentDemoLastMessage(message || title)
+            setSubAgentDemoSteps(prev => {
+                const base = stepId === 'controller' && status === 'running'
+                    ? createDefaultSubAgentDemoSteps()
+                    : prev
+                const exists = base.some(item => item.id === stepId)
+                const next = exists
+                    ? base
+                    : [
+                        ...base,
+                        {
+                            id: stepId,
+                            title: title || stepId,
+                            icon: 'smart_toy',
+                            status: 'pending' as SubAgentDemoStatus,
+                            message: '等待执行',
+                        },
+                    ]
+                const simulationCompleted = next.some(item => item.id === 'simulation' && item.status === 'completed')
+                return next.map(item => {
+                    if (item.id !== stepId) return item
+                    let nextStatus = status
+                    let nextMessage = message || item.message
+                    if (stepId === 'history' && status === 'completed') {
+                        nextStatus = 'running'
+                        nextMessage = '历史曲线 Agent 已完成查询，正在打开曲线面板。'
+                        window.setTimeout(() => {
+                            completeSubAgentDemoStepIfStillRunning(
+                                'history',
+                                '历史曲线联动已触发，历史曲线 Agent 完成。',
+                                '历史曲线 Agent',
+                            )
+                        }, 2200)
+                    } else if (stepId === 'topology' && status === 'completed') {
+                        nextStatus = 'running'
+                        nextMessage = '拓扑分析 Agent 已完成计算，正在联动地图定位。'
+                        window.setTimeout(() => {
+                            completeSubAgentDemoStepIfStillRunning(
+                                'topology',
+                                '地图定位联动已触发，拓扑分析 Agent 完成。',
+                                '拓扑分析 Agent',
+                            )
+                        }, 2400)
+                    } else if (stepId === 'simulation' && status === 'completed') {
+                        nextStatus = 'running'
+                        nextMessage = '仿真 Agent 已准备三工况，等待点击开始并完成全部仿真后打勾。'
+                    } else if (stepId === 'main_summary' && status === 'completed') {
+                        nextStatus = 'running'
+                        nextMessage = simulationCompleted
+                            ? '最终结论正在输出，输出完成后主 Agent 打勾。'
+                            : '主 Agent 已收齐前序材料，等待三工况仿真完成后再输出最终结论。'
+                    }
+                    return {
+                        ...item,
+                        title: title || item.title,
+                        status: nextStatus,
+                        message: nextMessage,
+                        updatedAt: Date.now(),
+                    }
+                })
+            })
+        }
+
+        const handleSubAgentStepEvent = (event: Event) => {
+            applySubAgentStep((event as CustomEvent<SubAgentDemoStepEventDetail>).detail)
+        }
+
+        const handleSubAgentStepMessage = (event: MessageEvent) => {
+            const payload = event.data as { type?: string; detail?: SubAgentDemoStepEventDetail } | undefined
+            if (payload?.type === 'assistant-subagent-demo-step') {
+                applySubAgentStep(payload.detail)
+            } else if (payload?.type === 'assistant-subagent-demo-final-shown') {
+                updateSubAgentDemoStep('main_summary', 'completed', '最终结论已显示，主 Agent 汇总完成。', '主 Agent 汇总')
+            }
+        }
+
+        const handleSubAgentFinalShown = () => {
+            updateSubAgentDemoStep('main_summary', 'completed', '最终结论已显示，主 Agent 汇总完成。', '主 Agent 汇总')
+        }
+
+        let channel: BroadcastChannel | null = null
+        try {
+            channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+            channel.onmessage = (event) => {
+                const payload = event.data as { type?: string; detail?: SubAgentDemoStepEventDetail } | undefined
+                if (payload?.type === 'assistant-subagent-demo-step') {
+                    applySubAgentStep(payload.detail)
+                } else if (payload?.type === 'assistant-subagent-demo-final-shown') {
+                    updateSubAgentDemoStep('main_summary', 'completed', '最终结论已显示，主 Agent 汇总完成。', '主 Agent 汇总')
+                }
+            }
+        } catch {
+            channel = null
+        }
+
+        window.addEventListener('assistant-subagent-demo-step', handleSubAgentStepEvent as EventListener)
+        window.addEventListener('assistant-subagent-demo-final-shown', handleSubAgentFinalShown as EventListener)
+        window.addEventListener('message', handleSubAgentStepMessage)
+        return () => {
+        window.removeEventListener('assistant-subagent-demo-step', handleSubAgentStepEvent as EventListener)
+            window.removeEventListener('assistant-subagent-demo-final-shown', handleSubAgentFinalShown as EventListener)
+            window.removeEventListener('message', handleSubAgentStepMessage)
+            channel?.close()
+        }
+    }, [completeSubAgentDemoStepIfStillRunning, updateSubAgentDemoStep])
 
     // 西二线 SCADA 面板拖拽状态
     useEffect(() => {
@@ -1563,11 +3393,9 @@ const GlobalPipelineView: React.FC = () => {
     const we2DragOffsetRef = React.useRef({ x: 0, y: 0 })
 
     const handleWe2ScadaMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault()
         setIsDraggingWe2Scada(true)
-        we2DragOffsetRef.current = {
-            x: e.clientX - we2ScadaPos.x,
-            y: e.clientY - we2ScadaPos.y
-        }
+        we2DragOffsetRef.current = getFloatingPanelDragOffset(e)
     }
 
     // 通用拖拽面板处理
@@ -1575,6 +3403,38 @@ const GlobalPipelineView: React.FC = () => {
     // 获取屏幕尺寸计算安全位置
     const W = typeof window !== 'undefined' ? window.innerWidth : 1280
     const H = typeof window !== 'undefined' ? window.innerHeight : 800
+    const SCADA_PANEL_WIDTH = 480
+    const SCADA_PANEL_HEIGHT = 310
+    const getFloatingPanelDragOffset = (e: React.MouseEvent) => {
+        const panel = (e.currentTarget as HTMLElement).parentElement
+        const rect = panel?.getBoundingClientRect()
+        return rect
+            ? { x: e.clientX - rect.left, y: e.clientY - rect.top }
+            : { x: 0, y: 0 }
+    }
+    const clampScadaPanelPos = (x: number, y: number) => ({
+        x: clampNumber(x, 0, Math.max(0, W - SCADA_PANEL_WIDTH - 8)),
+        y: clampNumber(y, 54, Math.max(54, H - SCADA_PANEL_HEIGHT - 8)),
+    })
+    const networkxCutoffDefaultWidth = Math.min(NETWORKX_CUTOFF_PANEL_DEFAULT_WIDTH, Math.max(NETWORKX_CUTOFF_PANEL_MIN_WIDTH, W - 48))
+    const networkxCutoffDefaultHeight = Math.min(NETWORKX_CUTOFF_PANEL_DEFAULT_HEIGHT, Math.max(NETWORKX_CUTOFF_PANEL_MIN_HEIGHT, H - 130))
+    const [networkxCutoffPanelPos, setNetworkxCutoffPanelPos] = useState(() => ({
+        x: Math.max(16, W - networkxCutoffDefaultWidth - 24),
+        y: 92,
+    }))
+    const [networkxCutoffPanelSize, setNetworkxCutoffPanelSize] = useState(() => ({
+        width: networkxCutoffDefaultWidth,
+        height: networkxCutoffDefaultHeight,
+    }))
+    const [isDraggingNetworkxCutoffPanel, setIsDraggingNetworkxCutoffPanel] = useState(false)
+    const [isResizingNetworkxCutoffPanel, setIsResizingNetworkxCutoffPanel] = useState(false)
+    const networkxCutoffPanelDragOffsetRef = React.useRef({ x: 0, y: 0 })
+    const networkxCutoffPanelResizeStartRef = React.useRef({
+        x: 0,
+        y: 0,
+        width: networkxCutoffDefaultWidth,
+        height: networkxCutoffDefaultHeight,
+    })
     const initialDirectoryLayoutRef = React.useRef<DirectoryLayoutState>(readDirectoryLayoutState())
     const [directoryPos, setDirectoryPos] = useState(() => {
         const saved = initialDirectoryLayoutRef.current.position
@@ -1609,8 +3469,9 @@ const GlobalPipelineView: React.FC = () => {
     const [isDraggingWe1West, setIsDraggingWe1West] = useState(false)
     const we1WestOffsetRef = React.useRef({ x: 0, y: 0 })
     const handleWe1WestMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault()
         setIsDraggingWe1West(true)
-        we1WestOffsetRef.current = { x: e.clientX - we1WestPos.x, y: e.clientY - we1WestPos.y }
+        we1WestOffsetRef.current = getFloatingPanelDragOffset(e)
     }
 
     // 中俄东线 SCADA 面板（居中偏下）
@@ -1618,8 +3479,9 @@ const GlobalPipelineView: React.FC = () => {
     const [isDraggingCred, setIsDraggingCred] = useState(false)
     const credOffsetRef = React.useRef({ x: 0, y: 0 })
     const handleCredMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault()
         setIsDraggingCred(true)
-        credOffsetRef.current = { x: e.clientX - credPos.x, y: e.clientY - credPos.y }
+        credOffsetRef.current = getFloatingPanelDragOffset(e)
     }
 
     // 平泰支干线 SCADA 面板（右下）
@@ -1627,8 +3489,9 @@ const GlobalPipelineView: React.FC = () => {
     const [isDraggingPt, setIsDraggingPt] = useState(false)
     const ptOffsetRef = React.useRef({ x: 0, y: 0 })
     const handlePtMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault()
         setIsDraggingPt(true)
-        ptOffsetRef.current = { x: e.clientX - ptPos.x, y: e.clientY - ptPos.y }
+        ptOffsetRef.current = getFloatingPanelDragOffset(e)
     }
 
     // 压力趋势图面板（默认屏幕居中上部）
@@ -1643,6 +3506,26 @@ const GlobalPipelineView: React.FC = () => {
         e.stopPropagation()
         setIsResizingTrend(true)
         trendResizeStartRef.current = { x: e.clientX, width: trendWidth }
+    }
+    const handleNetworkxCutoffPanelMouseDown = (e: React.MouseEvent) => {
+        const target = e.target as HTMLElement
+        if (target.closest('button')) return
+        setIsDraggingNetworkxCutoffPanel(true)
+        networkxCutoffPanelDragOffsetRef.current = {
+            x: e.clientX - networkxCutoffPanelPos.x,
+            y: e.clientY - networkxCutoffPanelPos.y,
+        }
+    }
+    const handleNetworkxCutoffPanelResizeMouseDown = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        e.preventDefault()
+        setIsResizingNetworkxCutoffPanel(true)
+        networkxCutoffPanelResizeStartRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            width: networkxCutoffPanelSize.width,
+            height: networkxCutoffPanelSize.height,
+        }
     }
     const handleSimulationPressureChartMouseDown = useCallback((chartId: string, e: React.MouseEvent) => {
         const layout = simulationPressureChartLayouts[chartId]
@@ -1667,7 +3550,7 @@ const GlobalPipelineView: React.FC = () => {
             height: layout.height,
         }
     }, [simulationPressureChartLayouts])
-    const animateSimulationPressureChartReveal = useCallback(async (chartId: string, durationMs = 1700) => {
+    const animateSimulationPressureChartReveal = useCallback(async (chartId: string, durationMs = 2400) => {
         setSimulationPressureChartRevealProgress(prev => ({ ...prev, [chartId]: 0 }))
 
         const startedAt = performance.now()
@@ -1819,7 +3702,15 @@ const GlobalPipelineView: React.FC = () => {
             const detail = (event as CustomEvent).detail as { station?: string } | undefined
             const stationName = detail?.station?.trim()
             if (!stationName) return
-            locateStationOnMap(stationName)
+            const located = locateStationOnMap(stationName)
+            if (located) {
+                updateSubAgentDemoStep(
+                    'topology',
+                    'completed',
+                    `地图已定位到${stationName}，上下游拓扑关系已在主画面联动展示。`,
+                    '拓扑分析 Agent',
+                )
+            }
         }
         const handleAssistantLocateMessage = (event: MessageEvent) => {
             const payload = event.data as {
@@ -1838,7 +3729,7 @@ const GlobalPipelineView: React.FC = () => {
             window.removeEventListener('assistant-locate-station', handleAssistantLocateStation as EventListener)
             window.removeEventListener('message', handleAssistantLocateMessage)
         }
-    }, [locateStationOnMap])
+    }, [locateStationOnMap, updateSubAgentDemoStep])
 
     const activeTrendChart = useMemo(() => {
         if (!activeTrendPipelineId) return null
@@ -1856,30 +3747,28 @@ const GlobalPipelineView: React.FC = () => {
     const dragOffsetRef = React.useRef({ x: 0, y: 0 })
 
     const handleScadaMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault()
         setIsDraggingScada(true)
-        dragOffsetRef.current = {
-            x: e.clientX - scadaPos.x,
-            y: e.clientY - scadaPos.y
-        }
+        dragOffsetRef.current = getFloatingPanelDragOffset(e)
     }
 
     const handleGlobalMouseMove = (e: React.MouseEvent) => {
         if (isDraggingScada) {
-            setScadaPos({
-                x: e.clientX - dragOffsetRef.current.x,
-                y: e.clientY - dragOffsetRef.current.y
-            })
+            setScadaPos(clampScadaPanelPos(
+                e.clientX - dragOffsetRef.current.x,
+                e.clientY - dragOffsetRef.current.y,
+            ))
         }
         if (isDraggingWe2Scada) {
-            setWe2ScadaPos({
-                x: e.clientX - we2DragOffsetRef.current.x,
-                y: e.clientY - we2DragOffsetRef.current.y
-            })
+            setWe2ScadaPos(clampScadaPanelPos(
+                e.clientX - we2DragOffsetRef.current.x,
+                e.clientY - we2DragOffsetRef.current.y,
+            ))
         }
         // 其余三个面板拖拽处理
-        if (isDraggingWe1West) setWe1WestPos({ x: e.clientX - we1WestOffsetRef.current.x, y: e.clientY - we1WestOffsetRef.current.y })
-        if (isDraggingCred)    setCredPos({    x: e.clientX - credOffsetRef.current.x,    y: e.clientY - credOffsetRef.current.y    })
-        if (isDraggingPt)      setPtPos({      x: e.clientX - ptOffsetRef.current.x,      y: e.clientY - ptOffsetRef.current.y      })
+        if (isDraggingWe1West) setWe1WestPos(clampScadaPanelPos(e.clientX - we1WestOffsetRef.current.x, e.clientY - we1WestOffsetRef.current.y))
+        if (isDraggingCred)    setCredPos(clampScadaPanelPos(e.clientX - credOffsetRef.current.x, e.clientY - credOffsetRef.current.y))
+        if (isDraggingPt)      setPtPos(clampScadaPanelPos(e.clientX - ptOffsetRef.current.x, e.clientY - ptOffsetRef.current.y))
         if (isDraggingTrend)   setTrendPos({   x: e.clientX - trendOffsetRef.current.x,   y: e.clientY - trendOffsetRef.current.y   })
         if (draggingSimulationPressureChartId) {
             const chartId = draggingSimulationPressureChartId
@@ -1898,6 +3787,12 @@ const GlobalPipelineView: React.FC = () => {
         }
         if (isDraggingHistory) setHistoryChartPos({ x: e.clientX - historyOffsetRef.current.x, y: e.clientY - historyOffsetRef.current.y })
         if (isDraggingStationHistory) setStationHistoryPos({ x: e.clientX - stationHistoryOffsetRef.current.x, y: e.clientY - stationHistoryOffsetRef.current.y })
+        if (isDraggingNetworkxCutoffPanel) {
+            setNetworkxCutoffPanelPos({
+                x: clampNumber(e.clientX - networkxCutoffPanelDragOffsetRef.current.x, 0, Math.max(0, W - networkxCutoffPanelSize.width - 8)),
+                y: clampNumber(e.clientY - networkxCutoffPanelDragOffsetRef.current.y, 60, Math.max(60, H - networkxCutoffPanelSize.height - 8)),
+            })
+        }
         if (isDraggingDirectory) {
             setDirectoryPos({
                 x: clampNumber(e.clientX - directoryDragOffsetRef.current.x, 0, Math.max(0, W - directorySize.width)),
@@ -1914,6 +3809,14 @@ const GlobalPipelineView: React.FC = () => {
         }
         if (isResizingTrend) {
             setTrendWidth(clampNumber(trendResizeStartRef.current.width + e.clientX - trendResizeStartRef.current.x, 720, 1280))
+        }
+        if (isResizingNetworkxCutoffPanel) {
+            const nextWidth = networkxCutoffPanelResizeStartRef.current.width + e.clientX - networkxCutoffPanelResizeStartRef.current.x
+            const nextHeight = networkxCutoffPanelResizeStartRef.current.height + e.clientY - networkxCutoffPanelResizeStartRef.current.y
+            setNetworkxCutoffPanelSize({
+                width: clampNumber(nextWidth, NETWORKX_CUTOFF_PANEL_MIN_WIDTH, Math.max(NETWORKX_CUTOFF_PANEL_MIN_WIDTH, W - networkxCutoffPanelPos.x - 8)),
+                height: clampNumber(nextHeight, NETWORKX_CUTOFF_PANEL_MIN_HEIGHT, Math.max(NETWORKX_CUTOFF_PANEL_MIN_HEIGHT, H - networkxCutoffPanelPos.y - 8)),
+            })
         }
         if (resizingSimulationPressureChartId) {
             const chartId = resizingSimulationPressureChartId
@@ -1951,10 +3854,12 @@ const GlobalPipelineView: React.FC = () => {
         if (isDraggingTrend)    setIsDraggingTrend(false)
         if (isDraggingHistory)  setIsDraggingHistory(false)
         if (isDraggingStationHistory) setIsDraggingStationHistory(false)
+        if (isDraggingNetworkxCutoffPanel) setIsDraggingNetworkxCutoffPanel(false)
         if (isDraggingDirectory) setIsDraggingDirectory(false)
         if (draggingSimulationPressureChartId) setDraggingSimulationPressureChartId(null)
         if (isResizingDirectory) setIsResizingDirectory(false)
         if (isResizingTrend) setIsResizingTrend(false)
+        if (isResizingNetworkxCutoffPanel) setIsResizingNetworkxCutoffPanel(false)
         if (resizingSimulationPressureChartId) setResizingSimulationPressureChartId(null)
         if (pipelineDragId) {
             setPipelineDragId(null)
@@ -2339,9 +4244,6 @@ const GlobalPipelineView: React.FC = () => {
             newState[layerIds[i]] = !allVisible
         }
         setVisibleLayers(newState)
-        if (!allVisible) {
-            focusPipelinePackage(pkg)
-        }
     }
 
     // 全选 / 全部取消功能
@@ -2378,14 +4280,38 @@ const GlobalPipelineView: React.FC = () => {
     }), [pipelineData, pipelines])
 
     const currentMultiScenarioCase = useMemo(() => {
-        return MULTI_SCENARIO_AI_CASES.find(item => item.id === multiScenarioStepId) || null
-    }, [multiScenarioStepId])
+        const presetCase = MULTI_SCENARIO_AI_CASES.find(item => item.id === multiScenarioStepId)
+        if (presetCase) return presetCase
+
+        const runningScenario = activeSimulationPilot.scenarios.find(item => multiScenarioStepId.endsWith(`:${item.id}`))
+        if (runningScenario) {
+            return {
+                id: multiScenarioStepId,
+                label: runningScenario.label,
+                flowText: '',
+                description: '多段仿真槽位',
+                scenarioId: runningScenario.id,
+            }
+        }
+
+        return null
+    }, [activeSimulationPilot.scenarios, multiScenarioStepId])
 
     const multiScenarioDisplayCases = useMemo(() => {
         const selectedSet = new Set(multiScenarioSelectedCaseIds)
         const selectedCases = MULTI_SCENARIO_AI_CASES.filter(item => selectedSet.has(item.id))
-        return selectedCases.length > 0 ? selectedCases : MULTI_SCENARIO_AI_CASES
-    }, [multiScenarioSelectedCaseIds])
+        if (selectedCases.length > 0) return selectedCases
+        if (multiScenarioResults.length > 0) {
+            return multiScenarioResults.map(result => ({
+                id: result.caseId,
+                label: result.label,
+                flowText: result.flowText,
+                description: result.description,
+                scenarioId: result.overlay.scenario_id,
+            }))
+        }
+        return MULTI_SCENARIO_AI_CASES
+    }, [multiScenarioResults, multiScenarioSelectedCaseIds])
 
     const multiScenarioConclusion = useMemo(() => {
         return buildMultiScenarioAiConclusion(multiScenarioResults)
@@ -2393,10 +4319,12 @@ const GlobalPipelineView: React.FC = () => {
 
     const simulationPressureChartEntries = useMemo<SimulationPressureChartEntry[]>(() => {
         if (multiScenarioResults.length > 0) {
+            const referenceOverlay = multiScenarioResults[0]?.overlay ?? globalSimulation.baselineOverlay ?? null
             return multiScenarioResults.map(result => ({
                 id: result.caseId,
                 label: result.label,
                 overlay: result.overlay,
+                baselineOverlay: result.overlay === referenceOverlay ? globalSimulation.baselineOverlay : referenceOverlay,
                 color: getSimulationPressureChartColor(result.caseId),
             }))
         }
@@ -2407,9 +4335,10 @@ const GlobalPipelineView: React.FC = () => {
             id: 'latest',
             label: currentMultiScenarioCase?.label || '当前工况',
             overlay,
+            baselineOverlay: globalSimulation.baselineOverlay,
             color: '#10b981',
         }]
-    }, [currentMultiScenarioCase?.label, globalSimulation.overlay, multiScenarioResults, simulationPressureChartOverlay])
+    }, [currentMultiScenarioCase?.label, globalSimulation.baselineOverlay, globalSimulation.overlay, multiScenarioResults, simulationPressureChartOverlay])
 
     const visibleSimulationPressureChartEntries = useMemo(() => {
         return simulationPressureChartEntries.filter(entry => !hiddenSimulationPressureChartIds[entry.id])
@@ -2419,12 +4348,61 @@ const GlobalPipelineView: React.FC = () => {
         return visibleSimulationPressureChartEntries
             .map(entry => ({
                 ...entry,
-                config: buildSimulationPressureTrendConfig(entry.overlay, entry.label, entry.color),
+                config: buildSimulationPressureTrendConfig(entry.overlay, entry.label, entry.color, entry.baselineOverlay),
             }))
             .filter((entry): entry is SimulationPressureChartEntry & { config: TrendChartConfig } => Boolean(entry.config))
     }, [visibleSimulationPressureChartEntries])
 
     const simulationPressureTrendChart = simulationPressureChartConfigs[0]?.config ?? null
+    const presentationSimulationPressureItems = useMemo(() => {
+        const overlay = globalSimulation.overlay
+        if (!overlay) return []
+        const baselineOverlay = globalSimulation.baselineOverlay
+        const baselineNodeMap = new Map((baselineOverlay?.nodes || []).map(node => [node.id, node]))
+
+        return overlay.nodes
+            .map(node => {
+                const pipelineNode = findPipelineNodeByPilotNodeId(node.id, pipelineData)
+                const name = pipelineNode?.name || resolvePilotNodeName(node.id)
+                if (!shouldShowStationSimulationPressureLabel(node.id, name)) return null
+
+                const pressureIn = typeof node.pressure_in_mpa === 'number' ? node.pressure_in_mpa : node.pressure_mpa
+                const pressureOut = node.pressure_mpa
+                const flowRate = getSimulationNodeFlowRate(node.id, overlay)
+                const baselineNode = baselineNodeMap.get(node.id)
+                const baselinePressureIn = baselineNode
+                    ? (typeof baselineNode.pressure_in_mpa === 'number' ? baselineNode.pressure_in_mpa : baselineNode.pressure_mpa)
+                    : undefined
+                const baselinePressureOut = baselineNode?.pressure_mpa
+                const baselineFlowRate = baselineOverlay ? getSimulationNodeFlowRate(node.id, baselineOverlay) : undefined
+                const mileage = resolvePilotMileageKm(node.id) ?? Number.MAX_SAFE_INTEGER
+                return {
+                    id: node.id,
+                    name,
+                    pressureIn,
+                    pressureOut,
+                    baselinePressureIn,
+                    baselinePressureOut,
+                    flowRate,
+                    baselineFlowRate,
+                    mileage,
+                    alertLevel: node.alert_level,
+                }
+            })
+            .filter((item): item is {
+                id: string
+                name: string
+                pressureIn: number
+                pressureOut: number
+                baselinePressureIn?: number
+                baselinePressureOut?: number
+                flowRate?: number
+                baselineFlowRate?: number
+                mileage: number
+                alertLevel: 'normal' | 'warning' | 'critical'
+            } => Boolean(item))
+            .sort((left, right) => left.mileage - right.mileage)
+    }, [globalSimulation.baselineOverlay, globalSimulation.overlay, pipelineData])
 
     useEffect(() => {
         if (simulationPressureChartEntries.length === 0) return
@@ -2451,16 +4429,23 @@ const GlobalPipelineView: React.FC = () => {
         lastSimulationPressureChartRunIdRef.current = runId
         setSimulationPressureChartOverlay(overlay)
         setHiddenSimulationPressureChartIds({})
-        setSimulationPressureChartRevealProgress(prev => ({ ...prev, latest: 1 }))
+        setSimulationPressureChartRevealProgress(prev => ({ ...prev, latest: 0 }))
         setSimulationPressureChartOpen(true)
-    }, [globalSimulation.overlay])
+        void animateSimulationPressureChartReveal('latest', 2600)
+    }, [animateSimulationPressureChartReveal, globalSimulation.overlay])
 
-    const buildGlobalMultiScenarioResult = useCallback((demoCase: MultiScenarioAiCase, overlay: SimulationOverlay): MultiScenarioAiResult => {
-        const minPressureNode = overlay.nodes.reduce((currentMin, node) => {
+    const buildGlobalMultiScenarioResult = useCallback((demoCase: SimulationShowcaseCase, overlay: SimulationOverlay): MultiScenarioAiResult => {
+        const stationPressureNodes = overlay.nodes.filter(node => {
+            const pipelineNode = findPipelineNodeByPilotNodeId(node.id, pipelineData)
+            const name = pipelineNode?.name || resolvePilotNodeName(node.id)
+            return shouldShowStationSimulationPressureLabel(node.id, name)
+        })
+        const pressureNodes = stationPressureNodes.length > 0 ? stationPressureNodes : overlay.nodes
+        const minPressureNode = pressureNodes.reduce((currentMin, node) => {
             const currentPressure = currentMin.pressure_in_mpa ?? currentMin.pressure_mpa
             const nextPressure = node.pressure_in_mpa ?? node.pressure_mpa
             return nextPressure < currentPressure ? node : currentMin
-        }, overlay.nodes[0])
+        }, pressureNodes[0])
         const sourceNode = overlay.nodes.find(node => node.id === ZHONGWEI_SOURCE_NODE_ID)
         const minPressurePipelineNode = minPressureNode ? findPipelineNodeByPilotNodeId(minPressureNode.id, pipelineData) : null
 
@@ -2481,6 +4466,202 @@ const GlobalPipelineView: React.FC = () => {
         }
     }, [pipelineData])
 
+    const runNetworkxCutoffShowcase = useCallback(async (
+        station = 'jingbian',
+        options: {
+            stage?: NetworkxCutoffStage
+            label?: string
+            description?: string
+            key?: string
+            valveLabel?: string
+            valveId?: string
+            valveName?: string
+        } = {},
+    ) => {
+        const stage = options.stage || 'all'
+        const stageLabel = options.label || getNetworkxCutoffStageLabel(stage)
+        const itemKey = options.key || `${station}:${stage}:manual`
+
+        setNetworkxCutoffActive(true)
+        setNetworkxCutoffError(null)
+        setNetworkxCutoffStage(stage)
+        setNetworkxCutoffStageLabel(stageLabel)
+        setSimulationCutoffEdgeIds([])
+        globalSimulation.clearOverlay()
+        setMapTheme('dark')
+        setNodeDisplayMode('hub')
+        setHubNodeTypes(['source', 'compressor', 'junction', 'distribution'])
+        setNetworkxCutoffPathOpen(true)
+        const activeCutoffGroups = new Set(getNetworkxCutoffLayerGroups(station, stage))
+        const managedCutoffGroups = new Set(['we1', 'we2', 'zg', 'jxlz', 'sj2', 'sj3', 'sj4'])
+        setExpandedGroups(prev => ({
+            ...prev,
+            ...Object.fromEntries([...activeCutoffGroups].map(groupId => [groupId, true])),
+        }))
+        setVisibleLayers(() => {
+            const next = buildInitialLayerVisibility(pipelines)
+            pipelines.forEach(pkg => {
+                if (!managedCutoffGroups.has(pkg.id) || !activeCutoffGroups.has(pkg.id)) return
+                pkg.layers.forEach((layer, index) => {
+                    next[getPipelineLayerId(pkg, layer, index)] = true
+                })
+            })
+            return next
+        })
+        emitNetworkxCutoffAssistantEvent('progress', {
+            message: `已打开全国一张网，正在执行“${stageLabel}”外部截断演示。`,
+        })
+
+        try {
+            const query = new URLSearchParams({ station, stage })
+            if (options.valveId) query.set('valve_id', options.valveId)
+            const apiPath = `/api/topology/networkx-cutoff-demo?${query.toString()}`
+            const requestUrls = [resolveApiPath(apiPath)]
+
+            let response: Response | null = null
+            let lastMessage = ''
+            for (const requestUrl of requestUrls) {
+                try {
+                    const nextResponse = await fetch(requestUrl)
+                    if (nextResponse.ok) {
+                        response = nextResponse
+                        break
+                    }
+                    lastMessage = await nextResponse.text()
+                } catch (error) {
+                    lastMessage = error instanceof Error ? error.message : String(error)
+                }
+            }
+            if (!response) {
+                let message = lastMessage
+                try {
+                    const parsed = JSON.parse(lastMessage) as { detail?: string }
+                    message = parsed.detail || lastMessage
+                } catch {
+                    // keep raw backend message
+                }
+                throw new Error(message || 'NetworkX 截断接口未返回有效结果')
+            }
+            const result = await response.json() as NetworkxCutoffDemoResult
+            const overlayPipelineData = buildPipelineDataFromPackages(pipelines, buildInitialLayerVisibility(pipelines))
+            const overlay = buildNetworkxCutoffMapOverlay(result, overlayPipelineData, stage)
+            const item: NetworkxCutoffItem = {
+                key: itemKey,
+                stage,
+                label: stageLabel,
+                description: options.description,
+                valveLabel: options.valveLabel,
+                valveName: options.valveName,
+                result,
+                overlay,
+            }
+            setNetworkxCutoffResult(result)
+            setNetworkxCutoffItems(prev => {
+                const next = options.key
+                    ? [...prev.filter(existing => existing.key !== itemKey), item]
+                    : [item]
+                setNetworkxCutoffOverlay(mergeNetworkxCutoffMapOverlays(next))
+                return next
+            })
+            emitNetworkxCutoffAssistantEvent('result', {
+                message: options.description
+                    ? `${options.description}\n\n${formatNetworkxCutoffAssistantMessage(result)}`
+                    : formatNetworkxCutoffAssistantMessage(result),
+            })
+
+            const cutoffCenter = result.cutoff_nodes.find(node => Number.isFinite(node.longitude) && Number.isFinite(node.latitude))
+            if (mapInstance?.setZoomAndCenter && cutoffCenter) {
+                mapInstance.setZoomAndCenter(5.2, [cutoffCenter.longitude + 3.2, cutoffCenter.latitude - 0.6], false, 500)
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'NetworkX 靖边截断演示失败'
+            setNetworkxCutoffError(message)
+            emitNetworkxCutoffAssistantEvent('result', { error: message })
+        } finally {
+            setNetworkxCutoffActive(false)
+        }
+    }, [globalSimulation, mapInstance, pipelineData, pipelines])
+
+    const clearNetworkxCutoffShowcase = useCallback(() => {
+        setNetworkxCutoffActive(false)
+        setNetworkxCutoffResult(null)
+        setNetworkxCutoffItems([])
+        setNetworkxCutoffOverlay(null)
+        setNetworkxCutoffError(null)
+        setNetworkxCutoffStage('all')
+        setNetworkxCutoffStageLabel('站内阀门拓扑截断')
+    }, [])
+
+    const handleStationProcessCutoff = useCallback((detail: StationProcessCutoffStageDetail) => {
+        const demoStation = resolveStationProcessCutoffDemoStation(detail)
+        if (!detail || !demoStation) return
+        const stage = normalizeNetworkxCutoffStage(detail.stage)
+        const itemKey = `${detail.stationId || detail.stationName || demoStation}:${detail.valveId || 'valve'}:${stage}`
+        const key = `${detail.action || 'cutoff'}:${itemKey}`
+        const now = Date.now()
+        const last = stationProcessCutoffLastRef.current
+        if (last?.key === key && now - last.at < 800) return
+        stationProcessCutoffLastRef.current = { key, at: now }
+
+        if (detail.action === 'restore' || detail.valveOpen === true) {
+            setNetworkxCutoffItems(prev => {
+                const next = prev.filter(item => item.key !== itemKey)
+                setNetworkxCutoffOverlay(mergeNetworkxCutoffMapOverlays(next))
+                if (next.length === 0) {
+                    setNetworkxCutoffResult(null)
+                    setNetworkxCutoffError(null)
+                    setNetworkxCutoffStage('all')
+                    setNetworkxCutoffStageLabel('站内阀门拓扑截断')
+                } else {
+                    const latest = next[next.length - 1]
+                    setNetworkxCutoffResult(latest.result)
+                    setNetworkxCutoffStage(latest.stage)
+                    setNetworkxCutoffStageLabel(latest.label)
+                }
+                return next
+            })
+            emitNetworkxCutoffAssistantEvent('progress', {
+                message: `${detail.valveLabel || '阀门'} 已恢复打开，外部 NetworkX 截断演示已清除。`,
+            })
+            return
+        }
+
+        void runNetworkxCutoffShowcase(demoStation, {
+            stage,
+            key: itemKey,
+            label: detail.label || getNetworkxCutoffStageLabel(stage),
+            description: detail.description,
+            valveLabel: detail.valveLabel,
+            valveId: detail.valveId,
+            valveName: detail.valveName,
+        })
+    }, [clearNetworkxCutoffShowcase, runNetworkxCutoffShowcase])
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || pipelines.length === 0 || pipelineData.lines.length === 0) return
+        const params = new URLSearchParams(window.location.hash.split('?')[1] || window.location.search)
+        const station = params.get('networkxCutoff')
+        const stage = normalizeNetworkxCutoffStage(params.get('networkxStage') || 'all')
+        const valveId = params.get('networkxValveId') || ''
+        const appliedKey = `${station || ''}:${stage}:${valveId}`
+        if (!station || networkxCutoffUrlAppliedRef.current === appliedKey) return
+        networkxCutoffUrlAppliedRef.current = appliedKey
+        void runNetworkxCutoffShowcase(station, {
+            stage,
+            label: getNetworkxCutoffStageLabel(stage),
+            valveId,
+        })
+    }, [pipelineData.lines.length, pipelines.length, runNetworkxCutoffShowcase])
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        const handleStationProcessCutoffEvent = (event: Event) => {
+            handleStationProcessCutoff((event as CustomEvent<StationProcessCutoffStageDetail>).detail)
+        }
+        window.addEventListener('station-process-cutoff-stage', handleStationProcessCutoffEvent)
+        return () => window.removeEventListener('station-process-cutoff-stage', handleStationProcessCutoffEvent)
+    }, [handleStationProcessCutoff])
+
     const runGlobalMultiScenarioAi = useCallback(async (selectedScenarioIds?: string[]) => {
         if (multiScenarioActiveRef.current) return
 
@@ -2494,6 +4675,16 @@ const GlobalPipelineView: React.FC = () => {
 
         multiScenarioActiveRef.current = true
         setMultiScenarioActive(true)
+        setSubAgentDemoOpen(true)
+        setSubAgentDemoLastMessage('仿真 Agent 已收到点击指令，开始执行中卫三工况。')
+        setSubAgentDemoSteps(prev => prev.map(item => item.id === 'simulation'
+            ? {
+                ...item,
+                status: 'running',
+                message: '已点击开始，正在依次运行中卫 3000、2000、截断三种工况。',
+                updatedAt: Date.now(),
+            }
+            : item))
         setMultiScenarioSelectedCaseIds(casesToRun.map(item => item.id))
         setMultiScenarioError(null)
         setMultiScenarioResults([])
@@ -2526,7 +4717,16 @@ const GlobalPipelineView: React.FC = () => {
 
             for (const demoCase of casesToRun) {
                 setMultiScenarioStepId(demoCase.id)
-                setSimulationCutoffEdgeIds(demoCase.id === 'zhongwei-cutoff' ? [ZHONGWEI_FIRST_TRUNK_EDGE_ID] : [])
+                setSubAgentDemoLastMessage(`仿真 Agent 正在运行：${demoCase.label}`)
+                setSubAgentDemoSteps(prev => prev.map(item => item.id === 'simulation'
+                    ? {
+                        ...item,
+                        status: 'running',
+                        message: `正在运行 ${demoCase.label}，计算压力、流量和未满足需求。`,
+                        updatedAt: Date.now(),
+                    }
+                    : item))
+                setSimulationCutoffEdgeIds(isZhongweiCutoffScenario(demoCase.id) ? [ZHONGWEI_FIRST_TRUNK_EDGE_ID] : [])
                 emitMultiScenarioAiAssistantEvent('progress', {
                     message: `正在运行 ${demoCase.label}：${demoCase.description}`,
                 })
@@ -2548,24 +4748,59 @@ const GlobalPipelineView: React.FC = () => {
                 setSimulationPressureChartRevealProgress(prev => ({ ...prev, [result.caseId]: 0 }))
                 setSimulationPressureChartOpen(true)
                 emitMultiScenarioAiAssistantEvent('progress', {
-                    message: `${demoCase.label} 已完成，run_id=${result.runId}，正在生成中卫-上海白鹤压力曲线。`,
+                    message: `${demoCase.label} 已完成，run_id=${result.runId}，正在生成中卫-上海白鹤压力/流量曲线。`,
                 })
                 await new Promise(resolve => setTimeout(resolve, 80))
                 await animateSimulationPressureChartReveal(result.caseId)
                 emitMultiScenarioAiAssistantEvent('progress', {
-                    message: `${demoCase.label} 压力曲线已生成，未满足需求 ${result.unservedDemand.toFixed(0)} 万方/天，准备进入下一组工况。`,
+                    message: `${demoCase.label} 压力/流量曲线已生成，未满足需求 ${result.unservedDemand.toFixed(0)} 万方/天，准备进入下一组工况。`,
                 })
+                setSubAgentDemoSteps(prev => prev.map(item => item.id === 'simulation'
+                    ? {
+                        ...item,
+                        status: 'running',
+                        message: `${demoCase.label} 已完成，累计完成 ${collected.length}/${casesToRun.length} 组。`,
+                        updatedAt: Date.now(),
+                    }
+                    : item))
                 await new Promise(resolve => setTimeout(resolve, 320))
             }
 
             setMultiScenarioPanelOpen(true)
+            setSubAgentDemoLastMessage('三工况仿真已完成，主 Agent 开始统一收口。')
+            setSubAgentDemoSteps(prev => prev.map(item => item.id === 'simulation'
+                ? {
+                    ...item,
+                    status: 'completed',
+                    message: `中卫三工况仿真已完成：${casesToRun.map(item => item.label).join('、')}。`,
+                    updatedAt: Date.now(),
+                }
+                : item.id === 'main_summary'
+                    ? {
+                        ...item,
+                        status: 'running',
+                        message: '三工况仿真已完成，最终结论正在输出，显示完成后主 Agent 再打勾。',
+                        updatedAt: Date.now(),
+                    }
+                : item))
             emitMultiScenarioAiAssistantEvent('result', {
                 message: formatMultiScenarioAiMessage(collected),
             })
+            emitSubAgentDemoFinalReady()
         } catch (error) {
             const message = error instanceof Error ? error.message : '多工况 AI 仿真失败'
             setMultiScenarioError(message)
+            setSubAgentDemoLastMessage(`仿真 Agent 运行失败：${message}`)
+            setSubAgentDemoSteps(prev => prev.map(item => item.id === 'simulation'
+                ? {
+                    ...item,
+                    status: 'error',
+                    message,
+                    updatedAt: Date.now(),
+                }
+                : item))
             emitMultiScenarioAiAssistantEvent('result', { error: message })
+            emitSubAgentDemoFinalReady()
         } finally {
             setMultiScenarioStepId('')
             multiScenarioActiveRef.current = false
@@ -2731,8 +4966,12 @@ const GlobalPipelineView: React.FC = () => {
         if (!mapInstance) return
 
         const activeOverlay = globalSimulation.overlay
+        const baselineOverlay = globalSimulation.baselineOverlay
         const simByStationKey = new Map<string, SimulationOverlay['nodes'][number]>()
+        const simByNodeId = new Map<string, SimulationOverlay['nodes'][number]>()
+        const baselineByNodeId = new Map((baselineOverlay?.nodes || []).map(item => [item.id, item]))
         activeOverlay?.nodes.forEach(node => {
+            simByNodeId.set(node.id, node)
             simByStationKey.set(normalizeStationMatchKey(resolvePilotNodeName(node.id)), node)
         })
 
@@ -2740,10 +4979,11 @@ const GlobalPipelineView: React.FC = () => {
             const markerMap = getNodeMarkerMap()
             if (markerMap.size === 0) return
 
-            markerMap.forEach((marker) => {
+            markerMap.forEach((marker, markerNodeId) => {
                 if (!marker || !marker.getContent) return
 
-                const node = marker.getExtData()?.node as PipelineNode
+                const markerExtData = marker.getExtData?.()
+                const node = (markerExtData?.node || markerExtData?.group?.nodes?.find((item: PipelineNode) => item.id === markerNodeId)) as PipelineNode | undefined
                 if (!node) return
 
                 let originalContent = typeof marker.getContent === 'function' ? marker.getContent() : marker.getContent?.() || ''
@@ -2754,29 +4994,64 @@ const GlobalPipelineView: React.FC = () => {
                     originalContent = originalContent.split('<!--sim-label-->')[0]
                 }
 
-                const simNode = simByStationKey.get(normalizeStationMatchKey(node.name))
+                if (shouldShowSimulationPressureLabels) {
+                    if (hasSimLabel) marker.setContent(originalContent)
+                    return
+                }
+
+                const mapNodeKey = normalizeStationMatchKey(node.name)
+                const simNode = simByNodeId.get(node.id) || simByStationKey.get(mapNodeKey)
                 if (!simNode) {
+                    if (hasSimLabel) marker.setContent(originalContent)
+                    return
+                }
+                const labelName = node.name || resolvePilotNodeName(simNode.id)
+                if (!shouldShowStationSimulationPressureLabel(simNode.id, labelName)) {
                     if (hasSimLabel) marker.setContent(originalContent)
                     return
                 }
 
                 const pressureIn = simNode.pressure_in_mpa ?? simNode.pressure_mpa
                 const pressureOut = simNode.pressure_mpa
+                const baselineNode = baselineByNodeId.get(simNode.id)
+                const baselineOut = baselineNode?.pressure_mpa
+                const pressureDelta = typeof baselineOut === 'number' ? pressureOut - baselineOut : undefined
+                const deltaTone = getDeltaTone(pressureDelta)
                 const alertColor = simNode.alert_level === 'critical'
                     ? '#f87171'
                     : simNode.alert_level === 'warning'
                         ? '#fbbf24'
                         : '#67e8f9'
                 const shadow = '-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000'
-                const simHTML = `
+                const scenarioText = currentMultiScenarioCase?.label || activeOverlay?.scenario_id || '当前仿真'
+                const simHTML = isPresentationNodeMode ? `
+                    <!--sim-label-->
+                    <div class="absolute left-1/2 -top-5 -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none whitespace-nowrap z-50 overflow-visible"
+                         style="line-height:1.12; display:flex;">
+                        <span style="font-size:10px; font-weight:800; letter-spacing:0; color:#020617; background:${alertColor}; border:1px solid rgba(255,255,255,0.65); border-radius:999px; padding:2px 7px; box-shadow:0 0 14px rgba(34,211,238,0.42), 0 3px 10px rgba(0,0,0,0.45);">
+                            仿真压力 ${pressureOut.toFixed(2)} MPa
+                        </span>
+                        <span style="margin-top:2px; font-size:9px; font-weight:700; color:#e0f2fe; background:rgba(2,6,23,0.78); border:1px solid rgba(125,211,252,0.32); border-radius:6px; padding:1px 5px; text-shadow:${shadow};">
+                            入 ${pressureIn.toFixed(2)} / 出 ${pressureOut.toFixed(2)}
+                        </span>
+                        ${pressureDelta == null ? '' : `
+                        <span style="margin-top:2px; font-size:9px; font-weight:800; color:${deltaTone.color}; background:${deltaTone.bg}; border:1px solid ${deltaTone.border}; border-radius:999px; padding:1px 6px; text-shadow:${shadow};">
+                            ΔP ${formatSignedDelta(pressureDelta, 2, ' MPa')}
+                        </span>`}
+                    </div>
+                ` : `
                     <!--sim-label-->
                     <div class="absolute left-1/2 -top-7 -translate-x-1/2 -translate-y-full flex flex-col items-center pointer-events-none whitespace-nowrap z-50 overflow-visible"
                          style="line-height:1.08; display:flex;">
                         <span style="font-size:10px; font-weight:bold; color:${alertColor}; text-shadow:${shadow};">
                             仿真 入:${pressureIn.toFixed(2)} 出:${pressureOut.toFixed(2)}
                         </span>
+                        ${pressureDelta == null ? '' : `
+                        <span style="font-size:9px; font-weight:800; color:${deltaTone.color}; text-shadow:${shadow};">
+                            前:${baselineOut?.toFixed(2)} 后:${pressureOut.toFixed(2)} ΔP ${formatSignedDelta(pressureDelta, 2)}
+                        </span>`}
                         <span style="font-size:9px; color:#a5f3fc; text-shadow:${shadow};">
-                            ${currentMultiScenarioCase?.label || activeOverlay?.scenario_id || ''}
+                            ${scenarioText}
                         </span>
                     </div>
                 `
@@ -2790,7 +5065,118 @@ const GlobalPipelineView: React.FC = () => {
         }, 500)
 
         return () => clearInterval(timer)
-    }, [currentMultiScenarioCase?.label, globalSimulation.overlay, mapInstance])
+    }, [currentMultiScenarioCase?.label, globalSimulation.baselineOverlay, globalSimulation.overlay, shouldShowSimulationPressureLabels, mapInstance])
+
+    useEffect(() => {
+        if (!mapInstance) return
+
+        const clearSimulationPressureTexts = () => {
+            const overlays = simulationPressureTextOverlaysRef.current
+            if (overlays.length > 0) {
+                try {
+                    mapInstance.remove(overlays)
+                } catch (error) {
+                    overlays.forEach(item => item?.setMap?.(null))
+                }
+            }
+            simulationPressureTextOverlaysRef.current = []
+        }
+
+        const activeOverlay = globalSimulation.overlay
+        const baselineOverlay = globalSimulation.baselineOverlay
+        if (!activeOverlay || !shouldShowSimulationPressureLabels) {
+            clearSimulationPressureTexts()
+            return clearSimulationPressureTexts
+        }
+
+        const AMap = (window as any).AMap
+        if (!AMap?.Text || !AMap?.Pixel) {
+            clearSimulationPressureTexts()
+            return clearSimulationPressureTexts
+        }
+
+        const renderPressureTexts = () => {
+            clearSimulationPressureTexts()
+
+            const overlays: any[] = []
+            const renderedNodeIds = new Set<string>()
+            const baselineNodeMap = new Map((baselineOverlay?.nodes || []).map(node => [node.id, node]))
+            activeOverlay.nodes
+                .slice()
+                .sort((left, right) => (resolvePilotMileageKm(left.id) ?? 99999) - (resolvePilotMileageKm(right.id) ?? 99999))
+                .forEach((simNode, index) => {
+                if (renderedNodeIds.has(simNode.id)) return
+                renderedNodeIds.add(simNode.id)
+
+                const node = findPipelineNodeByPilotNodeId(simNode.id, pipelineData)
+                const labelName = node?.name || resolvePilotNodeName(simNode.id)
+                if (!shouldShowStationSimulationPressureLabel(simNode.id, labelName)) return
+
+                const coordinate = node?.coordinate
+                if (!coordinate || !Number.isFinite(coordinate.longitude) || !Number.isFinite(coordinate.latitude)) return
+
+                const pressureIn = typeof simNode.pressure_in_mpa === 'number' ? simNode.pressure_in_mpa : simNode.pressure_mpa
+                const pressureOut = simNode.pressure_mpa
+                if (!Number.isFinite(pressureIn) || !Number.isFinite(pressureOut)) return
+                const baselineNode = baselineNodeMap.get(simNode.id)
+                const baselinePressureOut = baselineNode?.pressure_mpa
+                const pressureDelta = typeof baselinePressureOut === 'number' ? pressureOut - baselinePressureOut : undefined
+                const pressureDeltaTone = getDeltaTone(pressureDelta)
+
+                const alertColor = simNode.alert_level === 'critical'
+                    ? '#f87171'
+                    : simNode.alert_level === 'warning'
+                        ? '#facc15'
+                        : '#22d3ee'
+                const flowRate = getSimulationNodeFlowRate(simNode.id, activeOverlay)
+                const baselineFlowRate = baselineOverlay ? getSimulationNodeFlowRate(simNode.id, baselineOverlay) : undefined
+                const flowDelta = typeof flowRate === 'number' && typeof baselineFlowRate === 'number' ? flowRate - baselineFlowRate : undefined
+                const flowDeltaTone = getDeltaTone(flowDelta)
+                const offsetY = -42 - (index % 3) * 14
+                const text = new AMap.Text({
+                    text: `
+                        <div style="font-size:10px;font-weight:900;color:#e0f2fe;">${escapeHtml(labelName)}</div>
+                        <div style="margin-top:2px;color:#cbd5e1;">前 ${baselinePressureOut == null ? '--' : baselinePressureOut.toFixed(2)} → 后 ${pressureOut.toFixed(2)} MPa</div>
+                        <div style="display:inline-block;margin-top:2px;padding:1px 6px;border-radius:999px;color:${pressureDeltaTone.color};background:${pressureDeltaTone.bg};border:1px solid ${pressureDeltaTone.border};animation:simDeltaPulse 1.45s ease-in-out infinite;">
+                            ${pressureDeltaTone.arrow} ΔP ${pressureDelta == null ? '--' : formatSignedDelta(pressureDelta, 2, ' MPa')}
+                        </div>
+                        <div style="margin-top:2px;color:${flowDeltaTone.color};">Q ${flowRate == null ? '--' : flowRate.toFixed(0)}${flowDelta == null ? '' : ` (${formatSignedDelta(flowDelta, 0)})`} 万方/天</div>
+                    `,
+                    position: [coordinate.longitude, coordinate.latitude],
+                    offset: new AMap.Pixel(0, offsetY),
+                    style: {
+                        'white-space': 'nowrap',
+                        'text-align': 'center',
+                        'font-size': '9px',
+                        'font-weight': '800',
+                        'line-height': '1.2',
+                        color: '#e0f2fe',
+                        'background-color': 'rgba(2, 6, 23, 0.86)',
+                        border: `1px solid ${alertColor}`,
+                        'border-radius': '8px',
+                        padding: '3px 6px',
+                        'box-shadow': `0 0 14px ${alertColor}55, 0 5px 16px rgba(0,0,0,0.48)`,
+                    },
+                    zIndex: 270,
+                    zooms: [2, 30],
+                })
+                overlays.push(text)
+            })
+
+            if (overlays.length > 0) {
+                mapInstance.add(overlays)
+                simulationPressureTextOverlaysRef.current = overlays
+            }
+        }
+
+        renderPressureTexts()
+        const timer = window.setInterval(renderPressureTexts, 1200)
+
+        return () => {
+            window.clearInterval(timer)
+            clearSimulationPressureTexts()
+        }
+    }, [globalSimulation.baselineOverlay, globalSimulation.overlay, shouldShowSimulationPressureLabels, mapInstance, pipelineData])
 
     const fixedScadaPanels = [
         {
@@ -2906,6 +5292,14 @@ const GlobalPipelineView: React.FC = () => {
                     </div>
                     {/* 右侧工具栏 */}
                     <div className="flex items-center gap-3">
+                        <button
+                            onClick={toggleSimulationPanel}
+                            className={`flex min-w-[68px] items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border ${simulationPanelVisible ? 'bg-violet-500/22 border-violet-300/55 text-violet-50' : 'bg-violet-500/12 border-violet-300/30 text-violet-100 hover:bg-violet-500/20 hover:border-violet-300/50'}`}
+                            title={simulationPanelVisible ? '隐藏稳态仿真面板' : '打开稳态仿真面板'}
+                        >
+                            <span className="material-symbols-outlined text-base">science</span>
+                            <span>仿真</span>
+                        </button>
                         <button
                             onClick={activatePresentationNodeMode}
                             className={`flex min-w-[68px] items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all border ${isPresentationNodeMode ? 'bg-amber-500/22 border-amber-300/55 text-amber-50' : 'bg-amber-500/15 border-amber-300/35 text-amber-100 hover:bg-amber-500/22 hover:border-amber-300/55'}`}
@@ -3058,9 +5452,338 @@ const GlobalPipelineView: React.FC = () => {
                 showValveRooms={showValveRooms}
                 simulationOverlay={globalSimulation.overlay}
                 simulationCutoffEdgeIds={simulationCutoffEdgeIds}
+                networkxCutoffOverlay={networkxCutoffOverlay}
+                onStationProcessCutoff={handleStationProcessCutoff}
                 onLoad={handleMapLoad}
                 onNodeClick={handleMapNodeClick}
             />
+
+            {subAgentDemoOpen && (
+                <SubAgentDemoPanel
+                    steps={subAgentDemoSteps}
+                    lastMessage={subAgentDemoLastMessage}
+                    onClose={() => setSubAgentDemoOpen(false)}
+                    onStartSimulation={() => void runGlobalMultiScenarioAi(DEFAULT_ZHONGWEI_MULTI_SCENARIO_IDS)}
+                />
+            )}
+
+            {simulationPanelVisible && (
+                <SimPanel
+                    scenarioId={globalSimulation.currentScenario}
+                    scenarios={activeSimulationPilot.scenarios}
+                    isLoading={globalSimulation.isLoading}
+                    snapshotLoading={globalSimulation.snapshotLoading}
+                    baselineSnapshotLoading={globalSimulation.baselineSnapshotLoading}
+                    error={globalSimulation.error}
+                    snapshotError={globalSimulation.snapshotError}
+                    overlay={globalSimulation.overlay}
+                    snapshots={globalSimulation.snapshots}
+                    selectedSnapshotRunId={globalSimulation.selectedSnapshotRunId}
+                    baselineSnapshotRunId={globalSimulation.baselineSnapshotRunId}
+                    trialRunScenarioId={globalSimulation.trialRunScenarioId}
+                    bulkTrialRunActive={globalSimulation.bulkTrialRunActive}
+                    comparison={globalSimulation.comparison}
+                    trialRunItems={globalSimulation.trialRunItems}
+                    selectedTrialScenarioIds={selectedSimulationScenarioIds}
+                    onScenarioChange={handleGlobalScenarioChange}
+                    onToggleTrialScenario={toggleSelectedSimulationScenario}
+                    onChangeTrialScenarioAtIndex={changeSelectedSimulationScenarioSlot}
+                    onSnapshotSelect={globalSimulation.setSelectedSnapshotRunId}
+                    onBaselineSnapshotSelect={globalSimulation.setBaselineSnapshotRunId}
+                    onRun={handleRunGlobalSimulation}
+                    onSaveSnapshot={() => void globalSimulation.saveSnapshot()}
+                    onRefreshSnapshots={() => void globalSimulation.refreshSnapshots()}
+                    onLoadSnapshot={() => void globalSimulation.loadSelectedSnapshot()}
+                    onRunTrialScenario={handleRunGlobalTrialScenario}
+                    onRunMissingTrialScenarios={() => void globalSimulation.runMissingTrialScenarios()}
+                    onRunSelectedTrialScenarios={handleRunSelectedGlobalTrialScenarios}
+                    onClear={() => {
+                        globalSimulation.clearOverlay()
+                        setSimulationCutoffEdgeIds([])
+                        setNetworkxCutoffResult(null)
+                        setNetworkxCutoffItems([])
+                        setNetworkxCutoffOverlay(null)
+                        setNetworkxCutoffError(null)
+                        setNetworkxCutoffStage('all')
+                        setNetworkxCutoffStageLabel('靖边枢纽截断')
+                        setSimulationPressureChartOverlay(null)
+                        setSimulationPressureChartOpen(false)
+                    }}
+                    dockSide="left"
+                    defaultExpanded
+                    floating
+                    initialPosition={{ x: 14, y: 88 }}
+                    initialSize={{ width: 340, height: 700 }}
+                    paramEditor={simulationParamEditor}
+                    multiStagePrimary
+                    multiStageRunActive={multiScenarioActive || globalSimulation.bulkTrialRunActive}
+                    multiStageCompletedCount={multiScenarioResults.length}
+                    multiStageTotalCount={Math.max(1, selectedSimulationScenarioIds.slice(0, 5).length)}
+                    multiStageActiveLabel={currentMultiScenarioCase?.label}
+                    simulationAnimationProgress={globalSimulation.animatingState
+                        ? {
+                            iteration: globalSimulation.animatingState.iteration,
+                            total: globalSimulation.animatingState.total,
+                            solverIterations: globalSimulation.animatingState.solverIterations,
+                        }
+                        : null}
+                />
+            )}
+
+            {shouldShowSimulationPressureLabels && presentationSimulationPressureItems.length > 0 && (
+                <div
+                    className="absolute top-[92px] z-30 w-[260px] rounded-2xl border border-cyan-400/25 bg-slate-950/88 backdrop-blur-md shadow-2xl shadow-cyan-950/35 overflow-hidden"
+                    style={{
+                        right: multiScenarioActive || multiScenarioResults.length > 0 || multiScenarioError ? '396px' : '24px',
+                    }}
+                >
+                    <div className="px-3.5 py-2.5 border-b border-white/10 bg-gradient-to-r from-cyan-950/70 to-slate-950/70">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 text-sm font-bold text-cyan-100">
+                                <span className="material-symbols-outlined text-base text-cyan-300">speed</span>
+                                展示层仿真压力/流量
+                            </div>
+                            <span className="text-[10px] text-slate-400">
+                                MPa / 万方·天
+                            </span>
+                        </div>
+                        <div className="mt-1 text-[10px] text-slate-400 truncate">
+                            {globalSimulation.overlay?.scenario_id || '当前场景'} · run {globalSimulation.overlay?.run_id?.slice(0, 10)}
+                        </div>
+                    </div>
+                    <div className="max-h-[46vh] overflow-y-auto p-2.5 space-y-1.5">
+                        {presentationSimulationPressureItems.map(item => {
+                            const pressureDelta = typeof item.baselinePressureOut === 'number'
+                                ? item.pressureOut - item.baselinePressureOut
+                                : undefined
+                            const flowDelta = typeof item.flowRate === 'number' && typeof item.baselineFlowRate === 'number'
+                                ? item.flowRate - item.baselineFlowRate
+                                : undefined
+                            const pressureDeltaTone = getDeltaTone(pressureDelta)
+                            const flowDeltaTone = getDeltaTone(flowDelta)
+                            const tone = item.alertLevel === 'critical'
+                                ? 'border-red-400/35 bg-red-950/22 text-red-100'
+                                : item.alertLevel === 'warning'
+                                    ? 'border-amber-300/35 bg-amber-950/20 text-amber-100'
+                                    : 'border-cyan-300/25 bg-cyan-950/18 text-cyan-50'
+                            return (
+                                <div key={item.id} className={`rounded-lg border px-2.5 py-2 ${tone}`}>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[11px] font-semibold truncate">{item.name}</span>
+                                        <span className="text-[10px] font-mono text-slate-300">{item.id}</span>
+                                    </div>
+                                    <div className="mt-1 grid grid-cols-3 gap-1.5 text-[10px]">
+                                        <div className="flex items-center justify-between gap-1 rounded bg-black/20 px-1.5 py-1">
+                                            <span className="text-slate-400">入</span>
+                                            <span className="font-mono font-bold">{item.pressureIn.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-1 rounded bg-black/20 px-1.5 py-1">
+                                            <span className="text-slate-400">出</span>
+                                            <span className="font-mono font-bold">{item.pressureOut.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-1 rounded bg-black/20 px-1.5 py-1">
+                                            <span className="text-slate-400">流</span>
+                                            <span className="font-mono font-bold text-emerald-200">
+                                                {item.flowRate == null ? '--' : item.flowRate.toFixed(0)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="mt-1.5 grid grid-cols-[1fr_1fr] gap-1.5 text-[10px]">
+                                        <div className="rounded border px-1.5 py-1 animate-pulse" style={{ color: pressureDeltaTone.color, background: pressureDeltaTone.bg, borderColor: pressureDeltaTone.border }}>
+                                            <div className="text-slate-400">前→后</div>
+                                            <div className="font-mono font-bold">
+                                                {item.baselinePressureOut == null ? '--' : item.baselinePressureOut.toFixed(2)}
+                                                <span className="px-1 text-slate-500">→</span>
+                                                {item.pressureOut.toFixed(2)}
+                                            </div>
+                                            <div className="font-mono font-bold">{pressureDeltaTone.arrow} ΔP {pressureDelta == null ? '--' : formatSignedDelta(pressureDelta, 2)}</div>
+                                        </div>
+                                        <div className="rounded border px-1.5 py-1" style={{ color: flowDeltaTone.color, background: flowDeltaTone.bg, borderColor: flowDeltaTone.border }}>
+                                            <div className="text-slate-400">流量变化</div>
+                                            <div className="font-mono font-bold">
+                                                {item.baselineFlowRate == null ? '--' : item.baselineFlowRate.toFixed(0)}
+                                                <span className="px-1 text-slate-500">→</span>
+                                                {item.flowRate == null ? '--' : item.flowRate.toFixed(0)}
+                                            </div>
+                                            <div className="font-mono font-bold">ΔQ {flowDelta == null ? '--' : formatSignedDelta(flowDelta, 0)}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {(networkxCutoffActive || networkxCutoffItems.length > 0 || networkxCutoffError) && (
+                <div
+                    className={`absolute z-30 flex flex-col rounded-2xl border border-emerald-400/25 bg-slate-950/94 backdrop-blur-md shadow-2xl shadow-emerald-950/40 overflow-hidden ${isDraggingNetworkxCutoffPanel || isResizingNetworkxCutoffPanel ? 'shadow-emerald-700/30' : ''}`}
+                    style={{
+                        left: networkxCutoffPanelPos.x,
+                        top: networkxCutoffPanelPos.y,
+                        width: networkxCutoffPanelSize.width,
+                        height: networkxCutoffPanelSize.height,
+                    }}
+                >
+                    <div
+                        className={`px-4 py-3 border-b border-white/10 bg-gradient-to-r from-emerald-950/70 via-slate-950/80 to-cyan-950/60 select-none ${isDraggingNetworkxCutoffPanel ? 'cursor-grabbing' : 'cursor-grab'}`}
+                        onMouseDown={handleNetworkxCutoffPanelMouseDown}
+                        title="拖动调整位置"
+                    >
+                        <div className="flex items-center justify-between gap-2">
+                            <div>
+                                <div className="flex items-center gap-2 text-white font-bold text-sm">
+                                    <span className={`material-symbols-outlined text-emerald-300 ${networkxCutoffActive ? 'animate-spin' : ''}`}>
+                                        {networkxCutoffActive ? 'sync' : 'account_tree'}
+                                    </span>
+                                    NetworkX · {networkxCutoffItems.length > 1 ? `${networkxCutoffItems.length}项联动截断` : networkxCutoffStageLabel}
+                                </div>
+                                <div className="mt-1 text-[11px] text-slate-400">
+                                    站内阀门动作同步到全国一张网
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    clearNetworkxCutoffShowcase()
+                                }}
+                                className="w-7 h-7 rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+                                title="清除 NetworkX 截断演示"
+                            >
+                                <span className="material-symbols-outlined text-base">close</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pr-3">
+                        {networkxCutoffActive && (
+                            <div className="rounded-xl border border-cyan-400/20 bg-cyan-950/20 p-3">
+                                <div className="flex items-center justify-between text-[11px] text-cyan-100 mb-2">
+                                    <span>正在执行 {networkxCutoffStageLabel}，同步外部管网显示</span>
+                                    <span className="font-mono">nx</span>
+                                </div>
+                                <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                                    <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-lime-300 animate-pulse" />
+                                </div>
+                            </div>
+                        )}
+
+                        {networkxCutoffItems.length > 0 && (
+                            <>
+                                <div className="rounded-xl border border-emerald-400/20 bg-emerald-950/20 p-3">
+                                    <div className="text-[11px] uppercase tracking-[0.18em] text-emerald-300 font-mono">Conclusion</div>
+                                    <div className="mt-1 text-sm font-bold text-emerald-50 leading-relaxed">
+                                        {networkxCutoffItems.length > 1
+                                            ? `当前已叠加 ${networkxCutoffItems.length} 个站内阀门截断动作，外部地图按并集显示截断段和停流段。`
+                                            : (networkxCutoffItems[0].result.after_path.available
+                                                ? `${networkxCutoffItems[0].label}后，NetworkX 找到替代通路，绕行增加约 ${(networkxCutoffItems[0].result.summary.extra_length_km ?? 0).toFixed(1)} km。`
+                                                : `${networkxCutoffItems[0].label}后，NetworkX 未找到替代通路，拓扑上存在断供风险。`)}
+                                    </div>
+                                    <div className="mt-2 text-[11px] text-emerald-100/80 leading-relaxed">
+                                        红色为截断段，灰色虚线为停流方向；多阀门关闭时按所有阀门的影响范围叠加。
+                                    </div>
+                                </div>
+
+                                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-2">
+                                    <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Active valve actions</div>
+                                    {networkxCutoffItems.map(item => (
+                                        <div key={item.key} className="rounded-lg border border-cyan-400/15 bg-cyan-950/15 px-2.5 py-2">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-[12px] font-bold text-cyan-50">{item.label}</span>
+                                                <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-200">截断中</span>
+                                            </div>
+                                            <div className="mt-1 text-[10px] text-slate-400">
+                                                {item.valveLabel ? `${item.valveLabel} ${item.valveName || ''}` : '手动截断'} · 截断段 {item.overlay.cutoffEdgeIds?.length ?? 0} · 停流段 {item.overlay.blockedFlowEdgeIds?.length ?? 0}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div className="rounded-xl border border-red-400/20 bg-red-950/20 p-2">
+                                        <div className="text-[10px] text-red-200">红色</div>
+                                        <div className="text-lg font-mono font-bold text-red-100">{networkxCutoffOverlay?.cutoffEdgeIds?.length ?? 0}</div>
+                                        <div className="text-[10px] text-slate-400">截断段</div>
+                                    </div>
+                                    <div className="rounded-xl border border-amber-400/20 bg-amber-950/20 p-2">
+                                        <div className="text-[10px] text-amber-200">橙色</div>
+                                        <div className="text-lg font-mono font-bold text-amber-100">{networkxCutoffOverlay?.beforePathEdgeIds?.length ?? 0}</div>
+                                        <div className="text-[10px] text-slate-400">截断前路径</div>
+                                    </div>
+                                    <div className="rounded-xl border border-emerald-400/20 bg-emerald-950/20 p-2">
+                                        <div className="text-[10px] text-emerald-200">绿色</div>
+                                        <div className="text-lg font-mono font-bold text-emerald-100">{networkxCutoffOverlay?.rerouteEdgeIds?.length ?? 0}</div>
+                                        <div className="text-[10px] text-slate-400">绕行段</div>
+                                    </div>
+                                </div>
+                                <div className="rounded-lg border border-slate-500/20 bg-slate-900/50 px-3 py-2 text-[11px] text-slate-300">
+                                    灰色虚线为当前阶段停流关联线；这些管段不再显示流光，未受影响的上游管线保持正常流动。
+                                </div>
+
+                                {networkxCutoffResult && (
+                                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div>
+                                                <div className="text-[10px] uppercase tracking-[0.16em] text-slate-500">Path review</div>
+                                                <div className="text-[11px] text-slate-400">截断前后路径对比</div>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNetworkxCutoffPathExpanded(value => !value)}
+                                                    className="rounded border border-cyan-400/20 bg-cyan-500/10 px-2 py-1 text-[10px] font-semibold text-cyan-100 hover:border-cyan-300/50"
+                                                >
+                                                    {networkxCutoffPathExpanded ? '摘要' : '完整'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNetworkxCutoffPathOpen(value => !value)}
+                                                    className="rounded border border-slate-400/20 bg-slate-800/70 px-2 py-1 text-[10px] font-semibold text-slate-100 hover:border-slate-300/50"
+                                                >
+                                                    {networkxCutoffPathOpen ? '隐藏' : '打开'}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {networkxCutoffPathOpen && (
+                                            <>
+                                                <div>
+                                                    <div className="text-[10px] text-slate-500">截断前路径</div>
+                                                    <div className="text-[11px] text-slate-200 leading-relaxed">
+                                                        {formatPathPreview(networkxCutoffResult.before_path.node_names, networkxCutoffPathExpanded ? 999 : 8)}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] text-slate-500">截断后路径</div>
+                                                    <div className="text-[11px] text-emerald-100 leading-relaxed">
+                                                        {networkxCutoffResult.after_path.available
+                                                            ? formatPathPreview(networkxCutoffResult.after_path.node_names, networkxCutoffPathExpanded ? 999 : 8)
+                                                            : (networkxCutoffResult.after_path.error || '未形成替代路径')}
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="rounded-xl border border-cyan-400/15 bg-cyan-950/15 p-3 text-[11px] leading-relaxed text-cyan-100">
+                                    算法依据：{networkxCutoffResult.algorithm}。{networkxCutoffResult.boundary_note}
+                                </div>
+                            </>
+                        )}
+
+                        {networkxCutoffError && (
+                            <div className="rounded-xl border border-red-400/25 bg-red-950/30 p-3 text-[11px] text-red-100 leading-relaxed">
+                                {networkxCutoffError}
+                            </div>
+                        )}
+                    </div>
+                    <div
+                        className="absolute bottom-0 right-0 h-5 w-5 cursor-nwse-resize rounded-tl-md border-l border-t border-emerald-300/25 bg-emerald-400/10 hover:bg-emerald-400/25"
+                        onMouseDown={handleNetworkxCutoffPanelResizeMouseDown}
+                        title="拖动调整大小"
+                    />
+                </div>
+            )}
 
             {(multiScenarioActive || globalSimulation.isLoading || globalSimulation.animatingState?.active || multiScenarioResults.length > 0 || multiScenarioError) && (
                 <div className="absolute top-[92px] right-6 z-30 w-[360px] rounded-2xl border border-emerald-400/25 bg-slate-950/92 backdrop-blur-md shadow-2xl shadow-emerald-950/40 overflow-hidden">
@@ -3083,7 +5806,7 @@ const GlobalPipelineView: React.FC = () => {
                                         }}
                                         className="text-[10px] px-2 py-1 rounded border border-cyan-400/25 bg-cyan-500/10 text-cyan-100"
                                     >
-                                        {simulationPressureChartOpen && simulationPressureChartConfigs.length > 0 ? '隐藏曲线' : '压力曲线'}
+                                        {simulationPressureChartOpen && simulationPressureChartConfigs.length > 0 ? '隐藏曲线' : '压力/流量曲线'}
                                     </button>
                                 )}
                                 {multiScenarioResults.length === multiScenarioDisplayCases.length && (
@@ -3164,7 +5887,7 @@ const GlobalPipelineView: React.FC = () => {
                                                 setSimulationPressureChartOpen(true)
                                             }}
                                             className="grid grid-cols-[1.1fr_0.7fr_0.7fr_0.7fr] w-full px-2 py-1.5 text-[10px] text-left hover:bg-white/[0.04] transition-colors"
-                                            title={`查看${result.label}压力曲线`}
+                                            title={`查看${result.label}压力/流量曲线`}
                                         >
                                             <span className="text-slate-100 truncate">{result.label}</span>
                                             <span className={`text-right font-mono ${result.unservedDemand > 0 ? 'text-red-300' : 'text-slate-400'}`}>{result.unservedDemand.toFixed(0)}</span>
@@ -3322,8 +6045,15 @@ const GlobalPipelineView: React.FC = () => {
 
                                     {/* 自定义复选框 - 控制整个组 */}
                                     <div
-                                        className="relative flex items-center justify-center w-[18px] h-[18px]"
-                                        onClick={(e) => { e.stopPropagation(); togglePackageVisibility(pkg); }}
+                                        className="relative flex items-center justify-center w-[18px] h-[18px] cursor-default"
+                                        onMouseDown={(e) => {
+                                            e.stopPropagation()
+                                        }}
+                                        onClick={(e) => {
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            togglePackageVisibility(pkg)
+                                        }}
                                     >
                                         <div className={`absolute inset-0 rounded-[4px] border ${isAllVisible || isPartialVisible ? 'border-[#137fec] bg-[#137fec]' : 'border-gray-500 bg-[#1c2430] group-hover:border-gray-400'} transition-colors`}></div>
                                         {isAllVisible && (
@@ -3369,7 +6099,19 @@ const GlobalPipelineView: React.FC = () => {
                                                 }}
                                             >
                                                 {/* 自定义复选框 - 子图层 */}
-                                                <div className="relative flex items-center justify-center w-[16px] h-[16px]">
+                                                <div
+                                                    className="relative flex items-center justify-center w-[16px] h-[16px] cursor-default"
+                                                    onMouseDown={(e) => {
+                                                        e.stopPropagation()
+                                                    }}
+                                                    onClick={(e) => {
+                                                        e.preventDefault()
+                                                        e.stopPropagation()
+                                                        const willShow = !visibleLayers[layerId]
+                                                        toggleLayer(layerId)
+                                                        if (willShow) return
+                                                    }}
+                                                >
                                                     <div className={`absolute inset-0 rounded-[3px] border ${visibleLayers[layerId] ? 'border-[#137fec] bg-[#137fec]' : 'border-gray-500 bg-[#1c2430] group-hover/item:border-gray-400'} transition-colors`}></div>
                                                     {visibleLayers[layerId] && (
                                                         <svg className="absolute w-[10px] h-[10px] text-white pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -3453,6 +6195,7 @@ const GlobalPipelineView: React.FC = () => {
                         closePopOut={panel.closePopOut}
                         popOut={panel.popOut}
                         accentColor={panel.accentColor}
+                        onStationClick={locateStationOnMap}
                         onMetricClick={handleMetricClick}
                         onStationHistoryClick={toggleStationHistoryPanel}
                         activeStationHistoryName={stationHistoryTarget?.stationName}
@@ -3504,6 +6247,7 @@ const GlobalPipelineView: React.FC = () => {
                                 closePopOut={noop}
                                 popOut={noop}
                                 accentColor={panel.color}
+                                onStationClick={locateStationOnMap}
                             />
                         ) : (
                             <EmptyScadaState color={panel.color} label={panel.label} />
@@ -3712,9 +6456,30 @@ const ScadaTableContent: React.FC<{
                             <tr key={name} style={{ background: rowBg, borderRadius: '6px', transition: 'background 0.15s' }}
                                 onMouseEnter={e => (e.currentTarget.style.background = `rgba(${rgb},0.14)`)}
                                 onMouseLeave={e => (e.currentTarget.style.background = rowBg)}>
-                                <td style={{ padding: '5px 6px', borderRadius: '6px 0 0 6px', fontWeight: nameBold ? 600 : 400, color: '#e2e8f0', maxWidth: '150px' }} title={name}>
+                                <td
+                                    style={{
+                                        padding: '5px 6px',
+                                        borderRadius: '6px 0 0 6px',
+                                        fontWeight: nameBold ? 600 : 400,
+                                        color: '#e2e8f0',
+                                        maxWidth: '150px',
+                                        cursor: onStationClick ? 'pointer' : 'default',
+                                    }}
+                                    title={onStationClick ? `定位到${name}` : name}
+                                    onClick={() => onStationClick?.(name)}
+                                >
                                     <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                                        <span
+                                            style={{
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                                textDecoration: onStationClick ? 'underline dotted rgba(148,163,184,0.45)' : 'none',
+                                                textUnderlineOffset: 3,
+                                            }}
+                                        >
+                                            {name}
+                                        </span>
                                         {onStationHistoryClick && hasEmbeddedHistory && (
                                             <button
                                                 type="button"

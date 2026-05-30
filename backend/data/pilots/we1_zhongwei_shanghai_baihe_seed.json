@@ -599,7 +599,7 @@
     },
     {
       "id": "zhongwei_supply_pressure_drop",
-      "name": "中卫出站压力下调",
+      "name": "中卫站压力/流量变化",
       "compressor_overrides": [],
       "edge_overrides": [],
       "node_overrides": [
@@ -610,7 +610,7 @@
           "nominal_flow": 2400.0
         }
       ],
-      "notes": "用边界压力和供给能力下调模拟中卫侧扰动。"
+      "notes": "用边界压力和供给流量变化模拟中卫侧扰动。"
     },
     {
       "id": "zhengzhou_compressor_offline",

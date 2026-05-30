@@ -1,0 +1,4 @@
+- generic [ref=e2]:
+  - button "呼出页面入口" [ref=e4]:
+    - generic [ref=e5]: apps
+  - generic [ref=e3736]: 页面加载中...

@@ -9,6 +9,7 @@
  */
 
 import type { GraphNode, GraphEdge } from './topology-validator'
+import { includesSupplyNodeKeyword } from '@/config/pipelineKeywords'
 
 // ==================== 类型定义 ====================
 
@@ -50,7 +51,8 @@ function buildAdjacency(
   nodes: GraphNode[],
   edges: GraphEdge[],
   excludeNodeIds: Set<string> = new Set(),
-  excludeEdgeIds: Set<string> = new Set()
+  excludeEdgeIds: Set<string> = new Set(),
+  directed = false
 ): Map<string, string[]> {
   const adj = new Map<string, string[]>()
   for (const n of nodes) {
@@ -61,43 +63,94 @@ function buildAdjacency(
     if (excludeNodeIds.has(e.startNodeId) || excludeNodeIds.has(e.endNodeId)) continue
     if (!adj.has(e.startNodeId) || !adj.has(e.endNodeId)) continue
     adj.get(e.startNodeId)!.push(e.endNodeId)
-    adj.get(e.endNodeId)!.push(e.startNodeId)
+    if (!directed) {
+      adj.get(e.endNodeId)!.push(e.startNodeId)
+    }
   }
   return adj
 }
 
 // ==================== 气源识别 ====================
 
+function isLikelySupplyNode(node: GraphNode): boolean {
+  const name = node.name || ''
+  return (
+    node.type === 'source' ||
+    includesSupplyNodeKeyword(name)
+  )
+}
+
 /**
  * 识别气源节点
  *
  * 策略（按优先级）：
- * 1. degree=1 的 compressor（管线链条的端点压气站，如轮南、黑河）
- * 2. 若策略1找不到节点，退化为全部 compressor
+ * 1. 显式气源 / LNG / 首站 / 接收站
+ * 2. 有向图入度为 0、出度大于 0 的起点
+ * 3. degree=1 的 compressor（兼容旧数据）
+ * 4. 若策略1找不到节点，退化为全部 compressor
  *
- * 物理意义：链状管线两端的压气站才是真正的气源注入点；
- * 中继压气站（degree>1）只是增压，不产气。
+ * 物理意义：截断推演要优先从拓扑录入方向识别上游，避免全网无向
+ * 搜索时把下游 LNG 站或末端压气站错误当成当前管段的上游气源。
  */
 function identifySources(
   nodes: GraphNode[],
-  adj: Map<string, string[]>
+  edges: GraphEdge[],
+  excludeNodeIds: Set<string> = new Set(),
+  excludeEdgeIds: Set<string> = new Set()
 ): Set<string> {
-  const terminalCompressors = nodes.filter(
-    n => n.type === 'compressor' && (adj.get(n.id)?.length ?? 0) === 1
-  )
+  const activeNodeIds = new Set(nodes.filter(n => !excludeNodeIds.has(n.id)).map(n => n.id))
+  const inDegree = new Map<string, number>()
+  const outDegree = new Map<string, number>()
+  for (const nodeId of activeNodeIds) {
+    inDegree.set(nodeId, 0)
+    outDegree.set(nodeId, 0)
+  }
+  for (const edge of edges) {
+    if (excludeEdgeIds.has(edge.id)) continue
+    if (!activeNodeIds.has(edge.startNodeId) || !activeNodeIds.has(edge.endNodeId)) continue
+    outDegree.set(edge.startNodeId, (outDegree.get(edge.startNodeId) ?? 0) + 1)
+    inDegree.set(edge.endNodeId, (inDegree.get(edge.endNodeId) ?? 0) + 1)
+  }
+
+  const explicitSources = nodes.filter(n => (
+    activeNodeIds.has(n.id) &&
+    isLikelySupplyNode(n) &&
+    (outDegree.get(n.id) ?? 0) > 0
+  ))
+
+  if (explicitSources.length > 0) {
+    return new Set(explicitSources.map(n => n.id))
+  }
+
+  const directionalSources = nodes.filter(n => (
+    activeNodeIds.has(n.id) &&
+    (outDegree.get(n.id) ?? 0) > 0 &&
+    (inDegree.get(n.id) ?? 0) === 0
+  ))
+
+  if (directionalSources.length > 0) {
+    return new Set(directionalSources.map(n => n.id))
+  }
+
+  const undirectedAdj = buildAdjacency(nodes, edges, excludeNodeIds, excludeEdgeIds)
+  const terminalCompressors = nodes.filter(n => (
+    activeNodeIds.has(n.id) &&
+    n.type === 'compressor' &&
+    (undirectedAdj.get(n.id)?.length ?? 0) === 1
+  ))
 
   if (terminalCompressors.length > 0) {
     return new Set(terminalCompressors.map(n => n.id))
   }
 
   // 退化策略：所有压气站
-  const compressors = nodes.filter(n => n.type === 'compressor')
+  const compressors = nodes.filter(n => activeNodeIds.has(n.id) && n.type === 'compressor')
   if (compressors.length > 0) {
     return new Set(compressors.map(n => n.id))
   }
 
   // 再退化：没有压气站时，用拓扑端点作为前端演示气源
-  const terminalNodes = nodes.filter(n => (adj.get(n.id)?.length ?? 0) === 1)
+  const terminalNodes = nodes.filter(n => activeNodeIds.has(n.id) && (undirectedAdj.get(n.id)?.length ?? 0) === 1)
   return new Set(terminalNodes.map(n => n.id))
 }
 
@@ -280,7 +333,7 @@ function simulateNodeCutoff(
   const adjAfter = buildAdjacency(nodes, edges, new Set([cutoffNodeId]), cutoffEdgeIds)
 
   // 识别气源（截断前全部气源；截断后若气源本身是截断点，则排除）
-  const sourcesBefore = identifySources(nodes, adjBefore)
+  const sourcesBefore = identifySources(nodes, edges)
   const sourcesAfter = new Set([...sourcesBefore].filter(id => id !== cutoffNodeId))
 
   // 气源节点信息（供 UI 展示）
@@ -382,7 +435,7 @@ function simulateEdgeCutoffInternal(
   const adjBefore = buildAdjacency(nodes, edges)
   const adjAfter = buildAdjacency(nodes, edges, new Set(), new Set([cutoffEdgeId]))
 
-  const sourcesBefore = identifySources(nodes, adjBefore)
+  const sourcesBefore = identifySources(nodes, edges)
   const sourcesAfter = new Set(sourcesBefore)
   const sourceNodeInfos = [...sourcesBefore].map(id => ({
     id,

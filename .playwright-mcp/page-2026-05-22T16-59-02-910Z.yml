@@ -1,0 +1,241 @@
+- generic [ref=e2]:
+  - button "呼出页面入口" [ref=e4]:
+    - generic [ref=e5]: apps
+  - button "smart_toy" [ref=e4417]:
+    - generic [ref=e4418]: smart_toy
+  - generic [ref=e4419]:
+    - generic [ref=e4421]:
+      - generic [ref=e4422]:
+        - heading "public 智脉平台-全国管网统一视图" [level=1] [ref=e4423]:
+          - generic [ref=e4424]: public
+          - text: 智脉平台-全国管网统一视图
+        - paragraph [ref=e4425]: "站场: 1034 | 管道段: 1043 | 管线组: 13"
+      - generic [ref=e4426]:
+        - button "science 仿真" [ref=e4427]:
+          - generic [ref=e4428]: science
+          - generic [ref=e4429]: 仿真
+        - button "filter_alt 展示" [ref=e4430]:
+          - generic [ref=e4431]: filter_alt
+          - generic [ref=e4432]: 展示
+        - button "account_tree 靖边截断" [ref=e4433]:
+          - generic [ref=e4434]: account_tree
+          - generic [ref=e4435]: 靖边截断
+        - button "dark_mode 深色" [ref=e4436]:
+          - generic [ref=e4437]: dark_mode
+          - generic [ref=e4438]: 深色
+        - button "hub 枢纽精简 4 expand_more" [ref=e4440]:
+          - generic [ref=e4441]: hub
+          - generic [ref=e4442]: 枢纽精简
+          - generic [ref=e4443]: "4"
+          - generic [ref=e4444]: expand_more
+    - generic [ref=e4446]:
+      - iframe [ref=e4447]:
+        
+      - generic [ref=e4449]:
+        - generic:
+          - generic "枢纽" [ref=e4451] [cursor=pointer]
+          - generic [ref=e4454]: 平顶山分输站
+          - generic [ref=e4456] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e4458]: 连木沁压气站
+          - generic [ref=e4460] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e4462]: 潼关压气站
+          - generic [ref=e4466]: 蕲春分输站
+          - generic [ref=e4468] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e4470]: 古浪压气站
+          - generic [ref=e4474]: 华阴分输站
+          - generic [ref=e4478]: 泾川分输站
+          - generic [ref=e4482]: 武威分输站
+          - generic [ref=e4486]: 九江分输站
+          - generic [ref=e4490]: 昌吉分输站
+      - generic:
+        - img
+      - generic [ref=e4491]: © 2026 AutoNavi
+    - generic [ref=e4492]:
+      - generic "按住标题栏可拖动管线目录" [ref=e4493]:
+        - heading "toc 管线目录" [level=3] [ref=e4494]:
+          - generic [ref=e4495]: toc
+          - text: 管线目录
+        - generic [ref=e4496]:
+          - button "全选" [ref=e4497]
+          - button "全部取消" [ref=e4498]
+          - button "复原" [ref=e4499]
+      - generic [ref=e4500]:
+        - generic "按住管线行可上下拖动排序" [ref=e4501]:
+          - generic [ref=e4502]:
+            - generic [ref=e4504]:
+              - img
+            - generic [ref=e4506]:
+              - generic [ref=e4509]: 西气东输二线
+              - generic [ref=e4510]:
+                - button "visibility_off" [ref=e4511]:
+                  - generic [ref=e4512]: visibility_off
+                - button "open_in_new" [ref=e4513]:
+                  - generic [ref=e4514]: open_in_new
+                - button "show_chart" [ref=e4515]:
+                  - generic [ref=e4516]: show_chart
+                - button "speed" [ref=e4517]:
+                  - generic [ref=e4518]: speed
+        - generic "按住管线行可上下拖动排序" [ref=e4519]:
+          - generic [ref=e4520]:
+            - generic [ref=e4522]:
+              - img
+            - generic [ref=e4524]:
+              - generic [ref=e4527]: 中俄东线
+              - generic [ref=e4528]:
+                - button "visibility_off" [ref=e4529]:
+                  - generic [ref=e4530]: visibility_off
+                - button "open_in_new" [ref=e4531]:
+                  - generic [ref=e4532]: open_in_new
+                - button "show_chart" [ref=e4533]:
+                  - generic [ref=e4534]: show_chart
+                - button "speed" [ref=e4535]:
+                  - generic [ref=e4536]: speed
+        - generic "按住管线行可上下拖动排序" [ref=e4537]:
+          - generic [ref=e4538]:
+            - generic [ref=e4540]:
+              - img
+            - generic [ref=e4542]:
+              - generic [ref=e4545]: 平泰支干线
+              - generic [ref=e4546]:
+                - button "visibility_off" [ref=e4547]:
+                  - generic [ref=e4548]: visibility_off
+                - button "open_in_new" [ref=e4549]:
+                  - generic [ref=e4550]: open_in_new
+                - button "show_chart" [ref=e4551]:
+                  - generic [ref=e4552]: show_chart
+                - button "speed" [ref=e4553]:
+                  - generic [ref=e4554]: speed
+        - generic "按住管线行可上下拖动排序" [ref=e4555]:
+          - generic [ref=e4556]:
+            - generic [ref=e4558]:
+              - img
+            - generic [ref=e4560]:
+              - generic [ref=e4563]: 中贵线
+              - generic [ref=e4564]:
+                - button "visibility_off" [ref=e4565]:
+                  - generic [ref=e4566]: visibility_off
+                - button "open_in_new" [ref=e4567]:
+                  - generic [ref=e4568]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e4569]:
+          - generic [ref=e4570]:
+            - generic [ref=e4572]:
+              - img
+            - generic [ref=e4574]:
+              - generic [ref=e4577]: 中缅线
+              - generic [ref=e4578]:
+                - button "visibility_off" [ref=e4579]:
+                  - generic [ref=e4580]: visibility_off
+                - button "open_in_new" [ref=e4581]:
+                  - generic [ref=e4582]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e4583]:
+          - generic [ref=e4584]:
+            - generic [ref=e4586]:
+              - img
+            - generic [ref=e4588]:
+              - generic [ref=e4591]: 广南支干线
+              - generic [ref=e4592]:
+                - button "visibility_off" [ref=e4593]:
+                  - generic [ref=e4594]: visibility_off
+                - button "open_in_new" [ref=e4595]:
+                  - generic [ref=e4596]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e4597]:
+          - generic [ref=e4598]:
+            - generic [ref=e4600]: chevron_right
+            - generic [ref=e4601]:
+              - img
+            - generic [ref=e4603]:
+              - generic [ref=e4606]: 广深支干线
+              - generic [ref=e4607]:
+                - button "visibility_off" [ref=e4608]:
+                  - generic [ref=e4609]: visibility_off
+                - button "open_in_new" [ref=e4610]:
+                  - generic [ref=e4611]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e4612]:
+          - generic [ref=e4613]:
+            - generic [ref=e4615]: chevron_right
+            - generic [ref=e4616]:
+              - img
+            - generic [ref=e4618]:
+              - generic [ref=e4621]: 南昌-上海支干线
+              - generic [ref=e4622]:
+                - button "visibility_off" [ref=e4623]:
+                  - generic [ref=e4624]: visibility_off
+                - button "open_in_new" [ref=e4625]:
+                  - generic [ref=e4626]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e4627]:
+          - generic [ref=e4628]:
+            - generic [ref=e4630]:
+              - img
+            - generic [ref=e4632]:
+              - generic [ref=e4635]: 嘉兴-甪直联络线
+              - generic [ref=e4636]:
+                - button "visibility_off" [ref=e4637]:
+                  - generic [ref=e4638]: visibility_off
+                - button "open_in_new" [ref=e4639]:
+                  - generic [ref=e4640]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e4641]:
+          - generic [ref=e4642]:
+            - generic [ref=e4644]:
+              - img
+            - generic [ref=e4646]:
+              - generic [ref=e4649]: 陕京四线
+              - generic [ref=e4650]:
+                - button "visibility_off" [ref=e4651]:
+                  - generic [ref=e4652]: visibility_off
+                - button "open_in_new" [ref=e4653]:
+                  - generic [ref=e4654]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e4655]:
+          - generic [ref=e4656]:
+            - generic [ref=e4658]:
+              - img
+            - generic [ref=e4660]:
+              - generic [ref=e4663]: 陕京二线
+              - generic [ref=e4664]:
+                - button "visibility_off" [ref=e4665]:
+                  - generic [ref=e4666]: visibility_off
+                - button "open_in_new" [ref=e4667]:
+                  - generic [ref=e4668]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e4669]:
+          - generic [ref=e4670]:
+            - generic [ref=e4672]:
+              - img
+            - generic [ref=e4674]:
+              - generic [ref=e4677]: 陕京三线
+              - generic [ref=e4678]:
+                - button "visibility_off" [ref=e4679]:
+                  - generic [ref=e4680]: visibility_off
+                - button "open_in_new" [ref=e4681]:
+                  - generic [ref=e4682]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e4683]:
+          - generic [ref=e4684]:
+            - generic [ref=e4686]:
+              - img
+            - generic [ref=e4688]:
+              - generic [ref=e4691]: 西气东输一线
+              - generic [ref=e4692]:
+                - button "visibility_off" [ref=e4693]:
+                  - generic [ref=e4694]: visibility_off
+                - button "open_in_new" [ref=e4695]:
+                  - generic [ref=e4696]: open_in_new
+                - button "show_chart" [ref=e4697]:
+                  - generic [ref=e4698]: show_chart
+                - button "speed" [ref=e4699]:
+                  - generic [ref=e4700]: speed
+      - generic "拖动调整管线目录宽高" [ref=e4701]
+    - generic [ref=e4703]:
+      - generic [ref=e4706]: 西气东输二线
+      - generic [ref=e4709]: 中俄东线
+      - generic [ref=e4712]: 平泰支干线
+      - generic [ref=e4715]: 中贵线
+      - generic [ref=e4718]: 中缅线
+      - generic [ref=e4721]: 广南支干线
+      - generic [ref=e4724]: 广深支干线
+      - generic [ref=e4727]: 南昌-上海支干线
+      - generic [ref=e4730]: 嘉兴-甪直联络线
+      - generic [ref=e4733]: 陕京四线
+      - generic [ref=e4736]: 陕京二线
+      - generic [ref=e4739]: 陕京三线
+      - generic [ref=e4742]: 西气东输一线

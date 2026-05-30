@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Dispatch, KeyboardEvent, SetStateAction } from 'react'
-import { resolveApiPath } from '@/services/apiBase'
+import { resolveApiPathCandidates } from '@/services/apiBase'
+import { ZHONGWEI_MULTI_SCENARIO_CASES } from '@/config/simulationScenarios'
 import { useAiAssistantPageContext } from './useAiAssistantPageContext'
 import type { AssistantChatContext } from './useAiAssistantPageContext'
 
@@ -21,7 +22,7 @@ export interface ChatRequestPayload {
 
 type StreamChunkType = 'REPLY' | 'TOOL' | 'LOG' | 'THINK' | 'ERROR' | 'DONE'
 
-const AI_ASSISTANT_API_URL = resolveApiPath('/api/ai-assistant/chat')
+const AI_ASSISTANT_API_URLS = resolveApiPathCandidates('/api/ai-assistant/chat')
 const DATA_ANALYSIS_ENTER_PATTERN = /^\s*\/\u6570\u636e\u5206\u6790(?:\s+.+)?\s*$/i
 const DATA_ANALYSIS_EXIT_PATTERN = /^\s*\/\u9000\u51fa\u6570\u636e\u5206\u6790\s*$/i
 const SUBAGENT_ENTER_PATTERN = /^\s*\/subagent(?:\s+.+)?\s*$/i
@@ -29,6 +30,9 @@ const SUBAGENT_EXIT_PATTERN = /^\s*\/\u9000\u51fasubagent\s*$/i
 const MULTI_SCENARIO_SELECTOR_PATTERN = /^\s*(?:\/\u591a\u5de5\u51b5ai|\/multi-scenario-ai)(?:\s+.+)?\s*$/i
 const MULTI_SCENARIO_EXECUTE_PATTERN = /^\s*\/\u6267\u884c\u591a\u5de5\u51b5ai(?:\s+.+)?\s*$/i
 const MULTI_SCENARIO_AI_PATTERN = /(多工况|三工况|3种工况|三种工况|中卫.*3000.*2000.*截断|multi[-\s]?scenario)/i
+const SUBAGENT_INTENT_PATTERN = /(subagent|sub agent|多agent|多智能体|专家组|主agent|主控agent)/i
+const NETWORKX_CUTOFF_SHOWCASE_PATTERN = /(networkx|NetworkX|全国一张网|全国网|原生截断).*(靖边).*(截断|推演|演示)|靖边.*(networkx|NetworkX|全国一张网|全国网|原生截断).*(截断|推演|演示)/i
+const CUTOFF_SHOWCASE_PATTERN = /(地图拓扑|拓扑管理|截断推演|截断演示|断供|绕行).*(演示|自动|操作|一连串|显示|分析)|演示.*(中卫|靖边|永清).*(截断|断供|绕行)/i
 const AI_ASSISTANT_SYNC_CHANNEL = 'ai-assistant-sync'
 
 interface MultiScenarioAiEventDetail {
@@ -36,6 +40,31 @@ interface MultiScenarioAiEventDetail {
     message?: string
     error?: string
     selectedScenarioIds?: string[]
+}
+
+interface CutoffShowcaseEventDetail {
+    skillName?: string
+    station?: string
+    stationLabel?: string
+    step?: string
+    message?: string
+    error?: string
+    summary?: {
+        supplyLost?: number
+        rerouted?: number
+        same?: number
+        stoppedEdges?: number
+        rerouteEdges?: number
+        sourceCount?: number
+        totalDistributionNodes?: number
+    }
+    affectedNodes?: Array<{ name: string; status: string }>
+}
+
+interface NetworkxCutoffShowcaseEventDetail {
+    skillName?: string
+    message?: string
+    error?: string
 }
 
 interface MultiScenarioSelectorCase {
@@ -56,6 +85,35 @@ export interface HandleSendOptions {
     displayText?: string
 }
 
+async function postChatWithFallback(payload: ChatRequestPayload): Promise<Response> {
+    let lastError: unknown = null
+
+    for (const url of AI_ASSISTANT_API_URLS) {
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+
+            if (response.ok) {
+                return response
+            }
+
+            lastError = new Error(`HTTP ${response.status} (${url})`)
+            if (![404, 502, 503, 504].includes(response.status)) {
+                throw lastError
+            }
+        } catch (error) {
+            lastError = error
+        }
+    }
+
+    const attempted = AI_ASSISTANT_API_URLS.join('、')
+    const message = lastError instanceof Error ? lastError.message : '请求失败'
+    throw new Error(`${message}；已尝试接口：${attempted}`)
+}
+
 async function* fetchChatStream(
     message: string,
     history: ChatMessage[],
@@ -72,15 +130,7 @@ async function* fetchChatStream(
         payload.context = context
     }
 
-    const response = await fetch(AI_ASSISTANT_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    })
-
-    if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-    }
+    const response = await postChatWithFallback(payload)
 
     const reader = response.body?.getReader()
     if (!reader) {
@@ -339,30 +389,99 @@ function shouldExecuteMultiScenarioAi(message: string): boolean {
     return MULTI_SCENARIO_EXECUTE_PATTERN.test(message)
 }
 
+function shouldUseSubagentBackendFlow(message: string, subagentMode: boolean): boolean {
+    return subagentMode || SUBAGENT_INTENT_PATTERN.test(message)
+}
+
+function shouldStartNetworkxCutoffShowcase(message: string): boolean {
+    return NETWORKX_CUTOFF_SHOWCASE_PATTERN.test(message)
+}
+
+function detectCutoffShowcaseStation(message: string): { station: string; stationLabel: string } | null {
+    if (!CUTOFF_SHOWCASE_PATTERN.test(message)) return null
+    if (/靖边/.test(message)) return { station: 'jingbian', stationLabel: '靖边压气站' }
+    if (/永清/.test(message)) return { station: 'yongqing', stationLabel: '永清压气站' }
+    return { station: 'zhongwei', stationLabel: '中卫压气站' }
+}
+
+function formatNetworkxCutoffShowcaseProgress(detail: NetworkxCutoffShowcaseEventDetail): string {
+    return [
+        'NetworkX 靖边截断演示',
+        '',
+        `当前操作：${detail.message || '正在联动全国一张网页面。'}`,
+        '',
+        '操作回放：',
+        '1. 打开全国管网统一视图',
+        '2. 展开 WE1 / SJ2 / SJ4 相关图层',
+        '3. 后端构建 NetworkX 全国无向图',
+        '4. 移除靖边相关节点并重新寻路',
+        '5. 把红色截断段、橙色受影响段、绿色绕行段叠加回地图',
+    ].join('\n')
+}
+
+function formatCutoffShowcaseProgress(detail: CutoffShowcaseEventDetail): string {
+    const stationLabel = detail.stationLabel || '目标站点'
+    return [
+        '地图拓扑截断推演',
+        '',
+        `当前操作：${detail.message || '正在联动地图拓扑管理页面。'}`,
+        '',
+        '操作回放：',
+        '1. 打开地图拓扑管理页面',
+        '2. 切换到“截断”功能面板',
+        `3. 选择截断点：${stationLabel}`,
+        '4. 自动运行截断推演',
+        '5. 汇总断供、绕行和停流路径',
+    ].join('\n')
+}
+
+function formatCutoffShowcaseResult(detail: CutoffShowcaseEventDetail): string {
+    if (detail.error) {
+        return [
+            '结论：截断推演没有跑通。',
+            '',
+            `待确认项：${detail.error}`,
+            '',
+            '建议：确认当前主窗口已经打开智脉平台，并能进入地图拓扑管理页面。',
+        ].join('\n')
+    }
+
+    const stationLabel = detail.stationLabel || '目标站点'
+    const summary = detail.summary || {}
+    const lost = summary.supplyLost ?? 0
+    const rerouted = summary.rerouted ?? 0
+    const same = summary.same ?? 0
+    const stoppedEdges = summary.stoppedEdges ?? 0
+    const rerouteEdges = summary.rerouteEdges ?? 0
+    const total = summary.totalDistributionNodes ?? (lost + rerouted + same)
+    const affectedPreview = (detail.affectedNodes || [])
+        .slice(0, 6)
+        .map(item => `${item.name}（${item.status === 'supply_lost' ? '断供' : '绕行'}）`)
+        .join('、')
+
+    return [
+        `结论：${stationLabel}截断推演已完成，影响范围已自动计算。`,
+        '',
+        `影响：共分析 ${total} 个分输站，其中 ${lost} 个断供、${rerouted} 个绕行、${same} 个保持正常；停流管段 ${stoppedEdges} 条，绕行路径管段 ${rerouteEdges} 条。`,
+        '',
+        affectedPreview ? `路径分析：重点受影响节点包括 ${affectedPreview}。地图上红色虚线表示停流/关闭方向，橙色路径表示可绕行链路。` : '路径分析：地图已完成截断点和受影响路径高亮。',
+        '',
+        '建议：汇报时先展示左侧统计卡，再指向地图上的红色停流路径和橙色绕行路径；真实调度使用前，还要补充实时压力、流量和站控边界。',
+        '',
+        '完整性提示：是，已完成 AI 指令触发、地图自动操作、截断推演和结果回传；该结果用于演示，不能直接替代真实调度指令。',
+    ].join('\n')
+}
+
 function buildMultiScenarioSelectorMessage(): string {
     const block: MultiScenarioSelectorBlock = {
         title: '多工况AI Skill',
         hint: '先勾选工况，再点击开始仿真比对。',
-        cases: [
-            {
-                id: 'zhongwei-3000',
-                label: '中卫 3000 万标方/天',
-                description: '基准供气工况，验证常规稳态能跑通。',
-                selected: true,
-            },
-            {
-                id: 'zhongwei-2000',
-                label: '中卫 2000 万标方/天',
-                description: '上游供气下降工况，观察压力、流量和缺口变化。',
-                selected: true,
-            },
-            {
-                id: 'zhongwei-cutoff',
-                label: '中卫截断',
-                description: '上游首段关闭工况，演示故障传播和供气缺口。',
-                selected: true,
-            },
-        ],
+        cases: ZHONGWEI_MULTI_SCENARIO_CASES.map(item => ({
+            id: item.id,
+            label: item.label,
+            description: item.description,
+            selected: true,
+        })),
     }
 
     return [
@@ -395,6 +514,120 @@ function dispatchMultiScenarioAiStart(message: string, selectedScenarioIds?: str
     }
 }
 
+function isSubagentFinalReplyContent(content: string): boolean {
+    const text = stripPrivateThinkBlocks(content).trim()
+    return /^结论[:：]/.test(text)
+        || /^【AI\s*风险诊断报告】/.test(text)
+        || text.includes('Agent证据互证链')
+}
+
+function waitForSubagentFinalReady(timeoutMs = 60000): Promise<boolean> {
+    if ((window as typeof window & { __smartgasSubagentFinalReady?: boolean }).__smartgasSubagentFinalReady) {
+        return Promise.resolve(true)
+    }
+    return new Promise((resolve) => {
+        let done = false
+        let channel: BroadcastChannel | null = null
+        const cleanup = () => {
+            window.removeEventListener('assistant-subagent-demo-final-ready', onReady as EventListener)
+            window.removeEventListener('assistant-multi-scenario-ai-result', onReady as EventListener)
+            window.removeEventListener('message', onMessage)
+            channel?.close()
+            window.clearTimeout(timer)
+        }
+        const finish = (ready: boolean) => {
+            if (done) return
+            done = true
+            cleanup()
+            resolve(ready)
+        }
+        const onReady = () => finish(true)
+        const onMessage = (event: MessageEvent) => {
+            const payload = event.data as { type?: string } | undefined
+            if (
+                payload?.type === 'assistant-subagent-demo-final-ready'
+                || payload?.type === 'assistant-multi-scenario-ai-result'
+            ) finish(true)
+        }
+        const timer = window.setTimeout(() => finish(false), timeoutMs)
+
+        window.addEventListener('assistant-subagent-demo-final-ready', onReady as EventListener)
+        window.addEventListener('assistant-multi-scenario-ai-result', onReady as EventListener)
+        window.addEventListener('message', onMessage)
+        try {
+            channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+            channel.onmessage = (event) => {
+                const payload = event.data as { type?: string } | undefined
+                if (
+                    payload?.type === 'assistant-subagent-demo-final-ready'
+                    || payload?.type === 'assistant-multi-scenario-ai-result'
+                ) finish(true)
+            }
+        } catch {
+            channel = null
+        }
+    })
+}
+
+function dispatchSubagentFinalShown(): void {
+    const detail = { shown: true }
+    window.dispatchEvent(new CustomEvent('assistant-subagent-demo-final-shown', { detail }))
+    if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'assistant-subagent-demo-final-shown', detail }, '*')
+    }
+    try {
+        const channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+        channel.postMessage({ type: 'assistant-subagent-demo-final-shown', detail })
+        channel.close()
+    } catch {
+        // BroadcastChannel is a convenience path for the popped-out assistant.
+    }
+}
+
+function dispatchCutoffShowcaseStart(message: string, target: { station: string; stationLabel: string }): void {
+    const detail = {
+        skillName: 'map-topology-cutoff-showcase',
+        message,
+        station: target.station,
+        stationLabel: target.stationLabel,
+    }
+
+    window.dispatchEvent(new CustomEvent('assistant-start-cutoff-showcase', { detail }))
+    if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'assistant-start-cutoff-showcase', detail }, '*')
+    }
+
+    try {
+        const channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+        channel.postMessage({ type: 'assistant-start-cutoff-showcase', detail })
+        channel.close()
+    } catch {
+        // BroadcastChannel is a convenience path for the popped-out assistant.
+    }
+}
+
+function dispatchNetworkxCutoffShowcaseStart(message: string): void {
+    const detail = {
+        skillName: 'networkx-cutoff-showcase',
+        message,
+        station: 'jingbian',
+        stationLabel: '靖边枢纽',
+    }
+
+    window.dispatchEvent(new CustomEvent('assistant-start-networkx-cutoff-showcase', { detail }))
+    if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'assistant-start-networkx-cutoff-showcase', detail }, '*')
+    }
+
+    try {
+        const channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+        channel.postMessage({ type: 'assistant-start-networkx-cutoff-showcase', detail })
+        channel.close()
+    } catch {
+        // BroadcastChannel is a convenience path for the popped-out assistant.
+    }
+}
+
 export interface UseAiAssistantChatResult {
     messages: ChatMessage[]
     input: string
@@ -417,12 +650,30 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
     const [dataAnalysisMode, setDataAnalysisMode] = useState(false)
     const [subagentMode, setSubagentMode] = useState(false)
     const frontendSkillRunningRef = useRef(false)
+    const cutoffShowcaseRunningRef = useRef(false)
+    const networkxCutoffShowcaseRunningRef = useRef(false)
     const frontendSkillTimeoutRef = useRef<number | null>(null)
+    const cutoffShowcaseTimeoutRef = useRef<number | null>(null)
+    const networkxCutoffShowcaseTimeoutRef = useRef<number | null>(null)
 
     const clearFrontendSkillTimeout = useCallback(() => {
         if (frontendSkillTimeoutRef.current != null) {
             window.clearTimeout(frontendSkillTimeoutRef.current)
             frontendSkillTimeoutRef.current = null
+        }
+    }, [])
+
+    const clearCutoffShowcaseTimeout = useCallback(() => {
+        if (cutoffShowcaseTimeoutRef.current != null) {
+            window.clearTimeout(cutoffShowcaseTimeoutRef.current)
+            cutoffShowcaseTimeoutRef.current = null
+        }
+    }, [])
+
+    const clearNetworkxCutoffShowcaseTimeout = useCallback(() => {
+        if (networkxCutoffShowcaseTimeoutRef.current != null) {
+            window.clearTimeout(networkxCutoffShowcaseTimeoutRef.current)
+            networkxCutoffShowcaseTimeoutRef.current = null
         }
     }, [])
 
@@ -495,12 +746,150 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
         }
     }, [clearFrontendSkillTimeout])
 
+    useEffect(() => {
+        const handleProgress = (detail: CutoffShowcaseEventDetail) => {
+            if (!cutoffShowcaseRunningRef.current) return
+            setMessages((prev) =>
+                updateLastAssistantMessage(prev, (message) => ({
+                    ...message,
+                    content: formatCutoffShowcaseProgress(detail),
+                    thinking: appendThinkingText(message.thinking, detail.message || ''),
+                    isStreaming: true,
+                })),
+            )
+        }
+
+        const handleResult = (detail: CutoffShowcaseEventDetail) => {
+            if (!cutoffShowcaseRunningRef.current) return
+            clearCutoffShowcaseTimeout()
+            cutoffShowcaseRunningRef.current = false
+            setMessages((prev) =>
+                updateLastAssistantMessage(prev, (message) => ({
+                    ...message,
+                    content: formatCutoffShowcaseResult(detail),
+                    thinking: appendThinkingText(message.thinking, detail.message || '地图拓扑截断推演已返回结果。'),
+                    isStreaming: false,
+                })),
+            )
+            setLoading(false)
+            setActiveToolName('')
+        }
+
+        const onProgress = (event: Event) => {
+            handleProgress((event as CustomEvent<CutoffShowcaseEventDetail>).detail || {})
+        }
+        const onResult = (event: Event) => {
+            handleResult((event as CustomEvent<CutoffShowcaseEventDetail>).detail || {})
+        }
+        const onMessage = (event: MessageEvent) => {
+            const payload = event.data as { type?: string; detail?: CutoffShowcaseEventDetail } | undefined
+            if (payload?.type === 'assistant-cutoff-showcase-progress') handleProgress(payload.detail || {})
+            if (payload?.type === 'assistant-cutoff-showcase-result') handleResult(payload.detail || {})
+        }
+
+        let channel: BroadcastChannel | null = null
+        try {
+            channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+            channel.onmessage = (event) => {
+                const payload = event.data as { type?: string; detail?: CutoffShowcaseEventDetail } | undefined
+                if (payload?.type === 'assistant-cutoff-showcase-progress') handleProgress(payload.detail || {})
+                if (payload?.type === 'assistant-cutoff-showcase-result') handleResult(payload.detail || {})
+            }
+        } catch {
+            channel = null
+        }
+
+        window.addEventListener('assistant-cutoff-showcase-progress', onProgress)
+        window.addEventListener('assistant-cutoff-showcase-result', onResult)
+        window.addEventListener('message', onMessage)
+        return () => {
+            clearCutoffShowcaseTimeout()
+            window.removeEventListener('assistant-cutoff-showcase-progress', onProgress)
+            window.removeEventListener('assistant-cutoff-showcase-result', onResult)
+            window.removeEventListener('message', onMessage)
+            channel?.close()
+        }
+    }, [clearCutoffShowcaseTimeout])
+
+    useEffect(() => {
+        const handleProgress = (detail: NetworkxCutoffShowcaseEventDetail) => {
+            if (!networkxCutoffShowcaseRunningRef.current) return
+            setMessages((prev) =>
+                updateLastAssistantMessage(prev, (message) => ({
+                    ...message,
+                    content: formatNetworkxCutoffShowcaseProgress(detail),
+                    thinking: appendThinkingText(message.thinking, detail.message || ''),
+                    isStreaming: true,
+                })),
+            )
+        }
+
+        const handleResult = (detail: NetworkxCutoffShowcaseEventDetail) => {
+            if (!networkxCutoffShowcaseRunningRef.current) return
+            clearNetworkxCutoffShowcaseTimeout()
+            networkxCutoffShowcaseRunningRef.current = false
+            const content = detail.error
+                ? ['结论：NetworkX 靖边截断演示没有跑通。', '', `待确认项：${detail.error}`].join('\n')
+                : (detail.message || '结论：NetworkX 靖边截断演示已完成。')
+            setMessages((prev) =>
+                updateLastAssistantMessage(prev, (message) => ({
+                    ...message,
+                    content,
+                    thinking: appendThinkingText(message.thinking, detail.message || 'NetworkX 靖边截断演示已返回结果。'),
+                    isStreaming: false,
+                })),
+            )
+            setLoading(false)
+            setActiveToolName('')
+        }
+
+        const onProgress = (event: Event) => {
+            handleProgress((event as CustomEvent<NetworkxCutoffShowcaseEventDetail>).detail || {})
+        }
+        const onResult = (event: Event) => {
+            handleResult((event as CustomEvent<NetworkxCutoffShowcaseEventDetail>).detail || {})
+        }
+        const onMessage = (event: MessageEvent) => {
+            const payload = event.data as { type?: string; detail?: NetworkxCutoffShowcaseEventDetail } | undefined
+            if (payload?.type === 'assistant-networkx-cutoff-showcase-progress') handleProgress(payload.detail || {})
+            if (payload?.type === 'assistant-networkx-cutoff-showcase-result') handleResult(payload.detail || {})
+        }
+
+        let channel: BroadcastChannel | null = null
+        try {
+            channel = new BroadcastChannel(AI_ASSISTANT_SYNC_CHANNEL)
+            channel.onmessage = (event) => {
+                const payload = event.data as { type?: string; detail?: NetworkxCutoffShowcaseEventDetail } | undefined
+                if (payload?.type === 'assistant-networkx-cutoff-showcase-progress') handleProgress(payload.detail || {})
+                if (payload?.type === 'assistant-networkx-cutoff-showcase-result') handleResult(payload.detail || {})
+            }
+        } catch {
+            channel = null
+        }
+
+        window.addEventListener('assistant-networkx-cutoff-showcase-progress', onProgress)
+        window.addEventListener('assistant-networkx-cutoff-showcase-result', onResult)
+        window.addEventListener('message', onMessage)
+        return () => {
+            clearNetworkxCutoffShowcaseTimeout()
+            window.removeEventListener('assistant-networkx-cutoff-showcase-progress', onProgress)
+            window.removeEventListener('assistant-networkx-cutoff-showcase-result', onResult)
+            window.removeEventListener('message', onMessage)
+            channel?.close()
+        }
+    }, [clearNetworkxCutoffShowcaseTimeout])
+
     const handleSend = useCallback(async (text?: string, options?: HandleSendOptions) => {
         const nextMessage = (text || input).trim()
         if (!nextMessage || loading) return
 
         const nextModes = resolveModesByCommand(nextMessage, dataAnalysisMode, subagentMode)
         const analysisMode = nextModes.subagentMode ? 'subagents' : 'default'
+        const useSubagentBackendFlow = shouldUseSubagentBackendFlow(nextMessage, nextModes.subagentMode)
+        const waitForManualSubagentSimulation = useSubagentBackendFlow && /(2000|3000|截断|三工况|三种工况)/i.test(nextMessage)
+        if (waitForManualSubagentSimulation) {
+            ;(window as typeof window & { __smartgasSubagentFinalReady?: boolean }).__smartgasSubagentFinalReady = false
+        }
         const historySnapshot = messages
         const visibleMessage = options?.displayText?.trim() || nextMessage
         const userMessage: ChatMessage = { role: 'user', content: visibleMessage }
@@ -523,7 +912,7 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
             setSubagentMode(nextModes.subagentMode)
         }
 
-        if (shouldOpenMultiScenarioSelector(nextMessage)) {
+        if (!useSubagentBackendFlow && shouldOpenMultiScenarioSelector(nextMessage)) {
             setMessages((prev) =>
                 updateLastAssistantMessage(prev, (message) => ({
                     ...message,
@@ -537,7 +926,7 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
             return
         }
 
-        if (shouldExecuteMultiScenarioAi(nextMessage)) {
+        if (!useSubagentBackendFlow && shouldExecuteMultiScenarioAi(nextMessage)) {
             const selectedCount = options?.selectedScenarioIds?.length || 3
             frontendSkillRunningRef.current = true
             setActiveToolName('multi-scenario-ai')
@@ -566,9 +955,84 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
             return
         }
 
+        if (!useSubagentBackendFlow && shouldStartNetworkxCutoffShowcase(nextMessage)) {
+            networkxCutoffShowcaseRunningRef.current = true
+            setActiveToolName('networkx-cutoff-showcase')
+            setMessages((prev) =>
+                updateLastAssistantMessage(prev, (message) => ({
+                    ...message,
+                    content: formatNetworkxCutoffShowcaseProgress({
+                        message: '已识别“全国一张网 + NetworkX 靖边截断”演示意图，准备打开全国网图。',
+                    }),
+                    thinking: appendThinkingText(
+                        message.thinking,
+                        '启动前端演示：目标为靖边枢纽，算法使用后端 NetworkX 原生截断，结果回填全国一张网。',
+                    ),
+                })),
+            )
+            dispatchNetworkxCutoffShowcaseStart(nextMessage)
+            clearNetworkxCutoffShowcaseTimeout()
+            networkxCutoffShowcaseTimeoutRef.current = window.setTimeout(() => {
+                if (!networkxCutoffShowcaseRunningRef.current) return
+                networkxCutoffShowcaseRunningRef.current = false
+                setMessages((prev) =>
+                    updateLastAssistantMessage(prev, (message) => ({
+                        ...message,
+                        content: ['结论：NetworkX 靖边截断演示没有返回结果。', '', '待确认项：全国一张网页面没有在限定时间内返回截断推演结果。'].join('\n'),
+                        isStreaming: false,
+                    })),
+                )
+                setLoading(false)
+                setActiveToolName('')
+            }, 60000)
+            return
+        }
+
+        const cutoffShowcaseTarget = detectCutoffShowcaseStation(nextMessage)
+        if (!useSubagentBackendFlow && cutoffShowcaseTarget) {
+            cutoffShowcaseRunningRef.current = true
+            setActiveToolName('map-topology-cutoff-showcase')
+            setMessages((prev) =>
+                updateLastAssistantMessage(prev, (message) => ({
+                    ...message,
+                    content: formatCutoffShowcaseProgress({
+                        station: cutoffShowcaseTarget.station,
+                        stationLabel: cutoffShowcaseTarget.stationLabel,
+                        message: '已识别截断推演演示意图，准备联动地图拓扑页面。',
+                    }),
+                    thinking: appendThinkingText(
+                        message.thinking,
+                        `启动前端演示：目标截断点 ${cutoffShowcaseTarget.stationLabel}，准备打开地图拓扑、切换截断面板并运行推演。`,
+                    ),
+                })),
+            )
+            dispatchCutoffShowcaseStart(nextMessage, cutoffShowcaseTarget)
+            clearCutoffShowcaseTimeout()
+            cutoffShowcaseTimeoutRef.current = window.setTimeout(() => {
+                if (!cutoffShowcaseRunningRef.current) return
+                cutoffShowcaseRunningRef.current = false
+                setMessages((prev) =>
+                    updateLastAssistantMessage(prev, (message) => ({
+                        ...message,
+                        content: formatCutoffShowcaseResult({
+                            station: cutoffShowcaseTarget.station,
+                            stationLabel: cutoffShowcaseTarget.stationLabel,
+                            error: '地图拓扑页面没有在限定时间内返回截断推演结果。',
+                        }),
+                        isStreaming: false,
+                    })),
+                )
+                setLoading(false)
+                setActiveToolName('')
+            }, 60000)
+            return
+        }
+
         try {
             const stream = fetchChatStream(nextMessage, historySnapshot, pageContext, analysisMode)
             let fullReply = ''
+            let deferredSubagentFinalReply = ''
+            let subagentFinalDeferred = false
             let answerStarted = false
             let insidePrivateThink = false
 
@@ -576,6 +1040,24 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
                 if (chunk.type === 'REPLY') {
                     const filtered = splitPrivateThinkFromChunk(chunk.content, insidePrivateThink)
                     insidePrivateThink = filtered.insidePrivateThink
+                    if (
+                        useSubagentBackendFlow
+                        && waitForManualSubagentSimulation
+                        && (subagentFinalDeferred || isSubagentFinalReplyContent(filtered.publicContent))
+                    ) {
+                        deferredSubagentFinalReply += filtered.publicContent
+                        subagentFinalDeferred = true
+                        setMessages((prev) =>
+                            updateLastAssistantMessage(prev, (message) => ({
+                                ...message,
+                                thinking: appendThinkingText(
+                                    message.thinking,
+                                    '主 Agent 已收到最终材料，等待三工况仿真完成后再统一输出结论。',
+                                ),
+                            })),
+                        )
+                        continue
+                    }
                     const split = splitReplyForDisplay(filtered.publicContent, answerStarted)
                     answerStarted = split.answerStarted
                     if (split.reply) {
@@ -637,6 +1119,37 @@ export function useAiAssistantChat(): UseAiAssistantChatResult {
                 if (chunk.type === 'DONE') {
                     break
                 }
+            }
+
+            if (deferredSubagentFinalReply.trim()) {
+                const finalReplyToRelease = deferredSubagentFinalReply
+                const replyPrefix = fullReply
+                setMessages((prev) =>
+                    updateLastAssistantMessage(prev, (message) => ({
+                        ...message,
+                        isStreaming: false,
+                        thinking: appendThinkingText(
+                            message.thinking,
+                            '最终答复已暂存：等待三工况仿真完成信号，随后自动显示主 Agent 汇总结论。',
+                        ),
+                    })),
+                )
+                void (async () => {
+                    await waitForSubagentFinalReady()
+                    setMessages((prev) =>
+                        updateLastAssistantMessage(prev, (message) => ({
+                            ...message,
+                            content: `${replyPrefix}${finalReplyToRelease}`,
+                            thinking: appendThinkingText(
+                                message.thinking,
+                                '三工况仿真已完成，主 Agent 汇总结论已输出。',
+                            ),
+                            isStreaming: false,
+                        })),
+                    )
+                    dispatchSubagentFinalShown()
+                })()
+                return
             }
 
             setMessages((prev) =>

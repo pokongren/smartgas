@@ -25,6 +25,7 @@ from app.routers.topology_simulation import (
 )
 from app.services.ai_sim_evaluator import evaluate_simulation_result_text
 from app.services.raw_excel_ai_index import STATION_TYPE_LABELS, raw_excel_ai_index
+from app.services.simulation_scenarios import get_zhongwei_multi_scenario_cases
 from app.services.topology import TopologyService
 from app.services.topology_simulation import solve_steady
 from app.services.we1_result_snapshot_service import get_snapshot, save_snapshot
@@ -405,8 +406,38 @@ def _looks_like_knowledge_query(query: str) -> bool:
     return any(k in text for k in keywords)
 
 
-def _expand_knowledge_query(query: str, doc_type: str = "") -> list[str]:
+def _normalize_knowledge_query(query: str) -> str:
     text = str(query or "").strip()
+    return text.replace("棺材", "管材")
+
+
+PIPELINE_KNOWLEDGE_ALIASES: dict[str, tuple[str, ...]] = {
+    "西气东输一线": ("西一线",),
+    "西一线": ("西气东输一线",),
+    "西气东输二线": ("西二线",),
+    "西二线": ("西气东输二线",),
+    "西气东输三线": ("西三线",),
+    "西三线": ("西气东输三线",),
+    "中俄东线": ("中俄",),
+    "中俄": ("中俄东线",),
+    "中贵线": (),
+    "陕京": ("陕京线",),
+    "涩宁兰": ("涩宁兰线", "涩宁兰管道"),
+    "忠武": ("忠武线", "忠武管道"),
+    "泰青威": ("泰青威管道",),
+    "川气东送": ("川气东送一线", "川气东送二线"),
+    "冀宁": ("冀宁线", "冀宁管道"),
+    "中缅": ("中缅线", "中缅管道"),
+    "榆济": ("榆济线", "榆济管道"),
+    "兰银": ("兰银线", "兰银管道"),
+    "广南": ("广南支干线",),
+    "广深": ("广深支干线",),
+    "上海支干线": ("上海支线",),
+}
+
+
+def _expand_knowledge_query(query: str, doc_type: str = "") -> list[str]:
+    text = _normalize_knowledge_query(query)
     if not text:
         return []
 
@@ -431,9 +462,32 @@ def _expand_knowledge_query(query: str, doc_type: str = "") -> list[str]:
     else:
         expanded.append(f"{text} {' '.join(operation_terms)}")
 
-    for term in ("西气东输三线", "西三线", "西气东输一线", "西一线", "陕京", "中卫", "靖边", "甪直"):
+    for term in (
+        "西气东输三线",
+        "西三线",
+        "西气东输二线",
+        "西二线",
+        "西气东输一线",
+        "西一线",
+        "中俄东线",
+        "中贵线",
+        "陕京",
+        "涩宁兰",
+        "忠武",
+        "泰青威",
+        "川气东送",
+        "冀宁",
+        "中缅",
+        "榆济",
+        "兰银",
+        "中卫",
+        "靖边",
+        "甪直",
+    ):
         if term in text:
             expanded.append(f"{term} {text}")
+    if any(term in compact for term in ("管材", "材质", "钢级", "钢管", "用管", "材料")):
+        expanded.append(f"{text} 干线 支线 管材 钢级")
 
     return list(dict.fromkeys(item for item in expanded if item.strip()))
 
@@ -454,20 +508,25 @@ def _compact_doc_excerpt(doc: str, max_chars: int = 650) -> str:
 
 
 def _knowledge_lexical_terms(query: str) -> list[str]:
-    text = str(query or "")
-    aliases = {
-        "西气东输三线": ("西三线",),
-        "西三线": ("西气东输三线",),
-        "西气东输一线": ("西一线",),
-        "西一线": ("西气东输一线",),
-        "西气东输二线": ("西二线",),
-        "西二线": ("西气东输二线",),
-    }
+    text = _normalize_knowledge_query(query)
     terms: set[str] = set()
-    for term, alias_items in aliases.items():
+    for term, alias_items in PIPELINE_KNOWLEDGE_ALIASES.items():
         if term in text:
             terms.add(term)
             terms.update(alias_items)
+    for term in (
+        "管材",
+        "材质",
+        "钢级",
+        "钢管",
+        "干线",
+        "支线",
+        "联络线",
+        "中卫",
+        "甪直",
+    ):
+        if term in text:
+            terms.add(term)
     compound_terms = {
         "失效": ("关键站场失效", "站场失效", "功能失效", "全站失效"),
         "泄漏": ("站场泄漏", "管道泄漏", "泄漏火灾爆炸"),
@@ -524,6 +583,85 @@ def _score_knowledge_doc(query: str, doc: str, meta: dict[str, Any]) -> int:
     if ("泄漏" in query or "火灾" in query or "爆炸" in query) and "泄漏、火灾、爆炸" in doc:
         score += 35
     return score
+
+
+def _knowledge_required_term_groups(query: str) -> list[tuple[str, ...]]:
+    text = _search_key(_normalize_knowledge_query(query))
+    groups: list[tuple[str, ...]] = []
+    for term, alias_items in PIPELINE_KNOWLEDGE_ALIASES.items():
+        if _search_key(term) in text:
+            groups.append((term, *alias_items))
+    if "中卫" in text:
+        groups.append(("中卫",))
+    if "甪直" in text:
+        groups.append(("甪直",))
+    if any(term in text for term in ("管材", "材质", "钢级", "钢管", "用管", "材料")):
+        groups.append((
+            "管材",
+            "材质",
+            "钢级",
+            "钢管",
+            "管道材料",
+            "l245",
+            "l290",
+            "l360",
+            "l415",
+            "l450",
+            "l485",
+            "x42",
+            "x52",
+            "x60",
+            "x65",
+            "x70",
+            "x80",
+        ))
+    if any(term in text for term in ("壁厚", "厚度")):
+        groups.append(("壁厚", "厚度"))
+    if any(term in text for term in ("管径", "直径", "口径")):
+        groups.append(("管径", "直径", "口径", "dn"))
+    if any(term in text for term in ("保护定值", "设定值", "报警值", "超压保护", "低压保护")):
+        groups.append(("保护定值", "保护设定值", "设定值", "报警值", "超压", "低压"))
+    return groups
+
+
+def _knowledge_hit_matches_required_terms(query: str, hit: dict[str, Any]) -> bool:
+    groups = _knowledge_required_term_groups(query)
+    if not groups:
+        return True
+    query_key = _search_key(_normalize_knowledge_query(query))
+    source_key = _search_key(hit.get("source") or "")
+    strict_source_groups = (
+        ("西气东输一线", "西一线"),
+        ("西气东输二线", "西二线"),
+        ("西气东输三线", "西三线"),
+        ("中俄东线", "中俄"),
+        ("中贵线",),
+        ("涩宁兰",),
+        ("忠武",),
+        ("泰青威",),
+        ("川气东送",),
+        ("冀宁",),
+        ("中缅",),
+        ("榆济",),
+        ("兰银",),
+    )
+    is_material_query = any(term in query_key for term in ("管材", "材质", "钢级", "钢管", "材料"))
+    if is_material_query:
+        for group in strict_source_groups:
+            group_keys = [_search_key(term) for term in group]
+            if any(key and key in query_key for key in group_keys):
+                if not any(key and key in source_key for key in group_keys):
+                    return False
+    haystack = _search_key(
+        " ".join(
+            [
+                str(hit.get("source") or ""),
+                str(hit.get("type") or ""),
+                str(hit.get("excerpt") or ""),
+            ]
+        )
+    )
+    return all(any(_search_key(term) in haystack for term in group) for group in groups)
 
 
 def _lexical_knowledge_hits(rag_service: Any, query: str, metadata_filter: dict[str, str] | None, limit: int) -> list[dict[str, Any]]:
@@ -1009,7 +1147,7 @@ def _handle_simulate_failure(args: dict, session: Session) -> str:
 
 def _handle_search_knowledge_base(args: dict, session: Session) -> str:
     """查询结构化 PDF 操作规程与应急预案库"""
-    query = str(args.get("query", "") or "").strip()
+    query = _normalize_knowledge_query(args.get("query", ""))
     if not query:
         return "请提供要查询的具体问题或关键字。"
     limit = _limit_int(args.get("limit"), default=8, minimum=3, maximum=12)
@@ -1022,8 +1160,11 @@ def _handle_search_knowledge_base(args: dict, session: Session) -> str:
 
         hits: list[dict[str, Any]] = []
         seen: set[tuple[str, str, str]] = set()
+        candidate_limit = max(limit * 4, 20)
 
-        for hit in _lexical_knowledge_hits(rag_service, query, metadata_filter, limit):
+        for hit in _lexical_knowledge_hits(rag_service, query, metadata_filter, candidate_limit):
+            if not _knowledge_hit_matches_required_terms(query, hit):
+                continue
             key = (hit["source"], hit["type"], hit["chunk"])
             if key in seen:
                 continue
@@ -1037,11 +1178,11 @@ def _handle_search_knowledge_base(args: dict, session: Session) -> str:
                 break
             vector_result = rag_service.query_vector_db(
                 candidate_query,
-                n_results=limit,
+                n_results=candidate_limit,
                 metadata_filter=metadata_filter,
             )
             if (not vector_result or not vector_result.get("documents")) and metadata_filter:
-                vector_result = rag_service.query_vector_db(candidate_query, n_results=limit)
+                vector_result = rag_service.query_vector_db(candidate_query, n_results=candidate_limit)
             if not vector_result or not vector_result.get("documents"):
                 continue
             docs = vector_result.get("documents", [])
@@ -1055,14 +1196,17 @@ def _handle_search_knowledge_base(args: dict, session: Session) -> str:
                 key = (source, hit_type, chunk_idx)
                 if key in seen:
                     continue
-                seen.add(key)
-                hits.append({
+                candidate_hit = {
                     "source": source,
                     "type": hit_type,
                     "chunk": chunk_idx,
                     "distance": distances[i] if i < len(distances) else None,
                     "excerpt": _compact_doc_excerpt(doc),
-                })
+                }
+                if not _knowledge_hit_matches_required_terms(query, candidate_hit):
+                    continue
+                seen.add(key)
+                hits.append(candidate_hit)
                 if len(hits) >= limit:
                     break
             if len(hits) >= limit:
@@ -1709,54 +1853,12 @@ def _handle_run_steady_sim(args: dict, session: Session) -> str:
 
 def _handle_compare_zhongwei_multi_scenarios(args: dict, session: Session) -> str:
     pilot_id = str(args.get("pilot_id") or "zhongwei_shanghai_baihe").strip() or "zhongwei_shanghai_baihe"
-    cases = [
-        {
-            "label": "中卫 3000 万标方/天",
-            "input": {
-                "node_overrides": [{
-                    "node_id": "WE1-76",
-                    "supply_max": 3000,
-                    "nominal_flow": 3000,
-                    "supply_nominal": 3000,
-                    "target_pressure_mpa": 9.8,
-                }],
-            },
-        },
-        {
-            "label": "中卫 2000 万标方/天",
-            "input": {
-                "node_overrides": [{
-                    "node_id": "WE1-76",
-                    "supply_max": 2000,
-                    "nominal_flow": 2000,
-                    "supply_nominal": 2000,
-                    "target_pressure_mpa": 9.8,
-                }],
-            },
-        },
-        {
-            "label": "中卫截断",
-            "input": {
-                "node_overrides": [{
-                    "node_id": "WE1-76",
-                    "supply_max": 0,
-                    "nominal_flow": 0,
-                    "supply_nominal": 0,
-                    "target_pressure_mpa": 0,
-                }],
-                "edge_overrides": [{
-                    "edge_id": "WE1-T-76",
-                    "flow_rate": 0,
-                    "status": "closed",
-                }],
-            },
-        },
-    ]
+    cases = get_zhongwei_multi_scenario_cases()
 
     rows: list[dict[str, Any]] = []
     for case in cases:
         solver_input = _build_solver_input_or_raise(pilot_id, session)
-        raw_initial = case["input"]
+        raw_initial = case["initial_input"]
         if hasattr(InitialConditionsInput, "model_validate"):
             initial_conditions = InitialConditionsInput.model_validate(raw_initial)
         else:
@@ -1984,7 +2086,7 @@ def _handle_compare_stations(args: dict, session: Session) -> str:
     ][:5]
 
     if len(station_names) < 2:
-        return '请至少提供两个站场名称，用逗号分隔，如：璒直分输站,中卫分输站'
+        return '请至少提供两个站场名称，用逗号分隔，如：甪直分输站,中卫分输站'
 
     METRIC_LABEL = {
         'pressure': ('pressure', '压力', 'MPa'),
@@ -2007,7 +2109,7 @@ def _handle_compare_stations(args: dict, session: Session) -> str:
                     sc, station_ref, metric_types=(metric_type,)
                 )
                 if not resolved:
-                    result['hint'] = hint or '未匹配到展场'
+                    result['hint'] = hint or '未匹配到站场'
                     return result
                 records = _fetch_scada_metric_records(sc, resolved, metric_type, hours=hours)
                 if not records:
@@ -2039,7 +2141,7 @@ def _handle_compare_stations(args: dict, session: Session) -> str:
     for m in selected_metrics:
         _, label, unit = METRIC_LABEL[m]
         output_lines.append('## ' + label + '对比（' + unit + '）\n')
-        output_lines.append('  站场                最新値    最小値    最大値    近6h变化    数据点')
+        output_lines.append('  站场                最新值    最小值    最大值    近6h变化    数据点')
         output_lines.append('-' * 62)
 
         valid: list = []
@@ -2074,17 +2176,17 @@ def _handle_compare_stations(args: dict, session: Session) -> str:
                     '[温度] ' + hi_name + '最高(' + f"{hi_r['latest']:.1f}" + unit + ')，'
                     + lo_name + '最低(' + f"{lo_r['latest']:.1f}" + unit + ')，'
                     + ('温差' + f'{diff:.1f}' + unit + '，差异较大。'
-                       if diff > 5 else '差多' + f'{diff:.1f}' + unit + '，正常。')
+                       if diff > 5 else '相差' + f'{diff:.1f}' + unit + '，正常。')
                 )
             elif m == 'dewpoint':
                 advice = (
                     '[水露点] ' + hi_name + '最高(' + f"{hi_r['latest']:.1f}" + unit + ')，'
                     + lo_name + '最低(' + f"{lo_r['latest']:.1f}" + unit + ')，'
-                    + ('差値' + f'{diff:.1f}' + unit + '，请复核' + hi_name + '脱水效果。'
-                       if diff > 3 else '相近，差値' + f'{diff:.1f}' + unit + '，正常。')
+                    + ('差值' + f'{diff:.1f}' + unit + '，请复核' + hi_name + '脱水效果。'
+                       if diff > 3 else '相近，差值' + f'{diff:.1f}' + unit + '，正常。')
                 )
             else:
-                advice = '[' + label + '] 最高展场:' + hi_name + '，最低:' + lo_name
+                advice = '[' + label + '] 最高站场:' + hi_name + '，最低:' + lo_name
             dispatch.append(advice)
 
     if dispatch:

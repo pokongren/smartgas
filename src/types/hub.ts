@@ -130,6 +130,16 @@ export interface ProcessValve {
 
   /** 图标旋转角度 */
   angle?: number
+
+  /** 站内截断演示动作 */
+  cutoffAction?: {
+    /** 动作阶段 ID，如 we1 / sj2 / sj4 */
+    stage: string
+    /** 按钮文案 */
+    label: string
+    /** 动作说明 */
+    description?: string
+  }
 }
 
 /**

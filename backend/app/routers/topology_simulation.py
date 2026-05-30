@@ -84,6 +84,7 @@ class SolveFailureRequest(BaseModel):
 class SaveSnapshotRequest(BaseModel):
     pilot_id: str
     scenario_id: str = "steady_base"
+    initial_conditions: Optional[InitialConditionsInput] = None
 
 
 def _sanitize_query_value(value: Any) -> Any:
@@ -291,6 +292,7 @@ def get_simulation_overlay(
 @router.post("/topology-simulation/snapshots")
 def create_simulation_snapshot(req: SaveSnapshotRequest, session: Session = Depends(get_session)) -> Dict[str, Any]:
     solver_input = _build_solver_input_or_raise(req.pilot_id, session)
+    _apply_initial_conditions(solver_input, req.scenario_id, req.initial_conditions)
 
     try:
         result = solve_steady(seed=solver_input, scenario_id=req.scenario_id, pilot_id=req.pilot_id)

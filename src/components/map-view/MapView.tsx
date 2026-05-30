@@ -116,6 +116,8 @@ function MapView({
     onDeviceClick,
     simulationOverlay,
     simulationCutoffEdgeIds,
+    networkxCutoffOverlay,
+    onStationProcessCutoff,
     nodeDisplayMode = 'full',
     hubNodeTypes = ['source', 'compressor', 'junction', 'distribution'],
     showValveRooms,
@@ -129,6 +131,7 @@ function MapView({
     const isInitializedRef = useRef(false)
     const lineOverlaysRef = useRef<any[]>([])
     const nodeOverlaysRef = useRef<any[]>([])
+    const cutoffHubHitOverlaysRef = useRef<any[]>([])
     const [renderTrigger, setRenderTrigger] = useState(0)
     const [selectedCluster, setSelectedCluster] = useState<ClusterGroup | null>(null)
     const [isClusterPanelVisible, setIsClusterPanelVisible] = useState(false)
@@ -224,6 +227,7 @@ function MapView({
                 || (hubNode.name.includes('中卫') && node.name?.includes('中卫'))
                 || (hubNode.name.includes('甪直') && node.name?.includes('甪直'))
                 || (hubNode.name.includes('靖边') && node.name?.includes('靖边'))
+                || (hubNode.name.includes('广州') && node.name?.includes('广州'))
             )
         )
     }, [effectivePipelineData, showDemoHubNodes])
@@ -590,7 +594,7 @@ function MapView({
                             originalEvent: e
                         }) : undefined,
                         abortController.signal,
-                        { simulationOverlay, cutoffEdgeIds: simulationCutoffEdgeIds }
+                        { simulationOverlay, cutoffEdgeIds: simulationCutoffEdgeIds, networkxCutoffOverlay }
                     )
                     if (!abortController.signal.aborted) {
                         lineOverlaysRef.current = lineOverlays
@@ -628,7 +632,7 @@ function MapView({
         return () => {
             abortController.abort()
         }
-    }, [effectivePipelineData, mapInstance, simulationOverlay, simulationCutoffEdgeIds])
+    }, [effectivePipelineData, mapInstance, simulationOverlay, simulationCutoffEdgeIds, networkxCutoffOverlay])
 
     /**
      * 仿真覆盖层着色
@@ -696,6 +700,7 @@ function MapView({
                                 || (hubNode.name.includes('中卫') && e.node.name?.includes('中卫'))
                                 || (hubNode.name.includes('甪直') && e.node.name?.includes('甪直'))
                                 || (hubNode.name.includes('靖边') && e.node.name?.includes('靖边'))
+                                || (hubNode.name.includes('广州') && e.node.name?.includes('广州'))
                             )
                             if (matchedHubNode) {
                                 setSelectedHubNode(matchedHubNode)
@@ -729,6 +734,55 @@ function MapView({
             abortController.abort()
         }
     }, [effectivePipelineData, mapInstance, renderTrigger, handleClusterClick, visibleHubNodes])
+
+    useEffect(() => {
+        const AMap = (window as any).AMap
+        const map = mapInstanceRef.current
+        clearMapOverlays(map, cutoffHubHitOverlaysRef.current)
+        cutoffHubHitOverlaysRef.current = []
+
+        if (!AMap || !map || !networkxCutoffOverlay?.cutoffNodeIds?.length) return
+
+        const cutoffNodeIds = new Set(networkxCutoffOverlay.cutoffNodeIds)
+        const nodeById = new Map((effectivePipelineData?.nodes || []).map(node => [node.id, node]))
+        const hitOverlays = visibleHubNodes
+            .filter(hubNode => cutoffNodeIds.has(hubNode.id))
+            .map(hubNode => {
+                const coordinate = hubNode.coordinate
+                const marker = new AMap.Marker({
+                    position: [coordinate.longitude, coordinate.latitude],
+                    content: '<div style="width:96px;height:56px;border-radius:999px;background:rgba(255,255,255,0.01);cursor:pointer;"></div>',
+                    offset: new AMap.Pixel(-48, -28),
+                    zIndex: 320,
+                    clickable: true,
+                    bubble: false,
+                    cursor: 'pointer',
+                    extData: { hubNode, isCutoffHubHitArea: true },
+                    zooms: [2, 30],
+                })
+                marker.on('click', () => {
+                    setSelectedHubNode(hubNode)
+                    const pipelineNode = nodeById.get(hubNode.id)
+                    if (pipelineNode) {
+                        callbacksRef.current.onNodeClick?.({
+                            type: 'node',
+                            targetId: pipelineNode.id,
+                            data: pipelineNode,
+                            originalEvent: null,
+                        })
+                    }
+                })
+                map.add(marker)
+                return marker
+            })
+
+        cutoffHubHitOverlaysRef.current = hitOverlays
+
+        return () => {
+            clearMapOverlays(map, hitOverlays)
+            cutoffHubHitOverlaysRef.current = []
+        }
+    }, [effectivePipelineData, mapInstance, networkxCutoffOverlay, visibleHubNodes])
 
     return (
         <div className={`${styles.mapContainer} ${className}`} style={style}>
@@ -795,6 +849,7 @@ function MapView({
                 onPipelineClick={(pipelineId) => {
                     console.log('点击管线:', pipelineId)
                 }}
+                onCutoffStage={onStationProcessCutoff}
             />
         </div>
     )

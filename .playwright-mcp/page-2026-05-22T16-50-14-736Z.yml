@@ -1,0 +1,82 @@
+- generic [ref=e2]:
+  - button "呼出页面入口" [ref=e4]:
+    - generic [ref=e5]: apps
+  - button "smart_toy" [ref=e6]:
+    - generic [ref=e7]: smart_toy
+  - generic [ref=e128]:
+    - generic [ref=e130]:
+      - generic [ref=e131]:
+        - heading "public 智脉平台-全国管网统一视图" [level=1] [ref=e132]:
+          - generic [ref=e133]: public
+          - text: 智脉平台-全国管网统一视图
+        - paragraph [ref=e134]: "站场: 0 | 管道段: 0 | 管线组: 0"
+      - generic [ref=e135]:
+        - button "science 仿真" [ref=e136]:
+          - generic [ref=e137]: science
+          - generic [ref=e138]: 仿真
+        - button "filter_alt 展示" [ref=e139]:
+          - generic [ref=e140]: filter_alt
+          - generic [ref=e141]: 展示
+        - button "account_tree 靖边截断" [ref=e142]:
+          - generic [ref=e143]: account_tree
+          - generic [ref=e144]: 靖边截断
+        - button "dark_mode 深色" [ref=e145]:
+          - generic [ref=e146]: dark_mode
+          - generic [ref=e147]: 深色
+        - button "hub 枢纽精简 4 expand_more" [ref=e149]:
+          - generic [ref=e150]: hub
+          - generic [ref=e151]: 枢纽精简
+          - generic [ref=e152]: "4"
+          - generic [ref=e153]: expand_more
+    - generic [ref=e155]:
+      - iframe [ref=e156]:
+        
+      - generic [ref=e158]:
+        - generic:
+          - generic [ref=e161]: 北京市
+          - generic [ref=e163]: 天津市
+          - generic [ref=e165]: 河北省
+          - generic [ref=e167]: 山西省
+          - generic [ref=e169]: 内蒙古自治区
+          - generic [ref=e171]: 辽宁省
+          - generic [ref=e173]: 吉林省
+          - generic [ref=e175]: 黑龙江省
+          - generic [ref=e177]: 上海市
+          - generic [ref=e179]: 江苏省
+          - generic [ref=e181]: 浙江省
+          - generic [ref=e183]: 安徽省
+          - generic [ref=e185]: 福建省
+          - generic [ref=e187]: 江西省
+          - generic [ref=e189]: 山东省
+          - generic [ref=e191]: 河南省
+          - generic [ref=e193]: 湖北省
+          - generic [ref=e195]: 湖南省
+          - generic [ref=e197]: 广东省
+          - generic [ref=e199]: 广西壮族自治区
+          - generic [ref=e201]: 海南省
+          - generic [ref=e203]: 重庆市
+          - generic [ref=e205]: 四川省
+          - generic [ref=e207]: 贵州省
+          - generic [ref=e209]: 云南省
+          - generic [ref=e211]: 西藏自治区
+          - generic [ref=e213]: 陕西省
+          - generic [ref=e215]: 甘肃省
+          - generic [ref=e217]: 青海省
+          - generic [ref=e219]: 宁夏回族自治区
+          - generic [ref=e221]: 新疆维吾尔自治区
+          - generic [ref=e223]: 台湾省
+          - generic [ref=e225]: 香港特别行政区
+          - generic [ref=e227]: 澳门特别行政区
+      - generic:
+        - img
+      - generic [ref=e228]: © 2026 AutoNavi - GS(2019)756号
+    - generic [ref=e229]:
+      - generic "按住标题栏可拖动管线目录" [ref=e230]:
+        - heading "toc 管线目录" [level=3] [ref=e231]:
+          - generic [ref=e232]: toc
+          - text: 管线目录
+        - generic [ref=e233]:
+          - button "全选" [active] [ref=e234]
+          - button "全部取消" [ref=e235]
+          - button "复原" [ref=e236]
+      - generic "拖动调整管线目录宽高" [ref=e238]

@@ -1,0 +1,95 @@
+- generic [ref=e2]:
+  - button "呼出页面入口" [ref=e4]:
+    - generic [ref=e5]: apps
+  - button "smart_toy" [ref=e6]:
+    - generic [ref=e7]: smart_toy
+  - generic [ref=e8]:
+    - banner [ref=e9]:
+      - generic [ref=e10]:
+        - generic [ref=e12]: propane
+        - heading "智脉平台-智慧管网 政企版" [level=2] [ref=e13]
+      - navigation [ref=e14]:
+        - button "概览" [ref=e15]
+        - button "管网维护" [ref=e16]
+        - button "应急响应" [ref=e17]
+        - button "数据报表" [ref=e18]
+      - generic [ref=e19]:
+        - button "notifications" [ref=e20]:
+          - generic [ref=e21]: notifications
+        - button "settings" [ref=e22]:
+          - generic [ref=e23]: settings
+    - main [ref=e26]:
+      - generic [ref=e28]:
+        - iframe [ref=e29]:
+          
+        - generic [ref=e31]:
+          - generic:
+            - generic [ref=e34]: 福建省
+            - generic [ref=e36]: 江西省
+            - generic [ref=e38]: 湖南省
+            - generic [ref=e40]: 广东省
+            - generic [ref=e42]: 广西壮族自治区
+            - generic [ref=e44]: 海南省
+            - generic [ref=e46]: 贵州省
+            - generic [ref=e48]: 云南省
+            - generic [ref=e50]: 台湾省
+            - generic [ref=e52]: 香港特别行政区
+            - generic [ref=e54]: 澳门特别行政区
+        - generic:
+          - img
+        - generic [ref=e55]: © 2026 AutoNavi - GS(2019)756号
+      - generic:
+        - generic [ref=e56]:
+          - generic [ref=e58]:
+            - generic [ref=e60]: search
+            - textbox "搜索管段、站场或区域..." [ref=e61]
+            - button "tune" [ref=e63]:
+              - generic [ref=e64]: tune
+          - generic [ref=e65]:
+            - generic [ref=e66]:
+              - button "add" [ref=e67]:
+                - generic [ref=e68]: add
+              - button "remove" [ref=e69]:
+                - generic [ref=e70]: remove
+            - button "my_location" [ref=e71]:
+              - generic [ref=e72]: my_location
+        - generic [ref=e74]:
+          - generic [ref=e75]:
+            - heading "图例" [level=3] [ref=e76]
+            - button "info" [ref=e77]:
+              - generic [ref=e78]: info
+          - generic [ref=e79]:
+            - generic [ref=e80] [cursor=pointer]:
+              - generic [ref=e83]: 运行中
+              - generic [ref=e84]: check_circle
+            - generic [ref=e85] [cursor=pointer]:
+              - generic [ref=e88]: 维护中
+              - generic [ref=e89]: engineering
+            - generic [ref=e90] [cursor=pointer]:
+              - generic [ref=e91]:
+                - generic [ref=e92]: warning
+                - generic [ref=e93]: 严重告警
+              - generic [ref=e94]: 新
+    - contentinfo [ref=e95]:
+      - generic [ref=e96]:
+        - generic [ref=e97]:
+          - generic [ref=e98] [cursor=pointer]:
+            - generic [ref=e100]: health_metrics
+            - generic [ref=e101]:
+              - paragraph [ref=e102]: 系统健康度
+              - generic [ref=e103]:
+                - paragraph [ref=e104]: 98.4%
+                - generic [ref=e105]: 优
+          - generic [ref=e107] [cursor=pointer]:
+            - generic [ref=e109]: timeline
+            - generic [ref=e110]:
+              - paragraph [ref=e111]: 运行管线总长
+              - paragraph [ref=e112]: 42,300 km
+          - generic [ref=e114] [cursor=pointer]:
+            - generic [ref=e116]: speed
+            - generic [ref=e117]:
+              - paragraph [ref=e118]: 平均压力
+              - paragraph [ref=e119]: 8.5 MPa
+        - button "description 生成报表" [ref=e121]:
+          - generic [ref=e122]: description
+          - text: 生成报表

@@ -62,7 +62,7 @@ interface UseSimulationReturn {
   refreshSnapshots: () => Promise<void>
   loadSelectedSnapshot: () => Promise<void>
   loadSnapshotByRunId: (runId: string) => Promise<void>
-  runTrialScenario: (scenarioId: string) => Promise<void>
+  runTrialScenario: (scenarioId: string, options?: { initialInput?: SimulationInitialInput }) => Promise<SimulationOverlay | null>
   runMissingTrialScenarios: () => Promise<void>
   hydrateFromContext: (context: {
     scenarioId?: string
@@ -291,13 +291,13 @@ export function useSimulation({
 
       // Start animation loop
       const solverIterations = Math.max(1, data.iterations ?? 1)
-      const totalIters = Math.max(6, solverIterations * 3)
+      const totalIters = Math.max(8, Math.ceil(solverIterations * 3.5))
       setAnimatingState({ active: true, iteration: 1, total: totalIters, solverIterations, prevOverlay })
       
       const animateTicks = async () => {
         for (let i = 1; i <= totalIters; i++) {
           setAnimatingState({ active: true, iteration: i, total: totalIters, solverIterations, prevOverlay })
-          await new Promise(r => setTimeout(r, 200)) // 200ms per tick
+          await new Promise(r => setTimeout(r, 240)) // 展示用 tick，略慢一些方便看清求解过程
         }
         setAnimatingState(null)
       }
@@ -341,7 +341,7 @@ export function useSimulation({
   const persistScenarioSnapshot = useCallback(
     async (
       scenarioId: string,
-      options?: { syncCurrentScenario?: boolean; refreshSnapshotList?: boolean },
+      options?: { syncCurrentScenario?: boolean; refreshSnapshotList?: boolean; initialInput?: SimulationInitialInput },
     ): Promise<SimulationSnapshotRecord> => {
       const syncCurrentScenario = options?.syncCurrentScenario ?? true
       const refreshSnapshotList = options?.refreshSnapshotList ?? true
@@ -358,6 +358,7 @@ export function useSimulation({
           body: JSON.stringify({
             pilot_id: pilotId,
             scenario_id: scenarioId,
+            initial_conditions: options?.initialInput,
           }),
         })
 
@@ -387,14 +388,16 @@ export function useSimulation({
     await persistScenarioSnapshot(currentScenario, { syncCurrentScenario: true })
   }, [currentScenario, persistScenarioSnapshot])
 
-  const runTrialScenario = useCallback(async (scenarioId: string) => {
+  const runTrialScenario = useCallback(async (scenarioId: string, options?: { initialInput?: SimulationInitialInput }): Promise<SimulationOverlay | null> => {
     setTrialRunScenarioId(scenarioId)
     setError(null)
     setSnapshotError(null)
 
     try {
-      await persistScenarioSnapshot(scenarioId, { syncCurrentScenario: true })
+      const snapshot = await persistScenarioSnapshot(scenarioId, { syncCurrentScenario: true, initialInput: options?.initialInput })
+      return snapshot.result
     } catch (requestError) {
+      return null
     } finally {
       setTrialRunScenarioId('')
     }

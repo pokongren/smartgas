@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import create_db_and_tables
-from app.routers import basic, emergency, workflow, ai_assistant, topology_editor, topology_computation, scada, pipeline_packages, feishu, topology_simulation, gas_sources
+from app.routers import basic, emergency, workflow, ai_assistant, topology_editor, topology_computation, scada, pipeline_packages, feishu, topology_simulation, gas_sources, networkx_cutoff
 from app.mcp import setup_mcp
 # NOTE: 导入模型以触发 SQLModel 建表
 import app.workflow_models  # noqa: F401
@@ -41,14 +43,34 @@ async def custom_swagger_ui_html():
         swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
     )
 
-# 配置 CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:5173", "http://127.0.0.1:3002", "http://127.0.0.1:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+APP_ENV = os.getenv("SMARTGAS_ENV", os.getenv("APP_ENV", "dev")).strip().lower()
+DEV_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3002",
+]
+PROD_CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("SMARTGAS_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+DEV_CORS_ORIGIN_REGEX = r"(null|https?://(localhost|127\.0\.0\.1|0\.0\.0\.0|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?)"
+
+cors_kwargs = {
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+if APP_ENV == "dev":
+    cors_kwargs["allow_origins"] = DEV_CORS_ORIGINS
+    cors_kwargs["allow_origin_regex"] = DEV_CORS_ORIGIN_REGEX
+else:
+    cors_kwargs["allow_origins"] = PROD_CORS_ORIGINS
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 # （原 startup 事件已通过 lifespan 管理替代）
 
@@ -77,7 +99,7 @@ app.include_router(pipeline_packages.router, tags=["管线数据包：分组与�
 app.include_router(feishu.router, tags=["飞书集成"])
 app.include_router(topology_simulation.router, tags=["稳态仿真：压力流量求解"])
 app.include_router(gas_sources.router, tags=["气源管理：供应侧数据"])
+app.include_router(networkx_cutoff.router)
 
 # 挂载 MCP Server（/mcp 端点）
 setup_mcp(app)
-

@@ -1,0 +1,1974 @@
+{
+  "snapshot_version": "we1-snapshot-v1",
+  "run_id": "we1-bfcd80b81308",
+  "pilot_id": "zhongwei_shanghai_baihe",
+  "scenario_id": "zhongwei_supply_pressure_drop",
+  "generated_at": "2026-05-24T14:27:10.392884+00:00",
+  "saved_at": "2026-05-24T14:27:10.392884+00:00",
+  "solver_status": "converged",
+  "iterations": 2,
+  "input_summary": {
+    "solver_input_version": "we1-stage2-v1",
+    "seed_file": "we1_zhongwei_shanghai_baihe_seed.json",
+    "node_count": 106,
+    "edge_count": 105,
+    "valve_count": 76,
+    "scenario_count": 5,
+    "available_scenarios": [
+      "steady_base",
+      "zhongwei_supply_pressure_drop",
+      "zhengzhou_compressor_offline",
+      "east_china_peak_demand",
+      "baihe_delivery_limited"
+    ]
+  },
+  "output_summary": {
+    "total_supply": 1800.0,
+    "total_demand": 339.0,
+    "unserved_demand": 0.0,
+    "avg_utilization": 0.2585,
+    "alert_count": 103.0
+  },
+  "key_nodes": [
+    {
+      "id": "WE1-105",
+      "pressure_mpa": 6.4,
+      "alert_level": "critical",
+      "demand_served": 0.0,
+      "supply_actual": 0.0
+    },
+    {
+      "id": "WE1-106",
+      "pressure_mpa": 6.4,
+      "alert_level": "critical",
+      "demand_served": 0.0,
+      "supply_actual": 0.0
+    },
+    {
+      "id": "WE1-107",
+      "pressure_mpa": 6.4,
+      "alert_level": "critical",
+      "demand_served": 0.0,
+      "supply_actual": 0.0
+    },
+    {
+      "id": "WE1-112",
+      "pressure_mpa": 6.4,
+      "alert_level": "critical",
+      "demand_served": 0.0,
+      "supply_actual": 0.0
+    },
+    {
+      "id": "WE1-113",
+      "pressure_mpa": 6.4,
+      "alert_level": "critical",
+      "demand_served": 0.0,
+      "supply_actual": 0.0
+    },
+    {
+      "id": "WE1-114",
+      "pressure_mpa": 6.4,
+      "alert_level": "critical",
+      "demand_served": 0.0,
+      "supply_actual": 0.0
+    },
+    {
+      "id": "WE1-115",
+      "pressure_mpa": 6.4,
+      "alert_level": "critical",
+      "demand_served": 0.0,
+      "supply_actual": 0.0
+    },
+    {
+      "id": "WE1-116",
+      "pressure_mpa": 6.4,
+      "alert_level": "critical",
+      "demand_served": 0.0,
+      "supply_actual": 0.0
+    }
+  ],
+  "key_edges": [
+    {
+      "id": "WE1-T-76",
+      "flow_rate": 1800.0,
+      "utilization": 0.45,
+      "direction": "forward",
+      "alert_level": "normal"
+    },
+    {
+      "id": "WE1-T-77",
+      "flow_rate": 1800.0,
+      "utilization": 0.45,
+      "direction": "forward",
+      "alert_level": "normal"
+    },
+    {
+      "id": "WE1-T-78",
+      "flow_rate": 1800.0,
+      "utilization": 0.45,
+      "direction": "forward",
+      "alert_level": "normal"
+    },
+    {
+      "id": "WE1-T-85",
+      "flow_rate": 1800.0,
+      "utilization": 0.45,
+      "direction": "reverse",
+      "alert_level": "normal"
+    },
+    {
+      "id": "WE1-T-86",
+      "flow_rate": 1800.0,
+      "utilization": 0.45,
+      "direction": "forward",
+      "alert_level": "normal"
+    },
+    {
+      "id": "WE1-T-87",
+      "flow_rate": 1800.0,
+      "utilization": 0.45,
+      "direction": "forward",
+      "alert_level": "normal"
+    },
+    {
+      "id": "WE1-T-88",
+      "flow_rate": 1800.0,
+      "utilization": 0.45,
+      "direction": "forward",
+      "alert_level": "normal"
+    },
+    {
+      "id": "WE1-T-91",
+      "flow_rate": 1800.0,
+      "utilization": 0.45,
+      "direction": "forward",
+      "alert_level": "normal"
+    }
+  ],
+  "result": {
+    "pilot_id": "zhongwei_shanghai_baihe",
+    "scenario_id": "zhongwei_supply_pressure_drop",
+    "solver_status": "converged",
+    "iterations": 2,
+    "nodes": [
+      {
+        "id": "WE1-76",
+        "pressure_mpa": 9.3,
+        "pressure_in_mpa": 9.3,
+        "demand_served": 0.0,
+        "supply_actual": 1800.0,
+        "alert_level": "normal"
+      },
+      {
+        "id": "WE1-77",
+        "pressure_mpa": 8.3395,
+        "pressure_in_mpa": 8.3395,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-78",
+        "pressure_mpa": 7.2821,
+        "pressure_in_mpa": 7.2821,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-79",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 6.14,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-80",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.3039,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-81",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.1971,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-82",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.1705,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-83",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 6.0293,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-84",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 4.9349,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-85",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 4.8742,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-86",
+        "pressure_mpa": 9.8,
+        "pressure_in_mpa": 5.3651,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-87",
+        "pressure_mpa": 8.3415,
+        "pressure_in_mpa": 8.3415,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-88",
+        "pressure_mpa": 7.0201,
+        "pressure_in_mpa": 7.0201,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-89",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.5681,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-90",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.0538,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-91",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.1862,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-92",
+        "pressure_mpa": 9.8,
+        "pressure_in_mpa": 6.4,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-93",
+        "pressure_mpa": 8.8,
+        "pressure_in_mpa": 9.8,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "normal"
+      },
+      {
+        "id": "WE1-94",
+        "pressure_mpa": 7.4986,
+        "pressure_in_mpa": 7.4986,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-95",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 6.0299,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-96",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 4.9772,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-97",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.0921,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-98",
+        "pressure_mpa": 7.4,
+        "pressure_in_mpa": 6.4,
+        "demand_served": 12.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-99",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 6.0949,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-100",
+        "pressure_mpa": 9.8,
+        "pressure_in_mpa": 5.34,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-101",
+        "pressure_mpa": 8.6235,
+        "pressure_in_mpa": 8.6235,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-102",
+        "pressure_mpa": 8.6235,
+        "pressure_in_mpa": 8.6235,
+        "demand_served": 10.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-103",
+        "pressure_mpa": 7.2443,
+        "pressure_in_mpa": 7.2443,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-104",
+        "pressure_mpa": 6.415,
+        "pressure_in_mpa": 6.415,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-105",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.1609,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-106",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.2,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-107",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.2142,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-108",
+        "pressure_mpa": 9.8,
+        "pressure_in_mpa": 5.1253,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-109",
+        "pressure_mpa": 8.5325,
+        "pressure_in_mpa": 8.5325,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-110",
+        "pressure_mpa": 7.0821,
+        "pressure_in_mpa": 7.0821,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-111",
+        "pressure_mpa": 7.2,
+        "pressure_in_mpa": 6.2263,
+        "demand_served": 14.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-112",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 6.2392,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-113",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.529,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-114",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.4387,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-115",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.3184,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-116",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.1235,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-117",
+        "pressure_mpa": 9.8,
+        "pressure_in_mpa": 5.4733,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-118",
+        "pressure_mpa": 8.8,
+        "pressure_in_mpa": 8.8863,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "normal"
+      },
+      {
+        "id": "WE1-119",
+        "pressure_mpa": 7.7981,
+        "pressure_in_mpa": 7.7981,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-120",
+        "pressure_mpa": 6.5218,
+        "pressure_in_mpa": 6.5218,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-121",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.2266,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-122",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.3552,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-123",
+        "pressure_mpa": 7.1,
+        "pressure_in_mpa": 5.3868,
+        "demand_served": 12.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-124",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 6.0988,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-125",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.4836,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-126",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.5573,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-127",
+        "pressure_mpa": 9.8,
+        "pressure_in_mpa": 5.0779,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-128",
+        "pressure_mpa": 8.546,
+        "pressure_in_mpa": 8.546,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-129",
+        "pressure_mpa": 7.3429,
+        "pressure_in_mpa": 7.3429,
+        "demand_served": 18.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-130",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 6.1189,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-131",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.4292,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-132",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.1441,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-133",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.1037,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-134",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.1281,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-135",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.1614,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-136",
+        "pressure_mpa": 9.8,
+        "pressure_in_mpa": 5.4381,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-137",
+        "pressure_mpa": 8.5254,
+        "pressure_in_mpa": 8.5254,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-138",
+        "pressure_mpa": 7.2007,
+        "pressure_in_mpa": 7.2007,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-139",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.8461,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-140",
+        "pressure_mpa": 6.9,
+        "pressure_in_mpa": 6.4,
+        "demand_served": 12.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-141",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.6292,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-142",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.0675,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-143",
+        "pressure_mpa": 6.9,
+        "pressure_in_mpa": 5.1193,
+        "demand_served": 10.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-144",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.7586,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-145",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.1268,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-146",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.4795,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-147",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.76,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-148",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.2355,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-149",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.7211,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-150",
+        "pressure_mpa": 6.8,
+        "pressure_in_mpa": 5.6751,
+        "demand_served": 13.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-151",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.4844,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-152",
+        "pressure_mpa": 9.8,
+        "pressure_in_mpa": 5.0321,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-153",
+        "pressure_mpa": 8.5083,
+        "pressure_in_mpa": 8.5083,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-154",
+        "pressure_mpa": 7.2256,
+        "pressure_in_mpa": 7.2256,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-155",
+        "pressure_mpa": 6.8,
+        "pressure_in_mpa": 6.2208,
+        "demand_served": 16.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-156",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.4899,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-157",
+        "pressure_mpa": 6.8,
+        "pressure_in_mpa": 5.247,
+        "demand_served": 16.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-158",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.9578,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-159",
+        "pressure_mpa": 6.8,
+        "pressure_in_mpa": 5.3874,
+        "demand_served": 10.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-160",
+        "pressure_mpa": 6.8,
+        "pressure_in_mpa": 6.1233,
+        "demand_served": 18.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-161",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.8066,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-162",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.543,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-163",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.7367,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-164",
+        "pressure_mpa": 6.7,
+        "pressure_in_mpa": 5.8947,
+        "demand_served": 12.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-165",
+        "pressure_mpa": 6.7,
+        "pressure_in_mpa": 5.5381,
+        "demand_served": 10.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-166",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.5951,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-167",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.5083,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-168",
+        "pressure_mpa": 6.7,
+        "pressure_in_mpa": 5.5612,
+        "demand_served": 16.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-169",
+        "pressure_mpa": 6.7,
+        "pressure_in_mpa": 5.6983,
+        "demand_served": 22.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-170",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.7871,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-171",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.5697,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-172",
+        "pressure_mpa": 6.6,
+        "pressure_in_mpa": 5.6075,
+        "demand_served": 15.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-173",
+        "pressure_mpa": 6.6,
+        "pressure_in_mpa": 5.5584,
+        "demand_served": 14.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-174",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.8626,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-175",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.6939,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-176",
+        "pressure_mpa": 6.6,
+        "pressure_in_mpa": 5.8444,
+        "demand_served": 18.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-177",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.9595,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-178",
+        "pressure_mpa": 6.4,
+        "pressure_in_mpa": 5.7784,
+        "demand_served": 0.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-179",
+        "pressure_mpa": 6.5,
+        "pressure_in_mpa": 6.4,
+        "demand_served": 16.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      },
+      {
+        "id": "WE1-180",
+        "pressure_mpa": 6.5,
+        "pressure_in_mpa": 6.5,
+        "demand_served": 20.0,
+        "supply_actual": 0.0,
+        "alert_level": "warning"
+      },
+      {
+        "id": "WE1-181",
+        "pressure_mpa": 6.5,
+        "pressure_in_mpa": 5.6447,
+        "demand_served": 35.0,
+        "supply_actual": 0.0,
+        "alert_level": "critical"
+      }
+    ],
+    "edges": [
+      {
+        "id": "WE1-T-76",
+        "flow_rate": 1800.0,
+        "direction": "forward",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-77",
+        "flow_rate": 1800.0,
+        "direction": "forward",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-78",
+        "flow_rate": 1800.0,
+        "direction": "forward",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-79",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-80",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-81",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-82",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-83",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-84",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-85",
+        "flow_rate": 1800.0,
+        "direction": "reverse",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-86",
+        "flow_rate": 1800.0,
+        "direction": "forward",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-87",
+        "flow_rate": 1800.0,
+        "direction": "forward",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-88",
+        "flow_rate": 1800.0,
+        "direction": "forward",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-89",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-90",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-91",
+        "flow_rate": 1800.0,
+        "direction": "forward",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-92",
+        "flow_rate": 1800.0,
+        "direction": "forward",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-93",
+        "flow_rate": 1800.0,
+        "direction": "forward",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-94",
+        "flow_rate": 1800.0,
+        "direction": "forward",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-95",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-96",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-97",
+        "flow_rate": 1800.0,
+        "direction": "reverse",
+        "utilization": 0.45,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.895
+      },
+      {
+        "id": "WE1-T-98",
+        "flow_rate": 1788.0,
+        "direction": "forward",
+        "utilization": 0.447,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.892
+      },
+      {
+        "id": "WE1-T-99",
+        "flow_rate": 1788.0,
+        "direction": "reverse",
+        "utilization": 0.447,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.892
+      },
+      {
+        "id": "WE1-T-100",
+        "flow_rate": 1788.0,
+        "direction": "forward",
+        "utilization": 0.447,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.892
+      },
+      {
+        "id": "WE1-T-101",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-102",
+        "flow_rate": 1778.0,
+        "direction": "forward",
+        "utilization": 0.4445,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.889
+      },
+      {
+        "id": "WE1-T-103",
+        "flow_rate": 1778.0,
+        "direction": "forward",
+        "utilization": 0.4445,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.889
+      },
+      {
+        "id": "WE1-T-104",
+        "flow_rate": 1778.0,
+        "direction": "forward",
+        "utilization": 0.4445,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.889
+      },
+      {
+        "id": "WE1-T-105",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-106",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-107",
+        "flow_rate": 1778.0,
+        "direction": "reverse",
+        "utilization": 0.4445,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.889
+      },
+      {
+        "id": "WE1-T-108",
+        "flow_rate": 1778.0,
+        "direction": "forward",
+        "utilization": 0.4445,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.889
+      },
+      {
+        "id": "WE1-T-109",
+        "flow_rate": 1778.0,
+        "direction": "forward",
+        "utilization": 0.4445,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.889
+      },
+      {
+        "id": "WE1-T-110",
+        "flow_rate": 1778.0,
+        "direction": "reverse",
+        "utilization": 0.4445,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.889
+      },
+      {
+        "id": "WE1-T-111",
+        "flow_rate": 1764.0,
+        "direction": "forward",
+        "utilization": 0.441,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.885
+      },
+      {
+        "id": "WE1-T-112",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-113",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-114",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-115",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-116",
+        "flow_rate": 1764.0,
+        "direction": "reverse",
+        "utilization": 0.441,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.885
+      },
+      {
+        "id": "WE1-T-117",
+        "flow_rate": 1764.0,
+        "direction": "forward",
+        "utilization": 0.441,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.885
+      },
+      {
+        "id": "WE1-T-118",
+        "flow_rate": 1764.0,
+        "direction": "forward",
+        "utilization": 0.441,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.885
+      },
+      {
+        "id": "WE1-T-119",
+        "flow_rate": 1764.0,
+        "direction": "forward",
+        "utilization": 0.441,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.885
+      },
+      {
+        "id": "WE1-T-120",
+        "flow_rate": 1764.0,
+        "direction": "forward",
+        "utilization": 0.441,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.885
+      },
+      {
+        "id": "WE1-T-121",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-122",
+        "flow_rate": 1764.0,
+        "direction": "reverse",
+        "utilization": 0.441,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.885
+      },
+      {
+        "id": "WE1-T-123",
+        "flow_rate": 1752.0,
+        "direction": "forward",
+        "utilization": 0.438,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.882
+      },
+      {
+        "id": "WE1-T-124",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-125",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-126",
+        "flow_rate": 1752.0,
+        "direction": "reverse",
+        "utilization": 0.438,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.882
+      },
+      {
+        "id": "WE1-T-127",
+        "flow_rate": 1752.0,
+        "direction": "forward",
+        "utilization": 0.438,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.882
+      },
+      {
+        "id": "WE1-T-128",
+        "flow_rate": 1752.0,
+        "direction": "forward",
+        "utilization": 0.438,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.882
+      },
+      {
+        "id": "WE1-T-129",
+        "flow_rate": 1734.0,
+        "direction": "forward",
+        "utilization": 0.4335,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.877
+      },
+      {
+        "id": "WE1-T-130",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-131",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-132",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-133",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-134",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-135",
+        "flow_rate": 1734.0,
+        "direction": "reverse",
+        "utilization": 0.4335,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.877
+      },
+      {
+        "id": "WE1-T-136",
+        "flow_rate": 1734.0,
+        "direction": "forward",
+        "utilization": 0.4335,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.877
+      },
+      {
+        "id": "WE1-T-137",
+        "flow_rate": 1734.0,
+        "direction": "forward",
+        "utilization": 0.4335,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.877
+      },
+      {
+        "id": "WE1-T-138",
+        "flow_rate": 1734.0,
+        "direction": "forward",
+        "utilization": 0.4335,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.877
+      },
+      {
+        "id": "WE1-T-139",
+        "flow_rate": 1734.0,
+        "direction": "reverse",
+        "utilization": 0.4335,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.877
+      },
+      {
+        "id": "WE1-T-140",
+        "flow_rate": 1722.0,
+        "direction": "forward",
+        "utilization": 0.4305,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.874
+      },
+      {
+        "id": "WE1-T-141",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-142",
+        "flow_rate": 1722.0,
+        "direction": "reverse",
+        "utilization": 0.4305,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.874
+      },
+      {
+        "id": "WE1-T-143",
+        "flow_rate": 1712.0,
+        "direction": "forward",
+        "utilization": 0.428,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.871
+      },
+      {
+        "id": "WE1-T-144",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-145",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-146",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-147",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-148",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-149",
+        "flow_rate": 1712.0,
+        "direction": "reverse",
+        "utilization": 0.428,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.871
+      },
+      {
+        "id": "WE1-T-150",
+        "flow_rate": 1699.0,
+        "direction": "forward",
+        "utilization": 0.4248,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.867
+      },
+      {
+        "id": "WE1-T-151",
+        "flow_rate": 1699.0,
+        "direction": "reverse",
+        "utilization": 0.4248,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.867
+      },
+      {
+        "id": "WE1-T-152",
+        "flow_rate": 1699.0,
+        "direction": "forward",
+        "utilization": 0.4248,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.867
+      },
+      {
+        "id": "WE1-T-153",
+        "flow_rate": 1699.0,
+        "direction": "forward",
+        "utilization": 0.4248,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.867
+      },
+      {
+        "id": "WE1-T-154",
+        "flow_rate": 1699.0,
+        "direction": "forward",
+        "utilization": 0.4248,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.867
+      },
+      {
+        "id": "WE1-T-155",
+        "flow_rate": 1683.0,
+        "direction": "forward",
+        "utilization": 0.4208,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.863
+      },
+      {
+        "id": "WE1-T-156",
+        "flow_rate": 1683.0,
+        "direction": "reverse",
+        "utilization": 0.4208,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.863
+      },
+      {
+        "id": "WE1-T-157",
+        "flow_rate": 1667.0,
+        "direction": "forward",
+        "utilization": 0.4168,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.858
+      },
+      {
+        "id": "WE1-T-158",
+        "flow_rate": 1667.0,
+        "direction": "reverse",
+        "utilization": 0.4168,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.858
+      },
+      {
+        "id": "WE1-T-159",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-160",
+        "flow_rate": 1639.0,
+        "direction": "forward",
+        "utilization": 0.4098,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.851
+      },
+      {
+        "id": "WE1-T-161",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-162",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-163",
+        "flow_rate": 1639.0,
+        "direction": "reverse",
+        "utilization": 0.4098,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.851
+      },
+      {
+        "id": "WE1-T-164",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-165",
+        "flow_rate": 1617.0,
+        "direction": "forward",
+        "utilization": 0.4042,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.845
+      },
+      {
+        "id": "WE1-T-166",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-167",
+        "flow_rate": 1617.0,
+        "direction": "reverse",
+        "utilization": 0.4042,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.845
+      },
+      {
+        "id": "WE1-T-168",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-169",
+        "flow_rate": 1579.0,
+        "direction": "forward",
+        "utilization": 0.3947,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.834
+      },
+      {
+        "id": "WE1-T-170",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-171",
+        "flow_rate": 1579.0,
+        "direction": "reverse",
+        "utilization": 0.3947,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.834
+      },
+      {
+        "id": "WE1-T-172",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-173",
+        "flow_rate": 1550.0,
+        "direction": "forward",
+        "utilization": 0.3875,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.826
+      },
+      {
+        "id": "WE1-T-174",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-175",
+        "flow_rate": 1550.0,
+        "direction": "reverse",
+        "utilization": 0.3875,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.826
+      },
+      {
+        "id": "WE1-T-176",
+        "flow_rate": 1532.0,
+        "direction": "forward",
+        "utilization": 0.383,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.821
+      },
+      {
+        "id": "WE1-T-177",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      },
+      {
+        "id": "WE1-T-178",
+        "flow_rate": 1532.0,
+        "direction": "forward",
+        "utilization": 0.383,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.821
+      },
+      {
+        "id": "WE1-T-179",
+        "flow_rate": 1516.0,
+        "direction": "forward",
+        "utilization": 0.379,
+        "alert_level": "normal",
+        "color": "#22c55e",
+        "width_factor": 0.817
+      },
+      {
+        "id": "WE1-T-180",
+        "flow_rate": 0.0,
+        "direction": "zero",
+        "utilization": 0.0,
+        "alert_level": "normal",
+        "color": "#64748b",
+        "width_factor": 0.4
+      }
+    ],
+    "summary": {
+      "total_supply": 1800.0,
+      "total_demand": 339.0,
+      "unserved_demand": 0.0,
+      "avg_utilization": 0.2585,
+      "alert_count": 103.0
+    },
+    "run_id": "we1-bfcd80b81308",
+    "generated_at": "2026-05-24T14:27:10.392884+00:00",
+    "meta": {
+      "pilot_id": "zhongwei_shanghai_baihe",
+      "scenario_id": "zhongwei_supply_pressure_drop",
+      "available_scenarios": [
+        "steady_base",
+        "zhongwei_supply_pressure_drop",
+        "zhengzhou_compressor_offline",
+        "east_china_peak_demand",
+        "baihe_delivery_limited"
+      ],
+      "node_count": 106,
+      "edge_count": 105,
+      "solver_input_version": "we1-stage2-v1"
+    }
+  }
+}

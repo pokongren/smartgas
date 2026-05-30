@@ -7,6 +7,7 @@
 import React from 'react'
 import type { HubNode, NodePort, PortConnection, HubProcessFlowConfig, ProcessValve } from '@/types/hub'
 import { PortDirection, DistributionStrategy } from '@/types/hub'
+import type { StationProcessCutoffStageDetail } from '@/components/map-view/types'
 
 interface HubDetailPanelProps {
     node: HubNode | null
@@ -14,6 +15,52 @@ interface HubDetailPanelProps {
     onClose: () => void
     onPortClick?: (portId: string) => void
     onPipelineClick?: (pipelineId: string) => void
+    onCutoffStage?: (detail: StationProcessCutoffStageDetail) => void
+}
+
+type PanelLayout = {
+    x: number
+    y: number
+    width: number
+    height: number
+}
+
+type PanelDragState = {
+    startX: number
+    startY: number
+    layout: PanelLayout
+}
+
+const PANEL_MIN_WIDTH = 720
+const PANEL_MIN_HEIGHT = 560
+const PANEL_MARGIN = 12
+
+function getInitialPanelLayout(): PanelLayout {
+    if (typeof window === 'undefined') {
+        return { x: 80, y: 48, width: 900, height: 720 }
+    }
+    const width = Math.min(920, Math.max(PANEL_MIN_WIDTH, window.innerWidth - PANEL_MARGIN * 2))
+    const height = Math.min(720, Math.max(PANEL_MIN_HEIGHT, window.innerHeight - PANEL_MARGIN * 2))
+    return {
+        x: Math.max(PANEL_MARGIN, Math.round((window.innerWidth - width) / 2)),
+        y: Math.max(PANEL_MARGIN, Math.round((window.innerHeight - height) / 2)),
+        width,
+        height,
+    }
+}
+
+function clampPanelLayout(layout: PanelLayout): PanelLayout {
+    if (typeof window === 'undefined') return layout
+    const maxWidth = Math.max(PANEL_MIN_WIDTH, window.innerWidth - PANEL_MARGIN * 2)
+    const maxHeight = Math.max(PANEL_MIN_HEIGHT, window.innerHeight - PANEL_MARGIN * 2)
+    const width = clamp(layout.width, PANEL_MIN_WIDTH, maxWidth)
+    const height = clamp(layout.height, PANEL_MIN_HEIGHT, maxHeight)
+    return {
+        width,
+        height,
+        x: clamp(layout.x, PANEL_MARGIN, Math.max(PANEL_MARGIN, window.innerWidth - width - PANEL_MARGIN)),
+        y: clamp(layout.y, PANEL_MARGIN, Math.max(PANEL_MARGIN, window.innerHeight - height - PANEL_MARGIN)),
+    }
 }
 
 /**
@@ -233,18 +280,52 @@ function getConnectionValveIds(conn: PortConnection, processFlow?: HubProcessFlo
     return []
 }
 
+function buildStationCutoffStageDetail(
+    node: HubNode,
+    valve: ProcessValve,
+    action: 'cutoff' | 'restore',
+    valveOpen: boolean,
+): StationProcessCutoffStageDetail | null {
+    if (!valve.cutoffAction) return null
+    return {
+        stationId: node.id,
+        stationName: node.name,
+        valveId: valve.id,
+        valveLabel: valve.label,
+        valveName: valve.name,
+        action,
+        valveOpen,
+        stage: valve.cutoffAction.stage,
+        label: action === 'restore' ? `${valve.cutoffAction.label}恢复` : valve.cutoffAction.label,
+        description: action === 'restore'
+            ? `${valve.label} ${valve.name}重新打开，外部全国一张网恢复该阶段截断显示。`
+            : valve.cutoffAction.description,
+    }
+}
+
+function emitStationCutoffStage(detail: StationProcessCutoffStageDetail): void {
+    if (typeof window === 'undefined') return
+    window.dispatchEvent(new CustomEvent('station-process-cutoff-stage', {
+        detail,
+    }))
+}
+
 export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
     node,
     visible,
     onClose,
     onPortClick,
-    onPipelineClick
+    onPipelineClick,
+    onCutoffStage
 }) => {
     const diagramRef = React.useRef<HTMLDivElement>(null)
     const dragStateRef = React.useRef<{ id: string; offsetX: number; offsetY: number } | null>(null)
+    const panelDragRef = React.useRef<PanelDragState | null>(null)
+    const panelResizeRef = React.useRef<PanelDragState | null>(null)
     const [metricTick, setMetricTick] = React.useState(() => Date.now())
     const [labelOverrides, setLabelOverrides] = React.useState<Record<string, { x: number; y: number }>>({})
     const [valveStates, setValveStates] = React.useState<Record<string, boolean>>({})
+    const [panelLayout, setPanelLayout] = React.useState<PanelLayout>(() => getInitialPanelLayout())
 
     React.useEffect(() => {
         if (!visible) return
@@ -253,7 +334,36 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
     }, [visible])
 
     React.useEffect(() => {
+        if (!visible) return
+        setPanelLayout(prev => clampPanelLayout(prev))
+    }, [visible])
+
+    React.useEffect(() => {
         const handlePointerMove = (event: PointerEvent) => {
+            const panelDrag = panelDragRef.current
+            if (panelDrag) {
+                const dx = event.clientX - panelDrag.startX
+                const dy = event.clientY - panelDrag.startY
+                setPanelLayout(clampPanelLayout({
+                    ...panelDrag.layout,
+                    x: panelDrag.layout.x + dx,
+                    y: panelDrag.layout.y + dy,
+                }))
+                return
+            }
+
+            const panelResize = panelResizeRef.current
+            if (panelResize) {
+                const dx = event.clientX - panelResize.startX
+                const dy = event.clientY - panelResize.startY
+                setPanelLayout(clampPanelLayout({
+                    ...panelResize.layout,
+                    width: panelResize.layout.width + dx,
+                    height: panelResize.layout.height + dy,
+                }))
+                return
+            }
+
             const dragState = dragStateRef.current
             const rect = diagramRef.current?.getBoundingClientRect()
             if (!dragState || !rect) return
@@ -272,6 +382,8 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
 
         const handlePointerUp = () => {
             dragStateRef.current = null
+            panelDragRef.current = null
+            panelResizeRef.current = null
         }
 
         window.addEventListener('pointermove', handlePointerMove)
@@ -298,6 +410,7 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
     const beginLabelDrag = (id: string, fallback: { labelX: number; labelY: number }, event: React.PointerEvent) => {
         const rect = diagramRef.current?.getBoundingClientRect()
         if (!rect) return
+        event.stopPropagation()
 
         const current = labelOverrides[id] || { x: fallback.labelX, y: fallback.labelY }
         dragStateRef.current = {
@@ -307,22 +420,62 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
         }
     }
 
+    const beginPanelDrag = (event: React.PointerEvent<HTMLElement>) => {
+        const target = event.target as HTMLElement
+        if (target.closest('button')) return
+        panelDragRef.current = {
+            startX: event.clientX,
+            startY: event.clientY,
+            layout: panelLayout,
+        }
+    }
+
+    const beginPanelResize = (event: React.PointerEvent<HTMLElement>) => {
+        event.preventDefault()
+        event.stopPropagation()
+        panelResizeRef.current = {
+            startX: event.clientX,
+            startY: event.clientY,
+            layout: panelLayout,
+        }
+    }
+
     const isValveOpen = (valveId: string): boolean => valveStates[valveId] !== false
     const isConnectionOpen = (conn: PortConnection): boolean => getConnectionValveIds(conn, extension.processFlow).every(isValveOpen)
-    const toggleValve = (valveId: string) => {
+    const publishValveCutoffStage = (valve: ProcessValve, nextOpen: boolean) => {
+        const detail = buildStationCutoffStageDetail(node, valve, nextOpen ? 'restore' : 'cutoff', nextOpen)
+        if (!detail) return
+        onCutoffStage?.(detail)
+        emitStationCutoffStage(detail)
+    }
+    const toggleValve = (valve: ProcessValve) => {
+        const nextOpen = !isValveOpen(valve.id)
         setValveStates(prev => ({
             ...prev,
-            [valveId]: prev[valveId] === false,
+            [valve.id]: nextOpen,
         }))
+        publishValveCutoffStage(valve, nextOpen)
     }
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            className="pointer-events-none fixed inset-0 z-50"
             style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
         >
-            <div className="bg-slate-950 rounded-lg shadow-2xl border border-cyan-500/30 w-[820px] max-w-[calc(100vw-24px)] max-h-[88vh] overflow-hidden flex flex-col">
-                <div className="flex justify-between items-center px-4 py-3 border-b border-slate-700 bg-slate-900 shrink-0">
+            <div
+                className="pointer-events-auto absolute bg-slate-950 rounded-lg shadow-2xl border border-cyan-500/30 overflow-hidden flex flex-col"
+                style={{
+                    left: panelLayout.x,
+                    top: panelLayout.y,
+                    width: panelLayout.width,
+                    height: panelLayout.height,
+                }}
+            >
+                <div
+                    className="flex cursor-move select-none justify-between items-center px-4 py-3 border-b border-slate-700 bg-slate-900 shrink-0"
+                    onPointerDown={beginPanelDrag}
+                    title="按住标题栏拖动窗口"
+                >
                     <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-cyan-300 text-2xl">valve</span>
                         <div>
@@ -372,12 +525,12 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                                     `}
                                 </style>
                             </defs>
-                            <line x1="8" y1="30" x2="92" y2="30" stroke="rgba(148,163,184,0.26)" strokeWidth="5" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
-                            <line x1="10" y1="30" x2="90" y2="30" stroke="rgba(34,211,238,0.58)" strokeWidth="3" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
+                            <line x1="8" y1="30" x2="92" y2="30" stroke="rgba(148,163,184,0.24)" strokeWidth="5" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
+                            <line x1="10" y1="30" x2="90" y2="30" stroke="rgba(51,65,85,0.58)" strokeWidth="3" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
                             <line x1="8" y1="62" x2="92" y2="62" stroke="rgba(148,163,184,0.22)" strokeWidth="5" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
-                            <line x1="10" y1="62" x2="90" y2="62" stroke="rgba(14,165,233,0.56)" strokeWidth="3" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
+                            <line x1="10" y1="62" x2="90" y2="62" stroke="rgba(51,65,85,0.54)" strokeWidth="3" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
                             <line x1="56" y1="62" x2="56" y2="88" stroke="rgba(148,163,184,0.22)" strokeWidth="5" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
-                            <line x1="56" y1="62" x2="56" y2="88" stroke="rgba(59,130,246,0.52)" strokeWidth="3" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
+                            <line x1="56" y1="62" x2="56" y2="88" stroke="rgba(51,65,85,0.52)" strokeWidth="3" strokeLinecap="square" vectorEffect="non-scaling-stroke" />
                             {activeConnections.map((conn, index) => {
                                 const fromPort = extension.ports?.find(p => p.portId === conn.fromPort)
                                 const toPort = extension.ports?.find(p => p.portId === conn.toPort)
@@ -453,36 +606,54 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                             const open = isValveOpen(valve.id)
                             const valveColor = open ? '#22c55e' : '#ef4444'
                             return (
-                                <button
+                                <div
                                     key={valve.id}
-                                    type="button"
-                                    onClick={() => toggleValve(valve.id)}
-                                    className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5 rounded px-1 py-0.5 text-[10px] leading-none text-white transition-transform hover:scale-125"
+                                    className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5"
                                     style={{ left: `${valve.x}%`, top: `${valve.y}%` }}
-                                    title={`${valve.label} ${valve.name}：${open ? '开' : '关'}，点击切换`}
                                 >
-                                    <svg
-                                        width="20"
-                                        height="12"
-                                        viewBox="0 0 20 12"
-                                        style={{ transform: `rotate(${valve.angle ?? 0}deg)` }}
-                                        aria-hidden="true"
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleValve(valve)}
+                                        className="flex flex-col items-center gap-0.5 rounded px-1 py-0.5 text-[10px] leading-none text-white transition-transform hover:scale-125"
+                                        title={`${valve.label} ${valve.name}：${open ? '开' : '关'}，点击切换`}
                                     >
-                                        <rect x="0.5" y="0.5" width="19" height="11" rx="1.5" fill="rgba(2,6,23,0.94)" stroke="rgba(255,255,255,0.2)" />
-                                        <path
-                                            d="M2 2 L10 6 L2 10 Z M18 2 L10 6 L18 10 Z"
-                                            fill={open ? 'rgba(34,197,94,0.16)' : 'rgba(239,68,68,0.18)'}
-                                            stroke={valveColor}
-                                            strokeWidth="1.25"
-                                            strokeLinejoin="round"
-                                        />
-                                        <circle cx="10" cy="6" r="2.15" fill="#020617" stroke={valveColor} strokeWidth="1.1" />
-                                        <circle cx="10" cy="6" r="1.05" fill={valveColor} />
-                                        {!open && <path d="M3.5 2.4 L16.5 9.6" stroke={valveColor} strokeWidth="1.2" strokeLinecap="round" />}
-                                    </svg>
-                                    <span className="rounded bg-slate-950/80 px-1 font-semibold tracking-normal">{valve.label}</span>
-                                    <span className="font-semibold tracking-normal" style={{ color: valveColor }}>{open ? '开' : '关'}</span>
-                                </button>
+                                        <svg
+                                            width="20"
+                                            height="12"
+                                            viewBox="0 0 20 12"
+                                            style={{ transform: `rotate(${valve.angle ?? 0}deg)` }}
+                                            aria-hidden="true"
+                                        >
+                                            <rect x="0.5" y="0.5" width="19" height="11" rx="1.5" fill="rgba(2,6,23,0.94)" stroke="rgba(255,255,255,0.2)" />
+                                            <path
+                                                d="M2 2 L10 6 L2 10 Z M18 2 L10 6 L18 10 Z"
+                                                fill={open ? 'rgba(34,197,94,0.16)' : 'rgba(239,68,68,0.18)'}
+                                                stroke={valveColor}
+                                                strokeWidth="1.25"
+                                                strokeLinejoin="round"
+                                            />
+                                            <circle cx="10" cy="6" r="2.15" fill="#020617" stroke={valveColor} strokeWidth="1.1" />
+                                            <circle cx="10" cy="6" r="1.05" fill={valveColor} />
+                                            {!open && <path d="M3.5 2.4 L16.5 9.6" stroke={valveColor} strokeWidth="1.2" strokeLinecap="round" />}
+                                        </svg>
+                                        <span className="rounded bg-slate-950/80 px-1 font-semibold tracking-normal">{valve.label}</span>
+                                        <span className="font-semibold tracking-normal" style={{ color: valveColor }}>{open ? '开' : '关'}</span>
+                                    </button>
+                                    {valve.cutoffAction && (
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleValve(valve)}
+                                            className={`rounded border px-1.5 py-0.5 text-[9px] font-bold leading-none shadow-[0_0_10px_rgba(239,68,68,0.28)] transition-colors ${
+                                                open
+                                                    ? 'border-red-400/45 bg-red-950/75 text-red-100 hover:border-red-200 hover:bg-red-800/85'
+                                                    : 'border-emerald-400/45 bg-emerald-950/75 text-emerald-100 hover:border-emerald-200 hover:bg-emerald-800/85'
+                                            }`}
+                                            title={valve.cutoffAction.description || valve.cutoffAction.label}
+                                        >
+                                            {open ? '截断' : '恢复'}
+                                        </button>
+                                    )}
+                                </div>
                             )
                         })}
 
@@ -559,15 +730,33 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                         {valveNodes.map(valve => {
                             const open = isValveOpen(valve.id)
                             return (
-                                <button
+                                <span
                                     key={`${valve.id}-status`}
-                                    type="button"
-                                    onClick={() => toggleValve(valve.id)}
-                                    className="inline-flex items-center gap-1.5 hover:text-white transition-colors"
+                                    className="inline-flex items-center gap-1.5"
                                 >
-                                    <span className={`h-2 w-2 rounded-full ${open ? 'bg-green-500' : 'bg-red-500'}`} />
-                                    {valve.label} {valve.name}：{open ? '开' : '关'}
-                                </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleValve(valve)}
+                                        className="inline-flex items-center gap-1.5 hover:text-white transition-colors"
+                                    >
+                                        <span className={`h-2 w-2 rounded-full ${open ? 'bg-green-500' : 'bg-red-500'}`} />
+                                        {valve.label} {valve.name}：{open ? '开' : '关'}
+                                    </button>
+                                    {valve.cutoffAction && (
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleValve(valve)}
+                                            className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold hover:text-white ${
+                                                open
+                                                    ? 'border-red-500/35 bg-red-950/50 text-red-200 hover:border-red-300'
+                                                    : 'border-emerald-500/35 bg-emerald-950/50 text-emerald-200 hover:border-emerald-300'
+                                            }`}
+                                            title={valve.cutoffAction.description || valve.cutoffAction.label}
+                                        >
+                                            {open ? valve.cutoffAction.label : '恢复外部联动'}
+                                        </button>
+                                    )}
+                                </span>
                             )
                         })}
                         {extension.ports?.map(port => (
@@ -589,6 +778,11 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                         </button>
                     </div>
                 </div>
+                <div
+                    className="absolute bottom-1 right-1 h-5 w-5 cursor-nwse-resize rounded border-b-2 border-r-2 border-cyan-300/70 opacity-80 hover:opacity-100"
+                    onPointerDown={beginPanelResize}
+                    title="拖动改变窗口大小"
+                />
             </div>
         </div>
     )

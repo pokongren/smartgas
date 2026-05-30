@@ -1,6 +1,7 @@
 import type { PipelineNode, PipelineLine, PipelineDevice } from '@/types'
 import { NodeType, PipelineStatus, PressureLevel, DeviceType } from '@/types'
 import type { ClusterGroup, ClusterClickEvent } from '@/types/cluster'
+import type { NetworkxCutoffMapOverlay } from '@/components/map-view/types'
 import type { SimulationOverlay, SimEdgeResult } from '@/types/simulation'
 import { getJunctionKind, getLinePipelineKind, getNodeRawType, isCompressorNode, isDistributionNode, isHubNode, isLngSourceNode, isMajorJunctionNode, isSourceNode, isValveNode } from '@/utils/pipelineDomain'
 import { getNodeImportance, getNodeLODStrategy, NODE_LOD_THRESHOLDS, NodeImportance, shouldShowNodeAtZoom } from '@/utils/hierarchyRenderer'
@@ -99,6 +100,7 @@ const LNG_MARKER_CONFIG = {
 interface PipelineRenderOptions {
     simulationOverlay?: SimulationOverlay | null
     cutoffEdgeIds?: string[]
+    networkxCutoffOverlay?: NetworkxCutoffMapOverlay | null
 }
 
 interface MergedFlowPath {
@@ -155,6 +157,14 @@ function lineMatchesEdgeIds(line: PipelineLine, edgeIds?: Set<string>): boolean 
     return getLineSimulationCandidateIds(line).some(id => edgeIds.has(id))
 }
 
+function lineTouchesNodeIds(line: PipelineLine, nodeIds?: Set<string>): boolean {
+    if (!nodeIds || nodeIds.size === 0) return false
+    return Boolean(
+        (line.startNodeId && nodeIds.has(line.startNodeId))
+        || (line.endNodeId && nodeIds.has(line.endNodeId))
+    )
+}
+
 function isSimulationEdgeClosed(edge?: SimEdgeResult): boolean {
     if (!edge) return false
     return edge.direction === 'zero' || edge.flow_rate <= 0.001
@@ -164,7 +174,14 @@ function hasSimulationEdgeMap(edgeMap?: Map<string, SimEdgeResult>): boolean {
     return Boolean(edgeMap && edgeMap.size > 0)
 }
 
-function shouldRenderFlowForLine(line: PipelineLine, edgeMap?: Map<string, SimEdgeResult>): boolean {
+function shouldRenderFlowForLine(
+    line: PipelineLine,
+    edgeMap?: Map<string, SimEdgeResult>,
+    blockedFlowEdgeIds?: Set<string>,
+    blockedFlowNodeIds?: Set<string>,
+): boolean {
+    if (lineMatchesEdgeIds(line, blockedFlowEdgeIds)) return false
+    if (lineTouchesNodeIds(line, blockedFlowNodeIds)) return false
     if (!hasSimulationEdgeMap(edgeMap)) return true
     const edge = resolveSimulationEdge(line, edgeMap)
     return Boolean(edge && !isSimulationEdgeClosed(edge))
@@ -229,6 +246,38 @@ function createCutoffMarker(map: any, path: number[][], line: PipelineLine): any
             'box-shadow': '0 0 16px rgba(239,68,68,0.7)',
         },
         extData: { line, isCutoffMarker: true },
+    })
+
+    map.add(marker)
+    return marker
+}
+
+function createNetworkxCutoffNodeMarker(map: any, node: PipelineNode): any | null {
+    const AMap = (window as any).AMap
+    if (!AMap || !node?.coordinate) return null
+
+    const marker = new AMap.Text({
+        text: `✕ ${node.name || '截断点'}`,
+        position: [node.coordinate.longitude, node.coordinate.latitude],
+        offset: new AMap.Pixel(-38, -34),
+        zIndex: 118,
+        zooms: [2, 30],
+        clickable: false,
+        bubble: true,
+        style: {
+            'height': '28px',
+            'line-height': '26px',
+            'padding': '0 10px',
+            'border-radius': '999px',
+            'background': 'rgba(127, 29, 29, 0.96)',
+            'border': '1px solid rgba(252, 165, 165, 0.95)',
+            'color': '#fff1f2',
+            'font-size': '12px',
+            'font-weight': '800',
+            'box-shadow': '0 0 18px rgba(248,113,113,0.72)',
+            'pointer-events': 'none',
+        },
+        extData: { node, isNetworkxCutoffNode: true },
     })
 
     map.add(marker)
@@ -989,6 +1038,10 @@ function createClusterMarker(
         })
     }
 
+    group.nodes.forEach(node => {
+        nodeMarkerMap.set(node.id, marker)
+    })
+
     return marker
 }
 
@@ -1393,6 +1446,14 @@ export function renderPipelineLines(
         const polylines: any[] = []
         const simulationEdgeMap = buildSimulationEdgeMap(options.simulationOverlay)
         const cutoffEdgeIds = new Set(options.cutoffEdgeIds || [])
+        const networkxBeforePathEdgeIds = new Set(options.networkxCutoffOverlay?.beforePathEdgeIds || [])
+        const networkxCutoffEdgeIds = new Set(options.networkxCutoffOverlay?.cutoffEdgeIds || [])
+        const networkxAffectedEdgeIds = new Set(options.networkxCutoffOverlay?.affectedEdgeIds || [])
+        const networkxRerouteEdgeIds = new Set(options.networkxCutoffOverlay?.rerouteEdgeIds || [])
+        const networkxBlockedFlowEdgeIds = new Set(options.networkxCutoffOverlay?.blockedFlowEdgeIds || [])
+        const networkxCutoffNodeIds = new Set(options.networkxCutoffOverlay?.cutoffNodeIds || [])
+        const hasNetworkxCutoffOverlay = Boolean(options.networkxCutoffOverlay)
+        const renderedBlockedFlowLineIds = new Set<string>()
         const BATCH_SIZE = 50 // 每批渲染50条管线
         let index = 0
 
@@ -1411,24 +1472,55 @@ export function renderPipelineLines(
                     const color = line.properties?.color || getPipelineCategoryColor(category)
                     const simEdge = resolveSimulationEdge(line, simulationEdgeMap)
                     const isNoFlow = isSimulationEdgeClosed(simEdge)
-                    const isCutoff = lineMatchesEdgeIds(line, cutoffEdgeIds)
-                    const lineColor = isCutoff ? '#ef4444' : (isNoFlow && simEdge ? '#475569' : (simEdge?.color || color))
-                    const haloColor = isCutoff ? 'rgba(127, 29, 29, 0.92)' : 'rgba(8, 15, 23, 0.95)'
-                    const strokeStyle = line.status === PipelineStatus.MAINTENANCE || isCutoff ? 'dashed' : 'solid'
+                    const isNetworkxCutoff = lineMatchesEdgeIds(line, networkxCutoffEdgeIds)
+                    const isNetworkxAffected = lineMatchesEdgeIds(line, networkxAffectedEdgeIds)
+                    const isNetworkxReroute = lineMatchesEdgeIds(line, networkxRerouteEdgeIds)
+                    const isNetworkxBeforePath = lineMatchesEdgeIds(line, networkxBeforePathEdgeIds)
+                    const isNetworkxBlockedFlow = lineMatchesEdgeIds(line, networkxBlockedFlowEdgeIds)
+                    const isCutoff = lineMatchesEdgeIds(line, cutoffEdgeIds) || isNetworkxCutoff
+                    if (
+                        isCutoff
+                        || isNetworkxBlockedFlow
+                        || ((isNetworkxAffected || isNetworkxBeforePath) && !isNetworkxReroute)
+                    ) {
+                        renderedBlockedFlowLineIds.add(line.id)
+                    }
+                    const lineColor = isCutoff
+                        ? '#ef4444'
+                        : isNetworkxReroute
+                            ? '#22c55e'
+                            : isNetworkxAffected || isNetworkxBeforePath
+                                ? '#f59e0b'
+                                : isNetworkxBlockedFlow
+                                    ? '#64748b'
+                                : (isNoFlow && simEdge ? '#475569' : (simEdge?.color || color))
+                    const haloColor = isCutoff
+                        ? 'rgba(127, 29, 29, 0.92)'
+                        : isNetworkxReroute
+                            ? 'rgba(20, 83, 45, 0.92)'
+                            : isNetworkxAffected || isNetworkxBeforePath
+                                ? 'rgba(120, 53, 15, 0.9)'
+                                : isNetworkxBlockedFlow
+                                    ? 'rgba(15, 23, 42, 0.92)'
+                                : 'rgba(8, 15, 23, 0.95)'
+                    const strokeStyle = line.status === PipelineStatus.MAINTENANCE || isCutoff || isNetworkxAffected || isNetworkxBeforePath || isNetworkxBlockedFlow ? 'dashed' : 'solid'
                     const isBranch = getLinePipelineKind(line) === 'branch'
                     const baseWidth = isBranch ? 3 : (line.pressureLevel === PressureLevel.HIGH ? 7 : 5)
                     const simWidth = simEdge
                         ? Math.max(2, Math.min(9, Math.round(3 + simEdge.width_factor * 4)))
                         : baseWidth
-                    const visualWidth = isCutoff ? Math.max(baseWidth, simWidth) : simWidth
+                    const visualWidth = isCutoff || isNetworkxReroute || isNetworkxAffected || isNetworkxBeforePath ? Math.max(baseWidth, simWidth) : simWidth
+                    const activeOpacity = hasNetworkxCutoffOverlay && !isCutoff && !isNetworkxReroute && !isNetworkxAffected && !isNetworkxBeforePath && !isNetworkxBlockedFlow
+                        ? 0.28
+                        : 0.98
                     const path = buildVisualLinePath(line)
 
                     const haloPolyline = new AMap.Polyline({
                         path,
                         strokeColor: haloColor,
                         strokeWeight: visualWidth + 4,
-                        strokeOpacity: isCutoff ? 0.88 : (isNoFlow && simEdge ? 0.42 : 0.75),
-                        zIndex: 46,
+                        strokeOpacity: isCutoff || isNetworkxReroute || isNetworkxAffected || isNetworkxBeforePath || isNetworkxBlockedFlow ? 0.9 : (isNoFlow && simEdge ? 0.32 : activeOpacity * 0.75),
+                        zIndex: isCutoff || isNetworkxReroute || isNetworkxAffected || isNetworkxBeforePath ? 66 : 46,
                         lineJoin: 'round',
                         lineCap: 'round',
                         zooms: [2, 30],
@@ -1440,9 +1532,9 @@ export function renderPipelineLines(
                         strokeColor: lineColor,
                         strokeWeight: visualWidth,
                         strokeStyle: strokeStyle,
-                        strokeDasharray: isCutoff ? [10, 8] : undefined,
-                        strokeOpacity: isCutoff ? 0.92 : (isNoFlow && simEdge ? 0.42 : 0.98),
-                        zIndex: isCutoff ? 72 : 52,
+                        strokeDasharray: isCutoff ? [10, 8] : (isNetworkxAffected || isNetworkxBeforePath || isNetworkxBlockedFlow) ? [7, 7] : undefined,
+                        strokeOpacity: isCutoff || isNetworkxReroute || isNetworkxAffected || isNetworkxBeforePath ? 0.96 : (isNetworkxBlockedFlow ? 0.48 : (isNoFlow && simEdge ? 0.42 : activeOpacity)),
+                        zIndex: isCutoff ? 78 : isNetworkxReroute ? 76 : isNetworkxAffected || isNetworkxBeforePath ? 70 : isNetworkxBlockedFlow ? 58 : 52,
                         lineJoin: 'round',
                         lineCap: 'round',
                         zooms: [2, 30],
@@ -1481,8 +1573,29 @@ export function renderPipelineLines(
                 // 还有未渲染的，下一帧继续
                 requestAnimationFrame(renderBatch)
             } else {
+                if (networkxCutoffNodeIds.size > 0) {
+                    nodes
+                        .filter(node => networkxCutoffNodeIds.has(node.id))
+                        .forEach(node => {
+                            const marker = createNetworkxCutoffNodeMarker(map, node)
+                            if (marker) polylines.push(marker)
+                        })
+                }
+
                 // 1. 基础管线全部渲染完成，现在执行路径缝合算法，提取出贯穿全国的超长干线！
-                const mergedPaths = mergeLinesIntoContinuousPaths(lines, nodes, simulationEdgeMap)
+                const blockedFlowEdgeIds = new Set<string>([
+                    ...cutoffEdgeIds,
+                    ...networkxCutoffEdgeIds,
+                    ...networkxBlockedFlowEdgeIds,
+                    ...renderedBlockedFlowLineIds,
+                    ...[...networkxAffectedEdgeIds].filter(id => !networkxRerouteEdgeIds.has(id)),
+                ])
+
+                const mergedPaths = mergeLinesIntoContinuousPaths(lines, nodes, simulationEdgeMap, {
+                    blockedFlowEdgeIds,
+                    blockedFlowNodeIds: networkxCutoffNodeIds,
+                    rerouteEdgeIds: networkxRerouteEdgeIds,
+                })
 
                 // 2. 在这些超长干线上施加流动光效
                 mergedPaths.forEach(({ path, color, totalLength, flowIntensity, flowDirection }) => {
@@ -1516,9 +1629,15 @@ export function renderPipelineLines(
 function mergeLinesIntoContinuousPaths(
     lines: PipelineLine[],
     nodes: PipelineNode[],
-    simulationEdgeMap?: Map<string, SimEdgeResult>
+    simulationEdgeMap?: Map<string, SimEdgeResult>,
+    options: {
+        blockedFlowEdgeIds?: Set<string>
+        blockedFlowNodeIds?: Set<string>
+        rerouteEdgeIds?: Set<string>
+    } = {},
 ): MergedFlowPath[] {
     const paths: MergedFlowPath[] = []
+    const { blockedFlowEdgeIds, blockedFlowNodeIds, rerouteEdgeIds } = options
 
     // 找出所有具备“打断/发射”资格的重点站点
     const hubNodeIds = new Set<string>()
@@ -1536,7 +1655,7 @@ function mergeLinesIntoContinuousPaths(
     const nodeDegree = new Map<string, number>()
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
-        if (!shouldRenderFlowForLine(line, simulationEdgeMap)) continue
+        if (!shouldRenderFlowForLine(line, simulationEdgeMap, blockedFlowEdgeIds, blockedFlowNodeIds)) continue
         if (line.startNodeId) nodeDegree.set(line.startNodeId, (nodeDegree.get(line.startNodeId) || 0) + 1)
         if (line.endNodeId) nodeDegree.set(line.endNodeId, (nodeDegree.get(line.endNodeId) || 0) + 1)
     }
@@ -1545,9 +1664,10 @@ function mergeLinesIntoContinuousPaths(
     const linesByColor = new Map<string, PipelineLine[]>()
     for (const line of lines) {
         if (!line.path || line.path.length < 2) continue
-        if (!shouldRenderFlowForLine(line, simulationEdgeMap)) continue
+        if (!shouldRenderFlowForLine(line, simulationEdgeMap, blockedFlowEdgeIds, blockedFlowNodeIds)) continue
         const simEdge = resolveSimulationEdge(line, simulationEdgeMap)
-        const color = simEdge?.color || line.properties?.color || '#00e5ff' // default fallback
+        const isReroute = lineMatchesEdgeIds(line, rerouteEdgeIds)
+        const color = isReroute ? '#22c55e' : (simEdge?.color || line.properties?.color || '#00e5ff') // default fallback
 
         if (!linesByColor.has(color)) linesByColor.set(color, [])
         linesByColor.get(color)!.push(line)
@@ -1573,9 +1693,11 @@ function mergeLinesIntoContinuousPaths(
 
                 const headIsHub = headDegree > 2 || (headNode && hubNodeIds.has(headNode));
                 const tailIsHub = tailDegree > 2 || (tailNode && hubNodeIds.has(tailNode));
+                const headIsBlocked = Boolean(headNode && blockedFlowNodeIds?.has(headNode));
+                const tailIsBlocked = Boolean(tailNode && blockedFlowNodeIds?.has(tailNode));
 
-                const canExtendHead = headNode && !headIsHub;
-                const canExtendTail = tailNode && !tailIsHub;
+                const canExtendHead = headNode && !headIsHub && !headIsBlocked;
+                const canExtendTail = tailNode && !tailIsHub && !tailIsBlocked;
 
                 if (!canExtendHead && !canExtendTail) {
                     break;

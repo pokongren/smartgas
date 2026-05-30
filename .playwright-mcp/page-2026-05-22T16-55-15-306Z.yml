@@ -1,0 +1,771 @@
+- generic [ref=e2]:
+  - button "呼出页面入口" [ref=e4]:
+    - generic [ref=e5]: apps
+  - button "keyboard_arrow_down" [ref=e1563]:
+    - generic [ref=e7]: keyboard_arrow_down
+  - generic [ref=e1564]:
+    - generic [ref=e1565]:
+      - generic [ref=e1567]: smart_toy
+      - generic [ref=e1568]:
+        - generic [ref=e1569]: AI 助手
+        - generic [ref=e1570]: 智慧平台 · 拖动移动
+      - generic "在线" [ref=e1571]
+      - button "open_in_new" [ref=e1572] [cursor=pointer]:
+        - generic [ref=e1573]: open_in_new
+      - button "close" [ref=e1574] [cursor=pointer]:
+        - generic [ref=e1575]: close
+    - generic [ref=e1577]:
+      - generic [ref=e1579]: smart_toy
+      - heading "你好，我是管网 AI 助手" [level=3] [ref=e1580]
+      - paragraph [ref=e1581]: 你可以直接问业务，也可以输入 / 打开 Skill 菜单。
+      - generic [ref=e1582]: 可用提示词
+      - generic [ref=e1583]:
+        - generic [ref=e1584]:
+          - generic [ref=e1585]: 管网基础
+          - button "pin_drop 统计压气站数量 管网里有多少个压气站？请按类型给出统计口径。" [ref=e1586] [cursor=pointer]:
+            - generic [ref=e1587]: pin_drop
+            - generic [ref=e1588]:
+              - generic [ref=e1589]: 统计压气站数量
+              - generic [ref=e1590]: 管网里有多少个压气站？请按类型给出统计口径。
+          - button "route 列出干线管线 列出所有干线管线，并说明每条管线的起终点和关键站场。" [ref=e1591] [cursor=pointer]:
+            - generic [ref=e1592]: route
+            - generic [ref=e1593]:
+              - generic [ref=e1594]: 列出干线管线
+              - generic [ref=e1595]: 列出所有干线管线，并说明每条管线的起终点和关键站场。
+          - button "public 全网概况 请用汇报口径总结管网整体概况，包括站场、管线、管线组和重点节点。" [ref=e1596] [cursor=pointer]:
+            - generic [ref=e1597]: public
+            - generic [ref=e1598]:
+              - generic [ref=e1599]: 全网概况
+              - generic [ref=e1600]: 请用汇报口径总结管网整体概况，包括站场、管线、管线组和重点节点。
+        - generic [ref=e1601]:
+          - generic [ref=e1602]: 拓扑演示
+          - button "content_cut 中卫截断推演 演示中卫压气站截断推演，显示一连串操作，最后给分析。" [ref=e1603] [cursor=pointer]:
+            - generic [ref=e1604]: content_cut
+            - generic [ref=e1605]:
+              - generic [ref=e1606]: 中卫截断推演
+              - generic [ref=e1607]: 演示中卫压气站截断推演，显示一连串操作，最后给分析。
+          - button "account_tree 靖边NetworkX截断 在全国一张网里演示靖边 NetworkX 原生截断推演，显示截断点、受影响路径、绕行范围和分析结论。" [ref=e1608] [cursor=pointer]:
+            - generic [ref=e1609]: account_tree
+            - generic [ref=e1610]:
+              - generic [ref=e1611]: 靖边NetworkX截断
+              - generic [ref=e1612]: 在全国一张网里演示靖边 NetworkX 原生截断推演，显示截断点、受影响路径、绕行范围和分析结论。
+    - generic [ref=e1613]:
+      - textbox "输入你的问题..." [ref=e1614]
+      - button "send" [disabled] [ref=e1615]:
+        - generic [ref=e1616]: send
+  - generic [ref=e8]:
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - heading "public 智脉平台-全国管网统一视图" [level=1] [ref=e12]:
+          - generic [ref=e13]: public
+          - text: 智脉平台-全国管网统一视图
+        - paragraph [ref=e14]: "站场: 1034 | 管道段: 1043 | 管线组: 13"
+      - generic [ref=e15]:
+        - button "science 仿真" [ref=e16]:
+          - generic [ref=e17]: science
+          - generic [ref=e18]: 仿真
+        - button "filter_alt 展示" [ref=e19]:
+          - generic [ref=e20]: filter_alt
+          - generic [ref=e21]: 展示
+        - button "account_tree 靖边截断" [ref=e22]:
+          - generic [ref=e23]: account_tree
+          - generic [ref=e24]: 靖边截断
+        - button "dark_mode 深色" [ref=e25]:
+          - generic [ref=e26]: dark_mode
+          - generic [ref=e27]: 深色
+        - button "hub 枢纽精简 4 expand_more" [ref=e1644]:
+          - generic [ref=e30]: hub
+          - generic [ref=e31]: 枢纽精简
+          - generic [ref=e32]: "4"
+          - generic [ref=e33]: expand_more
+    - generic [ref=e35]:
+      - iframe [ref=e36]:
+        
+      - generic [ref=e38]:
+        - generic:
+          - generic [ref=e1330]: 北京市
+          - generic [ref=e1332]: 天津市
+          - generic [ref=e1334]: 河北省
+          - generic [ref=e1336]: 山西省
+          - generic [ref=e1338]: 内蒙古自治区
+          - generic [ref=e1340]: 辽宁省
+          - generic [ref=e1342]: 吉林省
+          - generic [ref=e1344]: 黑龙江省
+          - generic [ref=e1346]: 上海市
+          - generic [ref=e1348]: 江苏省
+          - generic [ref=e1350]: 浙江省
+          - generic [ref=e1352]: 安徽省
+          - generic [ref=e1354]: 福建省
+          - generic [ref=e1356]: 江西省
+          - generic [ref=e1358]: 山东省
+          - generic [ref=e1360]: 河南省
+          - generic [ref=e1362]: 湖北省
+          - generic [ref=e1364]: 湖南省
+          - generic [ref=e1366]: 广东省
+          - generic [ref=e1368]: 广西壮族自治区
+          - generic [ref=e1370]: 海南省
+          - generic [ref=e1372]: 重庆市
+          - generic [ref=e1374]: 四川省
+          - generic [ref=e1376]: 贵州省
+          - generic [ref=e1378]: 云南省
+          - generic [ref=e1380]: 西藏自治区
+          - generic [ref=e1382]: 陕西省
+          - generic [ref=e1384]: 甘肃省
+          - generic [ref=e1386]: 青海省
+          - generic [ref=e1388]: 宁夏回族自治区
+          - generic [ref=e1390]: 新疆维吾尔自治区
+          - generic [ref=e1392]: 台湾省
+          - generic [ref=e1394]: 香港特别行政区
+          - generic [ref=e1396]: 澳门特别行政区
+          - generic "枢纽" [ref=e2695] [cursor=pointer]
+          - generic [ref=e2698]: 平顶山分输站
+          - generic [ref=e2700] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2702]: 连木沁压气站
+          - generic [ref=e2704] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2706]: 潼关压气站
+          - generic [ref=e2710]: 蕲春分输站
+          - generic [ref=e2712] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2714]: 古浪压气站
+          - generic [ref=e2718]: 华阴分输站
+          - generic [ref=e2722]: 泾川分输站
+          - generic [ref=e2726]: 武威分输站
+          - generic [ref=e2730]: 九江分输站
+          - generic [ref=e2734]: 昌吉分输站
+          - generic [ref=e2738]: 礼泉分输站
+          - generic [ref=e2742]: 临潼分输站
+          - generic [ref=e2744] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2746]: 洛宁压气站
+          - generic [ref=e2748] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2750]: 海原压气站
+          - generic [ref=e2754]: 赣州分输站
+          - generic [ref=e2758]: 奎屯分输站
+          - generic [ref=e2760] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2762]: 乌苏压气站
+          - generic "枢纽" [ref=e2764] [cursor=pointer]
+          - generic [ref=e2767]: 中卫压气站
+          - generic [ref=e2771]: 孝感分输站
+          - generic [ref=e2775]: 哈密分输站
+          - generic [ref=e2777] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2779]: 哈密压气站
+          - generic [ref=e2783]: 洛阳分输站
+          - generic [ref=e2785] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2787]: 灵台压气站
+          - generic [ref=e2789] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2791]: 永昌压气站
+          - generic "枢纽" [ref=e2793] [cursor=pointer]
+          - generic [ref=e2796]: 广州压气站
+          - generic [ref=e2798] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2800]: 嘉峪关压气站
+          - generic "气源" [ref=e2802] [cursor=pointer]:
+            - img [ref=e2803]
+          - generic [ref=e2819]: 霍尔果斯压气站
+          - generic "枢纽" [ref=e2821] [cursor=pointer]
+          - generic [ref=e2824]: 红柳压气站
+          - generic [ref=e2828]: 黄州分输站
+          - generic [ref=e2830] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2832]: 黄陂压气站
+          - generic [ref=e2834] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2836]: 彭阳压气站
+          - generic [ref=e2840]: 三门峡分输站
+          - generic [ref=e2842] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2844]: 吉安压气站
+          - generic [ref=e2846] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2848]: 武穴压气站
+          - generic [ref=e2852]: 南阳分输站
+          - generic [ref=e2856]: 乾县西分输站
+          - generic [ref=e2860]: 平泉分输站
+          - generic [ref=e2862] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2864]: 鲁山压气站
+          - generic [ref=e2866] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2868]: 乌鲁木齐压气站
+          - generic [ref=e2870] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2872]: 了墩压气站
+          - generic [ref=e2876]: 随州分输站
+          - generic [ref=e2878] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2880]: 烟墩压气站
+          - generic [ref=e2882] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2884]: 玛纳斯压气站
+          - generic [ref=e2888]: 泾阳分输站
+          - generic "枢纽" [ref=e2890] [cursor=pointer]
+          - generic [ref=e2893]: 南昌压气站
+          - generic [ref=e2897]: 乾县东分输站
+          - generic [ref=e2901]: 樟树分输站
+          - generic [ref=e2903] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2905]: 高陵压气站
+          - generic [ref=e2909]: 固原分输站
+          - generic [ref=e2913]: 黄冈分输站
+          - generic [ref=e2917]: 南雄分输站
+          - generic [ref=e2919] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2921]: 枣阳压气站
+          - generic [ref=e2923] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2925]: 精河压气站
+          - generic [ref=e2927] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2929]: 张掖压气站
+          - generic [ref=e2933]: 社旗分输站
+          - generic [ref=e2937]: 昌北分输站
+          - generic [ref=e2939] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2941]: 吐鲁番压气站
+          - generic [ref=e2943] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2945]: 瓜州压气站
+          - generic [ref=e2949]: 阜宁分输站
+          - generic [ref=e2953]: 衡水分输站
+          - generic [ref=e2955] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2957]: 连云港分输压气站
+          - generic [ref=e2961]: 常熟分输站
+          - generic [ref=e2963] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e2965]: 中俄唐山压气站
+          - generic [ref=e2969]: 双辽分输站
+          - generic [ref=e2973]: 东台分输站
+          - generic [ref=e2977]: 中俄秦皇岛分输站
+          - generic "枢纽" [ref=e2979] [cursor=pointer]
+          - generic [ref=e2982]: 永清压气站
+          - generic [ref=e2986]: 中俄长岭分输站
+          - generic [ref=e2990]: 交气点
+          - generic [ref=e2994]: 德州分输站
+          - generic [ref=e2998]: 兴化分输站
+          - generic "枢纽" [ref=e3000] [cursor=pointer]
+          - generic [ref=e3003]: 安平压气站
+          - generic [ref=e3007]: 盐都南分输站
+          - generic [ref=e3011]: 盐都分输站
+          - generic [ref=e3013] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3015]: 锦州压气站
+          - generic [ref=e3017] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3019]: 明水压气站
+          - generic [ref=e3021] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3023]: 五大连池压气站
+          - generic "枢纽" [ref=e3025] [cursor=pointer]
+          - generic [ref=e3028]: 泰安压气站
+          - generic [ref=e3032]: 中俄宝坻分输站
+          - generic [ref=e3036]: 通辽分输站
+          - generic [ref=e3040]: 灌南分输站
+          - generic [ref=e3044]: 海安分输站
+          - generic "枢纽" [ref=e3046] [cursor=pointer]
+          - generic [ref=e3049]: 甪直联络站
+          - generic "气源" [ref=e3051] [cursor=pointer]:
+            - img [ref=e3052]
+          - generic [ref=e3068]: 黑河压气站
+          - generic [ref=e3070] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3072]: 沈阳压气站
+          - generic [ref=e3076]: 大庆分输站
+          - generic [ref=e3078] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3080]: 肇源压气站
+          - generic [ref=e3084]: 兰考分输站
+          - generic [ref=e3088]: 济宁分输站
+          - generic [ref=e3092]: 巨野分输站
+          - generic [ref=e3096]: 中牟分输站
+          - generic [ref=e3100]: 菏泽分输站
+          - generic "枢纽" [ref=e3102] [cursor=pointer]
+          - generic [ref=e3105]: 薛店分输站
+          - generic [ref=e3109]: 禹州分输站
+          - generic [ref=e3113]: 杞县分输站
+          - generic [ref=e3117]: 开封分输站
+          - generic [ref=e3121]: 硝河分输站
+          - generic [ref=e3123] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3125]: 广元压气站
+          - generic [ref=e3129]: 陇南分输站
+          - generic [ref=e3133]: 武胜分输站
+          - generic [ref=e3137]: 中贵马坊分输站
+          - generic [ref=e3139] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3141]: 江津压气站
+          - generic [ref=e3143] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3145]: 南充压气站
+          - generic [ref=e3147] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3149]: 天水压气站
+          - generic [ref=e3153]: 铜梁分输站
+          - generic [ref=e3155] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3157]: 固原压气站
+          - generic [ref=e3161]: 南部分输站
+          - generic [ref=e3165]: 贵阳北分输站
+          - generic [ref=e3167] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3169]: 遵义压气站
+          - generic "枢纽" [ref=e3171] [cursor=pointer]
+          - generic [ref=e3174]: 贵阳压气站
+          - generic [ref=e3178]: 安顺分输站
+          - generic [ref=e3180] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3182]: 河池压气站
+          - generic [ref=e3184] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3186]: 保山压气站
+          - generic [ref=e3190]: 忻城分输站
+          - generic [ref=e3194]: 都匀分输站
+          - generic "枢纽" [ref=e3196] [cursor=pointer]
+          - generic [ref=e3199]: 贵港压气站
+          - generic [ref=e3203]: 宜州分输站
+          - generic [ref=e3207]: 禄丰分输站
+          - generic [ref=e3211]: 楚雄分输站
+          - generic [ref=e3215]: 龙陵分输站
+          - generic [ref=e3219]: 弥渡分输站
+          - generic [ref=e3223]: 来宾分输站
+          - generic [ref=e3227]: 曲靖分输站
+          - generic [ref=e3231]: 寻甸分输站
+          - generic [ref=e3235]: 芒市分输站
+          - generic "气源" [ref=e3237] [cursor=pointer]:
+            - img [ref=e3238]
+          - generic [ref=e3254]: 瑞丽分输站
+          - generic [ref=e3258]: 德庆分输站
+          - generic [ref=e3262]: 高要分输站
+          - generic [ref=e3266]: 肇庆分输站
+          - generic [ref=e3270]: 广西管道南宁分输站
+          - generic [ref=e3274]: 清远分输站
+          - generic [ref=e3278]: 佛山分输站
+          - generic [ref=e3282]: 横县分输站
+          - generic [ref=e3286]: 南宁分输站
+          - generic [ref=e3288] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3290]: 梧州压气站
+          - generic [ref=e3292] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3294]: 大铲岛压气站
+          - generic [ref=e3298]: 东莞分输站
+          - generic [ref=e3302]: 求雨岭分输站
+          - generic "LNG接收站" [ref=e3304] [cursor=pointer]:
+            - img [ref=e3305]
+          - generic [ref=e3316]: 深圳LNG接收站
+          - generic [ref=e3318] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3320]: 湖州压气站
+          - generic [ref=e3324]: 景德镇分输站
+          - generic [ref=e3328]: 宣城分输站
+          - generic [ref=e3332]: 绩溪分输站
+          - generic "枢纽" [ref=e3334] [cursor=pointer]
+          - generic [ref=e3337]: 嘉兴
+          - generic [ref=e3339] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3341]: 黄山压气站
+          - generic [ref=e3345]: 余干分输站
+          - generic [ref=e3349]: 吴江分输站
+          - generic [ref=e3353]: 嘉善分输站
+          - generic [ref=e3355] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3357]: 鄂尔多斯压气站
+          - generic [ref=e3359] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3361]: 张家口压气站
+          - generic [ref=e3365]: 呼和浩特分输站
+          - generic [ref=e3367] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3369]: 乌兰察布压气站
+          - generic [ref=e3371] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3373]: 红墩界压气站
+          - generic [ref=e3377]: 怀来首站
+          - generic "枢纽" [ref=e3379] [cursor=pointer]
+          - generic [ref=e3382]: 靖边压气站
+          - generic [ref=e3386]: 延庆分输站
+          - generic [ref=e3388] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3390]: 托克托压气站
+          - generic [ref=e3394]: 兴和分输站
+          - generic [ref=e3398]: 西集分输站
+          - generic [ref=e3402]: 石家庄华泽站
+          - generic [ref=e3406]: 石家庄潜能站
+          - generic [ref=e3410]: 文安分输站
+          - generic [ref=e3412] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3414]: 石家庄压气站
+          - generic [ref=e3416] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3418]: 兴县压气站
+          - generic [ref=e3422]: 采育分输站
+          - generic [ref=e3426]: 盂县分输站
+          - generic [ref=e3430]: 阳曲大盂站
+          - generic [ref=e3432] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3434]: 阳曲压气站
+          - generic [ref=e3438]: 鹿泉华泽站
+          - generic [ref=e3442]: 鹿泉华电九期站
+          - generic [ref=e3446]: 鹿泉分输站
+          - generic [ref=e3450]: 霸州分输站
+          - generic [ref=e3454]: 兴县分输站
+          - generic [ref=e3458]: 项家输气站
+          - generic [ref=e3462]: 永清分输站
+          - generic [ref=e3466]: 岚县分输站
+          - generic [ref=e3470]: 榆阳分输站
+          - generic [ref=e3474]: 顺达站
+          - generic "枢纽" [ref=e3476] [cursor=pointer]
+          - generic [ref=e3479]: 榆林压气站
+          - generic [ref=e3483]: 正定分输站
+          - generic [ref=e3487]: 盂县西分输站
+          - generic [ref=e3491]: 八堡分输站
+          - generic [ref=e3495]: 雷家碛分输站
+          - generic [ref=e3499]: 涿州东分输站
+          - generic [ref=e3503]: 深泽北分输站
+          - generic [ref=e3507]: 井陉分输站
+          - generic [ref=e3511]: 良乡分输站
+          - generic [ref=e3515]: 临县分输站
+          - generic [ref=e3517] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3519]: 石家庄压气站
+          - generic [ref=e3523]: 大灰厂分输站
+          - generic [ref=e3527]: 潭柘寺分输站
+          - generic [ref=e3531]: 高阳分输站
+          - generic [ref=e3535]: 向阳五村分输站
+          - generic [ref=e3539]: 鹿泉东分输站
+          - generic [ref=e3541] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3543]: 临县压气站
+          - generic [ref=e3547]: 西沙屯分输站
+          - generic [ref=e3551]: 琉璃河分输站
+          - generic [ref=e3555]: 榆佳分输站
+          - generic [ref=e3559]: 陕京霸州分输站
+          - generic [ref=e3563]: 永清分输站
+          - generic [ref=e3565] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3567]: 阳曲压气站
+          - generic [ref=e3569] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3571]: 柳园压气站
+          - generic [ref=e3573] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3575]: 四道班压气站
+          - generic [ref=e3579]: 滁州分输站
+          - generic [ref=e3583]: 龙池分输站
+          - generic [ref=e3587]: 昆山分输站
+          - generic [ref=e3591]: 延川西分输站
+          - generic [ref=e3593] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3595]: 孔雀河压气站
+          - generic [ref=e3599]: 古浪分输站
+          - generic [ref=e3601] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3603]: 延川压气站
+          - generic [ref=e3605] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3607]: 定远压气站
+          - generic [ref=e3611]: 苏州分输站
+          - generic [ref=e3613] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3615]: 玉门压气站
+          - generic [ref=e3617] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3619]: 鄯善压气站
+          - generic [ref=e3621] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3623]: 西一盐池压气站
+          - generic [ref=e3627]: 常州分输站
+          - generic "气源" [ref=e3629] [cursor=pointer]:
+            - img [ref=e3630]
+          - generic [ref=e3646]: 轮南压气站
+          - generic [ref=e3648] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3650]: 淮阳压气站
+          - generic [ref=e3654]: 刘巷子分输站
+          - generic [ref=e3656] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3658]: 沁水压气站
+          - generic [ref=e3662]: 龙潭分输站
+          - generic [ref=e3666]: 芙蓉分输站
+          - generic [ref=e3668] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3670]: 蒲县压气站
+          - generic [ref=e3672] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3674]: 郑州压气站
+          - generic [ref=e3678]: 博爱分输站
+          - generic [ref=e3680] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3682]: 金昌压气站
+          - generic [ref=e3686]: 子长分输站
+          - generic [ref=e3688] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3690]: 山丹压气站
+          - generic [ref=e3694]: 无锡分输站
+          - generic [ref=e3698]: 太和分输站
+          - generic [ref=e3702]: 镇江分输站
+          - generic [ref=e3706]: 青山分输站
+          - generic [ref=e3708] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3710]: 酒泉压气站
+          - generic [ref=e3714]: 利辛分输站
+          - generic [ref=e3718]: 临汾分输站
+          - generic [ref=e3722]: 东桥分输站
+          - generic [ref=e3724] [cursor=pointer]:
+            - img "压气站"
+          - generic [ref=e3726]: 雅满苏压气站
+          - generic [ref=e3730]: 丹阳分输站
+      - generic:
+        - img
+      - generic [ref=e1077]: © 2026 AutoNavi - GS(2019)756号
+    - generic [ref=e1617]:
+      - generic "按住拖动仿真面板" [ref=e1618]:
+        - generic [ref=e1619]: 稳态仿真
+        - generic [ref=e1620]: 拖动
+      - generic [ref=e1621]:
+        - generic [ref=e1622]: 场景
+        - combobox [ref=e1623]:
+          - option "常规稳态输气" [selected]
+          - option "中卫站压力变化"
+          - option "郑州压气站停运"
+          - option "华东末端负荷上调"
+          - option "白鹤末端交付受限"
+      - button "tune 编辑精细化参数 (压力/流量) ▾" [ref=e1626]:
+        - generic [ref=e1627]: tune
+        - generic [ref=e1628]: 编辑精细化参数 (压力/流量)
+        - generic [ref=e1629]: ▾
+      - button "运行仿真" [ref=e1630] [cursor=pointer]
+      - generic [ref=e1631]:
+        - button "保存快照" [ref=e1632] [cursor=pointer]
+        - button "刷新快照" [ref=e1633] [cursor=pointer]
+      - generic [ref=e1634]:
+        - generic [ref=e1635]: 历史快照回放
+        - combobox [ref=e1636]:
+          - option "选择历史快照" [selected]
+          - option "steady_base | we1-ee45936c | 01:57:46"
+          - option "steady_base | we1-3e0c0685 | 20:54:02"
+          - option "steady_base | we1-25dffe83 | 20:54:02"
+          - option "steady_base | we1-03a8dbcb | 20:54:02"
+          - option "steady_base | we1-0b5de0cb | 20:53:17"
+          - option "steady_base | we1-740adf90 | 20:53:17"
+          - option "steady_base | we1-959f4b6d | 20:53:17"
+        - button "加载快照" [disabled] [ref=e1637]
+      - generic [ref=e1638]:
+        - generic [ref=e1639]: 基线快照
+        - combobox [ref=e1640]:
+          - option "选择对比基线"
+          - option "steady_base | we1-ee45936c | 01:57:46" [selected]
+          - option "steady_base | we1-3e0c0685 | 20:54:02"
+          - option "steady_base | we1-25dffe83 | 20:54:02"
+          - option "steady_base | we1-03a8dbcb | 20:54:02"
+          - option "steady_base | we1-0b5de0cb | 20:53:17"
+          - option "steady_base | we1-740adf90 | 20:53:17"
+          - option "steady_base | we1-959f4b6d | 20:53:17"
+        - generic [ref=e1641]: 默认优先选择 steady_base 快照
+    - generic "拖动调整仿真面板长宽" [ref=e1642]:
+      - generic [ref=e1643]: ◢
+    - generic [ref=e2682]:
+      - generic "拖动调整位置" [ref=e2683]:
+        - generic [ref=e2684]:
+          - generic [ref=e2685]:
+            - generic [ref=e2686]:
+              - generic [ref=e2687]: account_tree
+              - text: NetworkX · 靖边枢纽截断
+            - generic [ref=e2688]: 站内阀门动作同步到全国一张网
+          - button "close" [ref=e2689]:
+            - generic [ref=e2690]: close
+      - generic [ref=e3731]: "{\"detail\":\"Not Found\"}"
+      - generic "拖动调整大小" [ref=e2693]
+    - generic [ref=e1078]:
+      - generic "按住标题栏可拖动管线目录" [ref=e1079]:
+        - heading "toc 管线目录" [level=3] [ref=e1080]:
+          - generic [ref=e1081]: toc
+          - text: 管线目录
+        - generic [ref=e1082]:
+          - button "全选" [ref=e1083]
+          - button "全部取消" [ref=e1084]
+          - button "复原" [ref=e1085]
+      - generic [ref=e1086]:
+        - generic "按住管线行可上下拖动排序" [ref=e1087]:
+          - generic [ref=e1088]:
+            - generic [ref=e1090]:
+              - img
+            - generic [ref=e1092]:
+              - generic [ref=e1095]: 西气东输二线
+              - generic [ref=e1096]:
+                - button "visibility_off" [ref=e1097]:
+                  - generic [ref=e1098]: visibility_off
+                - button "open_in_new" [ref=e1099]:
+                  - generic [ref=e1100]: open_in_new
+                - button "show_chart" [ref=e1101]:
+                  - generic [ref=e1102]: show_chart
+                - button "speed" [ref=e1103]:
+                  - generic [ref=e1104]: speed
+        - generic "按住管线行可上下拖动排序" [ref=e1105]:
+          - generic [ref=e1106]:
+            - generic [ref=e1108]:
+              - img
+            - generic [ref=e1110]:
+              - generic [ref=e1113]: 中俄东线
+              - generic [ref=e1114]:
+                - button "visibility_off" [ref=e1115]:
+                  - generic [ref=e1116]: visibility_off
+                - button "open_in_new" [ref=e1117]:
+                  - generic [ref=e1118]: open_in_new
+                - button "show_chart" [ref=e1119]:
+                  - generic [ref=e1120]: show_chart
+                - button "speed" [ref=e1121]:
+                  - generic [ref=e1122]: speed
+        - generic "按住管线行可上下拖动排序" [ref=e1123]:
+          - generic [ref=e1124]:
+            - generic [ref=e1126]:
+              - img
+            - generic [ref=e1128]:
+              - generic [ref=e1131]: 平泰支干线
+              - generic [ref=e1132]:
+                - button "visibility_off" [ref=e1133]:
+                  - generic [ref=e1134]: visibility_off
+                - button "open_in_new" [ref=e1135]:
+                  - generic [ref=e1136]: open_in_new
+                - button "show_chart" [ref=e1137]:
+                  - generic [ref=e1138]: show_chart
+                - button "speed" [ref=e1139]:
+                  - generic [ref=e1140]: speed
+        - generic "按住管线行可上下拖动排序" [ref=e1141]:
+          - generic [ref=e1142]:
+            - generic [ref=e1144]:
+              - img
+            - generic [ref=e1146]:
+              - generic [ref=e1149]: 中贵线
+              - generic [ref=e1150]:
+                - button "visibility_off" [ref=e1151]:
+                  - generic [ref=e1152]: visibility_off
+                - button "open_in_new" [ref=e1153]:
+                  - generic [ref=e1154]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e1155]:
+          - generic [ref=e1156]:
+            - generic [ref=e1158]:
+              - img
+            - generic [ref=e1160]:
+              - generic [ref=e1163]: 中缅线
+              - generic [ref=e1164]:
+                - button "visibility_off" [ref=e1165]:
+                  - generic [ref=e1166]: visibility_off
+                - button "open_in_new" [ref=e1167]:
+                  - generic [ref=e1168]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e1169]:
+          - generic [ref=e1170]:
+            - generic [ref=e1172]:
+              - img
+            - generic [ref=e1174]:
+              - generic [ref=e1177]: 广南支干线
+              - generic [ref=e1178]:
+                - button "visibility_off" [ref=e1179]:
+                  - generic [ref=e1180]: visibility_off
+                - button "open_in_new" [ref=e1181]:
+                  - generic [ref=e1182]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e1183]:
+          - generic [ref=e1184]:
+            - generic [ref=e1186]: chevron_right
+            - generic [ref=e1187]:
+              - img
+            - generic [ref=e1189]:
+              - generic [ref=e1192]: 广深支干线
+              - generic [ref=e1193]:
+                - button "visibility_off" [ref=e1194]:
+                  - generic [ref=e1195]: visibility_off
+                - button "open_in_new" [ref=e1196]:
+                  - generic [ref=e1197]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e1198]:
+          - generic [ref=e1199]:
+            - generic [ref=e1201]: chevron_right
+            - generic [ref=e1202]:
+              - img
+            - generic [ref=e1204]:
+              - generic [ref=e1207]: 南昌-上海支干线
+              - generic [ref=e1208]:
+                - button "visibility_off" [ref=e1209]:
+                  - generic [ref=e1210]: visibility_off
+                - button "open_in_new" [ref=e1211]:
+                  - generic [ref=e1212]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e1213]:
+          - generic [ref=e1214]:
+            - generic [ref=e1216]:
+              - img
+            - generic [ref=e1218]:
+              - generic [ref=e1221]: 嘉兴-甪直联络线
+              - generic [ref=e1222]:
+                - button "visibility_off" [ref=e1223]:
+                  - generic [ref=e1224]: visibility_off
+                - button "open_in_new" [ref=e1225]:
+                  - generic [ref=e1226]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e1227]:
+          - generic [ref=e1228]:
+            - generic [ref=e1230]:
+              - img
+            - generic [ref=e1232]:
+              - generic [ref=e1235]: 陕京四线
+              - generic [ref=e1236]:
+                - button "visibility_off" [ref=e1237]:
+                  - generic [ref=e1238]: visibility_off
+                - button "open_in_new" [ref=e1239]:
+                  - generic [ref=e1240]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e1241]:
+          - generic [ref=e1242]:
+            - generic [ref=e1244]:
+              - img
+            - generic [ref=e1246]:
+              - generic [ref=e1249]: 陕京二线
+              - generic [ref=e1250]:
+                - button "visibility_off" [ref=e1251]:
+                  - generic [ref=e1252]: visibility_off
+                - button "open_in_new" [ref=e1253]:
+                  - generic [ref=e1254]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e1255]:
+          - generic [ref=e1256]:
+            - generic [ref=e1258]:
+              - img
+            - generic [ref=e1260]:
+              - generic [ref=e1263]: 陕京三线
+              - generic [ref=e1264]:
+                - button "visibility_off" [ref=e1265]:
+                  - generic [ref=e1266]: visibility_off
+                - button "open_in_new" [ref=e1267]:
+                  - generic [ref=e1268]: open_in_new
+        - generic "按住管线行可上下拖动排序" [ref=e1269]:
+          - generic [ref=e1270]:
+            - generic [ref=e1272]:
+              - img
+            - generic [ref=e1274]:
+              - generic [ref=e1277]: 西气东输一线
+              - generic [ref=e1278]:
+                - button "visibility_off" [ref=e1279]:
+                  - generic [ref=e1280]: visibility_off
+                - button "open_in_new" [ref=e1281]:
+                  - generic [ref=e1282]: open_in_new
+                - button "show_chart" [ref=e1283]:
+                  - generic [ref=e1284]: show_chart
+                - button "speed" [ref=e1285]:
+                  - generic [ref=e1286]: speed
+      - generic "拖动调整管线目录宽高" [ref=e1287]
+    - generic [ref=e1289]:
+      - generic [ref=e1292]: 西气东输二线
+      - generic [ref=e1295]: 中俄东线
+      - generic [ref=e1298]: 平泰支干线
+      - generic [ref=e1301]: 中贵线
+      - generic [ref=e1304]: 中缅线
+      - generic [ref=e1307]: 广南支干线
+      - generic [ref=e1310]: 广深支干线
+      - generic [ref=e1313]: 南昌-上海支干线
+      - generic [ref=e1316]: 嘉兴-甪直联络线
+      - generic [ref=e1319]: 陕京四线
+      - generic [ref=e1322]: 陕京二线
+      - generic [ref=e1325]: 陕京三线
+      - generic [ref=e1328]: 西气东输一线

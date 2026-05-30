@@ -49,8 +49,8 @@ WE1_PILOTS: Dict[str, Dict[str, Any]] = {
             },
             {
                 "id": "zhongwei_supply_pressure_drop",
-                "name": "中卫出站压力下调",
-                "description": "验证中卫边界压力降低后，全段压力和华东末端承接变化。",
+                "name": "中卫站压力/流量变化",
+                "description": "验证中卫边界压力与供给流量变化后，全段压力和华东末端承接变化。",
             },
             {
                 "id": "zhengzhou_compressor_offline",

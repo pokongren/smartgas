@@ -1,0 +1,41 @@
+- generic [ref=e2]:
+  - button "呼出页面入口" [ref=e4]:
+    - generic [ref=e5]: apps
+  - button "smart_toy" [ref=e6]:
+    - generic [ref=e7]: smart_toy
+  - generic [ref=e8]:
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - heading "public 智脉平台-全国管网统一视图" [level=1] [ref=e12]:
+          - generic [ref=e13]: public
+          - text: 智脉平台-全国管网统一视图
+        - paragraph [ref=e14]: "站场: 0 | 管道段: 0 | 管线组: 0"
+      - generic [ref=e15]:
+        - button "science 仿真" [ref=e16]:
+          - generic [ref=e17]: science
+          - generic [ref=e18]: 仿真
+        - button "filter_alt 展示" [ref=e19]:
+          - generic [ref=e20]: filter_alt
+          - generic [ref=e21]: 展示
+        - button "account_tree 靖边截断" [ref=e22]:
+          - generic [ref=e23]: account_tree
+          - generic [ref=e24]: 靖边截断
+        - button "dark_mode 深色" [ref=e25]:
+          - generic [ref=e26]: dark_mode
+          - generic [ref=e27]: 深色
+        - button "hub 枢纽精简 4 expand_more" [ref=e29]:
+          - generic [ref=e30]: hub
+          - generic [ref=e31]: 枢纽精简
+          - generic [ref=e32]: "4"
+          - generic [ref=e33]: expand_more
+    - generic [ref=e38]: 加载地图 SDK...
+    - generic [ref=e39]:
+      - generic "按住标题栏可拖动管线目录" [ref=e40]:
+        - heading "toc 管线目录" [level=3] [ref=e41]:
+          - generic [ref=e42]: toc
+          - text: 管线目录
+        - generic [ref=e43]:
+          - button "全选" [ref=e44]
+          - button "全部取消" [ref=e45]
+          - button "复原" [ref=e46]
+      - generic "拖动调整管线目录宽高" [ref=e48]

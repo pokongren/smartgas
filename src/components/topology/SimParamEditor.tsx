@@ -11,6 +11,9 @@ interface EdgeOption {
 interface NodeOverrideInput {
   target_pressure_mpa?: number
   min_pressure_mpa?: number
+  nominal_flow?: number
+  supply_nominal?: number
+  supply_max?: number
 }
 
 interface GlobalDefaultsInput {
@@ -61,7 +64,13 @@ function updateNodeOverride(
 ): Record<string, NodeOverrideInput> {
   const nextMap = { ...nodeOverrides }
   const merged = { ...(nextMap[nodeId] ?? {}), ...patch }
-  if (merged.target_pressure_mpa == null && merged.min_pressure_mpa == null) {
+  if (
+    merged.target_pressure_mpa == null &&
+    merged.min_pressure_mpa == null &&
+    merged.nominal_flow == null &&
+    merged.supply_nominal == null &&
+    merged.supply_max == null
+  ) {
     delete nextMap[nodeId]
   } else {
     nextMap[nodeId] = merged
@@ -89,6 +98,13 @@ function getReferenceInPressure(node: SeedNodePressure): number | undefined {
   }
   if (typeof node.min_pressure_mpa === 'number' && Number.isFinite(node.min_pressure_mpa)) {
     return node.min_pressure_mpa
+  }
+  return undefined
+}
+
+function getDefaultFlowRate(node: SeedNodePressure): number | undefined {
+  if (typeof node.default_flow_rate === 'number' && Number.isFinite(node.default_flow_rate)) {
+    return node.default_flow_rate
   }
   return undefined
 }
@@ -211,20 +227,21 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <div className="text-[10px] text-slate-300">关键站场设置</div>
-          <div className="text-[10px] text-slate-500">进站设定只读，出站与最小压力可调</div>
+          <div className="text-[10px] text-slate-500">进站只读，出站、最小压力和流量可调</div>
         </div>
         {displayNodes.length === 0 ? (
           <div className="text-[11px] text-slate-400">当前还没有读到站场种子数据</div>
         ) : (
           <div className="space-y-1">
-            <div className="grid grid-cols-[minmax(54px,1fr)_60px_60px_60px] items-center gap-1 px-0.5">
+            <div className="grid grid-cols-[minmax(54px,1fr)_52px_52px_52px_64px] items-center gap-1 px-0.5">
               <div className="text-[10px] text-slate-500">站场</div>
               <div className="text-center text-[10px] text-slate-500">进站设定</div>
               <div className="text-center text-[10px] text-slate-500">出站设定</div>
               <div className="text-center text-[10px] text-slate-500">最小约束</div>
+              <div className="text-center text-[10px] text-slate-500">流量设定</div>
             </div>
             {displayNodes.map((node) => (
-              <div key={node.id} className="grid grid-cols-[minmax(54px,1fr)_60px_60px_60px] items-center gap-1">
+              <div key={node.id} className="grid grid-cols-[minmax(54px,1fr)_52px_52px_52px_64px] items-center gap-1">
                 <div
                   className="min-w-0 truncate text-[11px] text-slate-200"
                   title={`${node.name || node.id} (${node.id})`}
@@ -267,6 +284,28 @@ const SimParamEditor: React.FC<SimParamEditorProps> = ({
                     )
                   }
                   className={INPUT_FIELD_CLASS}
+                />
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={
+                    nodeOverrides[node.id]?.nominal_flow ??
+                    formatDisplayNumber(getDefaultFlowRate(node), 1)
+                  }
+                  placeholder="流量"
+                  onChange={(event) => {
+                    const flow = toNumberOrUndefined(event.target.value)
+                    onNodeOverridesChange(
+                      updateNodeOverride(nodeOverrides, node.id, {
+                        nominal_flow: flow,
+                        supply_nominal: flow,
+                        supply_max: flow,
+                      }),
+                    )
+                  }}
+                  className={INPUT_FIELD_CLASS}
+                  title="站点默认流量，单位：万方/天"
                 />
               </div>
             ))}

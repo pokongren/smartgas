@@ -17,6 +17,15 @@ const TopologyDemoView = lazy(() => import('./views/TopologyDemoView'));
 import { AiAssistantStandalone } from './components/ai-assistant/AiAssistant';
 import { ScadaStandalone } from './views/GlobalPipelineView';
 
+const PENDING_ASSISTANT_HISTORY_ACTION_KEY = 'smartgas.pendingAssistantHistoryAction';
+
+interface AssistantHistoryActionDetail {
+  station?: string;
+  view?: string;
+  hours?: number;
+  metric?: string;
+}
+
 interface AppErrorBoundaryState {
   hasError: boolean;
   message: string;
@@ -214,8 +223,99 @@ const ViewSwitcher: React.FC = () => {
  */
 const AppContent: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const isPopout = location.pathname.startsWith('/popout');
   const hideAiAssistantOnHeavyPage = location.pathname === '/map-topology';
+
+  React.useEffect(() => {
+    if (isPopout) return;
+
+    const handleStart = (detail?: { station?: string }) => {
+      const station = detail?.station || 'zhongwei';
+      navigate(`/map-topology?pilotId=${DEFAULT_WE1_PILOT_ID}&cutoffDemo=${encodeURIComponent(station)}`);
+    };
+    const handleNetworkxStart = () => {
+      navigate('/global?networkxCutoff=jingbian');
+    };
+
+    const handleEvent = (event: Event) => {
+      handleStart((event as CustomEvent<{ station?: string }>).detail);
+    };
+    const handleNetworkxEvent = () => {
+      handleNetworkxStart();
+    };
+    const handleMessage = (event: MessageEvent) => {
+      const payload = event.data as { type?: string; detail?: { station?: string } } | undefined;
+      if (payload?.type === 'assistant-start-cutoff-showcase') {
+        handleStart(payload.detail);
+      }
+      if (payload?.type === 'assistant-start-networkx-cutoff-showcase') {
+        handleNetworkxStart();
+      }
+    };
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('ai-assistant-sync');
+      channel.onmessage = (event) => {
+        const payload = event.data as { type?: string; detail?: { station?: string } } | undefined;
+        if (payload?.type === 'assistant-start-cutoff-showcase') {
+          handleStart(payload.detail);
+        }
+        if (payload?.type === 'assistant-start-networkx-cutoff-showcase') {
+          handleNetworkxStart();
+        }
+      };
+    } catch {
+      channel = null;
+    }
+
+    window.addEventListener('assistant-start-cutoff-showcase', handleEvent);
+    window.addEventListener('assistant-start-networkx-cutoff-showcase', handleNetworkxEvent);
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('assistant-start-cutoff-showcase', handleEvent);
+      window.removeEventListener('assistant-start-networkx-cutoff-showcase', handleNetworkxEvent);
+      window.removeEventListener('message', handleMessage);
+      channel?.close();
+    };
+  }, [isPopout, navigate]);
+
+  React.useEffect(() => {
+    if (isPopout) return;
+
+    const openGlobalHistoryPanel = (detail?: AssistantHistoryActionDetail) => {
+      if (!detail?.station) return;
+      if (location.pathname === '/global') return;
+
+      try {
+        window.sessionStorage.setItem(PENDING_ASSISTANT_HISTORY_ACTION_KEY, JSON.stringify(detail));
+      } catch {
+        // sessionStorage may be unavailable in restricted browser contexts; the direct event still works on /global.
+      }
+      navigate('/global');
+    };
+
+    const handleHistoryEvent = (event: Event) => {
+      openGlobalHistoryPanel((event as CustomEvent<AssistantHistoryActionDetail>).detail);
+    };
+
+    const handleHistoryMessage = (event: MessageEvent) => {
+      const payload = event.data as { type?: string; detail?: AssistantHistoryActionDetail } | undefined;
+      if (payload?.type === 'assistant-open-history' || payload?.type === 'assistant-open-luzhi-history') {
+        openGlobalHistoryPanel(payload.detail);
+      }
+    };
+
+    window.addEventListener('assistant-open-history', handleHistoryEvent);
+    window.addEventListener('assistant-open-luzhi-history', handleHistoryEvent);
+    window.addEventListener('message', handleHistoryMessage);
+    return () => {
+      window.removeEventListener('assistant-open-history', handleHistoryEvent);
+      window.removeEventListener('assistant-open-luzhi-history', handleHistoryEvent);
+      window.removeEventListener('message', handleHistoryMessage);
+    };
+  }, [isPopout, location.pathname, navigate]);
 
   // 如果处于独立弹出窗口模式，不渲染主应用的叠加组件 (侧边栏/Switcher 等)
   if (isPopout) {

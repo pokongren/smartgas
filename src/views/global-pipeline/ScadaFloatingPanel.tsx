@@ -35,10 +35,16 @@ export const ScadaFloatingPanel: React.FC<ScadaFloatingPanelProps> = ({
 
     return (
         <div
-            className={`absolute z-10 glass-panel neon-border rounded-xl flex flex-col select-none overflow-hidden transition-all duration-300 ${isDragging ? 'cursor-grabbing scale-[1.02] shadow-2xl' : ''}`}
+            className={`absolute z-10 glass-panel neon-border rounded-xl flex flex-col select-none overflow-hidden ${isDragging ? 'cursor-grabbing shadow-2xl' : 'transition-shadow duration-200'}`}
             style={{
                 width: '480px',
                 height: '310px',
+                minWidth: '380px',
+                minHeight: '230px',
+                maxWidth: 'min(920px, calc(100vw - 16px))',
+                maxHeight: 'calc(100vh - 64px)',
+                resize: isDragging ? 'none' : 'both',
+                touchAction: 'none',
                 ...style,
             }}
         >
@@ -78,6 +84,21 @@ export const ScadaFloatingPanel: React.FC<ScadaFloatingPanelProps> = ({
                 </div>
             </div>
             {children}
+            {!isDragging && (
+                <div
+                    aria-hidden="true"
+                    style={{
+                        position: 'absolute',
+                        right: 4,
+                        bottom: 4,
+                        width: 12,
+                        height: 12,
+                        pointerEvents: 'none',
+                        opacity: 0.72,
+                        background: `linear-gradient(135deg, transparent 0 45%, ${accentColor} 46% 55%, transparent 56% 62%, ${accentColor} 63% 72%, transparent 73%)`,
+                    }}
+                />
+            )}
         </div>
     )
 }

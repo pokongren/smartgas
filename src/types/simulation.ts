@@ -189,7 +189,7 @@ export const ZHONGWEI_BAIHE_PILOT_ID = 'zhongwei_shanghai_baihe'
 
 export const ZHONGWEI_BAIHE_SCENARIOS: ScenarioOption[] = [
   { id: 'steady_base', label: '常规稳态输气' },
-  { id: 'zhongwei_supply_pressure_drop', label: '中卫出站压力下调' },
+  { id: 'zhongwei_supply_pressure_drop', label: '中卫站压力/流量变化' },
   { id: 'zhengzhou_compressor_offline', label: '郑州压气站停运' },
   { id: 'east_china_peak_demand', label: '华东末端负荷上调' },
   { id: 'baihe_delivery_limited', label: '白鹤末端交付受限' },

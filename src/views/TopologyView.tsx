@@ -117,6 +117,16 @@ function estimateNodeTemperatureC(pressureMpa: number): number {
     return Number((13 + pressureMpa * 1.7).toFixed(1));
 }
 
+function formatSignedPressureDelta(value: number): string {
+    if (!Number.isFinite(value) || Math.abs(value) < 0.0005) return '0.00';
+    return `${value > 0 ? '+' : ''}${value.toFixed(2)}`;
+}
+
+function getPressureDeltaColor(delta: number | null | undefined): string {
+    if (delta == null || !Number.isFinite(delta) || Math.abs(delta) < 0.0005) return '#cbd5e1';
+    return delta > 0 ? '#fbbf24' : '#38bdf8';
+}
+
 const NODE_COLORS: Record<string, string> = {
     compressor: '#f97316',
     distribution: '#3b82f6',
@@ -287,10 +297,12 @@ function drawGraph(
     panX: number,
     panY: number,
     simOverlay?: SimulationOverlay | null,
+    baselineOverlay?: SimulationOverlay | null,
     animationMs = 0,
 ): void {
     const simEdgeMap = new Map(simOverlay?.edges.map(e => [e.id, e]) ?? []);
     const simNodeMap = new Map(simOverlay?.nodes.map(n => [n.id, n]) ?? []);
+    const baselineNodeMap = new Map(baselineOverlay?.nodes.map(n => [n.id, n]) ?? []);
     ctx.save();
     ctx.clearRect(0, 0, width, height);
 
@@ -514,7 +526,17 @@ function drawGraph(
             const pressureIn = simNode.pressure_in_mpa ?? simNode.pressure_mpa;
             const pressureOut = simNode.pressure_mpa;
             const pressureDelta = pressureOut - pressureIn;
+            const baselinePressureOut = baselineNodeMap.get(simNode.id)?.pressure_mpa;
+            const baselineDelta = typeof baselinePressureOut === 'number' ? pressureOut - baselinePressureOut : null;
             ctx.textAlign = 'center';
+            if (baselineDelta != null) {
+                const pulse = (Math.sin(animationMs / 260) + 1) / 2;
+                ctx.font = `bold ${8 / zoom}px Inter, sans-serif`;
+                ctx.fillStyle = getPressureDeltaColor(baselineDelta);
+                ctx.globalAlpha = 0.72 + pulse * 0.28;
+                ctx.fillText(`前:${baselinePressureOut!.toFixed(2)} 后:${pressureOut.toFixed(2)} ΔP ${formatSignedPressureDelta(baselineDelta)}`, node.x, node.y - radius - 34 / zoom);
+                ctx.globalAlpha = 1;
+            }
             ctx.font = `bold ${9 / zoom}px Inter, sans-serif`;
             ctx.fillStyle = pc;
             ctx.fillText(`进:${pressureIn.toFixed(2)} 出:${pressureOut.toFixed(2)}`, node.x, node.y - radius - 24 / zoom);
@@ -1022,6 +1044,7 @@ const TopologyView: React.FC = () => {
     const simOverlayRef = useRef<SimulationOverlay | null>(null);
     const {
         overlay,
+        baselineOverlay,
         isLoading: simLoading,
         error: simError,
         currentScenario,
@@ -1049,7 +1072,9 @@ const TopologyView: React.FC = () => {
         clearOverlay,
     } =
         useSimulation({ pilotId, scenarios: scenarioOptions });
+    const baselineOverlayRef = useRef<SimulationOverlay | null>(null);
     useEffect(() => { simOverlayRef.current = overlay; }, [overlay]);
+    useEffect(() => { baselineOverlayRef.current = baselineOverlay; }, [baselineOverlay]);
     const showcaseSyncAppliedRef = useRef(false);
     const [showcaseSyncUpdatedAt, setShowcaseSyncUpdatedAt] = useState<string | null>(null);
 
@@ -1078,6 +1103,7 @@ const TopologyView: React.FC = () => {
                 currentViewport.pan.x,
                 currentViewport.pan.y,
                 simOverlayRef.current,
+                baselineOverlayRef.current,
                 performance.now(),
             );
             animFrameRef.current = requestAnimationFrame(animate);

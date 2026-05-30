@@ -1,0 +1,913 @@
+- generic [ref=e2]:
+  - button "呼出页面入口" [ref=e4]:
+    - generic [ref=e5]: apps
+  - generic [ref=e3737]:
+    - generic [ref=e3739]:
+      - generic [ref=e3740]:
+        - heading "conversion_path 智脉平台 · 地图拓扑管理" [level=1] [ref=e3741]:
+          - generic [ref=e3742]: conversion_path
+          - text: 智脉平台 · 地图拓扑管理
+        - paragraph [ref=e3743]: 节点 256 · 连线 265 · 孤立 0
+      - generic [ref=e3744]:
+        - button "download 导入拓扑" [ref=e3745]:
+          - generic [ref=e3746]: download
+          - text: 导入拓扑
+        - button "verified 验证" [ref=e3747]:
+          - generic [ref=e3748]: verified
+          - text: 验证
+        - button "stars 关键节点" [ref=e3749]:
+          - generic [ref=e3750]: stars
+          - text: 关键节点
+    - generic [ref=e3752]:
+      - iframe [ref=e3753]:
+        
+      - generic [ref=e3755]:
+        - generic:
+          - generic [ref=e3757]:
+            - generic:
+              - generic: 霍尔果斯压气站
+          - generic [ref=e3759]:
+            - generic:
+              - generic: 轮南压气站
+          - generic [ref=e3761]:
+            - generic:
+              - generic: 中卫压气站
+          - generic [ref=e3763]:
+            - generic:
+              - generic: 黑河压气站
+          - generic [ref=e3765]:
+            - generic:
+              - generic: 贵阳压气站
+          - generic [ref=e3767]:
+            - generic:
+              - generic: 瑞丽
+          - generic [ref=e3769]:
+            - generic:
+              - generic: 广州压气站
+          - generic [ref=e3771]:
+            - generic:
+              - generic: 贵港压气站
+          - generic [ref=e3773]:
+            - generic:
+              - generic: 平顶山压气站
+          - generic [ref=e3775]:
+            - generic:
+              - generic: 薛店
+          - generic [ref=e3777]:
+            - generic:
+              - generic: 泰安压气站
+          - generic [ref=e3779]:
+            - generic:
+              - generic: 连木沁压气站
+          - generic [ref=e3781]:
+            - generic:
+              - generic: 潼关压气站
+          - generic [ref=e3783]:
+            - generic:
+              - generic: 蕲春分输站
+          - generic [ref=e3785]:
+            - generic:
+              - generic: 古浪压气站
+          - generic [ref=e3787]:
+            - generic:
+              - generic: 华阴分输站
+          - generic [ref=e3789]:
+            - generic:
+              - generic: 泾川分输站
+          - generic [ref=e3791]:
+            - generic:
+              - generic: 武威分输站
+          - generic [ref=e3793]:
+            - generic:
+              - generic: 九江分输站
+          - generic [ref=e3795]:
+            - generic:
+              - generic: 昌吉分输站
+          - generic [ref=e3797]:
+            - generic:
+              - generic: 礼泉分输站
+          - generic [ref=e3799]:
+            - generic:
+              - generic: 临潼分输站
+          - generic [ref=e3801]:
+            - generic:
+              - generic: 洛宁压气站
+          - generic [ref=e3803]:
+            - generic:
+              - generic: 海原压气站
+          - generic [ref=e3805]:
+            - generic:
+              - generic: 赣州分输站
+          - generic [ref=e3807]:
+            - generic:
+              - generic: 奎屯分输站
+          - generic [ref=e3809]:
+            - generic:
+              - generic: 乌苏压气站
+          - generic [ref=e3811]:
+            - generic:
+              - generic: 孝感分输站
+          - generic [ref=e3813]:
+            - generic:
+              - generic: 哈密分输站
+          - generic [ref=e3815]:
+            - generic:
+              - generic: 洛阳分输站
+          - generic [ref=e3817]:
+            - generic:
+              - generic: 灵台压气站
+          - generic [ref=e3819]:
+            - generic:
+              - generic: 永昌压气站
+          - generic [ref=e3821]:
+            - generic:
+              - generic: 嘉峪关压气站
+          - generic [ref=e3823]:
+            - generic:
+              - generic: 红柳压气站
+          - generic [ref=e3825]:
+            - generic:
+              - generic: 黄州分输站
+          - generic [ref=e3827]:
+            - generic:
+              - generic: 黄陂压气站
+          - generic [ref=e3829]:
+            - generic:
+              - generic: 彭阳压气站
+          - generic [ref=e3831]:
+            - generic:
+              - generic: 三门峡分输站
+          - generic [ref=e3833]:
+            - generic:
+              - generic: 吉安压气站
+          - generic [ref=e3835]:
+            - generic:
+              - generic: 武穴压气站
+          - generic [ref=e3837]:
+            - generic:
+              - generic: 南阳分输站
+          - generic [ref=e3839]:
+            - generic:
+              - generic: 乾县西分输站
+          - generic [ref=e3841]:
+            - generic:
+              - generic: 平泉分输站
+          - generic [ref=e3843]:
+            - generic:
+              - generic: 鲁山压气站
+          - generic [ref=e3845]:
+            - generic:
+              - generic: 乌鲁木齐压气站
+          - generic [ref=e3847]:
+            - generic:
+              - generic: 了墩压气站
+          - generic [ref=e3849]:
+            - generic:
+              - generic: 随州分输站
+          - generic [ref=e3851]:
+            - generic:
+              - generic: 烟墩压气站
+          - generic [ref=e3853]:
+            - generic:
+              - generic: 玛纳斯压气站
+          - generic [ref=e3855]:
+            - generic:
+              - generic: 泾阳分输站
+          - generic [ref=e3857]:
+            - generic:
+              - generic: 南昌压气站
+          - generic [ref=e3859]:
+            - generic:
+              - generic: 乾县东分输站
+          - generic [ref=e3861]:
+            - generic:
+              - generic: 樟树分输站
+          - generic [ref=e3863]:
+            - generic:
+              - generic: 高陵压气站
+          - generic [ref=e3865]:
+            - generic:
+              - generic: 固原分输站
+          - generic [ref=e3867]:
+            - generic:
+              - generic: 黄冈分输站
+          - generic [ref=e3869]:
+            - generic:
+              - generic: 南雄分输站
+          - generic [ref=e3871]:
+            - generic:
+              - generic: 枣阳压气站
+          - generic [ref=e3873]:
+            - generic:
+              - generic: 精河压气站
+          - generic [ref=e3875]:
+            - generic:
+              - generic: 张掖压气站
+          - generic [ref=e3877]:
+            - generic:
+              - generic: 社旗分输站
+          - generic [ref=e3879]:
+            - generic:
+              - generic: 昌北分输站
+          - generic [ref=e3881]:
+            - generic:
+              - generic: 吐鲁番压气站
+          - generic [ref=e3883]:
+            - generic:
+              - generic: 瓜州压气站
+          - generic [ref=e3885]:
+            - generic:
+              - generic: 阜宁分输站
+          - generic [ref=e3887]:
+            - generic:
+              - generic: 衡水分输站
+          - generic [ref=e3889]:
+            - generic:
+              - generic: 连云港分输压气站
+          - generic [ref=e3891]:
+            - generic:
+              - generic: 阜宁联络站
+          - generic [ref=e3893]:
+            - generic:
+              - generic: 常熟分输站
+          - generic [ref=e3895]:
+            - generic:
+              - generic: 泗水分输清管站
+          - generic [ref=e3897]:
+            - generic:
+              - generic: 中俄唐山压气站
+          - generic [ref=e3899]:
+            - generic:
+              - generic: 泰兴联络站
+          - generic [ref=e3901]:
+            - generic:
+              - generic: 双辽分输站
+          - generic [ref=e3903]:
+            - generic:
+              - generic: 东台分输站
+          - generic [ref=e3905]:
+            - generic:
+              - generic: 济南西站
+          - generic [ref=e3907]:
+            - generic:
+              - generic: 中俄秦皇岛分输站
+          - generic [ref=e3909]:
+            - generic:
+              - generic: 永清压气站
+          - generic [ref=e3911]:
+            - generic:
+              - generic: 南通联络站
+          - generic [ref=e3913]:
+            - generic:
+              - generic: 中俄长岭分输站
+          - generic [ref=e3915]:
+            - generic:
+              - generic: 交气点
+          - generic [ref=e3917]:
+            - generic:
+              - generic: 德州分输站
+          - generic [ref=e3919]:
+            - generic:
+              - generic: 兴化分输站
+          - generic [ref=e3921]:
+            - generic:
+              - generic: 安平压气站
+          - generic [ref=e3923]:
+            - generic:
+              - generic: 盐都南分输站
+          - generic [ref=e3925]:
+            - generic:
+              - generic: 盐城分输清管站
+          - generic [ref=e3927]:
+            - generic:
+              - generic: 盐都分输站
+          - generic [ref=e3929]:
+            - generic:
+              - generic: 锦州压气站
+          - generic [ref=e3931]:
+            - generic:
+              - generic: 明水压气站
+          - generic [ref=e3933]:
+            - generic:
+              - generic: 五大连池压气站
+          - generic [ref=e3935]:
+            - generic:
+              - generic: 中俄宝坻分输站
+          - generic [ref=e3937]:
+            - generic:
+              - generic: 通辽分输站
+          - generic [ref=e3939]:
+            - generic:
+              - generic: 灌南分输站
+          - generic [ref=e3941]:
+            - generic:
+              - generic: 海安分输站
+          - generic [ref=e3943]:
+            - generic:
+              - generic: 甪直联络站
+          - generic [ref=e3945]:
+            - generic:
+              - generic: 盘锦联络站
+          - generic [ref=e3947]:
+            - generic:
+              - generic: 临沂分输清管站
+          - generic [ref=e3949]:
+            - generic:
+              - generic: 沈阳压气站
+          - generic [ref=e3951]:
+            - generic:
+              - generic: 大庆分输站
+          - generic [ref=e3953]:
+            - generic:
+              - generic: 肇源压气站
+          - generic [ref=e3955]:
+            - generic:
+              - generic: 兰考分输站
+          - generic [ref=e3957]:
+            - generic:
+              - generic: 济宁分输站
+          - generic [ref=e3959]:
+            - generic:
+              - generic: 巨野分输站
+          - generic [ref=e3961]:
+            - generic:
+              - generic: 中牟分输站
+          - generic [ref=e3963]:
+            - generic:
+              - generic: 菏泽分输站
+          - generic [ref=e3965]:
+            - generic:
+              - generic: 禹州分输站
+          - generic [ref=e3967]:
+            - generic:
+              - generic: 杞县分输站
+          - generic [ref=e3969]:
+            - generic:
+              - generic: 开封分输站
+          - generic [ref=e3971]:
+            - generic:
+              - generic: 硝河分输站
+          - generic [ref=e3973]:
+            - generic:
+              - generic: 广元压气站
+          - generic [ref=e3975]:
+            - generic:
+              - generic: 陇南分输站
+          - generic [ref=e3977]:
+            - generic:
+              - generic: 武胜分输站
+          - generic [ref=e3979]:
+            - generic:
+              - generic: 中贵马坊分输站
+          - generic [ref=e3981]:
+            - generic:
+              - generic: 江津压气站
+          - generic [ref=e3983]:
+            - generic:
+              - generic: 南充压气站
+          - generic [ref=e3985]:
+            - generic:
+              - generic: 天水压气站
+          - generic [ref=e3987]:
+            - generic:
+              - generic: 西吉清管站
+          - generic [ref=e3989]:
+            - generic:
+              - generic: 铜梁分输站
+          - generic [ref=e3991]:
+            - generic:
+              - generic: 固原压气站
+          - generic [ref=e3993]:
+            - generic:
+              - generic: 南部分输站
+          - generic [ref=e3995]:
+            - generic:
+              - generic: 贵阳北分输站
+          - generic [ref=e3997]:
+            - generic:
+              - generic: 遵义压气站
+          - generic [ref=e3999]:
+            - generic:
+              - generic: 安顺分输站
+          - generic [ref=e4001]:
+            - generic:
+              - generic: 跨境点
+          - generic [ref=e4003]:
+            - generic:
+              - generic: 河池压气站
+          - generic [ref=e4005]:
+            - generic:
+              - generic: 保山压气站
+          - generic [ref=e4007]:
+            - generic:
+              - generic: 忻城分输站
+          - generic [ref=e4009]:
+            - generic:
+              - generic: 都匀分输站
+          - generic [ref=e4011]:
+            - generic:
+              - generic: 宜州分输站
+          - generic [ref=e4013]:
+            - generic:
+              - generic: 禄丰分输站
+          - generic [ref=e4015]:
+            - generic:
+              - generic: 楚雄分输站
+          - generic [ref=e4017]:
+            - generic:
+              - generic: 龙陵分输站
+          - generic [ref=e4019]:
+            - generic:
+              - generic: 弥渡分输站
+          - generic [ref=e4021]:
+            - generic:
+              - generic: 来宾分输站
+          - generic [ref=e4023]:
+            - generic:
+              - generic: 曲靖分输站
+          - generic [ref=e4025]:
+            - generic:
+              - generic: 寻甸分输站
+          - generic [ref=e4027]:
+            - generic:
+              - generic: 芒市分输站
+          - generic [ref=e4029]:
+            - generic:
+              - generic: 德庆分输站
+          - generic [ref=e4031]:
+            - generic:
+              - generic: 高要分输站
+          - generic [ref=e4033]:
+            - generic:
+              - generic: 肇庆分输站
+          - generic [ref=e4035]:
+            - generic:
+              - generic: 广西管道南宁分输站
+          - generic [ref=e4037]:
+            - generic:
+              - generic: 清远分输站
+          - generic [ref=e4039]:
+            - generic:
+              - generic: 佛山分输站
+          - generic [ref=e4041]:
+            - generic:
+              - generic: 横县分输站
+          - generic [ref=e4043]:
+            - generic:
+              - generic: 南宁分输站
+          - generic [ref=e4045]:
+            - generic:
+              - generic: 梧州压气站
+          - generic [ref=e4047]:
+            - generic:
+              - generic: 广南支干线南宁分输站
+          - generic [ref=e4049]:
+            - generic:
+              - generic: 大铲岛压气站
+          - generic [ref=e4051]:
+            - generic:
+              - generic: 东莞分输站
+          - generic [ref=e4053]:
+            - generic:
+              - generic: 求雨岭分输站
+          - generic [ref=e4055]:
+            - generic:
+              - generic: 清溪清管站
+          - generic [ref=e4057]:
+            - generic:
+              - generic: 深圳燃气迭福门站
+          - generic [ref=e4059]:
+            - generic:
+              - generic: 深圳LNG接收站
+          - generic [ref=e4061]:
+            - generic:
+              - generic: 湖州压气站
+          - generic [ref=e4063]:
+            - generic:
+              - generic: 景德镇分输站
+          - generic [ref=e4065]:
+            - generic:
+              - generic: 宣城分输站
+          - generic [ref=e4067]:
+            - generic:
+              - generic: 绩溪分输站
+          - generic [ref=e4069]:
+            - generic:
+              - generic: 上海末站
+          - generic [ref=e4071]:
+            - generic:
+              - generic: 嘉兴
+          - generic [ref=e4073]:
+            - generic:
+              - generic: 黄山压气站
+          - generic [ref=e4075]:
+            - generic:
+              - generic: 余干分输站
+          - generic [ref=e4077]:
+            - generic:
+              - generic: 九江分输站
+          - generic [ref=e4079]:
+            - generic:
+              - generic: 吴江分输站
+          - generic [ref=e4081]:
+            - generic:
+              - generic: 嘉善分输站
+          - generic [ref=e4083]:
+            - generic:
+              - generic: 鄂尔多斯压气站
+          - generic [ref=e4085]:
+            - generic:
+              - generic: 张家口压气站
+          - generic [ref=e4087]:
+            - generic:
+              - generic: 高丽营分输站
+          - generic [ref=e4089]:
+            - generic:
+              - generic: 呼和浩特分输站
+          - generic [ref=e4091]:
+            - generic:
+              - generic: 乌兰察布压气站
+          - generic [ref=e4093]:
+            - generic:
+              - generic: 红墩界压气站
+          - generic [ref=e4095]:
+            - generic:
+              - generic: 怀来首站
+          - generic [ref=e4097]:
+            - generic:
+              - generic: 靖边压气站
+          - generic [ref=e4099]:
+            - generic:
+              - generic: 延庆分输站
+          - generic [ref=e4101]:
+            - generic:
+              - generic: 托克托压气站
+          - generic [ref=e4103]:
+            - generic:
+              - generic: 兴和分输站
+          - generic [ref=e4105]:
+            - generic:
+              - generic: 西集分输站
+          - generic [ref=e4107]:
+            - generic:
+              - generic: 石家庄华泽站
+          - generic [ref=e4109]:
+            - generic:
+              - generic: 石家庄潜能站
+          - generic [ref=e4111]:
+            - generic:
+              - generic: 文安分输站
+          - generic [ref=e4113]:
+            - generic:
+              - generic: 石家庄压气站
+          - generic [ref=e4115]:
+            - generic:
+              - generic: 兴县压气站
+          - generic [ref=e4117]:
+            - generic:
+              - generic: 通州东分输站
+          - generic [ref=e4119]:
+            - generic:
+              - generic: 采育分输站
+          - generic [ref=e4121]:
+            - generic:
+              - generic: 盂县分输站
+          - generic [ref=e4123]:
+            - generic:
+              - generic: 阳曲大盂站
+          - generic [ref=e4125]:
+            - generic:
+              - generic: 阳曲压气站
+          - generic [ref=e4127]:
+            - generic:
+              - generic: 鹿泉华泽站
+          - generic [ref=e4129]:
+            - generic:
+              - generic: 鹿泉华电九期站
+          - generic [ref=e4131]:
+            - generic:
+              - generic: 鹿泉分输站
+          - generic [ref=e4133]:
+            - generic:
+              - generic: 霸州分输站
+          - generic [ref=e4135]:
+            - generic:
+              - generic: 兴县分输站
+          - generic [ref=e4137]:
+            - generic:
+              - generic: 项家输气站
+          - generic [ref=e4139]:
+            - generic:
+              - generic: 永清分输站
+          - generic [ref=e4141]:
+            - generic:
+              - generic: 岚县分输站
+          - generic [ref=e4143]:
+            - generic:
+              - generic: 榆阳分输站
+          - generic [ref=e4145]:
+            - generic:
+              - generic: 顺达站
+          - generic [ref=e4147]:
+            - generic:
+              - generic: 榆林压气站
+          - generic [ref=e4149]:
+            - generic:
+              - generic: 正定分输站
+          - generic [ref=e4151]:
+            - generic:
+              - generic: 盂县西分输站
+          - generic [ref=e4153]:
+            - generic:
+              - generic: 八堡分输站
+          - generic [ref=e4155]:
+            - generic:
+              - generic: 雷家碛分输站
+          - generic [ref=e4157]:
+            - generic:
+              - generic: 涿州东分输站
+          - generic [ref=e4159]:
+            - generic:
+              - generic: 深泽北分输站
+          - generic [ref=e4161]:
+            - generic:
+              - generic: 井陉分输站
+          - generic [ref=e4163]:
+            - generic:
+              - generic: 良乡分输站
+          - generic [ref=e4165]:
+            - generic:
+              - generic: 临县分输站
+          - generic [ref=e4167]:
+            - generic:
+              - generic: 石家庄压气站
+          - generic [ref=e4169]:
+            - generic:
+              - generic: 大灰厂分输站
+          - generic [ref=e4171]:
+            - generic:
+              - generic: 潭柘寺分输站
+          - generic [ref=e4173]:
+            - generic:
+              - generic: 高阳分输站
+          - generic [ref=e4175]:
+            - generic:
+              - generic: 向阳五村分输站
+          - generic [ref=e4177]:
+            - generic:
+              - generic: 鹿泉东分输站
+          - generic [ref=e4179]:
+            - generic:
+              - generic: 临县压气站
+          - generic [ref=e4181]:
+            - generic:
+              - generic: 西沙屯分输站
+          - generic [ref=e4183]:
+            - generic:
+              - generic: 琉璃河分输站
+          - generic [ref=e4185]:
+            - generic:
+              - generic: 榆佳分输站
+          - generic [ref=e4187]:
+            - generic:
+              - generic: 陕京霸州分输站
+          - generic [ref=e4189]:
+            - generic:
+              - generic: 永清分输站
+          - generic [ref=e4191]:
+            - generic:
+              - generic: 阳曲压气站
+          - generic [ref=e4193]:
+            - generic:
+              - generic: 柳园压气站
+          - generic [ref=e4195]:
+            - generic:
+              - generic: 四道班压气站
+          - generic [ref=e4197]:
+            - generic:
+              - generic: 滁州分输站
+          - generic [ref=e4199]:
+            - generic:
+              - generic: 龙池分输站
+          - generic [ref=e4201]:
+            - generic:
+              - generic: 昆山分输站
+          - generic [ref=e4203]:
+            - generic:
+              - generic: 延川西分输站
+          - generic [ref=e4205]:
+            - generic:
+              - generic: 白鹤末站
+          - generic [ref=e4207]:
+            - generic:
+              - generic: 孔雀河压气站
+          - generic [ref=e4209]:
+            - generic:
+              - generic: 古浪分输站
+          - generic [ref=e4211]:
+            - generic:
+              - generic: 延川压气站
+          - generic [ref=e4213]:
+            - generic:
+              - generic: 定远压气站
+          - generic [ref=e4215]:
+            - generic:
+              - generic: 苏州分输站
+          - generic [ref=e4217]:
+            - generic:
+              - generic: 玉门压气站
+          - generic [ref=e4219]:
+            - generic:
+              - generic: 鄯善压气站
+          - generic [ref=e4221]:
+            - generic:
+              - generic: 西一盐池压气站
+          - generic [ref=e4223]:
+            - generic:
+              - generic: 常州分输站
+          - generic [ref=e4225]:
+            - generic:
+              - generic: 淮阳压气站
+          - generic [ref=e4227]:
+            - generic:
+              - generic: 刘巷子分输站
+          - generic [ref=e4229]:
+            - generic:
+              - generic: 沁水压气站
+          - generic [ref=e4231]:
+            - generic:
+              - generic: 龙潭分输站
+          - generic [ref=e4233]:
+            - generic:
+              - generic: 芙蓉分输站
+          - generic [ref=e4235]:
+            - generic:
+              - generic: 蒲县压气站
+          - generic [ref=e4237]:
+            - generic:
+              - generic: 郑州压气站
+          - generic [ref=e4239]:
+            - generic:
+              - generic: 博爱分输站
+          - generic [ref=e4241]:
+            - generic:
+              - generic: 金昌压气站
+          - generic [ref=e4243]:
+            - generic:
+              - generic: 子长分输站
+          - generic [ref=e4245]:
+            - generic:
+              - generic: 山丹压气站
+          - generic [ref=e4247]:
+            - generic:
+              - generic: 无锡分输站
+          - generic [ref=e4249]:
+            - generic:
+              - generic: 太和分输站
+          - generic [ref=e4251]:
+            - generic:
+              - generic: 镇江分输站
+          - generic [ref=e4253]:
+            - generic:
+              - generic: 青山分输站
+          - generic [ref=e4255]:
+            - generic:
+              - generic: 酒泉压气站
+          - generic [ref=e4257]:
+            - generic:
+              - generic: 哈密压气站
+          - generic [ref=e4259]:
+            - generic:
+              - generic: 利辛分输站
+          - generic [ref=e4261]:
+            - generic:
+              - generic: 临汾分输站
+          - generic [ref=e4263]:
+            - generic:
+              - generic: 东桥分输站
+          - generic [ref=e4265]:
+            - generic:
+              - generic: 雅满苏压气站
+          - generic [ref=e4267]:
+            - generic:
+              - generic: 丹阳分输站
+          - generic [ref=e4270]: 北京市
+          - generic [ref=e4272]: 天津市
+          - generic [ref=e4274]: 河北省
+          - generic [ref=e4276]: 山西省
+          - generic [ref=e4278]: 内蒙古自治区
+          - generic [ref=e4280]: 辽宁省
+          - generic [ref=e4282]: 吉林省
+          - generic [ref=e4284]: 黑龙江省
+          - generic [ref=e4286]: 上海市
+          - generic [ref=e4288]: 江苏省
+          - generic [ref=e4290]: 浙江省
+          - generic [ref=e4292]: 安徽省
+          - generic [ref=e4294]: 福建省
+          - generic [ref=e4296]: 江西省
+          - generic [ref=e4298]: 山东省
+          - generic [ref=e4300]: 河南省
+          - generic [ref=e4302]: 湖北省
+          - generic [ref=e4304]: 湖南省
+          - generic [ref=e4306]: 广东省
+          - generic [ref=e4308]: 广西壮族自治区
+          - generic [ref=e4310]: 海南省
+          - generic [ref=e4312]: 重庆市
+          - generic [ref=e4314]: 四川省
+          - generic [ref=e4316]: 贵州省
+          - generic [ref=e4318]: 云南省
+          - generic [ref=e4320]: 西藏自治区
+          - generic [ref=e4322]: 陕西省
+          - generic [ref=e4324]: 甘肃省
+          - generic [ref=e4326]: 青海省
+          - generic [ref=e4328]: 宁夏回族自治区
+          - generic [ref=e4330]: 新疆维吾尔自治区
+          - generic [ref=e4332]: 台湾省
+          - generic [ref=e4334]: 香港特别行政区
+          - generic [ref=e4336]: 澳门特别行政区
+      - generic:
+        - img
+      - generic [ref=e4337]: © 2026 AutoNavi - GS(2019)756号
+    - generic [ref=e4339]:
+      - generic [ref=e4340]:
+        - button "edit 编辑" [ref=e4341]:
+          - generic [ref=e4342]: edit
+          - text: 编辑
+        - button "verified 验证" [ref=e4343]:
+          - generic [ref=e4344]: verified
+          - text: 验证
+        - button "search 搜索" [ref=e4345]:
+          - generic [ref=e4346]: search
+          - text: 搜索
+        - button "stars 枢纽" [ref=e4347]:
+          - generic [ref=e4348]: stars
+          - text: 枢纽
+        - button "cut 截断" [ref=e4349]:
+          - generic [ref=e4350]: cut
+          - text: 截断
+        - button "science 仿真" [ref=e4351]:
+          - generic [ref=e4352]: science
+          - text: 仿真
+      - generic [ref=e4354]:
+        - generic [ref=e4355]:
+          - paragraph [ref=e4356]: 操作模式
+          - generic [ref=e4357]:
+            - button "pan_tool 浏览" [ref=e4358]:
+              - generic [ref=e4359]: pan_tool
+              - text: 浏览
+            - button "add_location 添点" [ref=e4360]:
+              - generic [ref=e4361]: add_location
+              - text: 添点
+            - button "timeline 连线" [ref=e4362]:
+              - generic [ref=e4363]: timeline
+              - text: 连线
+          - button "hub 兼容手工捏合（旧流程）" [ref=e4364]:
+            - generic [ref=e4365]: hub
+            - text: 兼容手工捏合（旧流程）
+        - generic [ref=e4366]:
+          - generic [ref=e4367]:
+            - paragraph [ref=e4368]: 运行时枢纽
+            - generic [ref=e4369]: 旧流程兼容
+          - paragraph [ref=e4370]: 当前枢纽由运行时重编结果维护，编辑器仅支持只读查看，不再以手工捏合作为主流程。
+          - generic [ref=e4371]:
+            - generic [ref=e4372]:
+              - generic [ref=e4373]: 枢纽数
+              - generic [ref=e4374]: "18"
+            - generic [ref=e4375]:
+              - generic [ref=e4376]: 大枢纽
+              - generic [ref=e4377]: "4"
+            - generic [ref=e4378]:
+              - generic [ref=e4379]: 覆盖站点
+              - generic [ref=e4380]: "30"
+        - generic [ref=e4381]:
+          - generic [ref=e4382]:
+            - paragraph [ref=e4383]: 点位保存
+            - generic [ref=e4384]: 0 个待保存
+          - generic [ref=e4385]:
+            - generic [ref=e4386]: 保存时联动阀室
+            - button "保存时联动阀室" [ref=e4387]
+          - paragraph [ref=e4389]: 保存后会把当前拖动过的主点写入数据库，并按区段自动重算受影响阀室的位置。
+          - generic [ref=e4390]:
+            - button "预览影响" [disabled] [ref=e4391]
+            - button "撤销未保存" [disabled] [ref=e4392]
+            - button "save 保存坐标" [disabled] [ref=e4393]:
+              - generic [ref=e4394]: save
+              - text: 保存坐标
+        - generic [ref=e4395]:
+          - paragraph [ref=e4396]: 图例
+          - generic [ref=e4397]:
+            - generic [ref=e4398]: 压气站
+            - generic [ref=e4400]: 分输站
+            - generic [ref=e4402]: 交汇枢纽
+            - generic [ref=e4404]: 站场
+            - generic [ref=e4406]: 阀室
+            - generic [ref=e4408]: 管线连接
+        - generic [ref=e4410]:
+          - button "undo 撤销" [disabled] [ref=e4411]:
+            - generic [ref=e4412]: undo
+            - text: 撤销
+          - button "导出" [ref=e4413]
+          - button "清空" [ref=e4414]
+      - generic [ref=e4415]:
+        - generic [ref=e4416]: info
+        - text: 浏览模式
