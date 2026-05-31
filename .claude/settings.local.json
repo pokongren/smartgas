@@ -24,7 +24,14 @@
       "Bash(git commit:*)",
       "Bash(npx tsc:*)",
       "WebFetch(domain:minimax-algeng-chat-tts.oss-cn-wulanchabu.aliyuncs.com)",
-      "Bash(awk '/^\\\\+/{print NR\": \"$0}')"
+      "Bash(awk '/^\\\\+/{print NR\": \"$0}')",
+      "Read(//c/Users/Administrator/**)",
+      "Bash(command -v feishu-cli lark-cli)",
+      "Bash(lark-cli --help)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(lark-cli contact *)",
+      "Bash(lark-cli config *)",
+      "Bash(lark-cli im *)"
     ]
   }
 }
