@@ -150,7 +150,7 @@ const CorpView: React.FC = () => {
   };
 
   return (
-    <div className="bg-corp-bg-light dark:bg-corp-bg-dark text-[#111418] dark:text-white font-body overflow-hidden flex flex-col h-screen w-full transition-colors duration-300">
+    <div className="dark bg-corp-bg-light dark:bg-[#0c121e] text-[#111418] dark:text-white font-body overflow-hidden flex flex-col h-screen w-full transition-colors duration-300">
       {/* Header */}
       <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-[#e5e7eb] dark:border-[#283039] px-6 py-3 bg-white dark:bg-[#111418] z-30 shadow-sm relative">
         <div className="flex items-center gap-3">
@@ -199,7 +199,7 @@ const CorpView: React.FC = () => {
           config={{
             center: { longitude: 102.0, latitude: 25.0 }, // 云南地区中心
             zoom: 7,
-            theme: 'light',
+            theme: 'dark',
             draggable: true,
             zoomControl: true, // 启用缩放控制
             showScale: true,

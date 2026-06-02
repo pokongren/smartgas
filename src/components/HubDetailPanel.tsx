@@ -463,7 +463,7 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
             style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}
         >
             <div
-                className="pointer-events-auto absolute bg-slate-950 rounded-lg shadow-2xl border border-cyan-500/30 overflow-hidden flex flex-col"
+                className="pointer-events-auto absolute bg-slate-950/85 backdrop-blur-xl rounded-2xl shadow-[0_30px_70px_rgba(6,182,212,0.25)] border border-cyan-500/40 overflow-hidden flex flex-col"
                 style={{
                     left: panelLayout.x,
                     top: panelLayout.y,
@@ -472,7 +472,7 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                 }}
             >
                 <div
-                    className="flex cursor-move select-none justify-between items-center px-4 py-3 border-b border-slate-700 bg-slate-900 shrink-0"
+                    className="flex cursor-move select-none justify-between items-center px-5 py-4 border-b border-slate-800/80 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 shrink-0"
                     onPointerDown={beginPanelDrag}
                     title="按住标题栏拖动窗口"
                 >
@@ -499,7 +499,11 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                 <div className="overflow-y-auto flex-1 p-4">
                     <div
                         ref={diagramRef}
-                        className="relative h-[430px] rounded-md border border-slate-700 bg-[linear-gradient(180deg,rgba(2,6,23,0.96),rgba(5,12,26,0.96))] overflow-hidden"
+                        className="relative h-[430px] rounded-xl border border-slate-800 bg-slate-950 overflow-hidden"
+                        style={{
+                            backgroundImage: 'radial-gradient(rgba(34, 211, 238, 0.1) 1.2px, transparent 0), linear-gradient(180deg, #020617 0%, #0f172a 100%)',
+                            backgroundSize: '16px 16px, 100% 100%',
+                        }}
                     >
                         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ fontFamily: 'inherit' }}>
                             <defs>
@@ -671,23 +675,25 @@ export const HubDetailPanel: React.FC<HubDetailPanelProps> = ({
                                         onPortClick?.(port.portId)
                                         onPipelineClick?.(port.pipelineId)
                                     }}
-                                    className={`absolute w-[218px] rounded-md border px-3 py-2 text-left shadow-[0_0_18px_rgba(14,165,233,0.12)] transition-colors ${
+                                    className={`absolute w-[184px] rounded-lg border px-3 py-2 text-left shadow-[0_4px_12px_rgba(0,0,0,0.4)] backdrop-blur-md transition-all duration-200 ${
                                         isInput
-                                            ? 'border-emerald-400/35 bg-slate-950/90 hover:border-emerald-300 hover:bg-emerald-950/70'
-                                            : 'border-sky-400/35 bg-slate-950/90 hover:border-sky-300 hover:bg-sky-950/70'
+                                            ? 'border-emerald-400/40 bg-slate-950/80 hover:border-emerald-300 hover:shadow-[0_4px_15px_rgba(16,185,129,0.25)] hover:scale-105'
+                                            : 'border-sky-400/40 bg-slate-950/80 hover:border-sky-300 hover:shadow-[0_4px_15px_rgba(56,189,248,0.25)] hover:scale-105'
                                     }`}
-                                    style={{ left: `${labelPosition.x}%`, top: `${labelPosition.y}%`, cursor: 'move' }}
+                                    style={{ left: `${labelPosition.x}%`, top: `${labelPosition.y}%`, cursor: 'move', zIndex: 30 }}
                                     title={port.pipelineName}
                                 >
-                                    <div className="flex items-center justify-between gap-2">
-                                        <span className="truncate text-sm font-semibold text-white">{getPortShortName(port)}</span>
-                                        <span className={`h-2 w-2 rounded-full ${getStatusColor(port.status)}`} />
+                                    <div className="flex items-center justify-between gap-1.5">
+                                        <span className="truncate text-xs font-bold text-white">{getPortShortName(port)}</span>
+                                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${getStatusColor(port.status)}`} />
                                     </div>
-                                    <div className={`truncate text-[11px] ${isInput ? 'text-emerald-200/80' : 'text-sky-200/80'}`}>{port.pipelineName}</div>
-                                    <div className="mt-1 grid grid-cols-3 gap-1 text-[10px] text-slate-300">
-                                        <span>{formatThroughput(metrics.throughput)}</span>
-                                        <span>{formatPressure(metrics.pressure)}</span>
-                                        <span>{formatTemperature(metrics.temperature)}</span>
+                                    <div className={`truncate text-[10px] opacity-75 mt-0.5 ${isInput ? 'text-emerald-200' : 'text-sky-200'}`}>{port.pipelineName}</div>
+                                    <div className="mt-2 flex items-center justify-between text-[9px] font-bold text-slate-300 border-t border-white/5 pt-1.5">
+                                        <span className="text-white/95">{formatThroughput(metrics.throughput).replace(' 万方/天', '万方')}</span>
+                                        <span className="w-px h-2 bg-white/10" />
+                                        <span className="text-cyan-300">{formatPressure(metrics.pressure)}</span>
+                                        <span className="w-px h-2 bg-white/10" />
+                                        <span className="text-amber-300">{formatTemperature(metrics.temperature)}</span>
                                     </div>
                                 </button>
                             )

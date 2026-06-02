@@ -278,7 +278,7 @@ export const zhongweiHubNodeSimple: HubNode = {
         currentThroughput: 520,
         currentPressure: 8.6,
         currentTemperature: 28.1,
-        diagramPosition: { x: 56, y: 88, labelX: 58, labelY: 78 }
+        diagramPosition: { x: 56, y: 88, labelX: 68, labelY: 82 }
       }
     ],
     internalConnections: [
@@ -481,7 +481,7 @@ export const luzhiProcessHubNode: HubNode = {
         currentThroughput: 300,
         currentPressure: 5.1,
         currentTemperature: 7.9,
-        diagramPosition: { x: 56, y: 88, labelX: 58, labelY: 78 }
+        diagramPosition: { x: 56, y: 88, labelX: 68, labelY: 82 }
       }
     ],
     internalConnections: [
@@ -697,7 +697,7 @@ export const jingbianProcessHubNode: HubNode = {
         currentThroughput: 260,
         currentPressure: 8.9,
         currentTemperature: 34.9,
-        diagramPosition: { x: 56, y: 88, labelX: 58, labelY: 78 }
+        diagramPosition: { x: 56, y: 88, labelX: 68, labelY: 82 }
       }
     ],
     internalConnections: [
@@ -853,7 +853,7 @@ export const guangzhouProcessHubNode: HubNode = {
         currentThroughput: 220,
         currentPressure: 7.2,
         currentTemperature: 36.5,
-        diagramPosition: { x: 56, y: 88, labelX: 58, labelY: 78 }
+        diagramPosition: { x: 56, y: 88, labelX: 68, labelY: 82 }
       }
     ],
     internalConnections: [

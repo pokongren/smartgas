@@ -256,6 +256,32 @@ function safeSetMarkerContent(marker: any, content: string): void {
 
 function safeSetPolylineOptions(polyline: any, options: Record<string, unknown>): void {
     try {
+        if (!polyline) return
+        
+        if (!polyline._lastOptions) {
+            polyline._lastOptions = {}
+        }
+        
+        let hasChanged = false
+        const keys = Object.keys(options)
+        for (const key of keys) {
+            const newVal = options[key]
+            const oldVal = polyline._lastOptions[key]
+            
+            if (Array.isArray(newVal) && Array.isArray(oldVal)) {
+                if (newVal.length !== oldVal.length || newVal.some((v, i) => v !== oldVal[i])) {
+                    hasChanged = true
+                    break
+                }
+            } else if (newVal !== oldVal) {
+                hasChanged = true
+                break
+            }
+        }
+        
+        if (!hasChanged) return
+        
+        polyline._lastOptions = { ...polyline._lastOptions, ...options }
         polyline?.setOptions?.(options)
     } catch (error) {
         console.warn('[MapTopologyView] polyline.setOptions failed', error)
@@ -463,9 +489,9 @@ function createTopoMarkerContent(type: PointType, name: string = '', isHighlight
         : `width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border};box-shadow:${shadow}; pointer-events: auto;`
     
     return `
-        <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: none;">
+        <div style="position: relative; display: inline-flex; flex-direction: column; align-items: center; pointer-events: none;">
+            ${name ? `<div style="position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:10px;font-weight:500;color:#e2e8f0;text-shadow:0 1px 3px rgba(0,0,0,0.95);background:rgba(2,6,23,0.80);padding:2px 6px;border-radius:4px;border:1px solid rgba(148,163,184,0.18);z-index:10;pointer-events:none;">${name}</div>` : ''}
             <div style="${shapeStyle}"></div>
-            ${name ? `<div style="position: absolute; top: ${size + 4}px; white-space: nowrap; font-size: 11px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000, 0 0 2px #000; z-index: 10;">${name}</div>` : ''}
         </div>
     `
 }
@@ -1967,20 +1993,21 @@ const MapTopologyView: React.FC = () => {
                     ? `${baseShapeCss}transform:rotate(45deg);border-radius:4px;`
                     : `${baseShapeCss}border-radius:50%;`
 
-                const labelContainerStyle = `position:absolute;top:${size + 8}px;white-space:nowrap;font-size:11px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.8);z-index:10;background:linear-gradient(135deg, rgba(15,23,42,0.85) 0%, rgba(30,41,59,0.9) 100%);padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);box-shadow:${flashGlow ? '0 0 12px rgba(248,113,113,0.5),' : ''}0 4px 12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);backdrop-filter:blur(4px);transition:all 0.3s ease;`
+                // 标签置于图标正上方，避免遮挡从站点延伸出的管道线路
+                const labelContainerStyle = `position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:10px;color:#e2e8f0;text-shadow:0 1px 3px rgba(0,0,0,0.9);z-index:10;background:linear-gradient(135deg, rgba(2,6,23,0.88) 0%, rgba(15,23,42,0.92) 100%);padding:3px 7px;border-radius:5px;border:1px solid ${flashGlow ? 'rgba(248,113,113,0.5)' : 'rgba(99,179,237,0.25)'};box-shadow:${flashGlow ? '0 0 10px rgba(248,113,113,0.4),' : ''}0 2px 8px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06);backdrop-filter:blur(6px);transition:all 0.3s ease;`
 
                 node.marker.setContent(`
-                    <div style="position:relative;display:flex;flex-direction:column;align-items:center;pointer-events:none;">
+                    <div style="position:relative;display:inline-flex;flex-direction:column;align-items:center;pointer-events:none;">
+                        <div style="${labelContainerStyle}">${flashGlow ? '<span style="color:#fca5a5;font-size:8px;margin-right:3px;">⚠ 故障</span>' : ''}${labelHtml}${baselineDeltaHtml}</div>
                         ${displayDeltaHtml}
                         <div style="${shapeStyle}"></div>
-                        <div style="${labelContainerStyle}">${flashGlow ? '<span style="color:#fca5a5;font-size:9px;margin-right:4px;">故障演示</span>' : ''}${labelHtml}${baselineDeltaHtml}</div>
                     </div>
                 `)
             } catch (error) {
                 console.warn('[MapTopologyView] update node label failed', node.id, error)
             }
         }
-    }, [baselineOverlayMapping, overlayMapping, topoNodes, sim.animatingState, lineFlowPhase, damageFlashVisible, sim.currentScenario])
+    }, [baselineOverlayMapping, overlayMapping, topoNodes, sim.animatingState, damageFlashVisible, sim.currentScenario])
 
     const cutoffClosedEdgeSet = useMemo(() => new Set(cutoffClosedEdgeIds), [cutoffClosedEdgeIds])
     const cutoffStoppedEdgeSet = useMemo(() => new Set(cutoffStoppedEdgeIds), [cutoffStoppedEdgeIds])
@@ -1996,7 +2023,7 @@ const MapTopologyView: React.FC = () => {
                 const isReroutePath = cutoffRerouteEdgeSet.has(edge.id)
                 if (isCutoffClosed || isStoppedByCutoff) {
                     forEachEdgePolyline(edge, polyline => {
-                        polyline?.setOptions({
+                        safeSetPolylineOptions(polyline, {
                             strokeColor: isCutoffClosed ? '#ef4444' : '#475569',
                             strokeWeight: isCutoffClosed ? LINE_WEIGHT + 3 : LINE_WEIGHT + 1,
                             strokeOpacity: isCutoffClosed ? 0.95 : 0.38,
@@ -2009,7 +2036,7 @@ const MapTopologyView: React.FC = () => {
                 }
                 if (isReroutePath) {
                     forEachEdgePolyline(edge, polyline => {
-                        polyline?.setOptions({
+                        safeSetPolylineOptions(polyline, {
                             strokeColor: '#f59e0b',
                             strokeWeight: LINE_WEIGHT + 2,
                             strokeOpacity: 0.92,
@@ -2024,7 +2051,7 @@ const MapTopologyView: React.FC = () => {
                 const match = overlayMapping?.edgeMatchesByDisplayId.get(edge.id)
                 if (!match || match.matchedEdges.length === 0) {
                     forEachEdgePolyline(edge, polyline => {
-                        polyline?.setOptions({
+                        safeSetPolylineOptions(polyline, {
                             strokeColor: LINE_COLOR,
                             strokeWeight: LINE_WEIGHT,
                             strokeOpacity: 0.98,
@@ -2041,7 +2068,7 @@ const MapTopologyView: React.FC = () => {
                 const weight = Math.max(2, Math.min(6, 2 + util * 4))
                 const dashArray = lineFlowPhase % 2 === 0 ? [14, 8] : [8, 14]
                 forEachEdgePolyline(edge, polyline => {
-                    polyline?.setOptions({
+                    safeSetPolylineOptions(polyline, {
                         strokeColor: damageFlashVisible && util >= 0.95 ? '#f43f5e' : color,
                         strokeWeight: damageFlashVisible && util >= 0.95 ? weight + 1 : weight,
                         strokeDasharray: util > 0 ? dashArray : [4, 8],

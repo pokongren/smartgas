@@ -3085,7 +3085,7 @@ const GlobalPipelineView: React.FC = () => {
     }), [pipelineData, pipelines])
 
     const currentMultiScenarioCase = useMemo(() => {
-        const presetCase = MULTI_SCENARIO_AI_CASES.find(item => item.id === multiScenarioStepId)
+        const presetCase = ZHONGWEI_MULTI_SCENARIO_CASES.find(item => item.id === multiScenarioStepId)
         if (presetCase) return presetCase
 
         const runningScenario = activeSimulationPilot.scenarios.find(item => multiScenarioStepId.endsWith(`:${item.id}`))
@@ -3104,7 +3104,7 @@ const GlobalPipelineView: React.FC = () => {
 
     const multiScenarioDisplayCases = useMemo(() => {
         const selectedSet = new Set(multiScenarioSelectedCaseIds)
-        const selectedCases = MULTI_SCENARIO_AI_CASES.filter(item => selectedSet.has(item.id))
+        const selectedCases = ZHONGWEI_MULTI_SCENARIO_CASES.filter(item => selectedSet.has(item.id))
         if (selectedCases.length > 0) return selectedCases
         if (multiScenarioResults.length > 0) {
             return multiScenarioResults.map(result => ({
@@ -3115,7 +3115,7 @@ const GlobalPipelineView: React.FC = () => {
                 scenarioId: result.overlay.scenario_id,
             }))
         }
-        return MULTI_SCENARIO_AI_CASES
+        return ZHONGWEI_MULTI_SCENARIO_CASES
     }, [multiScenarioResults, multiScenarioSelectedCaseIds])
 
     const multiScenarioConclusion = useMemo(() => {
@@ -3474,9 +3474,9 @@ const GlobalPipelineView: React.FC = () => {
             ? new Set(selectedScenarioIds)
             : null
         const selectedCases = selectedSet
-            ? MULTI_SCENARIO_AI_CASES.filter(item => selectedSet.has(item.id))
-            : MULTI_SCENARIO_AI_CASES
-        const casesToRun = selectedCases.length > 0 ? selectedCases : MULTI_SCENARIO_AI_CASES
+            ? ZHONGWEI_MULTI_SCENARIO_CASES.filter(item => selectedSet.has(item.id))
+            : ZHONGWEI_MULTI_SCENARIO_CASES
+        const casesToRun = selectedCases.length > 0 ? selectedCases : ZHONGWEI_MULTI_SCENARIO_CASES
 
         multiScenarioActiveRef.current = true
         setMultiScenarioActive(true)
@@ -3733,7 +3733,10 @@ const GlobalPipelineView: React.FC = () => {
 
                 const scadaData = activeStationData.get(node.name) || activeStationData.get(normalizeStationMatchKey(node.name))
                 if (!scadaData) {
-                    if (hasRealtime) marker.setContent(originalContent)
+                    if (hasRealtime) {
+                        marker.setContent(originalContent)
+                        delete (marker as any)._lastScadaHTML
+                    }
                     return
                 }
 
@@ -3754,13 +3757,20 @@ const GlobalPipelineView: React.FC = () => {
                     </div>
                 `
 
-                if (originalContent.includes('class="compressor-marker-container"')) {
-                    originalContent = originalContent.replace('class="compressor-marker-container"', 'class="compressor-marker-container" style="position:relative; overflow:visible;"')
-                    marker.setContent(originalContent + scadaHTML)
-                } else if (originalContent.startsWith('<div')) {
-                    originalContent = originalContent.replace('<div', '<div style="position:relative; overflow:visible;"')
-                    marker.setContent(originalContent + scadaHTML)
+                // 比对缓存
+                if (hasRealtime && (marker as any)._lastScadaHTML === scadaHTML) {
+                    return // 已经存在且内容未变，跳过重绘！
                 }
+
+                (marker as any)._lastScadaHTML = scadaHTML
+
+                let finalContent = originalContent
+                if (originalContent.includes('class="compressor-marker-container"')) {
+                    finalContent = originalContent.replace('class="compressor-marker-container"', 'class="compressor-marker-container" style="position:relative; overflow:visible;"')
+                } else if (originalContent.startsWith('<div')) {
+                    finalContent = originalContent.replace('<div', '<div style="position:relative; overflow:visible;"')
+                }
+                marker.setContent(finalContent + scadaHTML)
             })
         }, 800)
 
@@ -3800,19 +3810,28 @@ const GlobalPipelineView: React.FC = () => {
                 }
 
                 if (shouldShowSimulationPressureLabels) {
-                    if (hasSimLabel) marker.setContent(originalContent)
+                    if (hasSimLabel) {
+                        marker.setContent(originalContent)
+                        delete (marker as any)._lastSimHTML
+                    }
                     return
                 }
 
                 const mapNodeKey = normalizeStationMatchKey(node.name)
                 const simNode = simByNodeId.get(node.id) || simByStationKey.get(mapNodeKey)
                 if (!simNode) {
-                    if (hasSimLabel) marker.setContent(originalContent)
+                    if (hasSimLabel) {
+                        marker.setContent(originalContent)
+                        delete (marker as any)._lastSimHTML
+                    }
                     return
                 }
                 const labelName = node.name || resolvePilotNodeName(simNode.id)
                 if (!shouldShowStationSimulationPressureLabel(simNode.id, labelName)) {
-                    if (hasSimLabel) marker.setContent(originalContent)
+                    if (hasSimLabel) {
+                        marker.setContent(originalContent)
+                        delete (marker as any)._lastSimHTML
+                    }
                     return
                 }
 
@@ -3861,6 +3880,13 @@ const GlobalPipelineView: React.FC = () => {
                     </div>
                 `
 
+                // 比对缓存
+                if (hasSimLabel && (marker as any)._lastSimHTML === simHTML) {
+                    return // 已经存在且内容未变，跳过重绘！
+                }
+
+                (marker as any)._lastSimHTML = simHTML
+
                 if (originalContent.includes('style="position:relative; overflow:visible;"')) {
                     marker.setContent(originalContent + simHTML)
                 } else if (originalContent.startsWith('<div')) {
@@ -3900,7 +3926,15 @@ const GlobalPipelineView: React.FC = () => {
             return clearSimulationPressureTexts
         }
 
+        let lastRenderedKey = ''
+
         const renderPressureTexts = () => {
+            const currentKey = `${activeOverlay.run_id}:${baselineOverlay?.run_id || ''}:${shouldShowSimulationPressureLabels}`
+            if (lastRenderedKey === currentKey) {
+                return
+            }
+            lastRenderedKey = currentKey
+
             clearSimulationPressureTexts()
 
             const overlays: any[] = []

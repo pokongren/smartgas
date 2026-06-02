@@ -53,6 +53,15 @@ def _path_length(edges: list[dict[str, Any]]) -> float:
 
 
 def _build_national_network(session: Session) -> tuple[nx.Graph, dict[str, Station], dict[str, Pipeline], dict[str, Any]]:
+    """
+    构建全国管网拓扑图（无向图）。
+
+    方向性局限：这里用 nx.Graph（无向图），管段的 start_station_id / end_station_id
+    只表示连接关系，不表示实际输气流向。Pipeline 数据模型目前没有 direction /
+    is_bidirectional 字段，无法可靠区分单向管段与可双向输气的联络线，因此截断推演
+    按“物理连通性”计算，会忽略流向、可能高估可达性。它回答的是“截断后两点物理上还
+    连不连得通”，不等同于考虑流向与压力的水力调度仿真。
+    """
     stations = {station.id: station for station in session.exec(select(Station)).all()}
     pipelines = {pipeline.id: pipeline for pipeline in session.exec(select(Pipeline)).all()}
 
@@ -252,5 +261,5 @@ def run_networkx_cutoff_demo(
             "extra_length_km": delta_length,
         },
         "stats": stats,
-        "boundary_note": "这是拓扑连通性截断演示，只说明路径是否可达和绕行范围；不等同于水力仿真压力、流量和真实调度指令。",
+        "boundary_note": "这是拓扑连通性截断演示，基于无向图计算，只说明路径是否可达和绕行范围；不区分管段输气流向（忽略流向、可能高估可达性），也不等同于水力仿真压力、流量和真实调度指令。",
     }

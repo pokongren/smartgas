@@ -1159,7 +1159,7 @@ function createCompressorMarkerContent(): HTMLElement {
 export function createHubMarkerContent(isCompact = false, label = ''): string {
     const compactClass = isCompact ? ' compact' : ''
     const labelHtml = label
-        ? `<div style="position:absolute;top:${HUB_MARKER_CONFIG.SIZE + 8}px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:11px;font-weight:700;color:#fff;text-shadow:0 0 2px #000,0 0 4px #000;background:rgba(15,23,42,0.72);border:1px solid rgba(255,255,255,0.14);border-radius:4px;padding:1px 5px;">${label}</div>`
+        ? `<div style="position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:10px;font-weight:600;color:#fde68a;text-shadow:0 1px 3px rgba(0,0,0,0.9);background:rgba(2,6,23,0.82);border:1px solid rgba(251,191,36,0.25);border-radius:4px;padding:2px 6px;">${label}</div>`
         : ''
     return `
         <div class="hub-marker-container" title="枢纽">
@@ -1364,39 +1364,44 @@ function createOffsetNodeMarker(
     // 注册到映射表，方便管线查找对应 marker
     nodeMarkerMap.set(node.id, marker)
 
-    // 标签（也跟随拖拽移动）
     const baseLabelStyle = {
         'font-size': '10px',
         'font-weight': '500',
-        'color': '#ccc',
-        'background-color': 'rgba(0,0,0,0.5)',
-        'border-radius': '2px',
-        'padding': '1px 3px',
-        'border': 'none',
+        'color': '#cbd5e1',
+        'background-color': 'rgba(2,6,23,0.78)',
+        'border-radius': '3px',
+        'padding': '1px 5px',
+        'border': '1px solid rgba(148,163,184,0.15)',
+        'white-space': 'nowrap',
+        'pointer-events': 'none',
         'transition': 'font-size 180ms ease, padding 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease',
     }
     const hoverLabelStyle = {
         ...baseLabelStyle,
-        'font-size': '14px',
-        'font-weight': '800',
+        'font-size': '13px',
+        'font-weight': '700',
         'color': '#fff',
-        'background-color': 'rgba(0,0,0,0.82)',
-        'border-radius': '5px',
+        'background-color': 'rgba(2,6,23,0.92)',
+        'border-radius': '4px',
         'padding': '2px 7px',
-        'box-shadow': '0 0 10px rgba(56,189,248,0.45)',
+        'border': '1px solid rgba(56,189,248,0.35)',
+        'box-shadow': '0 0 10px rgba(56,189,248,0.4)',
+        'pointer-events': 'none',
     }
+    // 所有标签统一移到图标上方，避免遮挡从站点延伸出去的管道
+    const labelOffset = isLngSource
+        ? new AMap.Pixel(0, -(LNG_MARKER_CONFIG.HEIGHT / 2 + 14))
+        : isSource
+        ? new AMap.Pixel(0, -(SOURCE_MARKER_CONFIG.SIZE / 2 + 14))
+        : isHub
+        ? new AMap.Pixel(0, -(HUB_MARKER_CONFIG.SIZE / 2 + 14))
+        : isCompressor
+        ? new AMap.Pixel(0, -(COMPRESSOR_ICON_CONFIG.HEIGHT / 2 + 12))
+        : new AMap.Pixel(0, -16)
     const text = new AMap.Text({
         text: node.name,
         position: [position.longitude, position.latitude],
-        offset: isLngSource
-            ? new AMap.Pixel(0, LNG_MARKER_CONFIG.HEIGHT / 2 + 5)
-            : isSource
-            ? new AMap.Pixel(0, SOURCE_MARKER_CONFIG.SIZE / 2 + 6)
-            : isHub
-            ? new AMap.Pixel(0, HUB_MARKER_CONFIG.SIZE / 2 + 6)
-            : isCompressor
-            ? new AMap.Pixel(0, COMPRESSOR_ICON_CONFIG.HEIGHT / 2 + 5)
-            : new AMap.Pixel(0, -15),
+        offset: labelOffset,
         style: baseLabelStyle,
         zIndex: 121,
         zooms: [2, 30]
@@ -1539,8 +1544,6 @@ export function renderPipelineLines(
                         lineCap: 'round',
                         zooms: [2, 30],
                         extData: { line, isHalo: true, simEdge, isCutoff },
-                        showDir: true,    // 开启方向箭头显示流向
-                        dirColor: '#ffffff',  // 箭头白色
                     })
 
                     const polyline = new AMap.Polyline({
@@ -1840,11 +1843,9 @@ function createLongFlowAnimation(
         const flowPolyline = new AMap.Polyline({
             path: [],
             strokeColor: '#ffffff', // 核心高亮白
-            strokeWeight: flowIntensity < 0.4 ? 1 : 2,
-            isOutline: true,
-            outlineColor: color,
-            borderWeight: flowIntensity < 0.4 ? 2 : 3,
-            strokeOpacity: clampNumber(0.35 + flowIntensity * 0.65, 0.35, 1),
+            strokeWeight: flowIntensity < 0.4 ? 1.5 : 2.5,
+            isOutline: false, // 禁用 outline，消除毛刺与彩色硬边
+            strokeOpacity: clampNumber(0.4 + flowIntensity * 0.4, 0.4, 0.8), // 柔和的半透明
             zIndex: 100,
             lineJoin: 'round',
             lineCap: 'round',
